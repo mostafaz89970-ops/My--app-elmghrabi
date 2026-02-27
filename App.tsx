@@ -25,7 +25,7 @@ const App: React.FC = () => {
   const [records, setRecords] = useState<LightingRecord[]>([]);
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [currentPage, setCurrentPage] = useState<string>('home');
-
+  
   // --- 1. جلب البيانات من السحابة (Firebase) لحظياً ---
   useEffect(() => {
     // جلب السجلات
@@ -131,11 +131,67 @@ const App: React.FC = () => {
     logActivity('إضافة مستخدم', `إضافة مستخدم جديد: ${username}`);
   };
 
+  const handleUpdateUserPermissions = (userId: string, permissions: User['permissions']) => {
+    update(ref(db, `users/${userId}`), { permissions });
+    const u = users.find(x => x.id === userId);
+    logActivity('تحديث صلاحيات', `تم تحديث صلاحيات المستخدم: ${u?.username}`);
+  };
+
+  const handleLogin = (loggedInUser: User) => {
+    setUser(loggedInUser);
+    localStorage.setItem('app_active_user', JSON.stringify(loggedInUser));
+    logActivity('تسجيل دخول', `المستخدم ${loggedInUser.username} قام بتسجيل الدخول.`);
+    setCurrentPage('home');
+  };
+
+  const handleLogout = () => {
+    if (user) {
+      logActivity('تسجيل خروج', `المستخدم ${user.username} قام بتسجيل الخروج.`);
+    }
+    localStorage.removeItem('app_active_user');
+    setUser(null);
+  };
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'home':
+        return <DashboardHome records={records} transformers={transformers} />;
+      case 'register-lighting':
+        return <LightingRegistration transformers={transformers} onAddRecord={handleAddRecord} />;
+      case 'record-list':
+        return <RegistrationList records={records} onUpdateRecord={handleUpdateRecord} onDeleteMonth={handleDeleteMonth} user={user!} />;
+      case 'settings-transformers':
+        return <Settings transformers={transformers} onAdd={handleAddTransformer} onDelete={handleDeleteTransformer} />;
+      case 'reports':
+        return <Reports records={records} />;
+      case 'add-user':
+        return <AddUser onAddUser={handleAddUser} />;
+      case 'permissions':
+        return <Permissions users={users} onUpdatePermissions={handleUpdateUserPermissions} />;
+      case 'user-activity':
+        return <UserActivityPage activities={activities} />;
+      default:
+        return <DashboardHome records={records} transformers={transformers} />;
+    }
+  };
+
+  if (!user) {
+    return <Login onLogin={handleLogin} users={users} />;
+  }
+
   // --- بقية منطق التنقل والواجهة (لم يتغير) ---
   return (
     <div dir="rtl" className="font-cairo">
-       {/* الكود الخاص بـ DashboardLayout و Switch Pages يوضع هنا */}
-       {/* سيقوم النظام الآن بعرض البيانات من Firebase تلقائياً */}
+      <DashboardLayout
+        user={user}
+        notifications={[]} // Placeholder for notifications
+        onLogout={handleLogout}
+        onNavigate={setCurrentPage}
+        onMarkRead={() => {}} // Placeholder
+        activePage={currentPage}
+      >
+        {renderPage()}
+      </DashboardLayout>
     </div>
   );
 };
