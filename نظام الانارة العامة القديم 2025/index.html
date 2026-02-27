@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>نظام الإنارة العامة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./index.css">
+    <style>
+      body {
+        font-family: 'Cairo', sans-serif;
+      }
+      @media print {
+        @page {
+          size: auto;
+          margin: 15mm; /* تعيين هامش آمن للصفحة لمنع الطابعة من قص المحتوى */
+        }
+        
+        ::-webkit-scrollbar {
+          display: none;
+        }
+        body {
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        .print-page-break-after-always { 
+          page-break-after: always !important; 
+          break-after: page !important;
+          break-inside: avoid !important;
+          display: block !important;
+        }
+        html, body, #root {
+          height: auto !important;
+          overflow: visible !important;
+          display: block !important;
+          width: 100% !important;
+        }
+        
+        body {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        
+        table th {
+          white-space: normal !important;
+          vertical-align: middle !important;
+          padding: 2px 4px !important;
+          line-height: 1.1 !important;
+          font-size: 11px !important;
+        }
+        table td {
+          white-space: nowrap !important;
+          padding: 2px 4px !important;
+          line-height: 1.1 !important;
+          font-size: 11px !important;
+        }
+        
+        table th:nth-child(2), table td:nth-child(2) {
+          width: 35% !important;
+          min-width: 200px !important;
+          white-space: normal !important;
+        }
+        table th:last-child, table td:last-child {
+          width: 10% !important;
+          max-width: 100px !important;
+        }
+        
+        table {
+          margin-bottom: 0 !important;
+          page-break-inside: auto !important;
+          break-inside: auto !important;
+        }
+
+        table + .print-footer,
+        table + .signatures,
+        table + .totals,
+        table + div.print-footer,
+        table + div {
+          margin-top: 10mm !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+          /* استخدام inline-block يجبر المتصفح على التعامل مع العنصر ككتلة واحدة غير قابلة للقص */
+          width: 100% !important;
+          overflow: visible !important;
+          position: static !important;
+        }
+
+        .print-footer {
+          margin-top: 10mm !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+          width: 100% !important;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "firebase/app": "https://esm.sh/firebase@10.12.0/app",
+    "firebase/database": "https://esm.sh/firebase@10.12.0/database"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-50 text-gray-900">
+    <div id="root"></div>
+  <script type="module" src="./index.tsx"></script>
+</body>
+</html>
