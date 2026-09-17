@@ -1,0 +1,2797 @@
+/*
+ * المتغيرات العامة (CSS Variables)
+ * تستخدم لتعريف الألوان والخطوط والأبعاد المستخدمة في كامل الموقع لسهولة التعديل لاحقاً وتوحيد الهوية البصرية.
+ */
+:root {
+  --primary-color: #3b82f6;
+  --bg-color: #f9fafb;
+  --sidebar-bg: #0d1117;
+  --card-bg: #ffffff;
+  --text-color-light: #f9fafb;
+  --text-color-dark: #1f2937;
+  --text-color: #1f2937;
+  --text-color-muted: #6b6e80;
+  --text-color-muted-light: #9ca3af;
+  --border-color: #e5e7eb;
+  --border-color-dark: #374151;
+  --shadow-color: rgba(0, 0, 0, 0.05);
+  --error-color: #ef4444;
+  --success-color: #22c55e;
+  --info-color: #3b82f6;
+  --font-family: 'Tajawal', sans-serif;
+  --border-radius-sm: 4px;
+  --border-radius-md: 6px;
+  --border-radius-lg: 8px;
+  --sidebar-width: 295px;
+  --sidebar-width-collapsed: 80px;
+  --logo-size-multiplier: 1;
+  --input-bg: #ffffff;
+}
+
+/*
+ * التنسيقات العامة (General Styles)
+ * تصفير الهوامش والحواشي وتحديد نوع الخط والاتجاه الافتراضي للصفحة (من اليمين لليسار RTL).
+ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+  direction: rtl;
+  transition: padding-right 0.3s ease;
+}
+
+small {
+  font-size: 0.8em;
+}
+
+/*
+ * تنسيقات الطباعة (Print Styles)
+ * تخصيص شكل الصفحة عند الطباعة (إخفاء القوائم الجانبية والرؤوس، ضبط الخلفيات، وإظهار المحتوى المطلوب فقط).
+ */
+@media print {
+    @page {
+        size: A4;
+        margin: 10mm;
+    }
+    body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        background-color: #fff !important;
+    }
+    .sidebar,
+    .main-header,
+    .main-footer,
+    .reports-container,
+    .report-actions-no-print {
+        display: none !important;
+    }
+    /* إخفاء مربعات التحديد وعمود الإجراءات في جدول المحولات عند الطباعة */
+    #transformers-table th:first-child,
+    #transformers-table td:first-child,
+    #transformers-table .actions-cell {
+        display: none !important;
+    }
+
+    #app-container, .main-content, .content-wrapper, .content-section.active {
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    #report-results-container {
+        display: block !important;
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+}
+
+/*
+ * شاشات الدخول والترحيب (Screens Wrapper)
+ * تنسيق الخلفية والحاويات لشاشة تسجيل الدخول وشاشة البداية، وجعلها تغطي كامل الشاشة.
+ */
+#login-screen, #welcome-screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+body:has(#login-screen.active),
+body:has(#welcome-screen.active) {
+  background: #000 url('https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070&auto=format&fit=crop') center/cover no-repeat fixed;
+  overflow: hidden;
+}
+
+
+#login-screen.active, #welcome-screen.active {
+    display: flex;
+}
+
+.login-wrapper {
+    margin-top: 3cm;
+}
+
+
+.login-box {
+    width: 700px;
+    max-width: 90%;
+    padding: 2.5rem;
+    background: rgba(13, 17, 23, 0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: var(--border-radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    color: var(--text-color-light);
+    text-align: center;
+}
+
+.login-box-header {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.logo-container-login {
+    width: calc(60px * var(--logo-size-multiplier));
+    height: calc(60px * var(--logo-size-multiplier));
+    margin: 0 auto 1rem;
+    transition: width 0.2s ease, height 0.2s ease;
+}
+
+#login-company-name, #welcome-company-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+#welcome-company-name, #login-company-name, #sidebar-company-name, #header-company-name, #replacement-report-company-name {
+    white-space: pre-line;
+}
+
+.login-box-header h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-color-light);
+}
+
+.login-subtitle {
+    margin-top: 0.5rem;
+    color: var(--text-color-muted-light);
+}
+
+#login-form {
+    text-align: right;
+}
+
+.btn-login {
+    width: 100%;
+    padding: 0.85rem;
+    font-size: 1.1rem;
+    margin-top: 1rem;
+}
+
+.login-box .input-group input, 
+.login-box .input-group select {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-color-light);
+}
+
+/* إصلاح مشكلة الهدر في قائمة المستخدمين بصفحة تسجيل الدخول */
+.login-box #username {
+    height: auto !important;
+    min-height: 45px !important;
+    font-size: 1rem;
+}
+
+.login-box #username optgroup,
+.login-box #username option {
+    padding: 12px 8px;
+    font-size: 1rem;
+    line-height: 1.4;
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    direction: rtl;
+    text-align: right;
+}
+
+/* دعم متصفحات Webkit (Chrome/Safari) */
+.login-box #username::-webkit-scrollbar {
+    width: 8px;
+}
+
+.login-box #username::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.login-box #username::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+.login-box #username::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* دعم Firefox */
+.login-box #username {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+}
+
+.login-box .input-group select option {
+    color: black;
+    background-color: white;
+}
+
+/* منع تنسيقات التعبئة التلقائية الافتراضية للمتصفح في صندوق الدخول للحفاظ على المظهر الداكن */
+.login-box input:-webkit-autofill,
+.login-box input:-webkit-autofill:hover, 
+.login-box input:-webkit-autofill:focus, 
+.login-box input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.1) inset !important;
+    -webkit-text-fill-color: var(--text-color-light) !important;
+    transition: background-color 5000s ease-in-out 0s;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+.login-box .input-group input::placeholder {
+    color: var(--text-color-muted-light);
+}
+.login-box .input-group input:focus, 
+.login-box .input-group select:focus {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-color: var(--primary-color);
+}
+.login-box .input-group label {
+    color: var(--text-color-light);
+}
+
+
+.login-box-footer {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-color-muted-light);
+}
+
+/* تذييل صفحة الدخول كشريط أسفل الصفحة مثل navbar */
+#login-screen #login-footer-text,
+#login-screen.active #login-footer-text {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(180deg, rgba(13, 17, 23, 0.95) 0%, rgba(0, 0, 0, 0.9) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 1rem 2rem;
+    text-align: center;
+    color: #ffffff;
+    font-size: 0.9rem;
+    font-weight: 400;
+    z-index: 999;
+    white-space: pre-line;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
+#login-screen:not(.active) #login-footer-text {
+    display: none;
+}
+
+/* مساحة أسفل login-box للتذييل */
+.login-wrapper {
+    margin-top: 3cm;
+    margin-bottom: 430px; /* +15cm = 240px + 280px = 430px */
+}
+
+/* ضمان عدم تداخل login-box مع التذييل */
+.login-box {
+    z-index: 1001;
+}
+
+.welcome-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+.welcome-actions .btn {
+    width: 100%;
+    padding: 0.85rem;
+    font-size: 1rem;
+}
+
+@media (max-width: 480px) {
+    .login-box {
+        padding: 2rem;
+    }
+     .login-box-header h2 {
+        font-size: 1.75rem;
+    }
+}
+
+/* حاوية التطبيق وإدارة حالة تسجيل الدخول (App Container) */
+.app-container {
+  display: none; /* مخفية افتراضياً */
+}
+.app-container.active {
+  display: flex;
+}
+
+/* إصلاح: إخفاء الشريط الجانبي والرأس عندما لا تكون حاوية التطبيق نشطة (عندما تكون شاشة تسجيل الدخول ظاهرة) */
+#app-container:not(.active) .sidebar,
+#app-container:not(.active) .main-header {
+  display: none !important;
+}
+
+/*
+ * الشريط الجانبي (Sidebar)
+ * تنسيق القائمة الجانبية، بما في ذلك الرأس، الروابط، الأيقونات، والتذييل.
+ */
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  right: 0;
+  background-color: var(--sidebar-bg);
+  color: var(--text-color-light);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  z-index: 100;
+}
+.sidebar-header {
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color-dark);
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: inherit;
+}
+.logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.logo-container-sidebar {
+    width: calc(40px * var(--logo-size-multiplier));
+    height: calc(40px * var(--logo-size-multiplier));
+    transition: width 0.2s ease, height 0.2s ease;
+}
+.logo-container svg {
+  width: 100%;
+  height: 100%;
+  color: var(--text-color-light);
+}
+.logo-container .company-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: var(--border-radius-sm);
+}
+
+.sidebar-header h1 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  white-space: nowrap;
+  letter-spacing: -0.3px;
+}
+.sidebar-nav {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 1rem 0;
+}
+.sidebar-nav ul {
+  list-style: none;
+}
+.sidebar-nav .nav-link {
+  display: flex;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  color: var(--text-color-muted-light);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.2s, color 0.2s;
+  border-right: 3.5px solid transparent;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -0.2px;
+}
+.sidebar-nav .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-color-light);
+}
+.sidebar-nav .nav-link.active {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--primary-color);
+  border-right-color: var(--primary-color);
+  font-weight: 500;
+}
+.sidebar-nav .nav-link svg {
+  margin-left: 0.85rem;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.nav-category details {
+  margin-top: 1rem;
+}
+.nav-category summary {
+  padding: 0.9rem 1.25rem;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--text-color-light);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  list-style: none;
+  letter-spacing: -0.2px;
+}
+.nav-category summary::-webkit-details-marker {
+  display: none;
+}
+.nav-category summary svg {
+  margin-left: 0.85rem;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.nav-category details[open] > summary {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+.nav-category details > ul {
+    padding-right: 0.3rem;
+    border-right: 2px solid rgba(255, 255, 255, 0.12);
+    margin-right: 0.85rem;
+}
+.nav-category details > ul .nav-link {
+    font-size: 1rem;
+    font-weight: 500;
+    padding: 0.7rem 1rem;
+}
+
+
+.sidebar-footer {
+  padding: 0.75rem 1rem;
+  margin-top: auto;
+  border-top: 1px solid var(--border-color-dark);
+}
+
+.user-profile-menu {
+  position: relative;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  background: none;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: right;
+  border-radius: var(--border-radius-md);
+  transition: background-color 0.2s;
+}
+
+.user-profile:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.user-profile img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.user-profile .user-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  flex-grow: 1;
+}
+
+.user-profile .user-info span {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-color-light);
+}
+
+.user-profile .user-info small {
+  font-size: 0.8rem;
+  color: var(--text-color-muted-light);
+}
+
+.chevron-icon {
+  width: 18px;
+  height: 18px;
+  stroke: var(--text-color-muted-light);
+  transition: transform 0.2s ease-in-out;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.user-profile .chevron-icon {
+  transform: rotate(180deg);
+}
+
+.user-profile[aria-expanded="true"] .chevron-icon {
+  transform: rotate(0deg);
+}
+
+.user-profile-dropdown {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: 100%;
+  min-width: 180px;
+  background-color: #2d3748;
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+  z-index: 100;
+  overflow: hidden;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.2s ease-in-out;
+}
+
+.user-profile-dropdown.active {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.user-profile-dropdown a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  color: var(--text-color-light);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.user-profile-dropdown a:hover {
+  background-color: var(--primary-color);
+}
+
+.user-profile-dropdown a svg {
+  width: 18px;
+  height: 18px;
+}
+
+
+/*
+ * الشريط الجانبي المطوي (Sidebar Collapsed)
+ * تنسيقات خاصة عند تصغير الشريط الجانبي لإخفاء النصوص وإبقاء الأيقونات فقط.
+ */
+body.sidebar-collapsed .sidebar {
+  width: var(--sidebar-width-collapsed);
+}
+body.sidebar-collapsed .sidebar-header h1,
+body.sidebar-collapsed .sidebar-nav .nav-link span,
+body.sidebar-collapsed .nav-category summary span {
+  display: none;
+}
+body.sidebar-collapsed .sidebar-nav .nav-link,
+body.sidebar-collapsed .nav-category summary {
+    justify-content: center;
+}
+body.sidebar-collapsed .sidebar-nav .nav-link svg,
+body.sidebar-collapsed .nav-category summary svg {
+    margin: 0;
+}
+body.sidebar-collapsed .main-content {
+  padding-right: var(--sidebar-width-collapsed);
+}
+body.sidebar-collapsed .sidebar-header .logo {
+    justify-content: center;
+}
+body.sidebar-collapsed .nav-category details > ul {
+    display: none;
+}
+
+body.sidebar-collapsed .sidebar-footer {
+  padding: 0.75rem;
+}
+
+body.sidebar-collapsed .user-profile .user-info,
+body.sidebar-collapsed .user-profile .chevron-icon {
+  display: none;
+}
+
+body.sidebar-collapsed .user-profile-dropdown {
+  right: auto;
+  left: calc(100% + 10px);
+  bottom: 0;
+  transform: translateX(-10px) translateY(0);
+  opacity: 0;
+  visibility: hidden;
+}
+body.sidebar-collapsed .user-profile-dropdown.active {
+  transform: translateX(0) translateY(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+
+/*
+ * المحتوى الرئيسي والرأس (Main Content & Header)
+ * تنسيق المنطقة الرئيسية التي تعرض المحتوى وشريط العنوان العلوي وأزرار التحكم.
+ */
+.main-content {
+  padding-right: var(--sidebar-width);
+  width: 100%;
+  transition: padding-right 0.3s ease;
+}
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+#sidebar-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-color);
+    padding: 0.5rem;
+}
+#sidebar-toggle svg {
+  width: 24px;
+  height: 24px;
+}
+.main-header h2 {
+    font-size: 1.5rem;
+}
+.main-header p {
+    color: var(--text-color-muted);
+    font-size: 0.9rem;
+}
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+}
+
+/*
+ * أقسام المحتوى (Content Sections)
+ * التحكم في إظهار وإخفاء "الشاشات" المختلفة داخل التطبيق (مثل إدارة العدادات، الإعدادات، إلخ) بناءً على التفاعل.
+ */
+.content-wrapper {
+  padding: 2rem;
+}
+.content-section {
+  display: none;
+}
+.content-section.active {
+  display: block;
+}
+
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.section-header h3 {
+    font-size: 1.5rem;
+}
+
+.btn-back {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: transparent;
+    color: var(--primary-color);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+.btn-back:hover {
+    background-color: transparent;
+    box-shadow: none;
+    text-decoration: underline;
+}
+
+/*
+ * المكونات العامة (General Components)
+ * تنسيق الأزرار (Buttons) بأشكالها وألوانها المختلفة وحالات التحويم (Hover).
+ */
+.btn {
+  padding: 0.65rem 1.5rem;
+  border: none;
+  border-radius: var(--border-radius-md);
+  background-color: var(--primary-color);
+  color: var(--text-color-light);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+.btn:hover {
+  background-color: #2563eb;
+  box-shadow: 0 4px 14px 0 rgba(59,130,246,0.39);
+}
+.btn.secondary {
+    background-color: var(--text-color-muted);
+}
+.btn.secondary:hover {
+    background-color: #4b5563;
+    box-shadow: 0 4px 14px 0 rgba(107,114,128,0.39);
+}
+
+/*
+ * لوحة التحكم (Dashboard)
+ * تنسيق البطاقات الإحصائية (Cards) وشبكة العرض (Grid) في الصفحة الرئيسية.
+ */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.card {
+    background-color: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px var(--shadow-color);
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    color: var(--text-color);
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--primary-color);
+    color: var(--text-color-light);
+    flex-shrink: 0;
+}
+.card-icon.bg-success { background-color: var(--success-color); }
+.card-icon.bg-error { background-color: var(--error-color); }
+.card-icon.bg-info { background-color: var(--info-color); }
+.card-icon.bg-muted { background-color: var(--text-color-muted); }
+
+.card-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.card h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.card-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    text-align: right;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+.card-value svg {
+    width: 32px;
+    height: 32px;
+}
+
+/*
+ * النماذج وحقول الإدخال (Forms)
+ * تنسيق حاويات النماذج، الحقول النصية، القوائم المنسدلة، وترتيب الحقول داخل الشبكة.
+ */
+.form-container, .table-container, .settings-grid > div, .reports-container {
+    background-color: var(--card-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px var(--shadow-color);
+    margin-bottom: 2rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.input-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.input-group label {
+    font-weight: 500;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+/*حجم الهدر داخل الحقول المنسدلة */
+.input-group input,
+.input-group select,
+.input-group textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-family: inherit;
+    font-size: 1rem;
+    height: 45px; /* إضافة ارتفاع ثابت */
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-group input:focus,
+.input-group select:focus,
+.input-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* تغيير لون النص الافتراضي (Placeholder) في القوائم المنسدلة ليكون رمادياً */
+select:required:invalid {
+    color: var(--text-color-muted);
+    opacity: 1 !important; /* إجبار الظهور */
+}
+
+.input-group input:disabled,
+.input-group select:disabled,
+.input-group textarea:disabled {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+    color: var(--text-color-muted);
+}
+
+/* تنسيقات التحقق من صحة النماذج (Validation) - رسائل الخطأ والحقول غير الصالحة */
+.error-message-inline {
+    font-size: 0.8rem;
+    color: var(--error-color);
+    margin-top: 0.25rem;
+    min-height: 1.2em; /* Reserve space to prevent layout shift */
+}
+.error-message-inline:empty {
+    display: none;
+}
+
+.is-invalid {
+    border-color: var(--error-color) !important;
+}
+.is-invalid:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
+}
+
+
+.input-group textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.input-group.compound > .compound-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+    width: 100%;
+}
+.input-group.compound .input-group-sub {
+    flex: 1;
+    min-width: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.input-group.compound .input-group-sub label {
+    justify-content: center;
+    font-size: 0.8rem;
+    color: var(--text-color-muted);
+}
+.input-group.compound .input-group-sub input {
+    text-align: center;
+    padding: 0.75rem 0.25rem;
+}
+
+
+.form-grid-group {
+    grid-column: 1 / -1;
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+    margin-top: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+.form-grid-group legend {
+    padding: 0 0.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.form-static-text {
+    padding: 0.75rem;
+    background-color: var(--bg-color);
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+    min-height: 45px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.form-actions {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-start;
+}
+
+
+/*
+ * الجداول (Tables)
+ * تنسيق الجداول لعرض البيانات، بما في ذلك الرؤوس، الخلايا، وأدوات التحكم والفلترة.
+ */
+.table-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.table-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+.table-controls h3 {
+    flex-grow: 1;
+}
+
+.table-filter {
+    width: 100%;
+    max-width: 300px;
+    padding: 0.65rem;
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.responsive-table {
+    width: 100%;
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+table thead {
+    background-color: #f3f4f6;
+}
+
+table th, table td {
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border-color);
+    text-align: center;
+    vertical-align: middle;
+}
+
+table th {
+    font-weight: 700;
+    color: var(--text-color-muted);
+    text-transform: uppercase;
+    font-size: 11px;
+    white-space: nowrap; 
+}
+
+table tbody tr:hover {
+    background-color: #f9fafb;
+}
+
+body.dark-mode table tbody tr:hover {
+    background-color: #2c3647; /* A slightly lighter shade for hover in dark mode */
+}
+
+.actions-cell {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-weight: 500;
+    font-size: 0.8rem;
+    background-color: var(--text-color-muted);
+    color: var(--text-color-light);
+}
+
+.btn-view-details, .btn-edit-details, .btn-delete {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+    border-radius: var(--border-radius-sm);
+}
+.btn-view-details {
+    background-color: var(--text-color-muted);
+}
+.btn-view-details:hover {
+     background-color: #4b5563;
+    box-shadow: none;
+}
+
+.btn-edit-details {
+    background-color: var(--info-color);
+}
+.btn-edit-details:hover {
+    background-color: #1d4ed8;
+    box-shadow: none;
+}
+.btn-delete {
+    background-color: var(--error-color);
+}
+.btn-delete:hover {
+    background-color: #b91c1c;
+    box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.39);
+}
+
+/*
+ * القوائم المنسدلة للإجراءات (Action Dropdowns)
+ * تنسيق القائمة الصغيرة التي تظهر عند النقر على زر الإجراءات (الترس) داخل الصفوف.
+ */
+.dropdown-container {
+    position: relative;
+    display: inline-block;
+}
+
+.btn-icon {
+    padding: 0.4rem;
+    line-height: 1;
+}
+
+.btn-icon svg {
+    width: 1.2em;
+    height: 1.2em;
+}
+
+.dropdown-menu {
+    display: none;
+    position: fixed;
+    background-color: var(--card-bg);
+    min-width: 200px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 10000;
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+.dropdown-menu .dropdown-item {
+    color: var(--text-color);
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    text-align: right;
+    font-size: 0.9rem;
+}
+
+.dropdown-menu .dropdown-item:hover {
+    background-color: var(--bg-color);
+}
+
+.dropdown-menu .dropdown-item.delete {
+    color: var(--error-color);
+}
+.dropdown-menu .dropdown-item.delete:hover {
+    background-color: #fee2e2;
+}
+
+.dropdown-menu .dropdown-divider {
+    height: 1px;
+    margin: 0.5rem 0;
+    overflow: hidden;
+    background-color: var(--border-color);
+}
+
+/*
+ * إشعارات التنبيه (Toast Notifications)
+ * تنسيق الرسائل المنبثقة الملونة التي تظهر في زاوية الشاشة لتنبيه المستخدم بنجاح أو فشل العملية.
+ */
+#toast-container {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  direction: ltr;
+}
+
+.toast {
+  padding: 1rem 1.5rem;
+  border-radius: var(--border-radius-md);
+  color: #fff;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateX(-120%);
+  opacity: 0;
+  transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.toast.show {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.toast.success {
+  background-color: var(--success-color);
+}
+
+.toast.error {
+  background-color: var(--error-color);
+}
+
+/*
+ * أدوات مساعدة (Utilities)
+ * فئات عامة (Classes) تستخدم لإخفاء العناصر أو عرض رسائل الخطأ.
+ */
+.hidden {
+  display: none !important;
+}
+
+.error-message {
+  color: var(--error-color);
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  text-align: right;
+}
+
+/*
+ * تذييل الصفحة (Footer)
+ * التذييل الثابت في أسفل التطبيق.
+ */
+.main-footer {
+    text-align: center;
+    padding: 1.5rem 2rem;
+    color: var(--text-color-muted);
+    font-size: 0.9rem;
+    border-top: 1px solid var(--border-color);
+    margin-top: 2rem;
+}
+
+/*
+ * التقارير (Reports)
+ * تنسيقات خاصة بقسم التقارير، بما في ذلك الفلاتر ومنطقة المعاينة قبل الطباعة.
+ */
+#report-filters-container {
+    padding-top: 1.5rem;
+}
+#report-filters {
+    display: contents; /* Allows children to be direct children of the grid */
+}
+.reports-container .form-grid {
+    align-items: end;
+}
+.report-actions-no-print {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: var(--bg-color);
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+}
+#print-area {
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-md);
+}
+#report-print-header, #report-print-footer {
+    padding: 1rem;
+    border-bottom: 2px solid var(--text-color);
+    margin-bottom: 1.5rem;
+    text-align: center;
+    color: var(--text-color-muted);
+}
+#report-print-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+#report-print-header .company-logo {
+    max-width: calc(150px * var(--logo-size-multiplier));
+    max-height: calc(50px * var(--logo-size-multiplier));
+    object-fit: contain;
+    transition: max-width 0.2s ease, max-height 0.2s ease;
+}
+#report-print-header .header-text {
+    flex-grow: 1;
+    white-space: pre-wrap;
+    text-align: right;
+}
+#report-print-footer {
+    border-top: none;
+    border-bottom: none;
+    margin-top: 1.5rem;
+    margin-bottom: 0;
+    white-space: pre-wrap;
+}
+#report-title {
+    text-align: center;
+    font-size: 1.75rem;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+}
+
+/*
+ * نافذة التأكيد (Confirmation Dialog)
+ * تنسيق النافذة المنبثقة التي تطلب تأكيد المستخدم قبل الحذف أو الإجراءات الحساسة.
+ */
+.dialog-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(13, 17, 23, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1500;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.dialog-overlay:not([hidden]) {
+    opacity: 1;
+    visibility: visible;
+}
+
+.dialog-box {
+    background-color: var(--card-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    width: 90%;
+    max-width: 450px;
+    text-align: center;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
+}
+
+.dialog-overlay:not([hidden]) .dialog-box {
+    transform: scale(1);
+}
+
+.dialog-box h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-color);
+}
+
+.dialog-box p {
+    color: var(--text-color-muted);
+    margin-bottom: 2rem;
+    line-height: 1.7;
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.dialog-actions .btn {
+    min-width: 120px;
+}
+
+
+/*
+ * التجاوب (Responsive)
+ * تعديلات العرض للأجهزة المحمولة والشاشات الصغيرة لضمان عرض جيد للمحتوى.
+ */
+@media (max-width: 768px) {
+    body.sidebar-collapsed .main-content,
+    .main-content {
+        padding-right: 0;
+    }
+
+    .sidebar {
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+    }
+
+    body:not(.sidebar-collapsed) .sidebar {
+        transform: translateX(0);
+    }
+    
+    body.sidebar-collapsed .sidebar {
+        transform: translateX(100%);
+    }
+
+    .main-header {
+        padding: 1rem;
+    }
+    
+    .content-wrapper {
+        padding: 1rem;
+    }
+
+    .form-container, .table-container, .settings-grid > div {
+        padding: 1rem;
+    }
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .table-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .table-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .table-filter {
+      max-width: none;
+    }
+}
+
+/*
+ * صفحة الإعدادات (Settings Page)
+ * تنسيق بطاقات الإعدادات والقوائم القابلة للإضافة والحذف (مثل الفنيين، العناوين).
+ */
+.settings-grid {
+    display: grid;
+    grid-template-columns: 1fr; /* Start with single column */
+    gap: 2rem;
+}
+
+.settings-card {
+    background-color: var(--card-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px var(--shadow-color);
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.settings-card:first-child {
+    grid-column: 1 / -1; /* Make the list management card span full width */
+}
+
+
+.settings-card h3 {
+    font-size: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+    margin-bottom: 0;
+}
+
+.settings-card .text-muted {
+    color: var(--text-color-muted);
+    font-size: 0.9rem;
+    margin-top: -1rem;
+}
+
+.managed-list {
+    margin-top: 1rem;
+}
+.managed-list:first-of-type {
+    margin-top: 0;
+}
+
+
+.managed-list h4 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    color: var(--primary-color);
+}
+
+.add-item-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.add-item-form input {
+    flex-grow: 1;
+    padding: 0.65rem;
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+}
+
+.add-item-form .btn {
+    padding: 0.65rem 1rem;
+    flex-shrink: 0;
+}
+
+.managed-list ul {
+    list-style-type: none;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 0.5rem;
+}
+
+.managed-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    gap: 1rem;
+}
+
+.managed-list li:last-child {
+    border-bottom: none;
+}
+.managed-list li.empty-list-placeholder {
+    color: var(--text-color-muted);
+    justify-content: center;
+}
+
+.managed-list li .btn-delete {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    background-color: #fee2e2;
+    color: var(--error-color);
+    border: 1px solid transparent;
+}
+.managed-list li .btn-delete:hover {
+    background-color: var(--error-color);
+    color: white;
+    box-shadow: none;
+}
+.managed-list li .btn-delete svg {
+    pointer-events: none;
+}
+
+
+.settings-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.settings-actions .btn {
+    justify-content: flex-start;
+}
+
+.visibility-settings-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.visibility-settings-list .checkbox-group {
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-color);
+    padding: 0.75rem;
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.visibility-settings-list label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    width: 100%;
+    font-weight: 500;
+}
+/*تنيق مربعات الاختيار في قائمة اعدادات الرؤية لتكون اكبر او اصغر مع التنسيق العام لها */
+.visibility-settings-list input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--primary-color);
+}
+/*معاينة الشعار في صفحة اعدادت الشركة */
+.logo-preview-area {
+    width: 100%;
+    height: 150px;
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--bg-color);
+    overflow: hidden;
+}
+.logo-preview-area img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+.logo-preview-area .placeholder-text {
+    color: var(--text-color-muted);
+    text-align: center;
+}
+
+/* إعدادات النظام: تخطيط منظم وسهل المسح البصري */
+#settings {
+    background: linear-gradient(180deg, rgba(239, 246, 255, 0.7), var(--bg-color) 260px);
+}
+
+#settings > .section-header {
+    margin-bottom: 1.25rem;
+    padding: 0.25rem 0 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#settings > .section-header h3 {
+    font-size: clamp(1.35rem, 2vw, 1.8rem);
+    color: var(--text-color-dark);
+}
+
+#settings .settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+}
+
+#settings .settings-card {
+    min-width: 0;
+    padding: 1.35rem;
+    gap: 1rem;
+    border-color: #dbe4f0;
+    box-shadow: 0 8px 24px rgba(30, 64, 175, 0.07);
+}
+
+#settings .settings-card > h3 {
+    display: flex;
+    align-items: center;
+    min-height: 2.5rem;
+    padding-bottom: 0.75rem;
+    color: #1e3a5f;
+    font-size: 1.2rem;
+    border-bottom: 2px solid #dbeafe;
+}
+
+#settings .settings-card > h3::before {
+    content: '';
+    width: 0.35rem;
+    height: 1.35rem;
+    margin-left: 0.65rem;
+    border-radius: 2px;
+    background: var(--primary-color);
+}
+
+#settings .settings-card > .text-muted {
+    margin-top: -0.35rem;
+    line-height: 1.8;
+}
+
+#settings .settings-card:first-child {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+#settings .settings-card:first-child > h3,
+#settings .settings-card:first-child > p {
+    grid-column: 1 / -1;
+}
+
+#settings .settings-card:first-child .managed-list {
+    min-width: 0;
+    margin-top: 0;
+    padding: 0.9rem;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--border-radius-md);
+    background: #f8fbff;
+}
+
+#settings .managed-list h4 {
+    margin-bottom: 0.65rem;
+    color: #2563a6;
+    font-size: 1rem;
+}
+
+#settings .managed-list ul {
+    max-height: 180px;
+    background: var(--card-bg);
+}
+
+#settings .add-item-form {
+    margin-bottom: 0.75rem;
+}
+
+#settings .add-item-form input,
+#settings .add-item-form select,
+#settings .add-item-form textarea {
+    min-width: 0;
+}
+
+#settings .settings-card:nth-child(2),
+#settings .settings-card:nth-child(3) {
+    min-height: 100%;
+}
+
+#settings .settings-card:nth-child(4),
+#settings .settings-card:nth-child(5),
+#settings .settings-card:nth-child(6),
+#settings .settings-card:nth-child(7) {
+    min-height: 260px;
+}
+
+#settings .settings-card hr {
+    width: 100%;
+    border: 0;
+    border-top: 1px solid var(--border-color);
+}
+
+#settings .settings-card .input-group {
+    gap: 0.45rem;
+}
+
+#settings .settings-card textarea,
+#settings .settings-card input:not([type="checkbox"]):not([type="range"]),
+#settings .settings-card select {
+    border-color: #cbd5e1;
+    background: #fbfdff;
+}
+
+#settings .settings-card textarea:focus,
+#settings .settings-card input:not([type="checkbox"]):not([type="range"]):focus,
+#settings .settings-card select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+    outline: none;
+}
+
+#settings .settings-actions {
+    margin-top: auto;
+    padding-top: 0.75rem;
+    border-top: 1px solid #edf2f7;
+}
+
+#settings .settings-actions .btn {
+    justify-content: center;
+    width: 100%;
+}
+
+#settings .visibility-settings-list {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+}
+
+#settings .visibility-settings-list .checkbox-group {
+    background: #f8fbff;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+#settings .visibility-settings-list .checkbox-group:has(input:checked) {
+    border-color: #93c5fd;
+    background: #eff6ff;
+}
+
+#settings .logo-preview-area {
+    height: 170px;
+    border-color: #93c5fd;
+    background: repeating-linear-gradient(45deg, #f8fbff, #f8fbff 10px, #f1f6fc 10px, #f1f6fc 20px);
+}
+
+/* لوحة شركات توريد العدادات */
+#settings #meterSupplyCompanies-list-container {
+    position: relative;
+    margin-top: 0 !important;
+    padding: 1rem;
+    border: 1px solid #bfdbfe;
+    border-right: 4px solid #0ea5e9;
+    border-radius: var(--border-radius-md);
+    background: linear-gradient(135deg, #f8fbff, #eef7ff);
+    box-shadow: 0 5px 16px rgba(14, 165, 233, 0.08);
+}
+
+#settings #meterSupplyCompanies-list-container h4 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+    color: #075985;
+    font-size: 1.05rem;
+}
+
+#settings #meterSupplyCompanies-list-container h4::before {
+    content: '';
+    display: inline-grid;
+    width: 1.7rem;
+    height: 1.7rem;
+    place-items: center;
+    border-radius: 50%;
+    color: #0369a1;
+    background: #dbeafe;
+    font-size: 0.9rem;
+}
+
+#settings #meterSupplyCompanies-list-container ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.55rem;
+    max-height: 190px;
+    padding: 0.65rem;
+    border-color: #dbeafe;
+    background: rgba(255, 255, 255, 0.75);
+}
+
+#settings #meterSupplyCompanies-list-container li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-width: 0;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid #e0f2fe;
+    border-radius: var(--border-radius-sm);
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+#settings #meterSupplyCompanies-list-container li > span {
+    overflow: hidden;
+    color: #334155;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#settings #meterSupplyCompanies-list-container li > .btn-delete {
+    display: inline-grid;
+    width: 2rem;
+    height: 2rem;
+    min-width: 2rem;
+    margin-inline-start: 0.75rem;
+    padding: 0;
+    place-items: center;
+    border-color: #fecaca;
+}
+
+#settings #meterSupplyCompanies-list-container .add-item-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    margin: 0.8rem 0 0;
+}
+
+#settings #meterSupplyCompanies-list-container .add-item-form input {
+    min-height: 2.55rem;
+    background: #ffffff;
+}
+
+#settings #meterSupplyCompanies-list-container .add-item-form .btn {
+    min-width: 5.5rem;
+    background: #0284c7;
+    color: #ffffff;
+}
+
+#settings #meterSupplyCompanies-list-container .add-item-form .btn:hover {
+    background: #0369a1;
+}
+
+@media (max-width: 1100px) {
+    #settings .settings-card:first-child {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    #settings .settings-grid,
+    #settings .settings-card:first-child {
+        grid-template-columns: 1fr;
+    }
+
+    #settings .settings-card:first-child > h3,
+    #settings .settings-card:first-child > p {
+        grid-column: auto;
+    }
+
+    #settings .settings-card {
+        padding: 1rem;
+    }
+
+    #settings .add-item-form {
+        flex-wrap: wrap;
+    }
+
+    #settings .add-item-form .btn {
+        width: 100%;
+    }
+
+    #settings #meterSupplyCompanies-list-container .add-item-form {
+        grid-template-columns: 1fr;
+    }
+}
+
+/*
+ * نتائج كشف الحساب (Subscriber Statement)
+ * تنسيق طريقة عرض نتائج البحث في صفحة كشف حساب المشترك.
+ */
+#subscriber-statement-results {
+    margin-top: 2rem;
+}
+
+.statement-results-header {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.no-results-message {
+    background-color: var(--card-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border-color);
+    text-align: center;
+    color: var(--text-color-muted);
+    font-size: 1.1rem;
+}
+
+.statement-result-card {
+    background-color: var(--card-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px var(--shadow-color);
+    margin-bottom: 1.5rem;
+}
+
+.statement-result-card h4 {
+    font-size: 1.25rem;
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.detail-item {
+    background-color: var(--bg-color);
+    padding: 0.75rem 1rem;
+    border-radius: var(--border-radius-md);
+    border-left: 3px solid var(--primary-color);
+}
+
+.detail-item label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-color-muted);
+    margin-bottom: 0.25rem;
+}
+
+.detail-item span {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+/*
+ * التلميحات (Tooltips)
+ * تنسيق أيقونات المعلومات والنصوص التوضيحية التي تظهر عند تمرير الماوس فوقها.
+ */
+.tooltip-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: help;
+}
+
+.info-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--text-color-muted);
+    transition: color 0.2s;
+}
+
+.tooltip-container:hover .info-icon {
+    color: var(--primary-color);
+}
+
+.tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    width: 250px;
+    background-color: #2d3748; /* Dark background */
+    color: #fff;
+    text-align: center;
+    border-radius: var(--border-radius-md);
+    padding: 10px;
+    position: absolute;
+    z-index: 10;
+    bottom: 140%; /* Position above the icon */
+    left: 50%;
+    transform: translateX(-50%);
+    transition: opacity 0.3s ease;
+    font-size: 0.85rem;
+    font-weight: 400;
+    line-height: 1.5;
+    white-space: normal; /* Allow text to wrap */
+}
+
+/* Arrow for the tooltip */
+.tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #2d3748 transparent transparent transparent;
+}
+
+.tooltip-container:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* تعديلات لدمج العناصر وتنسيقها بشكل متناسق (Integration Adjustments) */
+.input-group label,
+.settings-card h3,
+.form-container h3 {
+    display: flex;
+    align-items: center;
+    gap: 4px; /* Creates a small space */
+}
+
+.input-group label {
+    justify-content: flex-start; /* Override previous justify-content */
+}
+
+/* ضمان عدم تكبير الأيقونات في العناوين بشكل مبالغ فيه */
+.settings-card h3 .info-icon,
+.form-container h3 .info-icon {
+    width: 20px;
+    height: 20px;
+}
+
+/*
+ * تقرير الإحلال (Replacement Report)
+ * تنسيقات خاصة لضبط تخطيط الطباعة لتقرير العدادات (الإحلال).
+ */
+.layout-replacement-report #report-print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    font-weight: bold;
+}
+.layout-replacement-report .report-header-right {
+    text-align: right;
+    flex: 1;
+}
+.layout-replacement-report .report-header-center {
+    text-align: center;
+    flex: 1.5;
+}
+.layout-replacement-report .report-header-center h4 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-decoration: underline;
+    margin: 0 0 0.5rem 0;
+}
+.layout-replacement-report .report-header-center .report-byline-inner {
+    color: #000;
+    font-size: 0.9rem;
+}
+.layout-replacement-report .report-header-left {
+    flex: 1;
+    text-align: left;
+}
+.layout-replacement-report #report-print-header .company-logo {
+    max-height: 70px;
+    max-width: 150px;
+    object-fit: contain;
+    display: inline-block;
+}
+
+/* إخفاء عناصر العنوان والتذييل الأصلية الفارغة في تقرير الإحلال */
+.layout-replacement-report #report-title,
+.layout-replacement-report #report-byline {
+    display: none;
+}
+
+.layout-replacement-report #report-results-table {
+     border: 2px solid #000;
+     color: #000;
+     font-size: 0.8rem;
+     width: auto;
+     table-layout: auto;
+     margin: 0 auto;
+}
+.layout-replacement-report #report-results-table th,
+.layout-replacement-report #report-results-table td {
+    border-color: #000;
+    border-style: solid;
+    border-width: 1px 2px;
+    text-align: center;
+    vertical-align: middle;
+}
+.layout-replacement-report #report-results-table th {
+    background-color: #e0e0e0 !important;
+    font-weight: bold;
+    color: #000;
+}
+
+/*
+ * التوقيعات (Signatures)
+ * تنسيق قسم التوقيعات الذي يظهر في أسفل التقارير المطبوعة.
+ */
+.signatures-section {
+    display: flex;
+    gap: 3cm;
+    justify-content: center;
+    flex-wrap: nowrap;
+    margin-top: 2rem;
+}
+
+.signature {
+    white-space: nowrap;
+    padding-top: 0.5rem;
+    min-width: 100px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/*
+ * بطاقة المطور (Developer Card)
+ * تنسيق البطاقة التي تعرض معلومات عن مطور النظام.
+ */
+.developer-card {
+    position: relative;
+    max-width: 680px;
+    margin: 2.5rem auto;
+    background: var(--card-bg);
+    border-radius: 18px;
+    box-shadow: 0 18px 45px -24px rgba(15, 23, 42, 0.55);
+    overflow: hidden;
+    text-align: center;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 2rem 1.5rem;
+}
+
+.developer-card-accent {
+    width: calc(100% + 4rem);
+    height: 8px;
+    display: flex;
+    gap: 0;
+    margin-bottom: 1.25rem;
+}
+
+.developer-card-accent span { flex: 1; }
+.developer-card-accent span:nth-child(1) { background: #0f766e; }
+.developer-card-accent span:nth-child(2) { background: var(--primary-color); }
+.developer-card-accent span:nth-child(3) { background: #f59e0b; }
+
+.developer-settings-preview {
+    width: 150px;
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 1rem 0;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    background: var(--bg-color);
+}
+
+.developer-settings-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.developer-settings-preview .placeholder-text {
+    padding: 0.75rem;
+    color: var(--text-muted-color);
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.developer-card-header {
+    position: relative;
+    margin-bottom: -75px;
+    z-index: 2;
+}
+
+.developer-avatar {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 5px solid var(--card-bg);
+    box-shadow: 0 0 0 5px var(--primary-color);
+    background-color: var(--sidebar-bg);
+}
+
+.developer-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.developer-card-body {
+    padding: 90px 1.5rem 1.5rem 1.5rem; /* Top padding to make space for avatar */
+    width: 100%;
+}
+
+.developer-name-ar {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text-color);
+    margin-bottom: 0.25rem;
+}
+
+.developer-name-en {
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--text-color-muted);
+    margin-bottom: 1rem;
+}
+
+.developer-title {
+    font-size: 0.95rem;
+    color: var(--primary-color);
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.developer-bio {
+    max-width: 530px;
+    margin: 0 auto 1.25rem;
+    color: var(--text-muted-color);
+    font-size: 1rem;
+    line-height: 1.9;
+}
+
+.developer-services {
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.developer-services span {
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: var(--text-color);
+    background: var(--bg-color);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.developer-contact .contact-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+    letter-spacing: 1px;
+}
+
+.developer-contact .contact-item svg {
+    width: 20px;
+    height: 20px;
+    color: var(--text-color-muted);
+}
+
+.developer-card-footer {
+    background-color: var(--bg-color);
+    padding: 1rem 1.5rem;
+    width: 100%;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-color-muted);
+    font-size: 0.9rem;
+}
+
+.developer-card-footer p { margin: 0; line-height: 1.7; }
+
+.developer-layout {
+    max-width: 1440px;
+    margin: 2rem auto;
+    display: grid;
+    grid-template-columns: minmax(190px, 1fr) minmax(420px, 680px) minmax(190px, 1fr);
+    gap: 1.25rem;
+    align-items: center;
+    direction: rtl;
+}
+
+.developer-side {
+    display: grid;
+    gap: 1rem;
+}
+
+.developer-side-right { grid-column: 1; }
+.developer-card { grid-column: 2; grid-row: 1; width: 100%; margin: 0; }
+.developer-side-left { grid-column: 3; grid-row: 1; }
+
+.developer-highlights {
+    display: none;
+}
+
+.developer-highlight-card {
+    width: 100%;
+    min-height: 190px;
+    padding: 1.35rem 1.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background: var(--card-bg);
+    box-shadow: 0 10px 28px -24px rgba(15, 23, 42, 0.8);
+    text-align: right;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.developer-highlight-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--primary-color);
+    box-shadow: 0 16px 30px -22px rgba(15, 23, 42, 0.75);
+}
+
+.developer-highlight-icon {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.9rem;
+    border-radius: 12px;
+    color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 12%, var(--card-bg));
+}
+
+.developer-highlight-card h4 {
+    margin: 0 0 0.55rem;
+    color: var(--text-color);
+    font-size: 1.05rem;
+}
+
+.developer-highlight-card p {
+    margin: 0;
+    color: var(--text-muted-color);
+    font-size: 0.9rem;
+    line-height: 1.8;
+}
+
+/* Keep the center profile prominent while the four supporting cards frame it. */
+.developer-layout .developer-card { order: 0; }
+
+@media (max-width: 1100px) {
+    .developer-layout { grid-template-columns: minmax(160px, 1fr) minmax(380px, 600px) minmax(160px, 1fr); gap: 0.75rem; }
+    .developer-highlight-card { padding: 1rem; }
+}
+
+@media (max-width: 800px) {
+    .developer-layout {
+        max-width: 680px;
+        margin: 1.25rem auto;
+        grid-template-columns: 1fr 1fr;
+        align-items: stretch;
+    }
+    .developer-card { grid-column: 1 / -1; grid-row: 1; }
+    .developer-side-right { grid-column: 1; grid-row: 2; }
+    .developer-side-left { grid-column: 2; grid-row: 2; }
+}
+
+@media (max-width: 600px) {
+    .developer-layout {
+        display: flex;
+        flex-direction: column;
+        margin: 1.25rem 0.75rem;
+    }
+    .developer-card { order: 0; }
+    .developer-side { width: 100%; grid-template-columns: 1fr 1fr; }
+    .developer-side-right { order: 1; }
+    .developer-side-left { order: 2; }
+    .developer-highlight-card { min-height: auto; }
+}
+
+/* Legacy spacing kept for older markup variants. */
+.developer-highlights-legacy {
+    max-width: 980px;
+    margin: 0 auto 2rem;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+/*
+ * جداول المشتركين (Filtered Tables)
+ * تخصيص عرض الجداول التي تحتوي على أعمدة كثيرة لضمان عدم التفاف النص بشكل عشوائي.
+ */
+[id^="subscribers-"] .responsive-table table th {
+    white-space: normal; /* Allow headers to wrap */
+    word-wrap: break-word;
+    vertical-align: middle;
+    padding: 0.6rem 0.4rem; /* Reduce padding */
+    font-size: 10px; /* Slightly smaller font for headers */
+}
+
+[id^="subscribers-"] .responsive-table table td {
+    white-space: nowrap; /* Keep data on a single line */
+    padding: 0.6rem 0.5rem; /* Reduce padding */
+    font-size: 0.9rem;
+}
+
+[id^="subscribers-"] .responsive-table table .actions-cell {
+    white-space: nowrap; /* Ensure action buttons stay on one line */
+}
+
+/*
+ * حاوية الفلاتر المتعددة (Multi-Filter)
+ * تنسيق منطقة البحث التي تحتوي على حقول متعددة بجانب بعضها.
+ */
+.multi-filter-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end; /* Align items to the bottom */
+    width: 100%;
+}
+
+.multi-filter-container .input-group {
+    flex: 1 1 200px;
+    margin-bottom: 0;
+}
+
+/* تنسيق مربع البحث في السجلات المحفوظة */
+.accounting-saved-records-search-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    max-width: 620px;
+    margin: 0 0 1.25rem auto;
+    padding: 0.85rem 1rem;
+    border: 1px solid #dbe5ef;
+    border-radius: var(--border-radius-lg);
+    background: #f8fbff;
+    box-shadow: 0 2px 8px rgba(30, 64, 175, 0.06);
+}
+
+.accounting-saved-records-search-box label {
+    color: var(--text-color);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.accounting-saved-records-search-box input {
+    width: 100%;
+    min-height: 44px;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid #cbd5e1;
+    border-radius: var(--border-radius-md);
+    background: var(--card-bg);
+    color: var(--text-color);
+    font: inherit;
+    text-align: right;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.accounting-saved-records-search-box input::placeholder {
+    color: var(--text-color-muted);
+}
+
+.accounting-saved-records-search-box input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+}
+
+/*
+ * تمييز الصفوف (Row Highlighting)
+ * ألوان خلفية لتمييز حالات معينة في الجداول (نجاح، خطأ، تحذير).
+ */
+.row-success {
+    background-color: #d4edda !important; /* Light green */
+    color: #155724;
+}
+
+.row-danger {
+    background-color: #f8d7da !important; /* Light red */
+    color: #721c24;
+}
+
+.row-warning {
+    background-color: #fff3cd !important; /* Light yellow */
+    color: #856404;
+}
+
+/*
+ * شريط التقدم (Progress Bar)
+ * يستخدم لإظهار حالة التحميل (مثل التحديثات أو استيراد البيانات).
+ */
+.progress-bar-container {
+    margin-top: 1rem;
+    width: 100%;
+    display: none; /* Hidden by default */
+}
+.progress-bar-track {
+    width: 100%;
+    height: 10px;
+    background-color: #e5e7eb;
+    border-radius: 5px;
+    overflow: hidden;
+}
+.progress-bar-fill {
+    height: 100%;
+    background-color: var(--primary-color);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+.progress-text {
+    font-size: 0.85rem;
+    color: var(--text-color-muted);
+    margin-bottom: 0.25rem;
+    text-align: right;
+}
+
+/*
+ * شريط أدوات الرسم (Canvas Toolbar)
+ * تنسيق الأزرار والأدوات المستخدمة في رسم الكروكي (القلم، المسح، النص).
+ */
+.btn-tool {
+    padding: 4px 8px;
+    font-size: 0.85rem;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    cursor: pointer;
+    border-radius: 4px;
+}
+.btn-tool.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+.btn-tool.danger {
+    background-color: #fee2e2;
+    color: var(--error-color);
+}
+.btn-tool.danger:hover {
+    background-color: var(--error-color);
+    color: white;
+}
+
+/*
+ * حاوية الجدول القابلة للتمرير (Scrollable Table)
+ * تنسيقات متقدمة لتثبيت رأس الجدول والعمود الأخير (الإجراءات) أثناء التمرير الأفقي.
+ */
+.content-section .table-container .responsive-table {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 65vh;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+}
+
+/* حاوية الجدول للأقسام الأخرى (Sections) */
+.table-container .responsive-table {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 65vh;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+}
+
+/* ضمان السماح بالتمرير الأفقي مع إبقاء عمود الإجراءات ظاهراً */
+.content-section .responsive-table {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 65vh;
+    position: relative;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+}
+
+/* إضافة مؤشر مرئي للمحتوى القابل للتمرير (ظل جانبي) */
+.content-section .responsive-table::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right:180px;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, var(--border-color), transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.content-section .responsive-table:hover::after {
+    opacity: 1;
+}
+
+/* تثبيت رأس الجدول أثناء التمرير (Sticky Header) */
+.content-section .responsive-table table thead {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+}
+
+.content-section .responsive-table table thead th {
+    background-color: #f3f4f6;
+    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* ضبط أدوات التنقل بين الصفحات لتبقى في الأسفل */
+.content-section .pagination-controls {
+    position: relative;
+    bottom: 0;
+    background-color: var(--card-bg);
+    border-top: 1px solid var(--border-color);
+    z-index: 5;
+}
+
+.content-section .responsive-table table {
+    width: 100%;
+    min-width: 1200px;
+    table-layout: auto;
+}
+
+/* عمود الإجراءات المثبت - يبقى ثابتاً عند التمرير الأفقي (Sticky Actions Column) */
+.content-section .responsive-table table th:last-child,
+.content-section .responsive-table table td:last-child {
+    position: sticky;
+    left: 0;
+    right: auto;
+    z-index: 20;
+    min-width: 180px;
+    max-width: 180px;
+    width: 180px;
+    background-color: var(--card-bg) !important;
+    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.15);
+    border-right: 2px solid var(--primary-color);
+}
+
+/* ضمان بقاء رأس عمود الإجراءات في المقدمة دائماً */
+.content-section .responsive-table table thead th:last-child {
+    z-index: 50 !important;
+    background-color: #f3f4f6 !important;
+    top: 0;
+}
+
+/* ضمان بقاء خلايا عمود الإجراءات في المقدمة */
+.content-section .responsive-table table tbody td:last-child {
+    z-index: 25 !important;
+}
+
+/* ضمان عمل تأثير التحويم (Hover) على العمود المثبت */
+.content-section .responsive-table table tbody tr:hover td:last-child {
+    background-color: #f9fafb !important;
+}
+
+/* تمييز حالة الصفوف للأعمدة المثبتة (Sticky Columns Highlighting) */
+.content-section .responsive-table table tbody tr.row-success td:last-child { 
+    background-color: #d4edda !important; 
+    box-shadow: 4px 0 10px rgba(34, 197, 94, 0.3);
+}
+.content-section .responsive-table table tbody tr.row-danger td:last-child { 
+    background-color: #f8d7da !important; 
+    box-shadow: 4px 0 10px rgba(239, 68, 68, 0.3);
+}
+.content-section .responsive-table table tbody tr.row-warning td:last-child { 
+    background-color: #fff3cd !important; 
+    box-shadow: 4px 0 10px rgba(255, 193, 7, 0.3);
+}
+
+/* منع أعمدة البيانات من تغطية العمود المثبت */
+.content-section .responsive-table table th:not(:last-child),
+.content-section .responsive-table table td:not(:last-child) {
+    z-index: 1;
+}
+
+/* حل جذري لتوحيد ارتفاعات الحقول والقوائم المنسدلة في صفحة تسجيل العداد وصفحة التفاصيل */
+#meter-registration select,
+#meter-registration input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+#subscriber-details-form select,
+#subscriber-details-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    box-sizing: border-box !important;
+    padding: 0px 0.75rem !important; /* إزالة الهامش الرأسي لمنع قص النص من الأسفل */
+    line-height: 40px !important; /* ضبط ارتفاع السطر ليتوسط الحقل ويمنع القص */
+    display: block !important;
+    width: 100% !important;
+}
+
+/* تنسيق تقرير أعطال مسبق الدفع ليطابق تقرير الإحلال */
+.faulty-prepaid-report {
+    border: 2px solid #000 !important;
+    color: #000 !important;
+    margin: 0 auto !important;
+}
+
+.faulty-prepaid-report th, .faulty-prepaid-report td {
+    font-size: 7.5pt !important;
+    padding: 1px 2px !important;
+    border: 1px solid #000 !important;
+    white-space: nowrap;
+    text-align: center !important;
+    vertical-align: middle !important;
+    color: #000 !important;
+}
+
+.faulty-prepaid-report th {
+    background-color: #e0e0e0 !important;
+    font-weight: bold !important;
+}
+
+/* إلغاء الهوامش الجانبية للجسم عند طباعة هذا التقرير تحديداً */
+@media print {
+    body:has(.faulty-prepaid-report) {
+        margin: 5mm !important; /* ضبط الهوامش لضمان أقصى عرض للجدول دون قص */
+    }
+}
+
+/* الحفاظ على تنسيق حقول مرجع الحساب كما هي (استثناء من تغيير الـ padding) */
+#meter-registration .input-group.compound .input-group-sub input {
+    padding: 0.75rem 0.25rem !important;
+}
+
+/*
+ * أزرار الإجراءات الأيقونية (Modern Iconic Action Buttons)
+ * بديل عصري للقوائم المنسدلة في الجداول، خاصة لصفحة الإصلاحات.
+ */
+.actions-inline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--text-color-muted);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    text-decoration: none;
+    padding: 0;
+}
+
+.action-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.5;
+}
+
+.action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    border-color: transparent;
+}
+
+/* تخصيص الألوان عند التحويم حسب نوع الإجراء */
+.action-btn.edit:hover { background-color: var(--info-color); color: #ffffff; }
+.action-btn.delete:hover { background-color: var(--error-color); color: #ffffff; }
+.action-btn.view:hover { background-color: var(--text-color-muted); color: #ffffff; }
+.action-btn.print:hover { background-color: var(--text-color); color: #ffffff; }
+.action-btn.success:hover { background-color: var(--success-color); color: #ffffff; }
+
+/* الحفاظ على تنسيق حقول مرجع الحساب كما هي (استثناء من تغيير الـ padding) */
+#meter-registration .input-group.compound .input-group-sub input {
+    padding: 0.75rem 0.25rem !important;
+}

@@ -1,0 +1,44 @@
+{
+  "cards": {
+    "EF74A35F": {
+      "uid": "EF74A35F",
+      "atr": "3B 85 80 01 43 59 53 48 44 41",
+      "meterNumber": "71310234",
+      "customerName": "محمد فالح احمد محمد",
+      "subscriptionCode": "0503480366",
+      "nationalId": "28504121401234",
+      "address": "المنيا - بني مزار",
+      "activityName": "منزلي كودي",
+      "customerTypeName": "أهالي",
+      "meterCompanyName": "السويدي",
+      "meterType": "أحادي إلكتروني مسبق الدفع",
+      "remainingBalance": 100,
+      "chargeSequence": 6,
+      "consumptionSlice": 1,
+      "lastChargeDate": "١٧‏/٩‏/٢٠٢٦",
+      "hasCharge": false,
+      "isStop": false,
+      "meterDebit": 45.33,
+      "updatedAt": "2026-09-17T09:01:03.174Z",
+      "isCleared": true,
+      "clearedAt": "2026-09-17T09:00:47.647Z",
+      "lastReceiptNumber": "RCP-663107"
+    }
+  },
+  "controlCards": {
+    "00118924": {
+      "cardId": "00118924",
+      "technicianCode": 12258,
+      "technicianName": "وحيد فاروق كامل",
+      "controlOperationTypeName": "إزالة تلاعبات و أخطاء",
+      "controlOperationType": 2,
+      "companyName": "السويدي",
+      "meterTypeName": "ثلاثى مباشر سوجويف 2024",
+      "cardIssueDate": "16/09/2026",
+      "activationDate": "28/02/2026",
+      "expiryDate": "23/09/2026",
+      "issueUsername": "المشغل المعتمد",
+      "meterData": []
+    }
+  }
+}

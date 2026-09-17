@@ -1,0 +1,1746 @@
+
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>المنظومة الموحدة للعدادات (محدث)</title>
+  <link rel="stylesheet" href="index.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <!-- Added Babel Standalone to transpile TSX in the browser -->
+  <style>
+    .main-app-title {
+      color: white;
+      font-weight: bold;
+      font-size: 2.5rem;
+      display: none;
+    }
+    .custom-multiselect {
+        position: relative;
+        width: 100%;
+    }
+    .multiselect-btn {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background-color: #fff;
+        text-align: right;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 38px; /* Match other inputs */
+    }
+    .multiselect-btn::after {
+        content: '▼';
+        font-size: 0.6em;
+        margin-left: 5px;
+    }
+    .multiselect-options {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background-color: #fff;
+        border: 1px solid #ccc;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        z-index: 1000;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .multiselect-options label {
+        display: block;
+        padding: 8px 12px;
+        cursor: pointer;
+    }
+    /* Added styles for Sketch Tools */
+    .btn-tool {
+        padding: 6px 12px;
+        border: 1px solid #ccc;
+        background: #fff;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 1.1rem;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .btn-tool.active {
+        background: #3b82f6;
+        color: white;
+        border-color: #2563eb;
+    }
+    .btn-tool:hover:not(.active) {
+        background: #f3f4f6;
+    }
+    .btn-tool.danger {
+        color: #dc2626;
+        border-color: #fca5a5;
+        margin-right: auto; /* Push to end if flex */
+    }
+    .btn-tool.danger:hover {
+        background: #fef2f2;
+    }
+    /* Report Style Input Form */
+    .report-paper {
+        background: white;
+        max-width: 210mm;
+        margin: 0 auto;
+        padding: 30px;
+        box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        border: 1px solid #ccc;
+    }
+    .report-section-header {
+        background: #f1f5f9;
+        padding: 8px 15px;
+        font-weight: bold;
+        border: 1px solid #cbd5e1;
+        border-right: 4px solid #3b82f6;
+        margin: 20px 0 15px 0;
+        color: #1e293b;
+    }
+    .sketch-toolbar-enhanced {
+        background: #f8fafc;
+        padding: 10px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .sketch-text-control {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        background: #fff;
+        padding: 4px 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="toast-container"></div>
+
+  <!-- Confirmation Dialog -->
+  <div id="confirmation-dialog" class="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="dialog-title" hidden>
+      <div class="dialog-box">
+          <h3 id="dialog-title">تأكيد الإجراء</h3>
+          <p id="dialog-message">هل أنت متأكد من رغبتك في المتابعة؟</p>
+          <div class="dialog-actions">
+              <button id="dialog-cancel-btn" class="btn secondary">إلغاء</button>
+              <button id="dialog-confirm-btn" class="btn btn-delete">تأكيد</button>
+          </div>
+      </div>
+  </div>
+
+  <!-- WELCOME SCREEN (FOR FIRST-TIME SETUP) -->
+  <section id="welcome-screen">
+      <div class="login-box">
+        <div class="login-box-header">
+          <div class="logo-container logo-container-login">
+            <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="30" cy="30" r="25" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
+              <text x="30" y="35" text-anchor="middle" font-size="10" fill="white" font-family="Arial, sans-serif" font-weight="bold">ELM</text>
+            </svg>
+          </div>
+          <h1 id="welcome-company-name">ELMAGHRABI</h1>
+          <h2>مرحباً بك</h2>
+          <p class="login-subtitle">كيف تود أن تبدأ؟</p>
+        </div>
+        <div class="welcome-actions">
+           <button id="start-new-btn" class="btn">البدء من جديد</button>
+           <button id="import-from-welcome-btn" class="btn secondary">استيراد بيانات من نسخة احتياطية</button>
+        </div>
+        <footer class="login-box-footer">
+          <p id="welcome-footer-text">المنظومة الموحدة للعدادات - جميع الحقوق محفوظة © 2025</p>
+        </footer>
+      </div>
+  </section>
+
+  <!-- LOGIN SCREEN -->
+  <section id="login-screen">
+    <div class="login-wrapper">
+        <h2 class="main-app-title">المنظومة الموحدة لادارة العدادات 2025</h2>
+        <div class="login-box">
+        <div class="login-box-header">
+          <div class="logo-container logo-container-login">
+            <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="30" cy="30" r="25" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
+              <text x="30" y="35" text-anchor="middle" font-size="10" fill="white" font-family="Arial, sans-serif" font-weight="bold">ELM</text>
+            </svg>
+          </div>
+          <h1 id="login-company-name">ELMAGHRABI</h1>
+          <h2>تسجيل الدخول</h2>
+          <p class="login-subtitle">مرحباً بعودتك! يرجى إدخال بياناتك.</p>
+        </div>
+        <form id="login-form" autocomplete="off">
+          <div class="input-group">
+            <label for="username">اسم المستخدم</label>
+            <select id="username" name="username" required="" autocomplete="off"></select>
+          </div>
+          <div class="input-group">
+            <label for="password">كلمة المرور</label>
+            <input type="text" style="display: none;" autocomplete="new-password" />
+            <input type="password" id="password" name="password" required="" placeholder="********" autocomplete="new-password">
+          </div>
+          <p id="login-error" class="error-message hidden">اسم المستخدم أو كلمة المرور غير صحيحة.</p>
+          <button type="submit" class="btn btn-login">تسجيل الدخول</button>
+        </form>
+        <footer class="login-box-footer">
+          <p id="login-footer-text">المنظومة الموحدة للعدادات - جميع الحقوق محفوظة ELMGHRABI © 2025</p>
+        </footer>
+      </div>
+    </div>
+  </section>
+
+  <!-- APP CONTAINER -->
+  <div id="app-container">
+    <aside class="sidebar">
+        <header class="sidebar-header">
+            <a href="#" class="logo nav-link" data-target="dashboard">
+                <h1 id="sidebar-company-name">ELMAGHRABI</h1>
+                <div class="logo-container logo-container-sidebar">
+                  <svg width="40" height="40" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="30" cy="30" r="25" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
+                    <text x="30" y="35" text-anchor="middle" font-size="10" fill="white" font-family="Arial, sans-serif" font-weight="bold">ELM</text>
+                  </svg>
+                </div>
+            </a>
+        </header>
+        <nav class="sidebar-nav">
+            <ul>
+                <li><a href="#" class="nav-link active" data-target="dashboard" data-permission="view_dashboard"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg><span>لوحة التحكم</span></a></li>
+                
+                <li class="nav-category" data-permission="view_meter_management_section">
+                    <details open>
+                        <summary><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg><span>إدارة العدادات</span></summary>
+                         <ul>
+                            <li><a href="#" class="nav-link" data-target="meter-management" data-permission="view_meters"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10M18 20V4M6 20v-4"/></svg><span>إدارة العدادات</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="meter-registration" id="sidebar-add-meter-btn" data-permission="add_meter"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>تسجيل عداد</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="repaired-meters" data-permission="view_repaired_meters"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg><span>إصلاحات</span></a></li>
+                        </ul>
+                    </details>
+                </li>
+
+                <li class="nav-category" data-permission="view_subscribers_section">
+                    <details>
+                        <summary><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg><span>المشتركين</span></summary>
+                        <ul>
+                            <li><a href="#" class="nav-link" data-target="subscribers-all" data-permission="view_subscribers_all"><span>جميع المشتركين</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="subscriber-statement" data-permission="view_subscriber_statement"><span>كشف حساب مشترك</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="subscribers-new" data-permission="view_subscribers_new"><span>جديد</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="subscribers-faults" data-permission="view_subscribers_faults"><span>مرفوع أعطال</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="subscribers-replacement" data-permission="view_subscribers_replacement"><span>مرفوع إحلال</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="subscribers-substituted" data-permission="view_subscribers_substituted"><span>استبدال</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="subscribers-scrapped" data-permission="view_subscribers_scrapped"><span>استغناء</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="subscribers-demolition" data-permission="view_subscribers_demolition"><span>هدم</span></a></li>
+                        </ul>
+                    </details>
+                </li>
+
+                <!-- New Section: المقايسات -->
+                <li class="nav-category" data-permission="view_mukayasat_section">
+                    <details>
+                        <summary><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/></svg><span>المقايسات</span></summary>
+                        <ul>
+                            <li><a href="#" class="nav-link" data-target="mukayasat-registration" id="sidebar-add-mukaysa-btn" data-permission="manage_mukayasat"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>ادخال مقايسة</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="mukayasat-list" data-permission="view_mukayasat_list"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span>المقايسات المحفوظة</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="pending-requests-section" data-permission="view_mukayasat_list">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                <span>الطلبات قيد الانتظار</span>
+                            </a></li>
+                        </ul>
+                    </details>
+                </li>
+
+                <!-- قسم الضبطية القضائية الجديد -->
+                <li class="nav-category" data-permission="view_judicial_control_section">
+                    <details>
+                        <summary>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                            <span>الضبطية القضائية</span>
+                        </summary>
+                        <ul>
+                            <li><a href="#" class="nav-link" data-target="judicial-control-list"><span>عرض القائمة</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="judicial-control-registration" data-permission="manage_judicial_control"><span>إضافة محضر</span></a></li>
+                        </ul>
+                    </details>
+                </li>
+
+                <li class="nav-category" data-permission="manage_settings">
+                  <details>
+                      <summary><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg><span>الإدارة</span></summary>
+                       <ul>
+                          <li><a href="#" class="nav-link" data-target="user-management" data-permission="manage_users"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span>المستخدمين</span></a></li>
+                          <li><a href="#" class="nav-link" data-target="permissions" data-permission="manage_settings"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg><span>الصلاحيات</span></a></li>
+                          <li><a href="#" class="nav-link" data-target="activity-log" data-permission="view_activity_log"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg><span>نشاط المستخدمين</span></a></li>
+                          <li><a href="#" class="nav-link" data-target="technicians" data-permission="view_technicians"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg><span>الفنيين</span></a></li>
+                       </ul>
+                  </details>
+              </li>
+
+                <li><a href="#" class="nav-link" data-target="reports" data-permission="view_reports"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 17l4 4 4-4m-4-5v9"></path><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path></svg><span>التقارير</span></a></li>
+                <li><a href="#" class="nav-link" data-target="settings" data-permission="manage_settings"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg><span>الإعدادات</span></a></li>
+                <li><a href="#" class="nav-link" data-target="developer-info"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg><span>المطور</span></a></li>
+            </ul>
+        </nav>
+        <footer class="sidebar-footer">
+          <div class="user-profile-menu">
+            <button class="user-profile" id="user-profile-trigger" aria-haspopup="true" aria-expanded="false">
+              <img src="https://ui-avatars.com/api/?name=Admin+User&background=3b82f6&color=fff" alt="User Avatar">
+              <div class="user-info">
+                <span id="sidebar-user-name">Admin User</span>
+                <small id="sidebar-user-role">Admin</small>
+              </div>
+              <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div class="user-profile-dropdown" id="user-profile-dropdown">
+              <a id="logout-link" href="#">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                <span>تسجيل الخروج</span>
+              </a>
+            </div>
+          </div>
+        </footer>
+    </aside>
+
+    <main class="main-content">
+      <header class="main-header">
+        <div class="header-left">
+            <button id="sidebar-toggle" aria-label="Toggle sidebar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            <div>
+                <h2>لوحة التحكم</h2>
+            </div>
+        </div>
+        <div class="header-brand">
+            <h3 id="header-company-name">ELMAGHRABI</h3>
+        </div>
+      </header>
+
+      <div class="content-wrapper">
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="content-section active">
+          <div class="dashboard-grid">
+            <!-- Dashboard cards are rendered here by JS -->
+          </div>
+        </section>
+
+        <!-- METER MANAGEMENT (UNIFIED) -->
+        <section id="meter-management" class="content-section">
+            <div class="table-container">
+                <div class="table-controls">
+                    <div class="section-header-title">
+                        <h3>قائمة العدادات</h3>
+                        <button class="btn btn-back-page" title="رجوع"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span></button>
+                    </div>
+                    <div class="table-actions">
+                        <input type="text" class="table-filter" placeholder="بحث في العدادات..." data-table-id="meters-table" id="meters-table-filter">
+                        <button class="btn" id="add-meter-record-btn" data-permission="add_meter">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            <span>إضافة سجل عداد</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="responsive-table">
+                    <table id="meters-table">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        
+        <!-- METER REGISTRATION FORM (UNIFIED) -->
+        <section id="meter-registration" class="content-section">
+            <div class="section-header">
+                <h3 id="meter-form-title">إضافة سجل عداد جديد</h3>
+                <button class="btn btn-back-page" title="رجوع">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <span>رجوع</span>
+                </button>
+            </div>
+            <div class="form-container">
+                 <form id="meter-form" class="form-grid" novalidate>
+                    <input type="hidden" id="meter-id">
+                    
+                    <!-- Basic Info -->
+                    <div class="input-group"><label for="subscriberName">اسم المشترك</label><input type="text" id="subscriberName" required></div>
+                    <div class="input-group"><label for="address">العنوان</label><select id="address" required></select></div>
+                    <div class="input-group">
+                        <label for="locationDescription">وصف المكان</label>
+                        <select id="locationDescription" required></select>
+                    </div>
+                    <div class="input-group"><label for="subscriptionCode">كود الاشتراك</label><input type="text" id="subscriptionCode" required></div>
+                    <div class="input-group">
+                        <label for="subscriberType">نوع المشترك / الحالة
+                            <div class="tooltip-container">
+                                <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                <span class="tooltip-text">اختر حالة المشترك. 'مرفوع إحلال' يقوم تلقائياً بإنشاء سجل جديد للعداد البديل.</span>
+                            </div>
+                        </label>
+                        <select id="subscriberType" required></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="meterChassisNumber">شاسية العداد
+                           <div class="tooltip-container">
+                                <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                <span class="tooltip-text">أدخل رقم شاسية العداد الذي يتم التعامل معه (القديم في حالة الرفع أو الإحلال).</span>
+                            </div>
+                        </label>
+                        <input type="text" id="meterChassisNumber">
+                    </div>
+                    <div class="input-group"><label for="panelNumber">رقم اللوحة</label><input type="text" id="panelNumber"></div>
+                    <div class="input-group compound">
+                        <label>مرجع الحساب</label>
+                        <div class="compound-controls">
+                            <div class="input-group-sub">
+                                <label for="accountRefF">ف</label>
+                                <input type="text" id="accountRefF" pattern="[0-9]*">
+                            </div>
+                            <div class="input-group-sub">
+                                <label for="accountRefH">ح</label>
+                                <input type="text" id="accountRefH" pattern="[0-9]*">
+                            </div>
+                            <div class="input-group-sub">
+                                <label for="accountRefY">ي</label>
+                                <input type="text" id="accountRefY" pattern="[0-9]*">
+                            </div>
+                            <div class="input-group-sub">
+                                <label for="accountRefM">م</label>
+                                <input type="text" id="accountRefM" pattern="[0-9]*">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-group"><label for="meterCapacity">قدرة العداد</label><select id="meterCapacity"></select></div>
+                    <div class="input-group"><label for="meterType">نوع العداد</label><select id="meterType" required></select></div>
+                    <div class="input-group"><label for="activityType">نوع النشاط</label><select id="activityType" required></select></div>
+                    <div class="input-group"><label for="subscriptionType">نوع الاشتراك</label><select id="subscriptionType" required></select></div>
+
+                    <!-- Dynamic Fields based on Meter Type -->
+                    <div id="reading-field-container" class="input-group hidden">
+                        <label for="readingAtRemoval">القراءة عند الرفع
+                            <div class="tooltip-container">
+                                <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                <span class="tooltip-text">هذا الحقل يظهر فقط للعدادات من نوع 'ميكانيكي' أو 'ديجيتال'.</span>
+                            </div>
+                        </label>
+                        <input type="number" id="readingAtRemoval" min="0">
+                    </div>
+                    <div id="card-status-field-container" class="input-group hidden"><label for="cardStatus">حالة الكارت</label><select id="cardStatus"></select></div>
+
+                    <!-- Conditional Fieldsets based on Subscriber Type -->
+                    <fieldset id="removal-fields" class="form-grid-group hidden">
+                        <legend>بيانات الرفع</legend>
+                        <div class="input-group"><label for="removalReason">سبب الرفع</label><select id="removalReason"></select></div>
+                        <div class="input-group"><label for="removalDate">تاريخ الرفع</label><input type="date" id="removalDate"></div>
+                        <div class="input-group"><label for="removedBy">القائم بالرفع</label><select id="removedBy"></select></div>
+                    </fieldset>
+
+                    <fieldset id="installation-fields" class="form-grid-group hidden">
+                        <legend>بيانات التركيب</legend>
+                        <div class="input-group"><label for="newMeterChassisNumber">شاسية العداد الجديد</label><input type="text" id="newMeterChassisNumber"></div>
+                        <div class="input-group"><label for="newMeterType">نوع العداد الجديد</label><select id="newMeterType"></select></div>
+                        <div class="input-group"><label for="installationDate">تاريخ التركيب</label><input type="date" id="installationDate"></div>
+                        <div class="input-group"><label for="installedBy">القائم بالتركيب</label><select id="installedBy"></select></div>
+                    </fieldset>
+
+                    <fieldset id="demolition-fields" class="form-grid-group hidden">
+                        <legend>بيانات الهدم / الاستغناء</legend>
+                        <div class="input-group">
+                            <label for="demolitionType">نوع الهدم</label>
+                            <select id="demolitionType">
+                                <option value="هدم جزئي">هدم جزئي</option>
+                                <option value="هدم كامل">هدم كامل</option>
+                            </select>
+                        </div>
+                        <div class="input-group"><label for="demolitionDate">تاريخ الهدم/الاستغناء</label><input type="date" id="demolitionDate"></div>
+                        <div class="input-group"><label for="meterReceivedBy">القائم باستلام العداد</label><select id="meterReceivedBy"></select></div>
+                    </fieldset>
+                    
+                    <div class="input-group full-width">
+                        <button type="submit" class="btn">حفظ السجل</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- SUBSCRIBER DETAILS (VIEW/EDIT) -->
+        <section id="subscriber-details" class="content-section">
+            <div class="section-header">
+                <h3 id="subscriber-details-title">تفاصيل المشترك</h3>
+                <button class="btn btn-back-page" title="رجوع">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <span>رجوع</span>
+                </button>
+            </div>
+            <div class="form-container">
+                 <form id="subscriber-details-form" class="form-grid" novalidate>
+                    <!-- Basic Info -->
+                    <div class="input-group"><label for="details-subscriberName">اسم المشترك</label><input type="text" id="details-subscriberName" required></div>
+                    <div class="input-group">
+                        <label for="details-locationDescription">وصف المكان</label>
+                        <select id="details-locationDescription" required></select>
+                    </div>
+                    <div class="input-group"><label for="details-address">العنوان</label><input type="text" id="details-address" required></div>
+                    <div class="input-group"><label for="details-subscriptionCode">كود الاشتراك</label><input type="text" id="details-subscriptionCode" required></div>
+                    <div class="input-group">
+                        <label for="details-subscriberType">نوع المشترك / الحالة
+                            <div class="tooltip-container">
+                                <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                <span class="tooltip-text">اختر حالة المشترك. 'مرفوع إحلال' يقوم تلقائياً بإنشاء سجل جديد للعداد البديل.</span>
+                            </div>
+                        </label>
+                        <select id="details-subscriberType" required></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="details-meterChassisNumber">شاسية العداد
+                           <div class="tooltip-container">
+                                <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                <span class="tooltip-text">أدخل رقم شاسية العداد الذي يتم التعامل معه (القديم في حالة الرفع أو الإحلال).</span>
+                            </div>
+                        </label>
+                        <input type="text" id="details-meterChassisNumber">
+                    </div>
+                    <div class="input-group"><label for="details-panelNumber">رقم اللوحة</label><input type="text" id="details-panelNumber"></div>
+                    <div class="input-group compound">
+                        <label>مرجع الحساب</label>
+                        <div class="compound-controls">
+                            <div class="input-group-sub">
+                                <label for="details-accountRefF">ف</label>
+                                <input type="text" id="details-accountRefF" pattern="[0-9]*">
+                            </div>
+                            <div class="input-group-sub">
+                                <label for="details-accountRefH">ح</label>
+                                <input type="text" id="details-accountRefH" pattern="[0-9]*">
+                            </div>
+                            <div class="input-group-sub">
+                                <label for="details-accountRefY">ي</label>
+                                <input type="text" id="details-accountRefY" pattern="[0-9]*">
+                            </div>
+                            <div class="input-group-sub">
+                                <label for="details-accountRefM">م</label>
+                                <input type="text" id="details-accountRefM" pattern="[0-9]*">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-group"><label for="details-meterCapacity">قدرة العداد</label><select id="details-meterCapacity"></select></div>
+                    <div class="input-group"><label for="details-meterType">نوع العداد</label><select id="details-meterType" required></select></div>
+                    <div class="input-group"><label for="details-activityType">نوع النشاط</label><select id="details-activityType" required></select></div>
+                    <div class="input-group"><label for="details-subscriptionType">نوع الاشتراك</label><select id="details-subscriptionType" required></select></div>
+
+                    <!-- Dynamic Fields based on Meter Type -->
+                    <div id="details-reading-field-container" class="input-group hidden">
+                        <label for="details-readingAtRemoval">القراءة عند الرفع
+                           <div class="tooltip-container">
+                                <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                <span class="tooltip-text">هذا الحقل يظهر فقط للعدادات من نوع 'ميكانيكي' أو 'ديجيتال'.</span>
+                            </div>
+                        </label>
+                        <input type="number" id="details-readingAtRemoval" min="0">
+                    </div>
+                    <div id="details-card-status-field-container" class="input-group hidden"><label for="details-cardStatus">حالة الكارت</label><select id="details-cardStatus"></select></div>
+
+                    <!-- Conditional Fieldsets based on Subscriber Type -->
+                    <fieldset id="details-removal-fields" class="form-grid-group hidden">
+                        <legend>بيانات الرفع</legend>
+                        <div class="input-group"><label for="details-removalReason">سبب الرفع</label><select id="details-removalReason"></select></div>
+                        <div class="input-group"><label for="details-removalDate">تاريخ الرفع</label><input type="date" id="details-removalDate"></div>
+                        <div class="input-group"><label for="details-removedBy">القائم بالرفع</label><select id="details-removedBy"></select></div>
+                    </fieldset>
+
+                    <fieldset id="details-installation-fields" class="form-grid-group hidden">
+                        <legend>بيانات التركيب</legend>
+                        <div class="input-group"><label for="details-newMeterChassisNumber">شاسية العداد الجديد</label><input type="text" id="details-newMeterChassisNumber"></div>
+                        <div class="input-group"><label for="details-newMeterType">نوع العداد الجديد</label><select id="details-newMeterType"></select></div>
+                        <div class="input-group"><label for="details-installationDate">تاريخ التركيب</label><input type="date" id="details-installationDate"></div>
+                        <div class="input-group"><label for="details-installedBy">القائم بالتركيب</label><select id="details-installedBy"></select></div>
+                    </fieldset>
+
+                    <fieldset id="details-demolition-fields" class="form-grid-group hidden">
+                        <legend>بيانات الهدم / الاستغناء</legend>
+                        <div class="input-group">
+                            <label for="details-demolitionType">نوع الهدم</label>
+                            <select id="details-demolitionType">
+                                <option value="هدم جزئي">هدم جزئي</option>
+                                <option value="هدم كامل">هدم كامل</option>
+                            </select>
+                        </div>
+                        <div class="input-group"><label for="details-demolitionDate">تاريخ الهدم/الاستغناء</label><input type="date" id="details-demolitionDate"></div>
+                        <div class="input-group"><label for="details-meterReceivedBy">القائم باستلام العداد</label><select id="details-meterReceivedBy"></select></div>
+                    </fieldset>
+
+                    <fieldset id="details-repaired-info-fields" class="form-grid-group hidden">
+                        <legend>بيانات الإصلاح</legend>
+                        <div class="input-group">
+                            <label for="details-repairDate">تاريخ الإصلاح</label>
+                            <input type="date" id="details-repairDate">
+                        </div>
+                        <div class="input-group">
+                            <label for="details-reinstallationDate">تاريخ الرجوع للتركيب</label>
+                            <input type="date" id="details-reinstallationDate">
+                        </div>
+                    </fieldset>
+                 </form>
+                 <div class="form-actions">
+                    <button id="save-details-btn" class="btn">حفظ التعديلات</button>
+                    <button id="delete-subscriber-btn" class="btn btn-delete">حذف المشترك</button>
+                 </div>
+            </div>
+        </section>
+
+
+        <!-- REPAIRED METERS SECTION -->
+        <section id="repaired-meters" class="content-section">
+            <div class="section-header">
+                <h3>إصلاحات</h3>
+                <button class="btn btn-back-page" title="رجوع"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span></button>
+            </div>
+            <div class="form-container" id="repair-search-container">
+                <h3>بحث عن عداد تالف
+                    <div class="tooltip-container">
+                        <span class="tooltip-text">هذا البحث مخصص فقط للعدادات التي حالتها 'مرفوع أعطال' لتسهيل الوصول إليها وتسجيل عملية الإصلاح.</span>
+                    </div>
+                </h3>
+                <form id="repair-search-form" class="form-grid">
+                    <div class="input-group"><label for="search-subscriberName">اسم المشترك</label><input type="text" id="search-subscriberName"></div>
+                    <div class="input-group"><label for="search-subscriptionCode">كود الاشتراك</label><input type="text" id="search-subscriptionCode"></div>
+                    <div class="input-group"><label for="search-meterChassisNumber">شاسية العداد</label><input type="text" id="search-meterChassisNumber"></div>
+                    <div class="input-group full-width">
+                        <button type="submit" class="btn">بحث</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="repair-search-results" class="table-container hidden">
+                <h4>نتائج البحث</h4>
+                <div class="responsive-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>اسم المشترك</th>
+                                <th>كود الاشتراك</th>
+                                <th>العنوان</th>
+                                <th>شاسية العداد</th>
+                                <th style="width: 220px;">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="repair-form-container" class="form-container hidden">
+                <h3>تسجيل عملية إصلاح</h3>
+                <form id="repair-form" class="form-grid" novalidate>
+                    <input type="hidden" id="repair-meter-id">
+                    <div class="input-group">
+                        <label>اسم المشترك</label>
+                        <p id="repair-subscriberName" class="form-static-text"></p>
+                    </div>
+                    <div class="input-group">
+                        <label>شاسية العداد</label>
+                        <p id="repair-meterChassisNumber" class="form-static-text"></p>
+                    </div>
+                    <div class="input-group">
+                        <label for="repairStatus">حالة الإصلاح</label>
+                        <select id="repairStatus" required></select>
+                    </div>
+
+                    <fieldset id="replacement-fields-container" class="form-grid-group hidden">
+                        <legend>بيانات العداد الجديد</legend>
+                        <div class="input-group">
+                            <label for="repair-newMeterChassisNumber">شاسية العداد الجديد</label>
+                            <input type="text" id="repair-newMeterChassisNumber">
+                        </div>
+                        <div class="input-group">
+                            <label for="repair-meterSupplyCompany">شركة توريد العداد</label>
+                            <select id="repair-meterSupplyCompany"></select>
+                        </div>
+                        <div class="input-group">
+                            <label for="repair-installationDate">تاريخ التركيب</label>
+                            <input type="date" id="repair-installationDate">
+                        </div>
+                        <div class="input-group">
+                            <label for="repair-installedBy">القائم بالتركيب</label>
+                            <select id="repair-installedBy"></select>
+                        </div>
+                    </fieldset>
+
+                    <fieldset id="repaired-fields-container" class="form-grid-group hidden">
+                        <legend>بيانات الإصلاح والتركيب</legend>
+                        <div class="input-group">
+                            <label for="repair-repairDate">تاريخ الإصلاح</label>
+                            <input type="date" id="repair-repairDate">
+                        </div>
+                        <div class="input-group">
+                            <label for="repair-reinstallationDate">تاريخ الرجوع للتركيب</label>
+                            <input type="date" id="repair-reinstallationDate">
+                        </div>
+                    </fieldset>
+
+                     <div class="input-group full-width">
+                        <button type="submit" class="btn">حفظ الإصلاح</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="table-container">
+                <h3>سجل الإصلاحات</h3>
+                 <div class="responsive-table">
+                    <table id="repaired-meters-table">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- SUBSCRIBER FILTERED SECTIONS -->
+        <section id="subscribers-all" class="content-section">
+            <div class="table-container">
+                <div class="table-controls">
+                    <div class="section-header-title">
+                        <h3>قائمة جميع المشتركين</h3>
+                        <button class="btn btn-back-page" title="رجوع"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span></button>
+                    </div>
+                    <div class="multi-filter-container" data-table-id="subscribers-all-table">
+                        <input type="text" class="table-filter" data-col-index="4" placeholder="بحث باسم المشترك...">
+                        <input type="text" class="table-filter" data-col-index="5" placeholder="بحث بكود الاشتراك...">
+                        <input type="text" class="table-filter" data-col-index="6" placeholder="بحث بالعنوان...">
+                        <input type="text" class="table-filter" data-col-index="7" placeholder="بحث بشاسية العداد...">
+                        <div class="input-group compound" style="flex-grow: 1; margin-bottom: 0;">
+                            <label style="font-size: 12px; margin-bottom: 2px;">بحث بمرجع الحساب</label>
+                            <div class="compound-controls"><input type="text" class="table-filter" data-col-index="0" placeholder="ف"><input type="text" class="table-filter" data-col-index="1" placeholder="ح"><input type="text" class="table-filter" data-col-index="2" placeholder="ي"><input type="text" class="table-filter" data-col-index="3" placeholder="م"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="responsive-table">
+                    <table id="subscribers-all-table">
+                        <thead>
+                            <tr>
+                                <th>مرجع الحساب</th>
+                                <th>اسم المشترك</th>
+                                <th>كود الاشتراك</th>
+                                <th>العنوان</th>
+                                <th>شاسية العداد</th>
+                                <th>الحالة</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody></table></div>
+            </div>
+        </section>
+        <section id="subscribers-new" class="content-section">
+            <div class="table-container">
+                <div class="table-controls">
+                    <div class="section-header-title">
+                        <h3>قائمة المشتركين - جديد</h3>
+                        <button class="btn btn-back-page" title="رجوع"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span></button>
+                    </div>
+                    <div class="multi-filter-container" data-table-id="subscribers-new-table">
+                        <input type="text" class="table-filter" data-col-index="4" placeholder="بحث باسم المشترك...">
+                        <input type="text" class="table-filter" data-col-index="5" placeholder="بحث بكود الاشتراك...">
+                        <input type="text" class="table-filter" data-col-index="6" placeholder="بحث بالعنوان...">
+                        <input type="text" class="table-filter" data-col-index="7" placeholder="بحث بشاسية العداد...">
+                        <div class="input-group compound" style="flex-grow: 1; margin-bottom: 0;">
+                            <label style="font-size: 12px; margin-bottom: 2px;">بحث بمرجع الحساب</label>
+                            <div class="compound-controls"><input type="text" class="table-filter" data-col-index="0" placeholder="ف"><input type="text" class="table-filter" data-col-index="1" placeholder="ح"><input type="text" class="table-filter" data-col-index="2" placeholder="ي"><input type="text" class="table-filter" data-col-index="3" placeholder="م"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="responsive-table"><table id="subscribers-new-table"><thead></thead><tbody></tbody></table></div>
+            </div>
+        </section>
+        <section id="subscribers-faults" class="content-section">
+            <div class="table-container">
+                <div class="table-controls">
+                    <div class="section-header-title">
+                        <h3>قائمة المشتركين - مرفوع أعطال</h3>
+                        <button class="btn btn-back-page" title="رجوع"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span></button>
+                    </div>
+                    <div class="multi-filter-container" data-table-id="subscribers-faults-table">
+                        <input type="text" class="table-filter" data-col-index="4" placeholder="بحث باسم المشترك...">
+                        <input type="text" class="table-filter" data-col-index="5" placeholder="بحث بكود الاشتراك...">
+                        <input type="text" class="table-filter" data-col-index="6" placeholder="بحث بالعنوان...">
+                        <input type="text" class="table-filter" data-col-index="7" placeholder="بحث بشاسية العداد...">
+                        <div class="input-group compound" style="flex-grow: 1; margin-bottom: 0;">
+                            <label style="font-size: 12px; margin-bottom: 2px;">بحث بمرجع الحساب</label>
+                            <div class="compound-controls"><input type="text" class="table-filter" data-col-index="0" placeholder="ف"><input type="text" class="table-filter" data-col-index="1" placeholder="ح"><input type="text" class="table-filter" data-col-index="2" placeholder="ي"><input type="text" class="table-filter" data-col-index="3" placeholder="م"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="responsive-table"><table id="subscribers-faults-table"><thead></thead><tbody></tbody></table></div>
+            </div>
+        </section>
+        <section id="subscribers-replacement" class="content-section">
+            <div class="table-container">
+                <div class="table-controls">
+                    <div class="section-header-title">
+                        <h3>قائمة المشتركين - مرفوع إحلال</h3>
+                        <button class="btn btn-back-page" title="رجوع"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span></button>
+                    </div>
+                    <div class="multi-filter-container" data-table-id="subscribers-replacement-table">
+                        <input type="text" class="table-filter" data-col-index="4" placeholder="بحث باسم المشترك...">
+                        <input type="text" class="table-filter" data-col-index="5" placeholder="بحث بكود الاشتراك...">
+                        <input type="text" class="table-filter" data-col-index="6" placeholder="بحث بالعنوان...">
+                        <input type="text" class="table-filter" data-col-index="7" placeholder="بحث بشاسية العداد...">
+                    </div>
+                </div>
+                <div class="responsive-table"><table id="subscribers-replacement-table"><thead></thead><tbody></tbody></table></div>
+            </div>
+        </section>
+        <section id="subscribers-substituted" class="content-section">
+            <div class="table-container">
+                <div class="table-controls">
+                    <div class="section-header-title"><h3>قائمة المشتركين - استبدال</h3><button class="btn btn-back-page" title="رجوع"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span></button></div>
+                    <input type="text" class="table-filter" placeholder="بحث..." data-table-id="subscribers-substituted-table">
+                </div>
+                <div class="responsive-table"><table id="subscribers-substituted-table"><thead></thead><tbody></tbody></table></div>
+            </div>
+        </section>
+        <section id="subscribers-scrapped" class="content-section">
+            <div class="table-container">
+                <div class="table-controls">
+                    <div class="section-header-title"><h3>قائمة المشتركين - استغناء</h3><button class="btn btn-back-page" title="رجوع"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span></button></div>
+                    <input type="text" class="table-filter" placeholder="بحث..." data-table-id="subscribers-scrapped-table">
+                </div>
+                <div class="responsive-table"><table id="subscribers-scrapped-table"><thead></thead><tbody></tbody></table></div>
+            </div>
+        </section>
+        <section id="subscribers-demolition" class="content-section">
+            <div class="table-container">
+                <div class="table-controls">
+                    <div class="section-header-title">
+                        <h3>قائمة المشتركين - هدم</h3>
+                        <button class="btn btn-back-page" title="رجوع"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span></button>
+                    </div>
+                    <div class="multi-filter-container" data-table-id="subscribers-demolition-table">
+                        <input type="text" class="table-filter" data-col-index="4" placeholder="بحث باسم المشترك...">
+                        <input type="text" class="table-filter" data-col-index="5" placeholder="بحث بكود الاشتراك...">
+                    </div>
+                </div>
+                <div class="responsive-table"><table id="subscribers-demolition-table"><thead></thead><tbody></tbody></table></div>
+            </div>
+        </section>
+
+        <!-- SUBSCRIBER ACCOUNT STATEMENT -->
+        
+        <!-- MUKAYASAT (NEW) -->
+        <section id="mukayasat-registration" class="content-section">
+            <div class="section-header">
+                <h3 id="mukayasat-form-title">ادخال مقايسة (نموذج المعاينة)</h3>
+                <button class="btn btn-back-page" title="رجوع">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <span>رجوع</span>
+                </button>
+            </div>
+            <div class="form-container" style="background-color: #f0f2f5; padding: 20px;">
+                <form id="mukayasat-form" class="form-grid" novalidate>
+                    <input type="hidden" id="mukaysa-id">
+                    
+                    <div class="report-paper">
+                        <!-- Header mimicking the report -->
+                        <div class="report-header-box" style="border-bottom: 3px double #333; padding-bottom: 15px; margin-bottom: 25px; text-align: center;">
+                            <h2 style="margin: 0 0 5px 0; color: #1e293b; font-size: 1.8rem;">تقرير معاينة فنية</h2>
+                            <p style="margin: 0; color: #64748b; font-size: 1.1rem;">شركة الكهرباء - قطاع التوزيع</p>
+                        </div>
+
+                        <!-- 1. Applicant Info -->
+                        <div class="report-section-header">1. بيانات العميل والموقع</div>
+                        <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="input-group"><label for="mukaysa-requestNumber">رقم الطلب</label><input type="text" id="mukaysa-requestNumber" required style="background: #f8fafc;"></div>
+                            <div class="input-group"><label for="mukaysa-requesterName">اسم مقدم الطلب</label><input type="text" id="mukaysa-requesterName" required></div>
+                            <div class="input-group"><label for="mukaysa-nationalId">الرقم القومي</label><input type="text" id="mukaysa-nationalId" pattern="[0-9]*" maxlength="14"></div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="input-group"><label for="mukaysa-address">عنوان الموقع بالتفصيل</label><input type="text" id="mukaysa-address" required></div>
+                            <div class="input-group"><label for="mukaysa-mobile">رقم الموبايل</label><input type="text" id="mukaysa-mobile"></div>
+                            <div class="input-group"><label for="mukaysa-establishmentType">نوع المنشأة</label><select id="mukaysa-establishmentType"><option value="سكنية">سكنية</option><option value="استثمارية">استثمارية</option></select></div>
+                        </div>
+
+                        <!-- 2. Boundaries & Sketch -->
+                        <div class="report-section-header">2. وصف العقار والكروكي</div>
+                        
+                        <div style="display: flex; flex-wrap: wrap; gap: 25px;">
+                            <!-- Boundaries & Description -->
+                            <div style="flex: 1; min-width: 300px;">
+                                <label for="mukaysa-dimensions" style="font-weight: bold; display: block; margin-bottom: 8px; color: #475569;">وصف المبنى والمساحات:</label>
+                                <textarea id="mukaysa-dimensions" rows="12" style="width: 100%; resize: vertical; border: 1px solid #ccc; border-radius: 4px; padding: 10px; line-height: 1.6;" placeholder="اكتب وصفاً تفصيلياً للعقار..."></textarea>
+                            </div>
+
+                            <!-- Sketch Canvas -->
+                            <div style="flex: 0 0 450px; max-width: 100%;">
+                                <label style="font-weight: bold; display: block; margin-bottom: 8px; color: #475569;">كروكي الموقع ونقطة التغذية:</label>
+                                <div class="canvas-wrapper" style="border: 2px solid #333; background: #fff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                                    <div class="sketch-toolbar-enhanced">
+                                        <button type="button" class="btn-tool active" data-tool="pen" title="قلم رسم">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>
+                                            رسم
+                                        </button>
+                                        <div style="width: 1px; height: 24px; background: #cbd5e1; margin: 0 5px;"></div>
+                                        <div class="sketch-text-control">
+                                            <button type="button" class="btn-tool" data-tool="text" title="إضافة نص">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+                                                نص
+                                            </button>
+                                            <input type="text" id="sketch-text-input" placeholder="اكتب النص هنا..." style="width: 140px; padding: 4px; border: none; outline: none; font-size: 0.9rem;">
+                                        </div>
+                                        <button type="button" class="btn-tool danger" id="btn-clear-sketch" title="مسح الكل" style="margin-right: auto;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                            مسح
+                                        </button>
+                                    </div>
+                                    <canvas id="mukaysa-sketch-canvas" width="450" height="400" style="cursor: crosshair; touch-action: none; display: block; width: 100%;"></canvas>
+                                    <div style="padding: 8px; background: #f1f5f9; font-size: 0.85rem; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0;">
+                                        اضغط على "رسم" للتخطيط، أو اكتب النص واضغط على "نص" ثم انقر في المكان المطلوب على الكروكي.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Technical Data -->
+                        <div class="report-section-header">3. البيانات الفنية للمصدر</div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="input-group"><label for="mukaysa-boundary-west">الحد الغربي</label><input type="text" id="mukaysa-boundary-west"></div>
+                            <div class="input-group"><label for="mukaysa-boundary-south">الحد البحري</label><input type="text" id="mukaysa-boundary-south"></div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="input-group"><label for="mukaysa-boundary-east">الحد الشرقي</label><input type="text" id="mukaysa-boundary-east"></div>
+                            <div class="input-group"><label for="mukaysa-boundary-north">الحد القبلي</label><input type="text" id="mukaysa-boundary-north"></div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="input-group"><label for="mukaysa-distance-pole">البعد عن أقرب عامود (م)</label><input type="text" id="mukaysa-distance-pole"></div>
+                            <div class="input-group"><label for="mukaysa-sortiaLoad">حمل السورتية (أمبير)</label><input type="text" id="mukaysa-sortiaLoad"></div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="input-group"><label for="mukaysa-transformerName">اسم المحول / الكشك</label><input type="text" id="mukaysa-transformerName"></div>
+                            <div class="input-group"><label for="mukaysa-distance-transformer">بعد العقار عن المحول (م)</label><input type="text" id="mukaysa-distance-transformer"></div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="input-group"><label for="mukaysa-transformerCapacity">قدرة المحول (ك.ف.أ)</label><input type="text" id="mukaysa-transformerCapacity"></div>
+                            <div class="input-group"><label for="mukaysa-transformer-load">نسبة التحميل (%)</label><input type="number" id="mukaysa-transformer-load" min="0" max="100"></div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="input-group">
+                                <label for="mukaysa-connectionType">نوع التوصيلة</label>
+                                <select id="mukaysa-connectionType">
+                                    <option value="">اختر...</option>
+                                    <option value="رئيسية">رئيسية</option>
+                                    <option value="فرعية">فرعية</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="mukaysa-mainConnectionType">نوع الوصلة الرئيسية</label>
+                                <select id="mukaysa-mainConnectionType">
+                                    <option value="">اختر...</option>
+                                    <option value="أرضية">أرضية</option>
+                                    <option value="هوائية">هوائية</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="input-group"><label for="mukaysa-transformerNumber">رقم المحول</label><input type="text" id="mukaysa-transformerNumber"></div>
+                            <div class="input-group"><label for="mukaysa-distance-feed">البعد عن مصدر التغذية (م)</label><input type="text" id="mukaysa-distance-feed"></div>
+                        </div>
+
+                        <!-- 4. Units & Meters -->
+                        <div class="report-section-header">4. مقايسة الأحمال</div>
+                        
+                        <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; background: #fff;">
+                            <div style="font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 10px; color: #000;">الوحدات المطلوب تركيب عداد بها ( توصيف الوحدات والنشاط )</div>
+                            <textarea id="mukaysa-unitsDescription" rows="4" style="width: 100%; resize: vertical; border: 1px solid #ccc; border-radius: 4px; padding: 10px;"></textarea>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="input-group"><label for="mukaysa-single-phase-count">عدد العدادات الاحادية</label><input type="number" id="mukaysa-single-phase-count"></div>
+                            <div class="input-group"><label for="mukaysa-three-phase-count">عدد العدادات الثلاثية</label><input type="number" id="mukaysa-three-phase-count"></div>
+                        </div>
+
+                        <!-- 5. Signatures -->
+                        <div class="report-section-header">5. التوقيعات</div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                            <div class="input-group"><label for="mukaysa-technician">الفني القائم بالمعاينة</label><select id="mukaysa-technician"></select></div>
+                            <div class="input-group"><label for="mukaysa-engineer">مهندس الشئون الفنية</label><select id="mukaysa-engineer"></select></div>
+                            <div class="input-group"><label for="mukaysa-headEngineer">رئيس الهندسة</label><select id="mukaysa-headEngineer"></select></div>
+                        </div>
+
+                        <div class="input-group full-width" style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                            <label for="mukaysa-attachments">مرفقات (صور) - اختياري</label>
+                            <input type="file" id="mukaysa-attachments" accept="image/*" multiple>
+                        </div>
+                    </div>
+
+                    <div class="input-group full-width" style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button type="submit" class="btn" style="flex: 1; padding: 12px; font-size: 1.1rem;">حفظ المقايسة</button>
+                        <button type="button" id="clear-mukayasa-form-btn" class="btn secondary" style="flex: 1;">مسح النموذج</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- قسم الطلبات قيد الانتظار الجديد -->
+        <section id="pending-requests-section" class="content-section">
+            <div class="table-container">
+                <div class="section-header">
+                    <h3>الطلبات قيد الانتظار</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="import-pending-excel-btn" class="btn secondary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>استيراد من Excel</span>
+                        </button>
+                        <input type="file" id="pending-excel-upload" accept=".xlsx, .xls" class="hidden">
+                        <button class="btn btn-back-page" title="رجوع"><span>رجوع</span></button>
+                    </div>
+                </div>
+                <div class="form-container" style="margin-bottom: 1.5rem; background: var(--bg-color);">
+                    <div class="multi-filter-container" id="pending-filters">
+                        <input type="text" id="filter-pending-name" class="table-filter" placeholder="اسم مقدم الطلب...">
+                        <input type="text" id="filter-pending-nationalId" class="table-filter" placeholder="الرقم القومي...">
+                        <input type="text" id="filter-pending-mobile" class="table-filter" placeholder="رقم الموبايل...">
+                        <input type="text" id="filter-pending-address" class="table-filter" placeholder="العنوان...">
+                        <select id="filter-pending-type" class="table-filter"><option value="تركيب عداد كودي">تركيب عداد كودي</option></select>
+                    </div>
+                </div>
+                <div id="pending-bulk-actions" class="bulk-actions-container" style="margin-bottom: 15px; padding: 10px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 4px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <span style="font-weight: bold; color: #0369a1;">نقل المحدد إلى:</span>
+                    <select id="assign-target-address-select" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; min-width: 150px;">
+                        <option value="">اختر منطقة...</option>
+                    </select>
+                    <button id="assign-pending-requests-btn" class="btn" style="padding: 6px 10px; background-color: #0284c7; color: white;">نقل</button>
+                    <button id="move-to-mukayasat-btn" class="btn" style="padding: 6px 10px; background-color: #059669; color: white;">تم عمل المعاينة</button>
+                    <button id="add-pending-address-tab-btn" class="btn" style="padding: 6px 10px; background-color: #10b981; color: white;">إضافة منطقة كتبويب</button>
+                    <button id="delete-selected-pending-btn" class="btn btn-danger" style="padding: 6px 10px;">حذف المحدد</button>
+                    <span id="pending-selected-count" style="margin-right: auto; font-size: 0.85rem; color: #666;">0 طلب محدد</span>
+                </div>
+                <div id="pending-tabs-container" class="tabs-wrapper" style="margin-bottom: 1rem; display: flex; gap: 5px; overflow-x: auto; padding-bottom: 10px; border-bottom: 2px solid var(--border-color);"></div>
+                <div class="responsive-table" id="pending-table-wrapper"></div>
+            </div>
+        </section>
+
+        <section id="mukayasat-list" class="content-section">
+            <div class="table-container">
+                <div class="table-controls">
+                    <div class="section-header-title">
+                        <h3>المقايسات المحفوظة</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="print-mukayasat-list-btn" class="btn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                                <span>طباعة القائمة</span>
+                            </button>
+                            <button class="btn btn-back-page" title="رجوع"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span></button>
+                        </div>
+                    </div>
+                    <form id="mukayasat-search-form" class="multi-filter-container" data-table-id="mukayasat-table">
+                        <input type="text" class="table-filter" name="filter-name" placeholder="بحث بالاسم...">
+                        <input type="text" class="table-filter" name="filter-requestNumber" placeholder="بحث برقم الطلب...">
+                        <input type="text" class="table-filter" name="filter-address" placeholder="بحث بالعنوان...">
+                        <select class="table-filter" name="filter-status"><option value="">الكل</option><option>قيد المعالجة</option><option>مكتمل</option><option>مرفوض</option></select>
+                        <input type="text" class="table-filter" name="filter-nationalId" placeholder="بحث بالرقم القومي...">
+                        <input type="text" class="table-filter" name="filter-mobile" placeholder="بحث برقم الموبايل...">
+                    </form>
+                </div>
+                <div class="responsive-table">
+                    <table id="mukayasat-table">
+                        <thead>
+                            <tr>
+                                <th>اسم الطالب</th>
+                                <th>رقم الطلب</th>
+                                <th>الرقم القومي</th>
+                                <th>العنوان</th>
+                                <th>الموبايل</th>
+                                <th>نوع المنشأة</th>
+                                <th>نوع النشاط</th>
+                                <th>حالة الطلب</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- MUKAYASA DETAILS (VIEW/PRINT) -->
+        <section id="mukayasa-details" class="content-section">
+            <div class="section-header">
+                <h3 id="mukayasa-details-title">تفاصيل المقايسة</h3>
+                <button class="btn btn-back-page" title="رجوع">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <span>رجوع</span>
+                </button>
+            </div>
+            <div class="form-container">
+                <div class="form-actions" style="justify-content: flex-end;">
+                    <button id="print-mukayasa-btn" class="btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        <span>طباعة</span>
+                    </button>
+                </div>
+                <div id="mukayasa-details-content" class="details-view">
+                    <!-- Details will be rendered here by JS -->
+                </div>
+            </div>
+        </section>
+
+        <section id="subscriber-statement" class="content-section">
+            <div class="form-container">
+                <div class="section-header">
+                    <h3>كشف حساب مشترك
+                     <div class="tooltip-container">
+                        <span class="tooltip-text">استخدم هذه الشاشة للبحث عن مشترك وعرض جميع السجلات المرتبطة به عبر النظام، بغض النظر عن حالة العداد.</span>
+                    </div>
+                </h3>
+                <p class="text-muted">ابحث عن مشترك لعرض جميع سجلاته وبياناته المسجلة في النظام.</p>
+                <form id="subscriber-statement-form" class="form-grid">
+                    <div class="input-group">
+                        <label for="statement-search-subscriberName">اسم المشترك</label>
+                        <input type="text" id="statement-search-subscriberName" placeholder="جزء من الاسم...">
+                    </div>
+                    <div class="input-group">
+                        <label for="statement-search-subscriptionCode">كود الاشتراك</label>
+                        <input type="text" id="statement-search-subscriptionCode" placeholder="الكود الكامل أو جزء منه...">
+                    </div>
+                    <div class="input-group">
+                        <label for="statement-search-meterChassisNumber">شاسية العداد</label>
+                        <input type="text" id="statement-search-meterChassisNumber" placeholder="رقم الشاسية...">
+                    </div>
+                    <div class="input-group compound">
+                        <label>بحث بمرجع الحساب</label>
+                        <div class="compound-controls">
+                            <div class="input-group-sub">
+                                <label for="statement-search-accountRefF">ف</label>
+                                <input type="text" id="statement-search-accountRefF" pattern="[0-9]*">
+                            </div>
+                            <div class="input-group-sub">
+                                <label for="statement-search-accountRefH">ح</label>
+                                <input type="text" id="statement-search-accountRefH" pattern="[0-9]*">
+                            </div>
+                            <div class="input-group-sub">
+                                <label for="statement-search-accountRefY">ي</label>
+                                <input type="text" id="statement-search-accountRefY" pattern="[0-9]*">
+                            </div>
+                            <div class="input-group-sub">
+                                <label for="statement-search-accountRefM">م</label>
+                                <input type="text" id="statement-search-accountRefM" pattern="[0-9]*">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-group full-width">
+                        <button type="submit" class="btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <span>بحث</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+    
+            <div id="print-area-statement" class="hidden">
+                <!-- Results will be rendered here by JS -->
+            </div>
+        </section>
+
+        <!-- قسم الضبطية القضائية -->
+        <section id="judicial-control-list" class="content-section">
+            <div class="table-container">
+                <div class="table-controls">
+                    <div class="section-header-title">
+                        <h3>قائمة الضبطية القضائية</h3>
+                        <button class="btn btn-back-page" title="رجوع"><span>رجوع</span></button>
+                    </div>
+                    <form id="judicial-control-filter-form" class="multi-filter-container" data-table-id="judicial-control-table">
+                        <input type="text" name="filter-text" class="table-filter" placeholder="بحث بالاسم، الرقم القومي، العنوان...">
+                        <select name="filter-status" class="table-filter">
+                            <!-- سيتم ملؤه بواسطة TypeScript -->
+                        </select>
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; margin-bottom: 2px;">تاريخ المحضر من</label>
+                            <input type="date" name="filter-date-from" class="table-filter">
+                        </div>
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; margin-bottom: 2px;">إلى</label>
+                            <input type="date" name="filter-date-to" class="table-filter">
+                        </div>
+                        <button type="submit" class="btn" style="padding: 0.5rem 1rem;">بحث</button>
+                        <button type="reset" class="btn secondary" style="padding: 0.5rem 1rem;">إعادة تعيين</button>
+                    </form>
+                </div>
+                <div class="responsive-table">
+                    <table id="judicial-control-table">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- نموذج إضافة محضر ضبطية قضائية -->
+        <section id="judicial-control-registration" class="content-section">
+            <div class="section-header"><h3 id="judicial-control-form-title">إضافة محضر ضبطية قضائية</h3><button class="btn btn-back-page" title="رجوع"><span>رجوع</span></button></div>
+            <div class="form-container">
+                <form id="judicial-control-form" class="form-grid" novalidate>
+                    <input type="hidden" id="judicial-control-id">
+                    <!-- سيتم إنشاء حقول النموذج بواسطة TypeScript -->
+                </form>
+            </div>
+        </section>
+
+        <!-- عرض تفاصيل محضر الضبطية القضائية -->
+        <section id="judicial-control-details" class="content-section">
+            <div class="section-header">
+                <h3 id="judicial-control-details-title">تفاصيل المحضر</h3>
+                <button class="btn btn-back-page" title="رجوع">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <span>رجوع</span>
+                </button>
+            </div>
+            <div class="form-container">
+                <div class="form-actions" style="justify-content: flex-end;">
+                    <button id="print-judicial-control-btn" class="btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        <span>طباعة</span>
+                    </button>
+                </div>
+                <div id="judicial-control-details-content" class="details-view">
+                    <!-- سيتم عرض التفاصيل والمرفقات هنا بواسطة TypeScript -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Other sections -->
+        <section id="technicians" class="content-section"></section>
+
+        <!-- Reports Section -->
+        <section id="reports" class="content-section">
+            <div class="reports-container">
+                <div class="section-header">
+                    <h3>التقارير</h3>
+                    <button class="btn btn-back-page" title="رجوع">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span>
+                    </button>
+                </div>
+                <h3>إنشاء تقرير مخصص</h3>
+                <form id="report-generation-form" class="form-grid" novalidate>
+                    <div class="input-group">
+                        <label for="report-type">نوع التقرير</label>
+                        <select id="report-type">
+                            <option value="all-meters">تقرير عدادات شامل</option>
+                            <option value="meters-by-status">تقرير العدادات حسب الحالة</option>
+                            <option value="prepaid-meters">تقرير عدادات مسبقة الدفع</option>
+                            <option value="replacement-report">تقرير عدادات الإحلال</option>
+                            <option value="technician-activity">تقرير نشاط الفنيين</option>
+                            <option value="repairs">تقرير الإصلاحات</option>
+                            <option value="memos">المذكرات</option>
+                        </select>
+                    </div>
+                    <!-- Dynamic filters will be inserted here -->
+                    <fieldset id="report-filters-container" class="form-grid-group">
+                        <legend>خيارات التصفية</legend>
+                        <div id="report-filters"></div>
+                    </fieldset>
+                    <div class="input-group full-width">
+                         <button type="submit" class="btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                            <span>إنشاء التقرير</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+    
+            <div id="report-results-container" class="form-container hidden">
+                <div id="print-area">
+                    <div class="report-actions-no-print">
+                        <button id="print-report-btn" class="btn">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            <span>طباعة التقرير</span>
+                        </button>
+                    </div>
+                    <header id="report-print-header"></header>
+                    <h4 id="report-title"></h4>
+                    <div id="report-byline" class="report-byline"></div>
+                    <div class="responsive-table">
+                        <table id="report-results-table">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <footer id="report-print-footer"></footer>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Settings Section -->
+        <section id="settings" class="content-section">
+            <div class="section-header">
+                <h3>الإعدادات</h3>
+                <button class="btn btn-back-page" title="رجوع">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span>
+                </button>
+            </div>
+          <div class="settings-grid">
+              <!-- Dropdown Management -->
+              <div class="settings-card">
+                  <h3>إدارة القوائم</h3>
+                  <p class="text-muted">تحكم في الخيارات المتاحة في القوائم المنسدلة عبر النظام.</p>
+                  
+                  <!-- Technicians -->
+                  <div class="managed-list" id="roles-list-container">
+                      <h4>الأدوار الوظيفية</h4>
+                      <p class="text-muted" style="font-size: 0.8rem;">الأدوار الجديدة ستظهر في جدول الصلاحيات.</p>
+                      <div class="add-item-form">
+                          <input type="text" id="new-role-input" placeholder="أضف دور جديد (مثال: محصل)">
+                          <button class="btn" data-list="roles">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+
+                  <!-- Technicians -->
+                  <div class="managed-list" id="technicians-list-container">
+                      <h4>الفنيين</h4>
+                      <div class="add-item-form">
+                          <input type="text" id="new-technician-input" placeholder="أضف فني جديد">
+                          <button class="btn" data-list="technicians">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+
+                  <!-- Addresses -->
+                  <div class="managed-list" id="addresses-list-container">
+                      <h4>العناوين</h4>
+                      <div class="add-item-form">
+                          <input type="text" id="new-addresses-input" placeholder="أضف عنوان جديد...">
+                          <button class="btn" data-list="addresses">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+      
+                  <!-- Subscription Types -->
+                  <div class="managed-list" id="subscriptionTypes-list-container">
+                      <h4>أنواع الاشتراكات</h4>
+                      <div class="add-item-form">
+                          <input type="text" id="new-subscriptionType-input" placeholder="أضف نوع اشتراك جديد">
+                          <button class="btn" data-list="subscriptionTypes">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+      
+                  <!-- Meter Types -->
+                  <div class="managed-list" id="meterTypes-list-container">
+                      <h4>أنواع العدادات</h4>
+                      <div class="add-item-form">
+                          <input type="text" id="new-meterType-input" placeholder="أضف نوع عداد جديد">
+                          <button class="btn" data-list="meterTypes">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+                  
+                  <!-- Meter Capacities -->
+                  <div class="managed-list" id="meterCapacities-list-container">
+                      <h4>قدرات العدادات</h4>
+                      <div class="add-item-form">
+                          <input type="text" id="new-meterCapacity-input" placeholder="أضف قدرة عداد جديدة">
+                          <button class="btn" data-list="meterCapacities">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+      
+                  <!-- Activity Types -->
+                  <div class="managed-list" id="activityTypes-list-container">
+                      <h4>أنواع الأنشطة</h4>
+                      <div class="add-item-form">
+                          <input type="text" id="new-activityType-input" placeholder="أضف نوع نشاط جديد">
+                          <button class="btn" data-list="activityTypes">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+      
+                  <!-- Repair Statuses -->
+                  <div class="managed-list" id="repairStatuses-list-container">
+                      <h4>حالات الإصلاح</h4>
+                      <div class="add-item-form">
+                          <input type="text" id="new-repairStatus-input" placeholder="أضف حالة إصلاح جديدة">
+                          <button class="btn" data-list="repairStatuses">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+
+                  <!-- Card Statuses -->
+                  <div class="managed-list" id="cardStatuses-list-container">
+                      <h4>حالات الكارت</h4>
+                      <div class="add-item-form">
+                          <input type="text" id="new-cardStatus-input" placeholder="أضف حالة كارت جديدة">
+                          <button class="btn" data-list="cardStatuses">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+
+                  <!-- Removal Reasons -->
+                  <div class="managed-list" id="removalReasons-list-container">
+                      <h4>أسباب الرفع</h4>
+                      <div class="add-item-form">
+                          <input type="text" id="new-removalReason-input" placeholder="أضف سبب رفع جديد">
+                          <button class="btn" data-list="removalReasons">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+              </div>
+              
+              <!-- Company & Report Settings Card -->
+              <div class="settings-card">
+                  <h3>إعدادات الشركة والتقارير</h3>
+                  <p class="text-muted">تخصيص بيانات الشركة التي تظهر في رأس التقارير الرسمية.</p>
+                  
+                  <div class="input-group">
+                      <label for="settings-company-name">اسم الشركة (العام)</label>
+                      <textarea id="settings-company-name" rows="2" style="resize: vertical;"></textarea>
+                  </div>
+
+                  <hr/>
+
+                  <p class="text-muted">
+                      هذه الإعدادات خاصة فقط بـ "تقرير عدادات الإحلال" المطبوع.
+                      <div class="tooltip-container">
+                          <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                          <span class="tooltip-text">استخدم هذه الحقول لتجاوز الإعدادات العامة أعلاه عند طباعة تقرير الإحلال فقط.</span>
+                      </div>
+                  </p>
+                  <div class="input-group">
+<label for="replacement-report-company-name">اسم الشركة الذي يظهر في التقارير والمذكرات</label>
+                      <textarea id="replacement-report-company-name" rows="2" style="resize: vertical;"></textarea>
+                  </div>
+                  <div class="input-group">
+                      <label for="replacement-report-footer-text">نص التذييل (Byline)</label>
+                      <textarea id="replacement-report-footer-text" rows="2"></textarea>
+                  </div>
+              
+                  <!-- Signatures -->
+                  <div class="managed-list" id="replacementSignatures-list-container">
+<h4>التوقيعات العامة</h4>
+                      <div class="add-item-form">
+                          <input type="text" id="new-replacementSignature-input" placeholder="أضف توقيع جديد">
+                          <button class="btn" data-list="replacementSignatures">إضافة</button>
+                      </div>
+                      <ul></ul>
+                  </div>
+                  
+                  <div class="settings-actions">
+                      <button id="save-company-report-settings-btn" class="btn">حفظ إعدادات الشركة والتقارير</button>
+                  </div>
+              </div>
+
+              <!-- Dashboard Visibility Settings -->
+              <div class="settings-card">
+                  <h3>إعدادات لوحة التحكم</h3>
+                  <p class="text-muted">اختر البطاقات التي تظهر في لوحة التحكم الرئيسية.</p>
+                  <div id="dashboard-visibility-settings" class="visibility-settings-list">
+                      <!-- Checkboxes will be rendered here by JS -->
+                  </div>
+              </div>
+      
+              <!-- Backup & Restore -->
+              <div class="settings-card">
+                  <h3>النسخ الاحتياطي والاستعادة
+                       <div class="tooltip-container">
+                        <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        <span class="tooltip-text">تحذير: استيراد ملف نسخة احتياطية سيقوم بالكتابة فوق جميع البيانات الحالية في النظام بشكل دائم.</span>
+                    </div>
+                  </h3>
+                  <p class="text-muted">حفظ جميع بيانات النظام في ملف أو استعادتها من نسخة احتياطية.</p>
+                  <div class="settings-actions">
+                      <button id="export-backup-btn" class="btn">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                          تصدير (نسخ احتياطي)
+                      </button>
+                      <button id="import-backup-btn" class="btn secondary">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                          استيراد (استعادة)
+                      </button>
+                      <input type="file" id="import-backup-input" accept=".json" class="hidden">
+                  </div>
+              </div>
+              
+              <!-- Data Export -->
+              <div class="settings-card">
+                  <h3>تصدير البيانات</h3>
+                  <p class="text-muted">تصدير بيانات محددة من النظام إلى ملف CSV.</p>
+                  <div class="settings-actions">
+                      <button id="export-csv-btn" class="btn">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                          تصدير العدادات إلى CSV
+                      </button>
+                  </div>
+              </div>
+
+               <!-- Company Logo Settings -->
+               <div class="settings-card">
+                  <h3>شعار الشركة</h3>
+                  <p class="text-muted">ارفع شعار شركتك ليظهر في النظام والتقارير المطبوعة.</p>
+                  <div class="logo-preview-area" id="logo-preview">
+                      <!-- Preview will be rendered here by JS -->
+                  </div>
+                  <div class="input-group">
+                    <label for="logo-size-slider">حجم الشعار: <span id="logo-size-value">100%</span></label>
+                    <input type="range" id="logo-size-slider" min="50" max="150" step="10">
+                  </div>
+                  <div class="settings-actions">
+                      <button id="upload-logo-btn" class="btn">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                          رفع شعار
+                      </button>
+                      <button id="remove-logo-btn" class="btn btn-delete">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                          إزالة الشعار
+                      </button>
+                      <input type="file" id="logo-upload-input" accept="image/*" class="hidden">
+                  </div>
+              </div>
+
+               <!-- Report Settings -->
+               <div class="settings-card">
+                  <h3>إعدادات تذييل التقارير
+                       <div class="tooltip-container">
+                        <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        <span class="tooltip-text">استخدم المتغيرات التالية ليتم استبدالها تلقائياً عند الطباعة: {companyName}, {date}, {time}.</span>
+                    </div>
+                  </h3>
+                  <p class="text-muted">تخصيص الرأس والتذييل للتقارير المطبوعة. يمكنك استخدام {companyName} و {date} و {time}.</p>
+                  <div class="input-group">
+                      <label for="report-header-text">نص رأس التقرير</label>
+                      <textarea id="report-header-text" rows="3"></textarea>
+                  </div>
+                  <div class="input-group">
+                      <label for="report-footer-text">نص تذييل التقرير</label>
+                      <textarea id="report-footer-text" rows="3"></textarea>
+                  </div>
+                  <div class="settings-actions">
+                      <button id="save-report-settings-btn" class="btn">حفظ إعدادات التقارير</button>
+                  </div>
+              </div>
+          </div>
+      </section>
+        
+        <!-- User Management Section -->
+        <section id="user-management" class="content-section">
+            <div class="section-header">
+                <h3>إدارة المستخدمين</h3>
+                <button class="btn btn-back-page" title="رجوع">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span>
+                </button>
+            </div>
+            <div class="form-container">
+                <h3>إضافة / تعديل مستخدم</h3>
+                <form id="user-form" class="form-grid" novalidate>
+                    <input type="hidden" id="user-id">
+                    <div class="input-group">
+                        <label for="user-fullName">الاسم الكامل</label>
+                        <input type="text" id="user-fullName" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="user-username">اسم المستخدم</label>
+                        <input type="text" id="user-username" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="user-role">الصلاحية</label>
+                        <select id="user-role" required></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="user-password">كلمة المرور (اتركه فارغاً للتجاهل عند التعديل)</label>
+                        <input type="password" id="user-password">
+                    </div>
+                    <div class="input-group">
+                        <label for="user-confirmPassword">تأكيد كلمة المرور</label>
+                        <input type="password" id="user-confirmPassword">
+                    </div>
+                    <div class="input-group full-width">
+                        <button type="submit" class="btn">حفظ المستخدم</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="table-container">
+                <div class="table-controls">
+                    <h3>قائمة المستخدمين</h3>
+                    <input type="text" class="table-filter" placeholder="بحث في المستخدمين..." data-table-id="users-table">
+                </div>
+                <div class="responsive-table">
+                    <table id="users-table">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Permissions Section -->
+        <section id="permissions" class="content-section">
+            <div class="section-header"><h2>إدارة الصلاحيات</h2></div>
+            <div class="card"><div class="card-header"><h4>صلاحيات الأدوار الوظيفية</h4></div>
+                <div class="card-body"><p>حدد الصلاحيات المتاحة لكل دور وظيفي في النظام. (صلاحيات "مدير النظام" ثابتة ولا يمكن تغييرها).</p>
+                    <div id="permissions-container" class="responsive-table"></div></div></div>
+            
+            <div class="card" style="margin-top: 2rem;">
+                <div class="card-header"><h4>صلاحيات لوحة التحكم</h4></div>
+                <div class="card-body"><p>تحكم في البطاقات التي تظهر في لوحة التحكم لكل دور وظيفي.</p></div>
+                    <div id="dashboard-permissions-container" class="responsive-table"></div></div>
+            </div>
+        </section>
+
+        <!-- Activity Log Section -->
+        <section id="activity-log" class="content-section">
+            <div class="table-container">
+                <div class="section-header">
+                    <h3>سجل نشاط المستخدمين</h3>
+                    <button class="btn btn-back-page" title="رجوع">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span>
+                    </button>
+                </div>
+                <div class="table-controls">
+                    <h3>سجل نشاط المستخدمين</h3>
+                    <button id="print-activity-log-btn" class="btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        <span>طباعة السجل</span>
+                    </button>
+                </div>
+                <div class="form-container" style="margin-bottom: 2rem;">
+                    <form id="activity-log-filter-form" class="form-grid" novalidate>
+                        <div class="input-group">
+                            <label for="activity-log-user-filter">المستخدم</label>
+                            <select id="activity-log-user-filter"></select>
+                        </div>
+                        <div class="input-group">
+                            <label for="activity-log-action-filter">نوع الإجراء</label>
+                            <select id="activity-log-action-filter"></select>
+                        </div>
+                        <div class="input-group">
+                            <label for="activity-log-date-from">من تاريخ</label>
+                            <input type="date" id="activity-log-date-from">
+                        </div>
+                        <div class="input-group">
+                            <label for="activity-log-date-to">إلى تاريخ</label>
+                            <input type="date" id="activity-log-date-to">
+                        </div>
+                        <div class="input-group full-width">
+                            <button type="submit" class="btn">تنفيذ</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="responsive-table">
+                    <table id="activity-log-table">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Developer Info Section -->
+        <section id="developer-info" class="content-section">
+            <div class="section-header">
+                <h3>حول المطور</h3>
+                <button class="btn btn-back-page" title="رجوع">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span>
+                </button>
+            </div>
+            <div class="developer-card">
+                <div class="developer-card-header">
+                    <div class="developer-avatar">
+                        <img src="https://ui-avatars.com/api/?name=Moustafa+Elmaghrabi&background=1f2937&color=fff&size=256" alt="Moustafa Elmaghrabi">
+                    </div>
+                </div>
+                <div class="developer-card-body">
+                    <h2 class="developer-name-ar">مصطفى المغربي للبرمجيات</h2>
+                    <h3 class="developer-name-en">Moustafa Elmaghrabi for Software</h3>
+                    <p class="developer-title">Full-Stack Developer & System Designer</p>
+                    <div class="developer-contact">
+                        <div class="contact-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                            <span>01124158545</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="developer-card-footer">
+                    <p>متخصص في بناء الأنظمة المحاسبية والإدارية المتكاملة.</p>
+                </div>
+            </div>
+        </section>
+      </div>
+      
+      <footer class="main-footer">
+        <p id="main-footer-text">المنظومة الموحدة للعدادات - جميع الحقوق محفوظة © 2025</p>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Add Pending Area Dialog -->
+  <div id="add-pending-area-dialog" class="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="area-dialog-title" hidden>
+      <div class="dialog-box">
+          <h3 id="area-dialog-title">إضافة منطقة جديدة لصفحة الانتظار</h3>
+          <div class="input-group">
+              <label for="new-pending-area-name">اسم المنطقة</label>
+              <input type="text" id="new-pending-area-name" placeholder="مثال: بني مزار شرق">
+          </div>
+          <div class="dialog-actions" style="margin-top: 20px;">
+              <button id="add-area-dialog-cancel-btn" class="btn secondary">إلغاء</button>
+              <button id="add-area-dialog-confirm-btn" class="btn">حفظ</button>
+          </div>
+      </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+  <script src="Amiri-Regular.js"></script>
+  <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript -->
+  <script src="./dist/index.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const printBtn = document.getElementById('print-mukayasat-list-btn');
+      if (printBtn) {
+        printBtn.addEventListener('click', () => {
+          const table = document.getElementById('mukayasat-table');
+          if (table) {
+            const printWindow = window.open('', '', 'height=600,width=800');
+            printWindow.document.write('<html dir="rtl"><head><title>المقايسات المحفوظة</title>');
+            printWindow.document.write('<style>body { font-family: "Tajawal", sans-serif; } table { width: 100%; border-collapse: collapse; margin-top: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: right; } th { background-color: #f2f2f2; } h2 { text-align: center; }</style>');
+            printWindow.document.write('</head><body>');
+            printWindow.document.write('<h2>قائمة المقايسات المحفوظة</h2>');
+            
+            const tableClone = table.cloneNode(true);
+            // Remove Actions column (last column) for printing
+            const headerRow = tableClone.querySelector('thead tr');
+            if (headerRow && headerRow.lastElementChild) headerRow.lastElementChild.remove();
+            tableClone.querySelectorAll('tbody tr').forEach(row => {
+              if (row.lastElementChild) row.lastElementChild.remove();
+            });
+
+            printWindow.document.write(tableClone.outerHTML);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

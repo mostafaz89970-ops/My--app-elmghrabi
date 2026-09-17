@@ -1,0 +1,542 @@
+{
+  "debtTypes": [
+    {
+      "id": 1,
+      "code": "DEBT_CONSUMPTION",
+      "name": "دين استهلاك (فرق شرائح)",
+      "category": "استهلاك",
+      "maxInstallments": 6,
+      "allowsInstallment": true,
+      "active": true
+    },
+    {
+      "id": 2,
+      "code": "DEBT_METER_INSTALLMENT",
+      "name": "قسط ثمن عداد كودي / إحلال",
+      "category": "عدادات",
+      "maxInstallments": 24,
+      "allowsInstallment": true,
+      "active": true
+    },
+    {
+      "id": 3,
+      "code": "DEBT_ASSAY",
+      "name": "دين مقايسة توصيل تيار",
+      "category": "مقايسات",
+      "maxInstallments": 36,
+      "allowsInstallment": true,
+      "active": true
+    },
+    {
+      "id": 4,
+      "code": "DEBT_JUDICIAL",
+      "name": "دين محضر ضبطية قضائية",
+      "category": "ضبطيات",
+      "maxInstallments": 12,
+      "allowsInstallment": true,
+      "active": true
+    },
+    {
+      "id": 5,
+      "code": "DEBT_SETTLEMENT",
+      "name": "دين تسوية وتصحيح رصيد",
+      "category": "تسويات",
+      "maxInstallments": 6,
+      "allowsInstallment": true,
+      "active": true
+    },
+    {
+      "id": 6,
+      "code": "DEBT_PEAK",
+      "name": "دين بدل فرق ساعات الذروة",
+      "category": "ذروة",
+      "maxInstallments": 12,
+      "allowsInstallment": true,
+      "active": true
+    },
+    {
+      "id": 7,
+      "code": "DEBT_PENALTY",
+      "name": "دين غرامات وتأخيرات",
+      "category": "أخرى",
+      "maxInstallments": 3,
+      "allowsInstallment": false,
+      "active": true
+    }
+  ],
+  "fees": [
+    {
+      "id": 1,
+      "code": "FEE_CLEANING",
+      "name": "رسم النظافة الشهري",
+      "calcType": "مبلغ ثابت",
+      "value": 15,
+      "frequency": "شهري مع أول شحنة",
+      "isDelayed": true,
+      "active": true
+    },
+    {
+      "id": 2,
+      "code": "FEE_STAMP_SPECIFIC",
+      "name": "الدمغة النوعية الموحدة",
+      "calcType": "مبلغ ثابت",
+      "value": 3,
+      "frequency": "مع كل شحنة",
+      "isDelayed": false,
+      "active": true
+    },
+    {
+      "id": 3,
+      "code": "FEE_STAMP_KWH",
+      "name": "دمغة استهلاك ك.و.س",
+      "calcType": "لكل ك.و.س",
+      "value": 0.006,
+      "frequency": "شهري مع المحاسبة",
+      "isDelayed": false,
+      "active": true
+    },
+    {
+      "id": 4,
+      "code": "FEE_ADMIN",
+      "name": "مصاريف إدارية وتنمية موارد",
+      "calcType": "مبلغ ثابت",
+      "value": 5,
+      "frequency": "مع كل شحنة",
+      "isDelayed": true,
+      "active": true
+    },
+    {
+      "id": 5,
+      "code": "FEE_VAT",
+      "name": "ضريبة القيمة المضافة (14%)",
+      "calcType": "نسبة مئوية",
+      "value": 14,
+      "frequency": "على الخدمات والرسوم",
+      "isDelayed": false,
+      "active": true
+    }
+  ],
+  "cleaningExceptions": [
+    {
+      "id": 1,
+      "customerId": "101",
+      "customerCode": "0503480366",
+      "customerName": "محمد فالح احمد محمد",
+      "meterNumber": "71310234",
+      "reason": "استثناء نشاط سكني منخفض الدخل",
+      "minFee": 5,
+      "maxFee": 10,
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "active": true
+    },
+    {
+      "id": 2,
+      "customerId": "102",
+      "customerCode": "0503480999",
+      "customerName": "مسجد الرحمن الرحيم",
+      "meterNumber": "71310555",
+      "reason": "دور عبادة (معفى بالكامل)",
+      "minFee": 0,
+      "maxFee": 0,
+      "startDate": "2026-01-01",
+      "endDate": "2030-12-31",
+      "active": true
+    }
+  ],
+  "peakDebtSettings": {
+    "enabled": true,
+    "peakHoursStart": "18:00",
+    "peakHoursEnd": "22:00",
+    "ratePerKwhDifference": 1.25,
+    "autoDeductDuringCharge": true,
+    "maxAllowedInstallments": 12
+  },
+  "debts": [
+    {
+      "id": "DEBT-738953",
+      "customerId": "1760087928245",
+      "customerName": "محمد عبد الحليم عبد العظيم",
+      "meterNumber": "7176370",
+      "subscriptionCode": "503283801",
+      "debtTypeId": 3,
+      "debtTypeName": "دين مقايسة توصيل تيار",
+      "totalDebtAmount": 1200,
+      "debtAmount": 1200,
+      "paidAmount": 0,
+      "remainingAmount": 1200,
+      "installmentsCount": 20,
+      "paidInstallmentsCount": 0,
+      "installmentAmount": 60,
+      "startDate": "2026-09-16",
+      "nextDueDate": "2026-09-16",
+      "deductWay": "meter",
+      "deductWayName": "خصم من العداد",
+      "status": "PaymentInProgress",
+      "statusName": "قيد التسديد",
+      "notes": "",
+      "receiptNumber": "RCP-738953",
+      "createdUser": "المشغل",
+      "installments": [
+        {
+          "seq": 1,
+          "dueDate": "2026-09-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "مستحق",
+          "payDate": null
+        },
+        {
+          "seq": 2,
+          "dueDate": "2026-10-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 3,
+          "dueDate": "2026-11-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 4,
+          "dueDate": "2026-12-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 5,
+          "dueDate": "2027-01-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 6,
+          "dueDate": "2027-02-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 7,
+          "dueDate": "2027-03-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 8,
+          "dueDate": "2027-04-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 9,
+          "dueDate": "2027-05-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 10,
+          "dueDate": "2027-06-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 11,
+          "dueDate": "2027-07-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 12,
+          "dueDate": "2027-08-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 13,
+          "dueDate": "2027-09-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 14,
+          "dueDate": "2027-10-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 15,
+          "dueDate": "2027-11-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 16,
+          "dueDate": "2027-12-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 17,
+          "dueDate": "2028-01-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 18,
+          "dueDate": "2028-02-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 19,
+          "dueDate": "2028-03-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 20,
+          "dueDate": "2028-04-16",
+          "amount": 60,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        }
+      ]
+    },
+    {
+      "id": "DEBT-1001",
+      "customerId": "0503480366",
+      "customerName": "محمد فالح احمد محمد",
+      "meterNumber": "71310234",
+      "subscriptionCode": "0503480366",
+      "debtTypeId": 2,
+      "debtTypeName": "قسط ثمن عداد كودي / إحلال",
+      "totalDebtAmount": 1200,
+      "paidAmount": 650,
+      "remainingAmount": 550,
+      "installmentsCount": 12,
+      "paidInstallmentsCount": 7,
+      "installmentAmount": 100,
+      "startDate": "2026-08-01",
+      "nextDueDate": "١٧‏/١٠‏/٢٠٢٦",
+      "deductWay": "charge",
+      "deductWayName": "خصم أثناء الشحن",
+      "status": "Delayed",
+      "statusName": "مؤجل",
+      "notes": "تقسيط ثمن العداد على 12 شهر بموجب العقد رقم 526/2025",
+      "installments": [
+        {
+          "seq": 1,
+          "dueDate": "2026-08-01",
+          "amount": 100,
+          "paidAmount": 100,
+          "status": "مسدد",
+          "payDate": "2026-08-04"
+        },
+        {
+          "seq": 2,
+          "dueDate": "2026-09-01",
+          "amount": 100,
+          "paidAmount": 100,
+          "status": "مسدد",
+          "payDate": "2026-09-02"
+        },
+        {
+          "seq": 3,
+          "dueDate": "2026-10-01",
+          "amount": 100,
+          "paidAmount": 100,
+          "status": "مسدد",
+          "payDate": "١٧‏/٩‏/٢٠٢٦"
+        },
+        {
+          "seq": 4,
+          "dueDate": "2026-11-01",
+          "amount": 100,
+          "paidAmount": 100,
+          "status": "مسدد",
+          "payDate": "١٧‏/٩‏/٢٠٢٦"
+        },
+        {
+          "seq": 5,
+          "dueDate": "2026-12-01",
+          "amount": 100,
+          "paidAmount": 100,
+          "status": "مسدد",
+          "payDate": "١٧‏/٩‏/٢٠٢٦"
+        },
+        {
+          "seq": 6,
+          "dueDate": "2027-01-01",
+          "amount": 100,
+          "paidAmount": 100,
+          "status": "مسدد",
+          "payDate": "١٧‏/٩‏/٢٠٢٦"
+        },
+        {
+          "seq": 7,
+          "dueDate": "2027-02-01",
+          "amount": 100,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 8,
+          "dueDate": "2027-03-01",
+          "amount": 100,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 9,
+          "dueDate": "2027-04-01",
+          "amount": 100,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 10,
+          "dueDate": "2027-05-01",
+          "amount": 100,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 11,
+          "dueDate": "2027-06-01",
+          "amount": 100,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        },
+        {
+          "seq": 12,
+          "dueDate": "2027-07-01",
+          "amount": 100,
+          "paidAmount": 0,
+          "status": "قادم",
+          "payDate": null
+        }
+      ]
+    },
+    {
+      "id": "DEBT-1002",
+      "customerId": "0503480366",
+      "customerName": "محمد فالح احمد محمد",
+      "meterNumber": "71310234",
+      "subscriptionCode": "0503480366",
+      "debtTypeId": 1,
+      "debtTypeName": "دين استهلاك (فرق رصيد العداد)",
+      "totalDebtAmount": 45.33,
+      "paidAmount": 45.33,
+      "remainingAmount": 0,
+      "installmentsCount": 1,
+      "paidInstallmentsCount": 1,
+      "installmentAmount": 45.33,
+      "startDate": "2026-09-10",
+      "nextDueDate": "١٧‏/١٠‏/٢٠٢٦",
+      "deductWay": "charge",
+      "deductWayName": "خصم أثناء الشحن",
+      "status": "Completed",
+      "statusName": "منتهي ومسدد بالكامل",
+      "notes": "دين فارق استهلاك مسترجع من كارت العداد عند القراءة",
+      "installments": [
+        {
+          "seq": 1,
+          "dueDate": "2026-09-17",
+          "amount": 45.33,
+          "paidAmount": 45.33,
+          "status": "مسدد",
+          "payDate": "١٧‏/٩‏/٢٠٢٦"
+        }
+      ]
+    },
+    {
+      "id": "DEBT-1003",
+      "customerId": "0503480888",
+      "customerName": "محمود حسن إبراهيم",
+      "meterNumber": "71220411",
+      "subscriptionCode": "0503480888",
+      "debtTypeId": 3,
+      "debtTypeName": "دين مقايسة توصيل تيار",
+      "totalDebtAmount": 3600,
+      "paidAmount": 1200,
+      "remainingAmount": 2400,
+      "installmentsCount": 24,
+      "paidInstallmentsCount": 8,
+      "installmentAmount": 150,
+      "startDate": "2026-01-01",
+      "nextDueDate": "2026-10-01",
+      "deductWay": "charge",
+      "deductWayName": "خصم أثناء الشحن",
+      "status": "PaymentInProgress",
+      "statusName": "قيد التسديد",
+      "notes": "مقايسة فرع شرق بني مزار",
+      "installments": []
+    },
+    {
+      "id": "DEBT-1004",
+      "customerId": "0503480777",
+      "customerName": "شركة الفتح للمقاولات",
+      "meterNumber": "71990214",
+      "subscriptionCode": "0503480777",
+      "debtTypeId": 4,
+      "debtTypeName": "دين محضر ضبطية قضائية",
+      "totalDebtAmount": 5000,
+      "paidAmount": 2500,
+      "remainingAmount": 2500,
+      "installmentsCount": 5,
+      "paidInstallmentsCount": 2,
+      "installmentAmount": 1000,
+      "startDate": "2026-07-01",
+      "nextDueDate": "2026-10-01",
+      "deductWay": "charge",
+      "deductWayName": "خصم أثناء الشحن",
+      "status": "PaymentInProgress",
+      "statusName": "قيد التسديد",
+      "notes": "محضر مخالفة شروط تعاقد رقم 412",
+      "installments": []
+    }
+  ]
+}

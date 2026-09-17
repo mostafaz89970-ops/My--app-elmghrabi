@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",                    // دعم includes وObject.entries وpadStart
+    "module": "commonjs",                  // استخدام نظام الوحدات الشائع
+    "jsx": "react",                        // تحديد كيفية التعامل مع JSX
+    "outDir": "./dist",                    // وضع الملفات المحولة في مجلد dist
+    "strict": false,                       // تعطيل التدقيق الصارم لتبسيط العملية
+    "esModuleInterop": true,               // السماح بالتوافق مع وحدات ES
+    "skipLibCheck": true,                  // تخطي فحص مكتبات التعريف
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["index.tsx"]                 // تحديد الملفات المراد تحويلها
+}

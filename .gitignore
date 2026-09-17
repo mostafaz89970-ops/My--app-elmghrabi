@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Electron build artifacts (ignore heavy binaries, keep compiled JS)
+dist/win-unpacked/
+dist/*.yml
+dist/*.yaml
+dist-ssr/
+Unified Counter System Output/
+
+# Large backup files
+elmaghrabi-backup-*.json
+*.zip
+*.lnk
+desktop.ini
+
+# Local sessions & tooling
+*.local
+.session_token
+.vite/
+.zencoder/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
