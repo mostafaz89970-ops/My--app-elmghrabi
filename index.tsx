@@ -545,6 +545,9 @@ const saveState = async (): Promise<boolean> => {
     try {
         // Save to IndexedDB (Primary, large storage capable of handling millions of records)
         await saveToIndexedDB('appState', state);
+        if (typeof cloudSyncManager !== 'undefined' && cloudSyncManager) {
+            cloudSyncManager.pushState(state);
+        }
         return true;
     } catch (error: any) {
         console.error("Failed to save state to IndexedDB:", error);
@@ -19287,6 +19290,436 @@ const renderJudicialCollectionSection = () => {
 
     };
 
+
+    // ==========================================
+    // Cloud Sync Manager (Firebase + BroadcastChannel)
+    // إدارة المزامنة السحابية اللحظية والتحكم المباشر عبر جميع المتصفحات
+    // ==========================================
+    class CloudSyncManager {
+        public sessionId: string;
+        private db: any = null;
+        private isInitialized: boolean = false;
+        private localChannel: BroadcastChannel | null = null;
+        private lastRemoteTimestamp: number = 0;
+        private pushTimer: any = null;
+        public syncStatus: 'connected' | 'connecting' | 'deactivated' | 'error' | 'offline' = 'connecting';
+
+        constructor() {
+            this.sessionId = 'sess_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+            if (typeof BroadcastChannel !== 'undefined') {
+                try {
+                    this.localChannel = new BroadcastChannel('elmghrabi_realtime_sync');
+                    this.localChannel.onmessage = (event: MessageEvent) => this.handleLocalMessage(event);
+                } catch (e) {
+                    console.warn("BroadcastChannel not supported or failed:", e);
+                }
+            }
+        }
+
+        public init() {
+            if (this.isInitialized) return;
+            this.isInitialized = true;
+            this.initFirebase();
+            this.setupBadgeUI();
+            this.setupSettingsUI();
+        }
+
+        private initFirebase() {
+            const firebase = (window as any).firebase;
+            if (!firebase) {
+                console.warn("Firebase SDK not loaded.");
+                this.updateStatus('offline');
+                return;
+            }
+
+            try {
+                const firebaseConfig = {
+                    apiKey: "AIzaSyBj2RJvbWLR1jx8PfWCqaCNezWJaSA-3sY",
+                    authDomain: "elmghrabyelectric.firebaseapp.com",
+                    databaseURL: "https://elmghrabyelectric-default-rtdb.firebaseio.com",
+                    projectId: "elmghrabyelectric",
+                    storageBucket: "elmghrabyelectric.appspot.com",
+                    messagingSenderId: "132688215967",
+                    appId: "1:132688215967:web:483d64a3e60c92780c87aa"
+                };
+
+                if (!firebase.apps || firebase.apps.length === 0) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+
+                this.db = firebase.database();
+
+                // مراقبة حالة الاتصال بالسيرفر
+                this.db.ref('.info/connected').on('value', (snapshot: any) => {
+                    const connected = snapshot.val() === true;
+                    if (connected) {
+                        if (this.syncStatus !== 'deactivated') {
+                            this.updateStatus('connected');
+                        }
+                    } else {
+                        if (this.syncStatus !== 'deactivated') {
+                            this.updateStatus('connecting');
+                        }
+                    }
+                });
+
+                // الاستماع للتحديثات المباشرة الواردة من أي جهاز أو متصفح آخر
+                this.db.ref('appSync/latest').on('value', 
+                    (snapshot: any) => {
+                        const data = snapshot.val();
+                        if (!data || !data.state) return;
+                        if (data.senderId === this.sessionId) return; // تجاهل التحديث الصادر من نفس هذه النافذة
+                        if (data.timestamp && data.timestamp <= this.lastRemoteTimestamp) return; // تحديث قديم
+
+                        this.lastRemoteTimestamp = data.timestamp || Date.now();
+                        this.applyRemoteUpdate(data.state, data.author || 'مستخدم عن بُعد');
+                    },
+                    (error: any) => {
+                        console.warn("Firebase sync subscription notice:", error);
+                        const msg = (error && error.message) ? error.message : '';
+                        if (msg.includes('deactivated') || msg.includes('permission_denied') || msg.includes('Permission denied')) {
+                            this.updateStatus('deactivated');
+                        } else {
+                            this.updateStatus('error');
+                        }
+                    }
+                );
+
+            } catch (e: any) {
+                console.error("Firebase init failed:", e);
+                const msg = (e && e.message) ? e.message : '';
+                if (msg.includes('deactivated')) {
+                    this.updateStatus('deactivated');
+                } else {
+                    this.updateStatus('error');
+                }
+            }
+        }
+
+        private handleLocalMessage(event: MessageEvent) {
+            const data = event.data;
+            if (!data || data.type !== 'SYNC_STATE' || !data.state) return;
+            if (data.senderId === this.sessionId) return;
+            if (data.timestamp && data.timestamp <= this.lastRemoteTimestamp) return;
+
+            this.lastRemoteTimestamp = data.timestamp || Date.now();
+            console.log("⚡ تم استلام تحديث فوري مباشر من تبويب آخر على نفس الجهاز!");
+            this.applyRemoteUpdate(data.state, data.author || 'نافذة أخرى');
+        }
+
+        public pushState(newState: any) {
+            const timestamp = Date.now();
+            const author = (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.fullName : 'system';
+
+            // 1. المزامنة الفورية اللحظية بين جميع النوافذ المفتوحة عبر BroadcastChannel
+            if (this.localChannel) {
+                try {
+                    this.localChannel.postMessage({
+                        type: 'SYNC_STATE',
+                        senderId: this.sessionId,
+                        timestamp: timestamp,
+                        author: author,
+                        state: newState
+                    });
+                } catch (e) {
+                    console.warn("Local broadcast error:", e);
+                }
+            }
+
+            // 2. الإرسال للسحابة عبر Firebase (مع مؤقت لتجنب الإرسال المتكرر السريع)
+            if (this.pushTimer) clearTimeout(this.pushTimer);
+            this.pushTimer = setTimeout(() => {
+                this.sendToFirebase(newState, author, timestamp);
+            }, 350);
+        }
+
+        public sendToFirebase(stateToPush: any, author: string, timestamp: number) {
+            if (!this.db) return;
+            try {
+                const cleanState = JSON.parse(JSON.stringify(stateToPush));
+                this.db.ref('appSync/latest').set({
+                    senderId: this.sessionId,
+                    timestamp: timestamp,
+                    author: author,
+                    state: cleanState
+                }).then(() => {
+                    this.updateStatus('connected');
+                }).catch((err: any) => {
+                    console.warn("Firebase push error:", err);
+                    const msg = (err && err.message) ? err.message : '';
+                    if (msg.includes('deactivated') || msg.includes('permission_denied') || msg.includes('Permission denied')) {
+                        this.updateStatus('deactivated');
+                    }
+                });
+            } catch (e) {
+                console.error("Firebase send failed:", e);
+            }
+        }
+
+        public async applyRemoteUpdate(remoteState: any, author: string) {
+            try {
+                console.log(`Applying remote live update from: ${author}`);
+                const defaultState = JSON.parse(JSON.stringify(state));
+                const merged = mergeWithDefaults(remoteState, defaultState);
+
+                // تحديث حالة النظام في الذاكرة
+                state = merged;
+
+                // الحفظ الفوري في قاعدة البيانات المحلية IndexedDB
+                await saveToIndexedDB('appState', state);
+
+                // فحص وتحديث المستخدم الحالي والصلاحيات
+                if (typeof loggedInUser !== 'undefined' && loggedInUser) {
+                    const existing = state.users.find((u: any) => u.username === loggedInUser.username);
+                    if (!existing) {
+                        showToast('تم إلغاء/حذف هذا الحساب بواسطة المسؤول عن بُعد. جارٍ تسجيل الخروج...', 'warning');
+                        handleLogout();
+                        return;
+                    }
+                    // تحديث صلاحيات وبيانات المستخدم الحالي لحظياً
+                    loggedInUser = existing;
+                    localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
+                }
+
+                // تحديث واجهة الصلاحيات والقوائم
+                updateUI();
+
+                // إعادة رسم الشاشة النشطة حالياً
+                this.refreshCurrentActiveView();
+
+                showToast(`⚡ تم استلام ومزامنة التحديثات مباشرة من (${author})`, 'info');
+            } catch (e) {
+                console.error("Failed to apply remote update:", e);
+            }
+        }
+
+        private refreshCurrentActiveView() {
+            try {
+                const activeSection = document.querySelector('.content-section.active');
+                if (!activeSection) return;
+                const targetId = activeSection.id;
+
+                const targetLink = document.querySelector(`.sidebar-nav .nav-link[data-target="${targetId}"]`) as HTMLElement | null;
+                if (targetLink && targetId !== 'meter-registration' && !targetId.startsWith('accounting-')) {
+                    targetLink.click();
+                } else if (targetId === 'dashboard') {
+                    renderDashboard();
+                }
+            } catch (err) {
+                console.warn("Could not auto-refresh active view:", err);
+            }
+        }
+
+        public updateStatus(status: 'connected' | 'connecting' | 'deactivated' | 'error' | 'offline') {
+            this.syncStatus = status;
+            const badge = document.getElementById('cloud-sync-badge');
+            const icon = document.getElementById('cloud-sync-icon');
+            const text = document.getElementById('cloud-sync-text');
+
+            if (badge && icon && text) {
+                if (status === 'connected') {
+                    badge.style.background = '#f0fdf4';
+                    badge.style.color = '#166534';
+                    badge.style.borderColor = '#bbf7d0';
+                    icon.style.background = '#22c55e';
+                    icon.style.boxShadow = '0 0 8px #22c55e';
+                    text.textContent = 'مزامنة لحظية نشطة 🟢';
+                    badge.title = 'متصل بالسحابة وقيد المزامنة الفورية مع جميع الأجهزة والمتصفحات';
+                } else if (status === 'connecting') {
+                    badge.style.background = '#fefce8';
+                    badge.style.color = '#854d0e';
+                    badge.style.borderColor = '#fef08a';
+                    icon.style.background = '#eab308';
+                    icon.style.boxShadow = '0 0 8px #eab308';
+                    text.textContent = 'مزامنة محلية نشطة 🟡';
+                    badge.title = 'المزامنة بين التبويبات نشطة - جارٍ محاولة الاتصال بالسحابة...';
+                } else if (status === 'deactivated') {
+                    badge.style.background = '#fef2f2';
+                    badge.style.color = '#991b1b';
+                    badge.style.borderColor = '#fecaca';
+                    icon.style.background = '#ef4444';
+                    icon.style.boxShadow = '0 0 8px #ef4444';
+                    text.textContent = 'السحابة معطلة (انقر للتفعيل) 🔴';
+                    badge.title = 'قاعدة بيانات Firebase معطلة حالياً. انقر هنا لفتح لوحة التحكم وتفعيلها بنقرة واحدة.';
+                } else {
+                    badge.style.background = '#f1f5f9';
+                    badge.style.color = '#475569';
+                    badge.style.borderColor = '#cbd5e1';
+                    icon.style.background = '#94a3b8';
+                    icon.style.boxShadow = 'none';
+                    text.textContent = 'مزامنة محلية';
+                    badge.title = 'يعمل في وضع التخزين المحلي';
+                }
+            }
+
+            const settingsBadge = document.getElementById('settings-cloud-sync-status-badge');
+            if (settingsBadge) {
+                if (status === 'connected') {
+                    settingsBadge.textContent = 'متصل بالسحابة 🟢';
+                    settingsBadge.style.background = '#16a34a';
+                } else if (status === 'deactivated') {
+                    settingsBadge.textContent = 'معطلة من Google 🔴';
+                    settingsBadge.style.background = '#dc2626';
+                } else {
+                    settingsBadge.textContent = 'مزامنة محلية 🟡';
+                    settingsBadge.style.background = '#d97706';
+                }
+            }
+        }
+
+        private setupBadgeUI() {
+            const badge = document.getElementById('cloud-sync-badge');
+            if (badge) {
+                badge.addEventListener('click', () => this.showSyncModal());
+            }
+        }
+
+        private setupSettingsUI() {
+            document.getElementById('settings-push-cloud-btn')?.addEventListener('click', () => {
+                this.sendToFirebase(state, (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.fullName : 'يدوي', Date.now());
+                showToast('جارٍ رفع كامل البيانات للسحابة الآن...', 'info');
+            });
+
+            document.getElementById('settings-pull-cloud-btn')?.addEventListener('click', () => {
+                this.pullFromFirebase();
+            });
+        }
+
+        public showSyncModal() {
+            let modal = document.getElementById('cloud-sync-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'cloud-sync-modal';
+                modal.className = 'modal-overlay';
+                modal.style.position = 'fixed';
+                modal.style.top = '0';
+                modal.style.left = '0';
+                modal.style.width = '100%';
+                modal.style.height = '100%';
+                modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+                modal.style.display = 'flex';
+                modal.style.alignItems = 'center';
+                modal.style.justifyContent = 'center';
+                modal.style.zIndex = '99999';
+                modal.style.backdropFilter = 'blur(4px)';
+
+                modal.innerHTML = `
+                    <div class="modal-content" style="background: var(--bg-surface, #fff); color: var(--text-color, #1e293b); padding: 25px; border-radius: 12px; max-width: 550px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2); direction: rtl; text-align: right; border: 1px solid var(--border-color, #e2e8f0);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color, #e2e8f0); padding-bottom: 12px; margin-bottom: 16px;">
+                            <h3 style="margin: 0; font-size: 1.25rem; font-weight: bold; color: var(--primary-color, #10b981); display: flex; align-items: center; gap: 8px;">
+                                <span>☁️</span> حالة المزامنة السحابية والتحكم اللحظي
+                            </h3>
+                            <button id="close-cloud-sync-modal-btn" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
+                        </div>
+
+                        <div style="margin-bottom: 20px;">
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+                                <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+                                    <span style="font-weight: bold;">المزامنة الداخلية (بين التبويبات):</span>
+                                    <span style="color: #16a34a; font-weight: bold;">✅ نشطة فورية (0ms)</span>
+                                </div>
+                                <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+                                    <span style="font-weight: bold;">المزامنة السحابية (Firebase):</span>
+                                    <span id="modal-cloud-status-text" style="font-weight: bold;"></span>
+                                </div>
+                                <div style="font-size: 0.82rem; color: #64748b;">
+                                    معرف الجلسة: <code style="direction: ltr; display: inline-block;">${this.sessionId}</code>
+                                </div>
+                            </div>
+
+                            <div id="modal-firebase-deactivated-notice" style="display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+                                <div style="color: #b91c1c; font-weight: bold; margin-bottom: 6px;">⚠️ قاعدة البيانات معطلة حالياً من Google</div>
+                                <p style="margin: 0 0 10px 0; font-size: 0.88rem; color: #7f1d1d; line-height: 1.5;">
+                                    تم إيقاف قاعدة بيانات المشروع <b>elmghrabyelectric</b> لانتهاء فترة التجربة المجانية (30 يوماً). 
+                                    لإعادة تفعيلها فوراً لتعمل المزامنة المباشرة بين الأجهزة والمتصفحات:
+                                </p>
+                                <ol style="margin: 0 0 12px 18px; font-size: 0.85rem; color: #7f1d1d; line-height: 1.6;">
+                                    <li>انقر على الزر أدناه للدخول إلى لوحة التحكم.</li>
+                                    <li>اضغط على <b>Create Database</b> أو <b>Enable</b> واختر <b>Test Mode</b>.</li>
+                                </ol>
+                                <a href="https://console.firebase.google.com/project/elmghrabyelectric/database" target="_blank" rel="noopener noreferrer" class="btn" style="display: inline-flex; align-items: center; gap: 6px; background: #dc2626; color: #fff; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 0.88rem;">
+                                    <span>🚀</span> فتح لوحة Firebase لتفعيلها بنقرة
+                                </a>
+                            </div>
+
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button id="modal-btn-push-now" class="btn btn-primary" style="flex: 1; min-width: 180px; padding: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <span>⬆️</span> رفع نسختي للسحابة الآن
+                                </button>
+                                <button id="modal-btn-pull-now" class="btn secondary" style="flex: 1; min-width: 180px; padding: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <span>⬇️</span> سحب أحدث نسخة من السحابة
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+
+                document.getElementById('close-cloud-sync-modal-btn')?.addEventListener('click', () => {
+                    modal!.style.display = 'none';
+                });
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal!.style.display = 'none';
+                });
+
+                document.getElementById('modal-btn-push-now')?.addEventListener('click', () => {
+                    this.sendToFirebase(state, (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.fullName : 'يدوي', Date.now());
+                    showToast('جارٍ رفع بياناتك إلى السحابة...', 'info');
+                });
+
+                document.getElementById('modal-btn-pull-now')?.addEventListener('click', () => {
+                    this.pullFromFirebase();
+                });
+            }
+
+            const statusText = document.getElementById('modal-cloud-status-text');
+            const notice = document.getElementById('modal-firebase-deactivated-notice');
+            if (statusText) {
+                if (this.syncStatus === 'connected') {
+                    statusText.textContent = '🟢 متصل وقيد البث اللحظي';
+                    statusText.style.color = '#16a34a';
+                    if (notice) notice.style.display = 'none';
+                } else if (this.syncStatus === 'deactivated') {
+                    statusText.textContent = '🔴 معطلة وتحتاج تفعيل بنقرة';
+                    statusText.style.color = '#dc2626';
+                    if (notice) notice.style.display = 'block';
+                } else {
+                    statusText.textContent = '🟡 جارٍ محاولة الاتصال...';
+                    statusText.style.color = '#d97706';
+                    if (notice) notice.style.display = 'none';
+                }
+            }
+
+            modal.style.display = 'flex';
+        }
+
+        public pullFromFirebase() {
+            if (!this.db) {
+                showToast('Firebase غير مهيأ حالياً.', 'error');
+                return;
+            }
+            showToast('جارٍ سحب أحدث نسخة من السحابة...', 'info');
+            this.db.ref('appSync/latest').once('value').then((snap: any) => {
+                const data = snap.val();
+                if (data && data.state) {
+                    this.applyRemoteUpdate(data.state, data.author || 'السحابة');
+                    showToast('✅ تم استيراد أحدث بيانات من السحابة بنجاح!', 'success');
+                } else {
+                    showToast('لا توجد بيانات محفوظة في السحابة حالياً.', 'warning');
+                }
+            }).catch((err: any) => {
+                showToast('فشل سحب البيانات من السحابة: ' + (err.message || err), 'error');
+                const msg = (err && err.message) ? err.message : '';
+                if (msg.includes('deactivated') || msg.includes('permission_denied') || msg.includes('Permission denied')) {
+                    this.updateStatus('deactivated');
+                }
+            });
+        }
+    }
+
+    const cloudSyncManager = new CloudSyncManager();
+    (window as any).cloudSyncManager = cloudSyncManager;
+
     // تهيئة التطبيق
     const initApp = async () => {
         setupHelpSection();
@@ -19313,6 +19746,7 @@ const renderJudicialCollectionSection = () => {
         document.title = 'المنظومة الموحدة للعدادات';
 
         await loadState(); // Always load state first (now async)
+        cloudSyncManager.init(); // تفعيل المزامنة السحابية واللحظية
 
         const savedUserJSON = localStorage.getItem('currentUser');
         if (savedUserJSON) {

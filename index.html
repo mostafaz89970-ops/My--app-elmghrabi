@@ -915,6 +915,10 @@
             <h3 id="header-company-name">ELMAGHRABI</h3>
         </div>
         <div class="header-actions" style="margin-right: auto; padding-left: 1rem; display: flex; align-items: center; gap: 10px;">
+            <div id="cloud-sync-badge" class="cloud-sync-badge" style="display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; cursor: pointer; transition: all 0.3s ease;" title="المزامنة السحابية الفورية المباشرة">
+                <span id="cloud-sync-icon" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e;"></span>
+                <span id="cloud-sync-text">مزامنة سحابية لحظية</span>
+            </div>
             <button id="dark-mode-toggle" class="btn icon-btn" title="تبديل الوضع">
                 <svg id="dark-mode-icon-sun" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
                 <svg id="dark-mode-icon-moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -2693,7 +2697,39 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span>
                 </button>
             </div>
-          <div class="settings-grid">
+                    <div class="settings-grid">
+              <!-- Cloud Realtime Sync & Control Card -->
+              <div class="settings-card" id="cloud-sync-settings-card" style="border: 2px solid #3b82f6; background: linear-gradient(to bottom, #ffffff, #f8fafc);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                      <h3 style="color: #1d4ed8; display: flex; align-items: center; gap: 8px; margin: 0;">
+                          <span>☁️</span> المزامنة السحابية والتحكم المباشر عن بُعد
+                      </h3>
+                      <span class="badge" id="settings-cloud-sync-status-badge" style="background: #22c55e; color: #fff; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;">متصل بالسحابة 🟢</span>
+                  </div>
+                  <p class="text-muted" style="font-size: 0.88rem;">مزامنة لحظية مباشرة عبر Firebase وسحب ودفع التغييرات في أي وقت على جميع المتصفحات والأجهزة مع تحكم كامل فوري بالصلاحيات والسجلات.</p>
+                  
+                  <div style="background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 12px;">
+                      <div style="font-size: 0.85rem; margin-bottom: 6px; display: flex; justify-content: space-between;">
+                          <span><b>مشروع Firebase:</b> <code>elmghrabyelectric</code></span>
+                          <span style="color: #16a34a; font-weight: bold;">⚡ نقل فوري (Realtime)</span>
+                      </div>
+                      <div style="font-size: 0.82rem; color: #475569;">
+                          <b>رابط قاعدة البيانات:</b> <code style="direction: ltr; display: inline-block;">https://elmghrabyelectric-default-rtdb.firebaseio.com</code>
+                      </div>
+                  </div>
+
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                      <button id="settings-push-cloud-btn" class="btn btn-primary" style="flex: 1; min-width: 160px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                          <span>⬆️</span> رفع نسختي للسحابة الآن
+                      </button>
+                      <button id="settings-pull-cloud-btn" class="btn secondary" style="flex: 1; min-width: 160px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                          <span>⬇️</span> سحب أحدث نسخة من السحابة
+                      </button>
+                      <a href="https://console.firebase.google.com/project/elmghrabyelectric/database" target="_blank" rel="noopener noreferrer" class="btn" style="background: #ef4444; color: #fff; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px; border-radius: 6px; font-weight: bold;">
+                          <span>🚀</span> فتح لوحة Firebase
+                      </a>
+                  </div>
+              </div>
               <!-- Dropdown Management -->
               <div class="settings-card">
                   <h3>إدارة القوائم</h3>
@@ -5172,6 +5208,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
   <script src="Amiri-Regular.js"></script>
+  <!-- Firebase Realtime Database SDK (للمزامنة السحابية الفورية المباشرة) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript -->
   <script src="./dist/index.js"></script>
 
