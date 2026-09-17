@@ -1086,6 +1086,10 @@
             <button id="user-settings-btn" class="btn icon-btn" title="إعدادات الحساب">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </button>
+                        <button id="developer-maintenance-btn" class="btn" style="display: none; background-color: #f59e0b; color: #1e293b; padding: 5px 12px; font-size: 0.85rem; font-weight: bold; align-items: center; gap: 5px; border-radius: 6px; border: 1px solid #d97706;" title="وضع الصيانة للمطور">
+                <span id="dev-maint-icon">🛠️</span>
+                <span id="dev-maint-text">وضع الصيانة</span>
+            </button>
             <button id="header-logout-btn" class="btn" style="background-color: #dc3545; color: white; padding: 5px 10px; font-size: 0.9rem; display: flex; align-items: center;" title="تسجيل الخروج">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 5px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                 تسجيل الخروج
@@ -1094,6 +1098,14 @@
       </header>
 
       <div class="content-wrapper">
+        <!-- شريط تنبيه وضع الصيانة للمطور -->
+        <div id="maintenance-mode-banner" style="display: none; background: linear-gradient(90deg, #b45309, #d97706); color: #fff; padding: 10px 18px; font-weight: bold; font-size: 0.95rem; border-radius: 8px; margin-bottom: 15px; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px -1px rgba(180, 83, 9, 0.3);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.2rem;">⚠️</span>
+                <span>المنظومة تعمل حالياً في <b>«وضع الصيانة الحصري»</b> (مغلقة ومحظورة أمام جميع المستخدمين وتعمل لديك فقط).</span>
+            </div>
+            <button type="button" id="btn-cancel-maintenance-banner" class="btn btn-sm" style="background: #fff; color: #b45309; font-weight: 800; border: none; border-radius: 4px; padding: 4px 12px; cursor: pointer;">إلغاء وضع الصيانة 🔓</button>
+        </div>
         <!-- Dashboard Section -->
         <section id="dashboard" class="content-section active">
           <div class="dashboard-grid">
@@ -2455,6 +2467,10 @@
                     <button id="treasury-open-deposit-btn" class="btn btn-primary" style="background: #10b981; border-color: #10b981;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         <span>إيداع نقدي مباشر</span>
+                    </button>
+                                        <button id="treasury-reset-btn" class="btn btn-danger" style="background: #dc2626; border-color: #dc2626; color: #fff;" title="تصفير الخزينة">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg>
+                        <span>تصفير الخزينة</span>
                     </button>
                     <button id="treasury-print-daily-btn" class="btn">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
@@ -5664,7 +5680,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript -->
-  <script src="./dist/index.js?v=1789682999564"></script>
+  <script src="./dist/index.js?v=1789684172496"></script>
 
   <!-- HOTFIX: Ensure app container is hidden on logout -->
   <script>
@@ -6101,6 +6117,82 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+
+    <!-- نافذة تصفير الخزينة -->
+    <div id="modal-treasury-reset" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: #fff; border-radius: 12px; max-width: 500px; width: 92%; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); position: relative; border-top: 5px solid #dc2626;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #dc2626; display: flex; align-items: center; gap: 8px;">
+                    <span>⚠️</span>
+                    <span>تصفير حسابات وحركات الخزينة</span>
+                </h3>
+                <button type="button" class="btn-close-modal" onclick="document.getElementById('modal-treasury-reset').style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <p style="color: #475569; font-size: 0.95rem; line-height: 1.6; margin-bottom: 15px;">
+                تحذير: هذه العملية ستقوم بإعادة ضبط وتصفير قيود التوريدات والتصفيات المسجلة. يرجى تحديد نوع التصفير المطلوب:
+            </p>
+            <form id="form-treasury-reset">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 6px;">نطاق التصفير:</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="radio" name="reset-scope" value="today" checked>
+                            <span>تصفير حركة وتوريدات اليوم الحالي فقط (<b id="reset-today-label">-</b>)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="radio" name="reset-scope" value="all">
+                            <span>تصفير شامل وكامل لجميع الحركات والتصفيات والأرشيف</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="reset-confirm-word" style="font-weight: bold; display: block; margin-bottom: 6px; color: #991b1b;">
+                        للتأكيد اكتب كلمة «تصفير» في الحقل أدناه:
+                    </label>
+                    <input type="text" id="reset-confirm-word" class="form-control" placeholder="اكتب تصفير" required style="width: 100%; padding: 8px 12px; border: 1px solid #fca5a5; border-radius: 6px;">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn secondary" onclick="document.getElementById('modal-treasury-reset').style.display='none'">إلغاء</button>
+                    <button type="submit" class="btn btn-danger" style="background: #dc2626; color: #fff; font-weight: bold;">تأكيد التصفير الآن 🔄</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- نافذة تنبيه إيقاف الحساب اللحظي (غير قابلة للإغلاق) -->
+    <div id="modal-account-suspended-alert" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.92); z-index: 999999; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+        <div style="background: #fff; border-radius: 16px; max-width: 520px; width: 92%; padding: 30px; text-align: center; box-shadow: 0 25px 50px -12px rgba(220, 38, 38, 0.4); border-top: 8px solid #dc2626;">
+            <div style="font-size: 3.5rem; margin-bottom: 15px; animation: bounce 1s infinite;">⛔</div>
+            <h2 style="color: #dc2626; margin: 0 0 10px 0; font-size: 1.6rem;">تم إيقاف حسابك من قِبل الإدارة</h2>
+            <div style="background: #fee2e2; border: 1px solid #f87171; border-radius: 8px; padding: 14px; margin: 15px 0; color: #991b1b; font-size: 1rem; font-weight: 600; line-height: 1.6;" id="suspended-modal-reason">
+                تم تعليق حسابك لعدم تصفية العهدة المالية المستحقة.
+            </div>
+            <p style="color: #64748b; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.6;">
+                تم إنهاء جلستك وإغلاق النظام حفاظاً على سلامة المعاملات. يرجى مراجعة مسؤول الخزينة والإدارة المالية لتسوية وضعك المالي وإعادة تنشيط الحساب.
+            </p>
+            <button type="button" id="btn-suspended-acknowledge" class="btn btn-primary" style="background: #0f172a; color: #fff; padding: 10px 24px; font-weight: bold; border-radius: 8px; font-size: 1rem; cursor: pointer;">
+                العودة إلى شاشة تسجيل الدخول &larr;
+            </button>
+        </div>
+    </div>
+
+    <!-- شاشة وضع الصيانة للعامة (كامل الشاشة) -->
+    <div id="modal-maintenance-mode-overlay" style="display: none; position: fixed; inset: 0; background: #0f172a; z-index: 999998; align-items: center; justify-content: center; color: #fff; text-align: center; padding: 20px;">
+        <div style="max-width: 550px; width: 100%; background: #1e293b; border: 2px solid #334155; border-radius: 20px; padding: 40px 30px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div style="font-size: 4rem; margin-bottom: 20px;">🛠️</div>
+            <h1 style="font-size: 1.8rem; margin: 0 0 15px 0; color: #f59e0b;">المنظومة في وضع الصيانة والتحديث</h1>
+            <p style="color: #cbd5e1; font-size: 1.05rem; line-height: 1.7; margin-bottom: 25px;" id="maintenance-overlay-message">
+                يجري حالياً إجراء صيانة دورية وتحديثات هامة على المنظومة بواسطة المطور. تم إيقاف الدخول مؤقتاً لجميع المستخدمين لضمان دقة البيانات وسلامتها.
+            </p>
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px dashed #f59e0b; border-radius: 8px; padding: 12px; color: #fbbf24; font-size: 0.9rem; margin-bottom: 25px;">
+                يرجى الانتظار والمحاولة مرة أخرى بعد انتهاء أعمال الصيانة.
+            </div>
+            <button type="button" onclick="location.reload()" class="btn" style="background: #f59e0b; color: #0f172a; font-weight: 800; padding: 10px 24px; border-radius: 8px; font-size: 1rem; border: none; cursor: pointer;">
+                إعادة المحاولة 🔄
+            </button>
         </div>
     </div>
 

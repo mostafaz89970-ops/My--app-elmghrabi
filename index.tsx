@@ -88,6 +88,8 @@ interface AppUser {
 }
 
 interface AppSettings {
+    maintenanceMode?: boolean;
+    maintenanceMessage?: string;
     companyName: string;
     companyAddress?: string;
     footerText: string;
@@ -200,6 +202,8 @@ let state = {
     ] as AppUser[],
     settings: { // تم تطبيق الواجهة AppSettings هنا
         companyName: 'ELMAGHRABI',
+        maintenanceMode: false,
+        maintenanceMessage: 'يجري حالياً إجراء صيانة دورية وتحديثات هامة على المنظومة بواسطة المطور. تم إيقاف الدخول مؤقتاً لجميع المستخدمين لضمان دقة البيانات وسلامتها.',
         companyAddress: 'قطاع شمال المنيا - هندسة كهرباء بني مزار',
         footerText: 'منظومة العدادات 2025 - جميع الحقوق محفوظة ELMGHRABI © 2026',
         technicians: ['محمد علي', 'أحمد السيد', 'خالد محمود'],
@@ -1396,6 +1400,29 @@ const handleLogin = async (event: Event) => {
     const user = state.users.find(u => u.username === username && u.password === password);
 
     if (user) {
+        // فحص وضع الصيانة
+        if (state.settings?.maintenanceMode && user.username !== 'admin' && user.role !== 'admin') {
+            if (errorElement) {
+                errorElement.textContent = state.settings.maintenanceMessage || 'المنظومة في وضع الصيانة من قِبل المطور حالياً.';
+                errorElement.classList.remove('hidden');
+            }
+            showToast('المنظومة متوقفة حالياً لوضع الصيانة من قِبل المطور.', 'error');
+            showMaintenanceModeAlert(state.settings.maintenanceMessage);
+            return;
+        }
+
+        // فحص إيقاف الحساب
+        if (user.isSuspended) {
+            const reason = user.suspendReason || 'عدم تصفية العهدة المالية المستحقة';
+            if (errorElement) {
+                errorElement.textContent = `تم إيقاف حسابك من قِبل مسؤول الخزينة / الإدارة: ${reason}`;
+                errorElement.classList.remove('hidden');
+            }
+            showToast(`تم إيقاف حسابك: ${reason}`, 'error');
+            showAccountSuspendedAlert(reason);
+            return;
+        }
+
         showAppLoading('جارٍ تسجيل الدخول والتحقق من الصلاحيات...', 'المنظومة الموحدة للعدادات - مزامنة سحابية ⚡', '🔐');
         await new Promise(r => setTimeout(r, 650));
         loggedInUser = { fullName: user.fullName, role: user.role, username: user.username };
@@ -3283,7 +3310,10 @@ const renderJudicialCollectionSection = () => {
             logActivity('تحصيل مبلغ', `تم تحصيل مبلغ ${payVal} ج.م (إيصال: ${receiptNumber}) من المخالف ${item.subscriberName}`);
             if (await saveState()) {
                 renderJudicialCollectionSection();
-                showToast('تم تسجيل الدفع بنجاح.');
+                renderTreasuryDashboard();
+                renderTreasuryUserSettlements();
+                renderTreasuryTransactionsLog();
+                showToast('تم تسجيل الدفع وتحديث الخزينة تلقائياً بنجاح.');
             } else {
                 item.payments.pop(); // Revert if save failed
             }
@@ -3813,7 +3843,10 @@ const renderJudicialCollectionSection = () => {
             logActivity('تحصيل زينات', `تم تحصيل مبلغ ${payVal} ج.م (إيصال: ${receiptNumber}) من ${item.requesterName}`);
             if (await saveState()) {
                 renderZinatCollectionSection();
-                showToast('تم تسجيل الدفع بنجاح.');
+                renderTreasuryDashboard();
+                renderTreasuryUserSettlements();
+                renderTreasuryTransactionsLog();
+                showToast('تم تسجيل الدفع وتحديث الخزينة تلقائياً بنجاح.');
             } else {
                 item.payments.pop(); // Revert if save failed
             }
@@ -3826,6 +3859,158 @@ const renderJudicialCollectionSection = () => {
     // =========================================================================
 
     
+    
+    // --- وظائف وضع صيانة المطور وفحص الجلسات النشطة وإيقاف الحسابات وتصفير الخزينة ---
+
+    function showAccountSuspendedAlert(reason?: string) {
+        const modal = document.getElementById('modal-account-suspended-alert');
+        if (modal) {
+            const reasonEl = document.getElementById('suspended-modal-reason');
+            if (reasonEl) {
+                reasonEl.textContent = reason || 'تم إيقاف حسابك من قِبل مسؤول الخزينة / الإدارة لعدم تصفية العهدة المالية المستحقة.';
+            }
+            modal.style.display = 'flex';
+        }
+    }
+
+    function showMaintenanceModeAlert(message?: string) {
+        const modal = document.getElementById('modal-maintenance-mode-overlay');
+        if (modal) {
+            const msgEl = document.getElementById('maintenance-overlay-message');
+            if (msgEl) {
+                msgEl.textContent = message || state.settings.maintenanceMessage || 'يجري حالياً إجراء صيانة دورية وتحديثات هامة على المنظومة بواسطة المطور. تم إيقاف الدخول مؤقتاً لجميع المستخدمين لضمان دقة البيانات وسلامتها.';
+            }
+            modal.style.display = 'flex';
+        }
+    }
+
+    function checkUserActiveSession() {
+        if (typeof loggedInUser === 'undefined' || !loggedInUser) {
+            return;
+        }
+
+        const found = (state.users || []).find((u: any) => u.username === loggedInUser.username);
+        if (!found) {
+            handleLogout();
+            return;
+        }
+
+        if (found.isSuspended) {
+            const reason = found.suspendReason || 'تم إيقاف حسابك من قِبل مسؤول الخزينة / الإدارة لعدم تصفية العهدة المالية.';
+            handleLogout();
+            showAccountSuspendedAlert(reason);
+            return;
+        }
+
+        if (state.settings?.maintenanceMode && found.username !== 'admin' && found.role !== 'admin') {
+            handleLogout();
+            showMaintenanceModeAlert();
+            return;
+        }
+    }
+
+    function updateDeveloperMaintenanceUI() {
+        const btn = document.getElementById('developer-maintenance-btn');
+        const banner = document.getElementById('maintenance-mode-banner');
+        const isMaint = Boolean(state.settings?.maintenanceMode);
+        const isAdmin = loggedInUser?.username === 'admin' || loggedInUser?.role === 'admin';
+
+        if (btn) {
+            if (isAdmin) {
+                btn.style.display = 'flex';
+                if (isMaint) {
+                    btn.style.backgroundColor = '#dc2626';
+                    btn.style.borderColor = '#b91c1c';
+                    btn.style.color = '#fff';
+                    btn.title = 'إلغاء وضع الصيانة وإعادة فتح المنظومة';
+                    const text = document.getElementById('dev-maint-text');
+                    if (text) text.textContent = 'إلغاء الصيانة 🔓';
+                } else {
+                    btn.style.backgroundColor = '#f59e0b';
+                    btn.style.borderColor = '#d97706';
+                    btn.style.color = '#1e293b';
+                    btn.title = 'تفعيل وضع الصيانة الحصري للمطور';
+                    const text = document.getElementById('dev-maint-text');
+                    if (text) text.textContent = 'وضع الصيانة 🛠️';
+                }
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        if (banner) {
+            banner.style.display = (isAdmin && isMaint) ? 'flex' : 'none';
+        }
+    }
+
+    async function toggleDeveloperMaintenanceMode() {
+        if (loggedInUser?.username !== 'admin' && loggedInUser?.role !== 'admin') {
+            showToast('هذه الخاصية حصرية للمطور والمسؤول العام فقط.', 'error');
+            return;
+        }
+
+        const current = Boolean(state.settings?.maintenanceMode);
+        if (!current) {
+            const msg = prompt('أدخل رسالة الصيانة التي ستظهر لجميع المستخدمين:', state.settings.maintenanceMessage || 'المنظومة قيد الصيانة والتحديث الدوري حالياً بواسطة المطور.');
+            if (msg === null) return;
+            state.settings.maintenanceMode = true;
+            state.settings.maintenanceMessage = msg.trim() || 'المنظومة قيد الصيانة والتحديث الدوري حالياً بواسطة المطور.';
+            logActivity('تفعيل وضع الصيانة', 'تم تفعيل وضع الصيانة وإغلاق المنظومة أمام جميع المستخدمين');
+            showToast('تم تفعيل وضع الصيانة! المنظومة مغلقة الآن أمام جميع المستخدمين وتعمل لديك فقط.', 'warning');
+        } else {
+            if (!confirm('هل تريد إلغاء وضع الصيانة وإعادة فتح المنظومة أمام جميع المستخدمين؟')) return;
+            state.settings.maintenanceMode = false;
+            logActivity('إلغاء وضع الصيانة', 'تم إلغاء وضع الصيانة وإعادة فتح المنظومة لجميع المستخدمين');
+            showToast('تم إلغاء وضع الصيانة وإعادة إتاحة المنظومة للجميع.', 'success');
+        }
+
+        await saveState();
+        updateDeveloperMaintenanceUI();
+    }
+
+    function openTreasuryResetModal() {
+        const modal = document.getElementById('modal-treasury-reset');
+        if (!modal) return;
+        const label = document.getElementById('reset-today-label');
+        if (label) label.textContent = activeTreasuryDateFilter === 'all' ? 'اليوم' : activeTreasuryDateFilter;
+        const wordInp = document.getElementById('reset-confirm-word') as HTMLInputElement | null;
+        if (wordInp) wordInp.value = '';
+        modal.style.display = 'flex';
+    }
+
+    async function handleTreasuryResetSubmit(event: Event) {
+        event.preventDefault();
+        const wordInp = document.getElementById('reset-confirm-word') as HTMLInputElement | null;
+        if (!wordInp || wordInp.value.trim() !== 'تصفير') {
+            showToast('يرجى كتابة كلمة "تصفير" بشكل صحيح لتأكيد العملية.', 'error');
+            return;
+        }
+
+        const scope = (document.querySelector('input[name="reset-scope"]:checked') as HTMLInputElement)?.value || 'today';
+
+        if (scope === 'today') {
+            const targetDate = activeTreasuryDateFilter;
+            state.treasurySettlements = (state.treasurySettlements || []).filter((s: any) => normalizeDateStr(s.settlementDate) !== targetDate);
+            state.treasuryTransactions = (state.treasuryTransactions || []).filter((t: any) => normalizeDateStr(t.date) !== targetDate);
+            logActivity('تصفير الخزينة', `تم تصفير حركات وتصفيات الخزينة لتاريخ (${targetDate}) بواسطة ${loggedInUser?.fullName}`);
+            showToast(`تم تصفير حركات وتوريدات الخزينة لتاريخ ${targetDate} بنجاح.`, 'success');
+        } else {
+            state.treasurySettlements = [];
+            state.treasuryTransactions = [];
+            logActivity('تصفير شامل للخزينة', `تم تصفير شامل وكامل لجميع حركات وتصفيات الخزينة بواسطة ${loggedInUser?.fullName}`);
+            showToast('تم التصفير الشامل لجميع حركات وتصفيات الخزينة بنجاح.', 'success');
+        }
+
+        await saveState();
+        const modal = document.getElementById('modal-treasury-reset');
+        if (modal) modal.style.display = 'none';
+
+        renderTreasuryDashboard();
+        renderTreasuryUserSettlements();
+        renderTreasuryTransactionsLog();
+
+        }
+
     function tafqeetNumber(num: number): string {
         if (isNaN(num) || num <= 0) return 'صفر جنيه مصري';
         
@@ -4393,26 +4578,35 @@ const renderJudicialCollectionSection = () => {
         }
 
         if (user.isSuspended) {
+            if (!confirm(`هل أنت متأكد من رفع الإيقاف وإعادة تفعيل حساب "${user.fullName}"؟`)) return;
             user.isSuspended = false;
             user.suspendReason = '';
+            user.suspendedAt = '';
+            user.suspendedBy = '';
             showToast(`تم رفع الإيقاف وإعادة تفعيل حساب المستخدم "${user.fullName}" بنجاح.`, 'success');
-            logActivity('تفعيل حساب مستخدم', `قام مسؤول الخزينة بتفعيل حساب "${user.fullName}" (@${user.username})`);
+            logActivity('تفعيل حساب مستخدم', `قام المسؤول بتفعيل حساب "${user.fullName}" (@${user.username})`);
         } else {
-            const confirmed = confirm(`هل أنت متأكد من إيقاف حساب المستخدم "${user.fullName}"؟\n\nلن يتمكن من تسجيل الدخول للنظام حتى يقوم بتصفية العهدة المالية بالخزينة.`);
-            if (!confirmed) return;
+            const reason = prompt(`يرجى كتابة سبب إيقاف حساب المستخدم "${user.fullName}":`, 'عدم تصفية العهدة المالية بالخزينة');
+            if (reason === null) return;
 
             user.isSuspended = true;
-            user.suspendReason = 'عدم تصفية العهدة المالية بالخزينة';
+            user.suspendReason = reason.trim() || 'عدم تصفية العهدة المالية بالخزينة';
             user.suspendedAt = new Date().toLocaleString('ar-EG');
-            user.suspendedBy = loggedInUser?.fullName || 'مسؤول الخزينة';
+            user.suspendedBy = loggedInUser?.fullName || 'مسؤول الخزينة / الإدارة';
 
-            showToast(`تم إيقاف حساب المستخدم "${user.fullName}" بنجاح ومنعه من تسجيل الدخول.`, 'warning');
-            logActivity('إيقاف حساب مستخدم', `قام مسؤول الخزينة بإيقاف حساب "${user.fullName}" (@${user.username}) لعدم تصفية العهدة المالية`);
+            showToast(`تم إيقاف حساب المستخدم "${user.fullName}" بنجاح وإغلاق جلسته.`, 'warning');
+            logActivity('إيقاف حساب مستخدم', `قام المسؤول بإيقاف حساب "${user.fullName}" (@${user.username}) - السبب: ${user.suspendReason}`);
         }
 
         await saveState();
+        populateUserDropdown();
         renderTreasuryDashboard();
         renderTreasuryUserSettlements();
+        renderUserManagementSection();
+
+        // إرسال التحديث لجميع الأجهزة فورياً لإنهاء جلسة المستخدم
+        // فحص محلي للجلسة الحالية
+        checkUserActiveSession();
     };
 
     (window as any).handlePrintLatestSettlementReceipt = (username: string) => {
@@ -13051,6 +13245,23 @@ const renderJudicialCollectionSection = () => {
                 }
             }
 
+            // تسجيل السداد في الخزينة العامة أيضاً
+            const debtTrans = {
+                id: Date.now(),
+                type: 'debt_payment',
+                typeName: `سداد دين: ${debt.debtTypeName || 'مديونية'}`,
+                amount: amt,
+                date: new Date().toISOString().slice(0, 10),
+                time: new Date().toLocaleTimeString('ar-EG'),
+                depositorName: debt.customerName || 'مشترك',
+                collectorName: loggedInUser?.fullName || 'محصل',
+                collectorUsername: loggedInUser?.username || '',
+                receiptNumber: rcptNo,
+                notes: `سداد دين للمشترك: ${debt.customerName} (حساب: ${debt.accountNumber || '-'})`
+            };
+            if (!state.treasuryTransactions) state.treasuryTransactions = [];
+            state.treasuryTransactions.push(debtTrans);
+
             await saveState();
 
             fetch('http://127.0.0.1:5002/api/debts/pay-installment', {
@@ -13059,7 +13270,7 @@ const renderJudicialCollectionSection = () => {
                 body: JSON.stringify({ debtId: dId, amount: amt, receiptNumber: rcptNo })
             }).catch(() => null);
 
-            showToast(`تم سداد مبلغ ${amt.toFixed(2)} ج.م نقداً بنجاح للمشترك ${debt.customerName}.`, 'success');
+            showToast(`تم سداد مبلغ ${amt.toFixed(2)} ج.م نقداً وتسميعه بالخزينة للمشترك ${debt.customerName}.`, 'success');
             logActivity('سداد نقدي بدون شحن', `تم تحصيل وسداد مبلغ ${amt.toFixed(2)} ج.م نقداً للدين ${debt.debtTypeName} للمشترك ${debt.customerName}`);
 
             const modal = document.getElementById('modal-cash-debt-payment');
@@ -13067,6 +13278,9 @@ const renderJudicialCollectionSection = () => {
 
             updateCustomerDebtsSummaryBox();
             renderDebtsTable();
+            renderTreasuryDashboard();
+            renderTreasuryUserSettlements();
+            renderTreasuryTransactionsLog();
         });
     };
 
@@ -17779,6 +17993,7 @@ const renderJudicialCollectionSection = () => {
             <th>الاسم الكامل</th>
             <th>اسم المستخدم</th>
             <th>الدور الوظيفي</th>
+            <th>حالة الحساب / الإيقاف</th>
             <th>إجراءات</th>
         </tr>
     `;
@@ -17787,11 +18002,29 @@ const renderJudicialCollectionSection = () => {
         state.users.forEach(user => {
             const role = state.settings.roles.find(r => r.key === user.role);
             const roleName = role ? role.name : user.role;
+            const isSusp = Boolean(user.isSuspended);
+
+            let statusHtml = isSusp
+                ? `<div style="display:flex; flex-direction:column; gap:3px;">
+                     <span class="badge" style="background:#fee2e2; color:#dc2626; border:1px solid #f87171; font-weight:bold; padding:4px 8px; border-radius:6px; font-size:0.85rem;">⛔ موقوف</span>
+                     ${user.suspendReason ? `<small style="color:#b91c1c; font-size:0.75rem;">(${user.suspendReason})</small>` : ''}
+                   </div>`
+                : `<span class="badge" style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-weight:bold; padding:4px 8px; border-radius:6px; font-size:0.85rem;">🟢 نشط</span>`;
+
+            let toggleSuspendBtn = '';
+            if (user.username !== 'admin' && (loggedInUser?.username === 'admin' || loggedInUser?.role === 'admin' || hasPermission('manage_treasury_settlements'))) {
+                toggleSuspendBtn = `<button type="button" class="btn btn-sm" onclick="window.toggleUserSuspension('${user.username}')" style="margin-top:4px; padding:3px 8px; font-size:0.8rem; background:${isSusp ? '#10b981' : '#dc2626'}; color:#fff; border-radius:4px; border:none; cursor:pointer;">${isSusp ? 'تفعيل الحساب 🔓' : 'إيقاف الحساب ⛔'}</button>`;
+            }
+
             const row = document.createElement('tr');
             row.innerHTML = ` 
-            <td>${user.fullName}</td>
-            <td>${user.username}</td>
-            <td>${roleName}</td>
+            <td><b>${user.fullName}</b></td>
+            <td><code>@${user.username}</code></td>
+            <td><span class="badge" style="background:#f1f5f9; color:#334155;">${roleName}</span></td>
+            <td>
+                ${statusHtml}
+                ${toggleSuspendBtn}
+            </td>
             <td class="actions-cell">
                 ${(loggedInUser?.username === 'admin' || loggedInUser?.role === 'admin') ? `<button class="btn btn-edit-details" data-id="${user.id}">تعديل</button>` : ''}
                 ${user.username !== 'admin' && (loggedInUser?.username === 'admin' || loggedInUser?.role === 'admin') ? `<button class="btn btn-delete" data-id="${user.id}">حذف</button>` : ''}
@@ -19859,6 +20092,44 @@ const renderJudicialCollectionSection = () => {
         document.getElementById('import-from-welcome-btn')?.addEventListener('click', handleImportFromWelcome);
 
         // ================= Treasury Event Listeners =================
+        // Listeners for Developer Maintenance Mode
+        document.getElementById('developer-maintenance-btn')?.addEventListener('click', () => {
+            toggleDeveloperMaintenanceMode();
+        });
+        document.getElementById('btn-cancel-maintenance-banner')?.addEventListener('click', () => {
+            toggleDeveloperMaintenanceMode();
+        });
+
+        // Listeners for Treasury Reset
+        document.getElementById('treasury-reset-btn')?.addEventListener('click', () => {
+            openTreasuryResetModal();
+        });
+        document.getElementById('form-treasury-reset')?.addEventListener('submit', (e) => {
+            handleTreasuryResetSubmit(e);
+        });
+
+        // Suspended alert acknowledge button
+        document.getElementById('btn-suspended-acknowledge')?.addEventListener('click', () => {
+            const modal = document.getElementById('modal-account-suspended-alert');
+            if (modal) modal.style.display = 'none';
+            const userSelect = document.getElementById('username') as HTMLSelectElement | null;
+            if (userSelect) userSelect.focus();
+        });
+
+        // Periodic active session verification (every 2.5 seconds)
+        setInterval(() => {
+            checkUserActiveSession();
+            updateDeveloperMaintenanceUI();
+        }, 2500);
+
+        // Cross-tab storage listener
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'appState' || e.key === 'currentUser') {
+                checkUserActiveSession();
+                updateDeveloperMaintenanceUI();
+            }
+        });
+
         document.getElementById('treasury-open-deposit-btn')?.addEventListener('click', () => {
             const modal = document.getElementById('modal-treasury-deposit');
             if (modal) {
@@ -21330,12 +21601,23 @@ const initMobileAdaptation = () => {
                 // 5. الحفظ الفوري في قاعدة البيانات المحلية لهذا الجهاز IndexedDB
                 await saveToIndexedDB('appState', state);
 
-                // 6. التحقق من المستخدم الحالي وتحديث صلاحياته أو تسجيل خروجه إذا حُذف
+                // 6. التحقق من المستخدم الحالي وتحديث صلاحياته أو تسجيل خروجه إذا حُذف أو تم إيقافه
                 if (typeof loggedInUser !== 'undefined' && loggedInUser) {
                     const found = (state.users || []).find((u: any) => u.username === loggedInUser.username);
                     if (!found) {
                         showToast('تم إلغاء/حذف هذا الحساب بواسطة المسؤول عن بُعد. جارٍ تسجيل الخروج...', 'warning');
                         handleLogout();
+                        return;
+                    }
+                    if (found.isSuspended) {
+                        const reason = found.suspendReason || 'تم إيقاف حسابك من قِبل مسؤول الخزينة / الإدارة لعدم تصفية العهدة.';
+                        handleLogout();
+                        showAccountSuspendedAlert(reason);
+                        return;
+                    }
+                    if (state.settings?.maintenanceMode && found.username !== 'admin' && found.role !== 'admin') {
+                        handleLogout();
+                        showMaintenanceModeAlert();
                         return;
                     }
                     loggedInUser = found;
