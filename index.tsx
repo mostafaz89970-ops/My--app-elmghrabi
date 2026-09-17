@@ -1215,7 +1215,66 @@ const validateForm = (form: HTMLFormElement): boolean => {
  * Handles the login form submission.
  * @param event The form submission event.
  */
-const handleLogin = (event: Event) => {
+
+// =======================================================
+// Global Elegant Loader (نظام التحميل الدائري الأنيق للمنظومة)
+// =======================================================
+function showAppLoading(actionTitle: string, subtext?: string, icon?: string): void {
+    const loader = document.getElementById('global-app-loader');
+    const actionText = document.getElementById('global-loader-action-text');
+    const subtextEl = document.getElementById('global-loader-subtext-label');
+    const iconEl = document.getElementById('global-loader-center-icon');
+
+    if (actionText) actionText.textContent = actionTitle;
+    if (subtextEl && subtext) subtextEl.textContent = subtext;
+    if (iconEl && icon) iconEl.textContent = icon;
+
+    if (loader) {
+        loader.style.display = 'flex';
+        loader.style.opacity = '1';
+    }
+}
+
+async function hideAppLoading(delayMs: number = 300): Promise<void> {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const loader = document.getElementById('global-app-loader');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    resolve();
+                }, 220);
+            } else {
+                resolve();
+            }
+        }, delayMs);
+    });
+}
+
+async function withAppLoading<T>(
+    actionTitle: string,
+    operation: () => Promise<T> | T,
+    subtext: string = 'تحديث فوري للسحابة وجميع الأجهزة المتصلة ☁️',
+    icon: string = '⚡'
+): Promise<T> {
+    showAppLoading(actionTitle, subtext, icon);
+    try {
+        const result = await operation();
+        if (typeof cloudSyncManager !== 'undefined' && cloudSyncManager) {
+            (cloudSyncManager as any).refreshCurrentActiveView?.();
+        }
+        return result;
+    } finally {
+        await hideAppLoading(400);
+    }
+}
+
+(window as any).showAppLoading = showAppLoading;
+(window as any).hideAppLoading = hideAppLoading;
+(window as any).withAppLoading = withAppLoading;
+
+const handleLogin = async (event: Event) => {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
 
@@ -1228,6 +1287,8 @@ const handleLogin = (event: Event) => {
     const user = state.users.find(u => u.username === username && u.password === password);
 
     if (user) {
+        showAppLoading('جارٍ تسجيل الدخول والتحقق من الصلاحيات...', 'المنظومة الموحدة للعدادات - مزامنة سحابية ⚡', '🔐');
+        await new Promise(r => setTimeout(r, 650));
         loggedInUser = { fullName: user.fullName, role: user.role, username: user.username };
         localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
         errorElement?.classList.add('hidden');
@@ -1251,6 +1312,7 @@ const handleLogin = (event: Event) => {
         setPageTitle(state.settings.companyName || 'ELMAGHRABI');
         window.requestAnimationFrame(() => renderDashboard());
         window.setTimeout(() => renderDashboard(), 100);
+        await hideAppLoading(300);
     } else {
         loggedInUser = null;
         errorElement?.classList.remove('hidden');
@@ -2152,7 +2214,7 @@ const displayTransformerQueryResult = (results: DataItem[]) => {
     });
 };
 
-const handleMeterFormSubmit = (event: Event) => {
+const handleMeterFormSubmit = async (event: Event) => {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
 
@@ -2281,10 +2343,12 @@ const handleMeterFormSubmit = (event: Event) => {
         showToast('تم حفظ السجل بنجاح.');
     }
 
-    saveState();
-    renderMeterManagementSection();
-    renderDashboard(); // Update dashboard stats
-    resetMeterForm(); // Clear the form for the next entry
+    await withAppLoading(existingId ? 'جارٍ تحديث بيانات العداد...' : 'جارٍ حفظ بيانات العداد الجديد...', async () => {
+        await saveState();
+        renderMeterManagementSection();
+        renderDashboard();
+        resetMeterForm();
+    }, 'بث فوري للسحابة وتحديث تلقائي لجميع الأجهزة ☁️', '💾');
 };
 
 // --- الضبطية القضائية ---
@@ -6690,17 +6754,18 @@ const renderJudicialCollectionSection = () => {
         const meterToDelete = state.meters.find(m => m.id === currentMeterIdForDetails);
         if (!meterToDelete) return;
 
-        const onConfirm = () => {
-            state.meters = state.meters.filter(m => m.id !== currentMeterIdForDetails);
-            const summary = `اسم: ${meterToDelete.subscriberName}, شاسية: ${meterToDelete.meterChassisNumber}, كود: ${meterToDelete.subscriptionCode}`;
-            logActivity('حذف مشترك', `حذف سجل المشترك "${meterToDelete.subscriberName}".`, summary);
-            saveState();
+        const onConfirm = async () => {
+            await withAppLoading('جارٍ حذف سجل المشترك وتحديث المنظومة...', async () => {
+                state.meters = state.meters.filter(m => m.id !== currentMeterIdForDetails);
+                const summary = `اسم: ${meterToDelete.subscriberName}, شاسية: ${meterToDelete.meterChassisNumber}, كود: ${meterToDelete.subscriptionCode}`;
+                logActivity('حذف مشترك', `حذف سجل المشترك "${meterToDelete.subscriberName}".`, summary);
+                await saveState();
+                currentMeterIdForDetails = null;
+                renderDashboard();
+                previousPageId = 'meter-management';
+                handleBackToList();
+            }, 'تحديث مباشر لجميع الأجهزة والشاشات 🗑️', '🗑️');
             showToast('تم حذف المشترك بنجاح.');
-            currentMeterIdForDetails = null;
-            renderDashboard();
-            // Go back to main management page as the list might be resorted or changed
-            previousPageId = 'meter-management';
-            handleBackToList();
         };
 
         showConfirmationDialog(
@@ -10854,11 +10919,13 @@ const renderJudicialCollectionSection = () => {
         if (!debt) return;
         if (!confirm(`هل أنت متأكد من حذف دين "${debt.debtTypeName}" للمشترك "${debt.customerName}"؟`)) return;
 
-        state.debts = (state.debts || []).filter(d => String(d.id) !== String(debtId));
-        await saveState();
+        await withAppLoading('جارٍ حذف سجل الدين وتحديث المنظومة...', async () => {
+            state.debts = (state.debts || []).filter(d => String(d.id) !== String(debtId));
+            await saveState();
+            logActivity('حذف دين', `تم حذف دين ${debt.debtTypeName} للمشترك ${debt.customerName}`);
+            renderDebtsManagementSection();
+        }, 'تحديث تلقائي وفوري للسحابة وجميع الأجهزة ☁️', '🗑️');
         showToast('تم حذف الدين بنجاح', 'success');
-        logActivity('حذف دين', `تم حذف دين ${debt.debtTypeName} للمشترك ${debt.customerName}`);
-        renderDebtsManagementSection();
     };
 
     // =========================================================================
@@ -17658,13 +17725,13 @@ const renderJudicialCollectionSection = () => {
             }
         });
 
-        if (newMetersToAdd.length > 0) {
-            state.meters.push(...newMetersToAdd);
-        }
-
-        logActivity('استيراد اكسل', `تم فحص ${importedExcelData.length} سجل: إضافة ${addedCount} جديد، إكمال بيانات ${updatedCount} موجود، وتخطي ${skippedCount} مكرر.`);
-
-        await saveState();
+        await withAppLoading(`جارٍ استيراد ومعالجة ${importedExcelData.length} سجل...`, async () => {
+            if (newMetersToAdd.length > 0) {
+                state.meters.push(...newMetersToAdd);
+            }
+            logActivity('استيراد اكسل', `تم فحص ${importedExcelData.length} سجل: إضافة ${addedCount} جديد، إكمال بيانات ${updatedCount} موجود، وتخطي ${skippedCount} مكرر.`);
+            await saveState();
+        }, 'نقل البيانات وتحديث كافة الأجهزة عبر السحابة ☁️', '📊');
 
         let resultMsg = `اكتمل الاستيراد بنجاح: تم إضافة ${addedCount} سجل جديد.`;
         if (updatedCount > 0) {
@@ -17699,14 +17766,15 @@ const renderJudicialCollectionSection = () => {
         const ids = Array.from(checkboxes).map(cb => parseInt((cb as HTMLInputElement).value, 10));
 
         const onConfirm = async () => {
-            state.meters = state.meters.filter(m => !ids.includes(m.id));
-            logActivity('حذف متعدد', `تم حذف ${ids.length} سجلات من العدادات الجديدة.`);
-            await saveState();
+            await withAppLoading(`جارٍ حذف ${ids.length} عداد محدد...`, async () => {
+                state.meters = state.meters.filter(m => !ids.includes(m.id));
+                logActivity('حذف متعدد', `تم حذف ${ids.length} سجلات من العدادات الجديدة.`);
+                await saveState();
+                const dashboardLink = document.querySelector('.sidebar-nav .nav-link[data-target="subscribers-new"]') as HTMLElement;
+                if (dashboardLink) dashboardLink.click();
+                renderDashboard();
+            }, 'تحديث تلقائي وفوري للسحابة والشاشات ☁️', '🗑️');
             showToast('تم الحذف بنجاح.');
-            // Refresh the view
-            const dashboardLink = document.querySelector('.sidebar-nav .nav-link[data-target="subscribers-new"]') as HTMLElement;
-            if (dashboardLink) dashboardLink.click();
-            renderDashboard(); // Update counts
         };
 
         showConfirmationDialog('تأكيد الحذف', `هل أنت متأكد من حذف ${ids.length} سجلات؟`, onConfirm);
@@ -17722,12 +17790,14 @@ const renderJudicialCollectionSection = () => {
         const ids = Array.from(checkboxes).map(cb => parseInt((cb as HTMLInputElement).value, 10));
 
         const onConfirm = async () => {
-            state.meters = state.meters.filter(m => !ids.includes(m.id));
-            logActivity('حذف متعدد', `تم حذف ${ids.length} مشتركين من قائمة جميع المشتركين.`);
-            await saveState();
+            await withAppLoading(`جارٍ حذف ${ids.length} مشترك محدد...`, async () => {
+                state.meters = state.meters.filter(m => !ids.includes(m.id));
+                logActivity('حذف متعدد', `تم حذف ${ids.length} مشتركين من قائمة جميع المشتركين.`);
+                await saveState();
+                handleAllSubscribersSearch();
+                renderDashboard();
+            }, 'تحديث تلقائي وفوري لجميع الأجهزة والشاشات ☁️', '🗑️');
             showToast('تم الحذف بنجاح.');
-            handleAllSubscribersSearch(); // Refresh list to reflect changes
-            renderDashboard(); // Update counts
         };
 
         showConfirmationDialog('تأكيد الحذف', `هل أنت متأكد من حذف ${ids.length} سجلات؟ لا يمكن التراجع عن هذا الإجراء.`, onConfirm);
@@ -19908,13 +19978,17 @@ const renderJudicialCollectionSection = () => {
         }
 
         private setupSettingsUI() {
-            document.getElementById('settings-push-cloud-btn')?.addEventListener('click', () => {
-                this.pushBackgroundSnapshot((typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.fullName : 'يدوي', Date.now());
+            document.getElementById('settings-push-cloud-btn')?.addEventListener('click', async () => {
+                await withAppLoading('جارٍ رفع كامل البيانات للسحابة...', async () => {
+                    this.pushBackgroundSnapshot((typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.fullName : 'يدوي', Date.now());
+                }, 'بث وتحديث شامل لكافة الأجهزة المتصلة ☁️', '⬆️');
                 showToast('تم رفع كامل البيانات المصفاة للسحابة بنجاح', 'success');
             });
 
-            document.getElementById('settings-pull-cloud-btn')?.addEventListener('click', () => {
-                this.pullFullSnapshot();
+            document.getElementById('settings-pull-cloud-btn')?.addEventListener('click', async () => {
+                await withAppLoading('جارٍ سحب وتحديث أحدث نسخة من السحابة...', async () => {
+                    this.pullFullSnapshot();
+                }, 'تحديث الجداول ولوحة التحكم تلقائياً', '⬇️');
             });
         }
 
@@ -19999,13 +20073,19 @@ const renderJudicialCollectionSection = () => {
                     if (e.target === modal) modal!.style.display = 'none';
                 });
 
-                document.getElementById('modal-btn-push-now')?.addEventListener('click', () => {
-                    this.pushBackgroundSnapshot((typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.fullName : 'يدوي', Date.now());
+                document.getElementById('modal-btn-push-now')?.addEventListener('click', async () => {
+                    modal!.style.display = 'none';
+                    await withAppLoading('جارٍ رفع كامل البيانات للسحابة...', async () => {
+                        this.pushBackgroundSnapshot((typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.fullName : 'يدوي', Date.now());
+                    }, 'بث وتحديث شامل لكافة الأجهزة المتصلة ☁️', '⬆️');
                     showToast('تم رفع النسخة الشاملة إلى السحابة بنجاح', 'success');
                 });
 
-                document.getElementById('modal-btn-pull-now')?.addEventListener('click', () => {
-                    this.pullFullSnapshot();
+                document.getElementById('modal-btn-pull-now')?.addEventListener('click', async () => {
+                    modal!.style.display = 'none';
+                    await withAppLoading('جارٍ سحب وتحديث أحدث نسخة من السحابة...', async () => {
+                        this.pullFullSnapshot();
+                    }, 'تحديث الجداول ولوحة التحكم تلقائياً', '⬇️');
                 });
             }
 
