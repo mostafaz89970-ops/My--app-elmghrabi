@@ -890,11 +890,11 @@
                     <details>
                         <summary><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg><span>المشتركين</span></summary>
                         <ul>
-                            <li><a href="#" class="nav-link" data-target="customer-management"><span>إدارة المشتركين</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="charging-card"><span>شحن طاقة</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="clear-card"><span>مسح كارت</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="new-card-no-charge"><span>كارت بديل بدون شحن</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="new-card-with-charge"><span>كارت بديل بشحن</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="customer-management" data-permission="view_customer_management"><span>إدارة المشتركين</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="charging-card" data-permission="manage_charging_card"><span>شحن طاقة</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="clear-card" data-permission="manage_clear_card"><span>مسح كارت</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="new-card-no-charge" data-permission="manage_replacement_cards"><span>كارت بديل بدون شحن</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="new-card-with-charge" data-permission="manage_replacement_cards"><span>كارت بديل بشحن</span></a></li>
                             <li><a href="#" class="nav-link" data-target="subscribers-all" data-permission="view_subscribers_all"><span>جميع المشتركين</span></a></li>
                             <li><a href="#" class="nav-link" data-target="subscriber-statement" data-permission="view_subscriber_statement"><span>الاستعلام عن مشترك</span></a></li>
                             <li><a href="#" class="nav-link" data-target="subscribers-new" data-permission="view_subscribers_new"><span>جديد</span></a></li>
@@ -914,7 +914,7 @@
                         <ul>
                             <li><a href="#" class="nav-link" data-target="mukayasat-registration" id="sidebar-add-mukaysa-btn" data-permission="manage_mukayasat"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>ادخال مقايسة</span></a></li>
                             <li><a href="#" class="nav-link" data-target="mukayasat-list" data-permission="view_mukayasat_list"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span>المقايسات المحفوظة</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="pending-requests-section" data-permission="view_mukayasat_list">
+                            <li><a href="#" class="nav-link" data-target="pending-requests-section" data-permission="view_pending_requests">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                                 <span>الطلبات قيد الانتظار</span>
                             </a></li>
@@ -930,7 +930,7 @@
                             <span>الضبطية القضائية</span>
                         </summary>
                         <ul>
-                            <li><a href="#" class="nav-link" data-target="judicial-control-list"><span>عرض القائمة</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="judicial-control-list" data-permission="view_judicial_control_list"><span>عرض القائمة</span></a></li>
                             <li><a href="#" class="nav-link" data-target="judicial-control-registration" data-permission="manage_judicial_control"><span>إضافة محضر</span></a></li>
                         </ul>
                     </details>
@@ -940,25 +940,25 @@
                     <details>
                         <summary><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg><span>التحصيل</span></summary>
                         <ul>
-                            <li><a href="#" class="nav-link" data-target="collection-judicial"><span>تحصيل الضبطية</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="collection-zinat"><span>تحصيل زينات</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="collection-judicial" data-permission="view_collection_judicial"><span>تحصيل الضبطية</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="collection-zinat" data-permission="view_collection_zinat"><span>تحصيل زينات</span></a></li>
                         </ul>
                     </details>
                 </li>
 
                 <!-- قسم كروت التحكم (MEEDCO Unified Card Service) -->
-                <li class="nav-category">
+                <li class="nav-category" data-permission="view_control_cards_section">
                     <details>
                         <summary><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg><span>كروت التحكم</span></summary>
                         <ul>
-                            <li><a href="#" class="nav-link" data-target="read-control-card"><span>قراءة كارت التحكم</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="issue-control-card"><span>إصدار كروت التحكم</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="read-control-card" data-permission="read_control_card"><span>قراءة كارت التحكم</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="issue-control-card" data-permission="issue_control_card"><span>إصدار كروت التحكم</span></a></li>
                         </ul>
                     </details>
                 </li>
 
                 <!-- قسم إضافة الاستثناءات والرسوم والدمغات (MEEDCO Exceptions, Fees & Debts) -->
-                <li class="nav-category">
+                <li class="nav-category" data-permission="view_debts_and_fees_section">
                     <details open>
                         <summary>
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -967,11 +967,11 @@
                             <span>الاستثناءات والرسوم والدمغات</span>
                         </summary>
                         <ul>
-                            <li><a href="#" class="nav-link" data-target="debts-management"><span>حسابات الديون والمديونيات</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="debt-types"><span>أنواع الديون</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="fees-stamps"><span>الرسوم والدمغات</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="cleaning-fee-exceptions"><span>استثناءات رسوم النظافة</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="peak-debt-settings"><span>إعدادات دين فرق ذروة</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="debts-management" data-permission="debts_management"><span>حسابات الديون والمديونيات</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="debt-types" data-permission="debt_types"><span>أنواع الديون</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="fees-stamps" data-permission="fees_stamps"><span>الرسوم والدمغات</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="cleaning-fee-exceptions" data-permission="cleaning_fee_exceptions"><span>استثناءات رسوم النظافة</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="peak-debt-settings" data-permission="peak_debt_settings"><span>إعدادات دين فرق ذروة</span></a></li>
                         </ul>
                     </details>
                 </li>
@@ -983,8 +983,8 @@
                             <li><a href="#" class="nav-link" data-target="transformer-list" data-permission="view_transformer_list"><span>قائمة المحولات</span></a></li>
                             <li><a href="#" class="nav-link" data-target="transformer-registration" data-permission="register_transformer"><span>إضافة محول</span></a></li>
                             <li><a href="#" class="nav-link" data-target="transformer-query" data-permission="query_transformer"><span>استعلام محول</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="transformer-loads" data-permission="query_transformer"><span>أحمال المحولات</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="transformer-load-records" data-permission="query_transformer"><span>سجلات أحمال المحولات</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="transformer-loads" data-permission="manage_transformer_loads"><span>أحمال المحولات</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="transformer-load-records" data-permission="view_transformer_load_records"><span>سجلات أحمال المحولات</span></a></li>
                         </ul>
                     </details>
                 </li>
@@ -993,10 +993,10 @@
                     <details>
                         <summary><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2m0 0V8m0 4h16m-16 0h2m12 0h2M6 8h12v8H6z"/><path d="M9 4v4M15 4v4M9 16v4M15 16v4"/></svg><span>تغيير نظام المحاسبة</span></summary>
                         <ul>
-                            <li><a href="#" class="nav-link" data-target="accounting-system" data-permission="manage_settings"><span>نظام المحاسبة</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="accounting-save-registration" data-permission="manage_settings"><span>التسجيل</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="accounting-saved-records" data-permission="manage_settings"><span>السجلات المحفوظة</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="accounting-query" data-permission="manage_settings"><span>استعلام</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="accounting-system" data-permission="view_accounting_system"><span>نظام المحاسبة</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="accounting-save-registration" data-permission="accounting_save_registration"><span>التسجيل</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="accounting-saved-records" data-permission="accounting_saved_records"><span>السجلات المحفوظة</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="accounting-query" data-permission="accounting_query"><span>استعلام</span></a></li>
                         </ul>
                     </details>
                 </li>
@@ -5342,7 +5342,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript -->
-  <script src="./dist/index.js?v=1789643780750"></script>
+  <script src="./dist/index.js?v=1789645611689"></script>
 
   <!-- HOTFIX: Ensure app container is hidden on logout -->
   <script>

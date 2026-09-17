@@ -153,33 +153,58 @@ let state = {
             'view_meters': { name: 'عرض قوائم العدادات', roles: ['admin', 'supervisor', 'reports', 'معاينات', 'user'] },
             'view_repaired_meters': { name: 'عرض قسم الإصلاحات', roles: ['admin', 'supervisor', 'user'] },
             'view_subscribers_section': { name: 'عرض قسم المشتركين', roles: ['admin', 'supervisor', 'user'] },
+            'view_customer_management': { name: 'عرض إدارة المشتركين والعمليات الموحدة', roles: ['admin', 'supervisor', 'user'] },
             'view_subscriber_statement': { name: 'عرض الاستعلام عن مشترك', roles: ['admin', 'supervisor', 'user'] },
+            'view_subscribers_all': { name: 'عرض جميع المشتركين', roles: ['admin', 'supervisor', 'user'] },
             'view_subscribers_new': { name: 'عرض المشتركين (جديد)', roles: ['admin', 'supervisor', 'user'] },
             'view_subscribers_faults': { name: 'عرض المشتركين (أعطال)', roles: ['admin', 'supervisor', 'user'] },
             'view_subscribers_replacement': { name: 'عرض المشتركين (إحلال)', roles: ['admin', 'supervisor', 'user'] },
             'view_subscribers_substituted': { name: 'عرض المشتركين (استبدال)', roles: ['admin', 'supervisor', 'user'] },
             'view_subscribers_scrapped': { name: 'عرض المشتركين (استغناء)', roles: ['admin', 'supervisor', 'user'] },
             'view_subscribers_demolition': { name: 'عرض المشتركين (هدم)', roles: ['admin', 'supervisor', 'user'] },
+            'manage_charging_card': { name: 'شحن طاقة للكارت', roles: ['admin', 'supervisor', 'user'] },
+            'manage_clear_card': { name: 'مسح وتفريغ كارت المشترك', roles: ['admin', 'supervisor'] },
+            'manage_replacement_cards': { name: 'إصدار كروت بديلة (بشحن/بدون شحن)', roles: ['admin', 'supervisor'] },
             'view_mukayasat_section': { name: 'عرض قسم المقايسات', roles: ['admin', 'supervisor', 'معاينات'] },
             'manage_mukayasat': { name: 'إدارة المقايسات (إضافة/تعديل/حذف)', roles: ['admin', 'معاينات'] },
-            'view_mukayasat_list': { name: 'عرض قائمة المقايسات', roles: ['admin', 'supervisor', 'معاينات'] },
+            'view_mukayasat_list': { name: 'عرض قائمة المقايسات المحفوظة', roles: ['admin', 'supervisor', 'معاينات'] },
+            'view_pending_requests': { name: 'عرض وإدارة الطلبات قيد الانتظار', roles: ['admin', 'supervisor', 'معاينات'] },
             'manage_users': { name: 'إدارة المستخدمين', roles: ['admin'] },
             'view_judicial_control_section': { name: 'عرض قسم الضبطية القضائية', roles: ['admin', 'supervisor'] },
+            'view_judicial_control_list': { name: 'عرض قائمة محاضر الضبطية', roles: ['admin', 'supervisor', 'user'] },
             'manage_judicial_control': { name: 'إدارة الضبطية القضائية', roles: ['admin'] },
             'manage_settings': { name: 'إدارة الإعدادات', roles: ['admin'] },
-            'view_transformer_management_section': { name: 'عرض قسم إدارة المحولات', roles: ['admin', 'supervisor'] }, // New
-            'register_transformer': { name: 'تسجيل محول', roles: ['admin', 'supervisor'] }, // New
-            'query_transformer': { name: 'استعلام عن محول', roles: ['admin', 'supervisor', 'user'] }, // New
-            'view_transformer_list': { name: 'قائمة المحولات', roles: ['admin', 'supervisor', 'user'] }, // New
+            'view_transformer_management_section': { name: 'عرض قسم إدارة المحولات', roles: ['admin', 'supervisor'] },
+            'register_transformer': { name: 'تسجيل محول جديد', roles: ['admin', 'supervisor'] },
+            'query_transformer': { name: 'استعلام عن محول', roles: ['admin', 'supervisor', 'user'] },
+            'view_transformer_list': { name: 'قائمة المحولات', roles: ['admin', 'supervisor', 'user'] },
+            'manage_transformer_loads': { name: 'تسجيل وإدارة أحمال المحولات', roles: ['admin', 'supervisor'] },
+            'view_transformer_load_records': { name: 'عرض سجلات أحمال المحولات', roles: ['admin', 'supervisor', 'user'] },
             'view_accounting_system': { name: 'عرض نظام المحاسبة', roles: ['admin', 'supervisor'] },
+            'accounting_save_registration': { name: 'تسجيل معاملة بنظام المحاسبة', roles: ['admin', 'supervisor'] },
+            'accounting_saved_records': { name: 'عرض السجلات المحفوظة لنظام المحاسبة', roles: ['admin', 'supervisor'] },
+            'accounting_query': { name: 'استعلام نظام المحاسبة', roles: ['admin', 'supervisor', 'user'] },
             'view_mukayasat_report': { name: 'عرض تقرير المعاينات', roles: ['admin', 'supervisor', 'معاينات'] },
             'view_judicial_control_report': { name: 'عرض تقرير الضبطية القضائية', roles: ['admin', 'supervisor'] },
-            'view_reports': { name: 'عرض التقارير', roles: ['admin', 'supervisor', 'reports'] },
+            'view_reports': { name: 'عرض وتوليد التقارير', roles: ['admin', 'supervisor', 'reports'] },
             'view_lost_meter_memos_section': { name: 'عرض قسم مذكرات الفقد', roles: ['admin', 'supervisor'] },
             'manage_lost_meter_memos': { name: 'إدارة مذكرات الفقد', roles: ['admin', 'supervisor'] },
             'view_activity_log': { name: 'عرض سجل النشاط', roles: ['admin', 'supervisor'] },
             'view_collection_section': { name: 'عرض قسم التحصيل', roles: ['admin', 'supervisor', 'user'] },
-            'manage_collection': { name: 'إدارة التحصيل (الدفع)', roles: ['admin', 'supervisor'] },
+            'view_collection_judicial': { name: 'عرض وإدارة تحصيل الضبطية', roles: ['admin', 'supervisor', 'user'] },
+            'view_collection_zinat': { name: 'عرض وإدارة تحصيل زينات', roles: ['admin', 'supervisor', 'user'] },
+            'register_zinat': { name: 'إضافة طلب وتصريح زينات', roles: ['admin', 'supervisor', 'user'] },
+            'manage_collection': { name: 'إدارة التحصيل (تسجيل الدفع)', roles: ['admin', 'supervisor'] },
+            'view_control_cards_section': { name: 'عرض قسم كروت التحكم الذكية', roles: ['admin', 'supervisor'] },
+            'read_control_card': { name: 'قراءة كارت التحكم', roles: ['admin', 'supervisor', 'user'] },
+            'issue_control_card': { name: 'إصدار كروت التحكم وبرمجتها', roles: ['admin', 'supervisor'] },
+            'view_debts_and_fees_section': { name: 'عرض قسم الاستثناءات والرسوم والديون', roles: ['admin', 'supervisor'] },
+            'debts_management': { name: 'إدارة حسابات الديون والمديونيات', roles: ['admin', 'supervisor'] },
+            'debt_types': { name: 'إدارة أنواع الديون وتعديلها', roles: ['admin', 'supervisor'] },
+            'fees_stamps': { name: 'إدارة الرسوم والدمغات الحكومية', roles: ['admin', 'supervisor'] },
+            'cleaning_fee_exceptions': { name: 'إدارة استثناءات رسوم النظافة', roles: ['admin', 'supervisor'] },
+            'peak_debt_settings': { name: 'إدارة إعدادات دين فرق الذروة', roles: ['admin', 'supervisor'] },
+            'view_technicians': { name: 'عرض وإدارة الفنيين', roles: ['admin', 'supervisor'] },
             'view_help_section': { name: 'عرض قسم المساعدة', roles: ['admin', 'supervisor', 'user'] },
             'view_excel_import': { name: 'استيراد ملفات اكسل', roles: ['admin', 'supervisor'] },
         },
@@ -193,10 +218,12 @@ let state = {
             'show_repairs_card': { name: 'عرض بطاقة الإصلاحات', roles: ['admin', 'supervisor', 'user'] },
             'show_judicial_control_card': { name: 'عرض بطاقة الضبطية القضائية', roles: ['admin', 'supervisor'] },
             'show_mukayasat_card': { name: 'عرض بطاقة المعاينات الفنية', roles: ['admin', 'supervisor', 'معاينات'] },
+            'show_transformers_card': { name: 'عرض بطاقة إدارة المحولات', roles: ['admin', 'supervisor', 'user'] },
             'show_judicial_collection_card': { name: 'عرض بطاقة تحصيل الضبطية', roles: ['admin', 'supervisor', 'user'] },
             'show_zinat_collection_card': { name: 'عرض بطاقة تحصيل زينات', roles: ['admin', 'supervisor', 'user'] },
             'show_zinat_registration_card': { name: 'عرض بطاقة إضافة زينات', roles: ['admin', 'supervisor', 'user'] },
             'show_accounting_card': { name: 'عرض بطاقة نظام المحاسبة', roles: ['admin', 'supervisor'] },
+            'show_users_card': { name: 'عرض بطاقة المستخدمين', roles: ['admin', 'supervisor'] },
         },
         buttonPermissions: {
             'view_button': { name: 'زر العرض', roles: ['admin', 'supervisor', 'reports', 'معاينات', 'user'] },
@@ -413,6 +440,25 @@ const logActivity = (action, details, changeSummary) => {
     };
     state.activityLog.unshift(newLogEntry); // Add to the beginning of the array
 };
+function ensureDefaultPermissions(settings) {
+    if (!settings || typeof settings !== 'object')
+        return;
+    const def = state.settings;
+    if (!settings.permissions)
+        settings.permissions = {};
+    for (const [key, val] of Object.entries(def.permissions)) {
+        if (!settings.permissions[key]) {
+            settings.permissions[key] = JSON.parse(JSON.stringify(val));
+        }
+    }
+    if (!settings.dashboardPermissions)
+        settings.dashboardPermissions = {};
+    for (const [key, val] of Object.entries(def.dashboardPermissions)) {
+        if (!settings.dashboardPermissions[key]) {
+            settings.dashboardPermissions[key] = JSON.parse(JSON.stringify(val));
+        }
+    }
+}
 function mergeWithDefaults(loadedObj, defaultObj) {
     if (typeof loadedObj !== 'object' || loadedObj === null)
         return defaultObj;
@@ -580,6 +626,7 @@ const loadState = async () => {
         if (!adminExists) {
             mergedState.users.unshift(adminUser);
         }
+        ensureDefaultPermissions(mergedState.settings);
         state = mergedState;
         // After successfully loading, save back to IndexedDB to complete migration
         // and remove from localStorage to prevent re-migration.
@@ -793,6 +840,16 @@ const updateUI = () => {
                 const permission = el.dataset.permission;
                 if (permission) {
                     showFor(permission, el);
+                }
+            });
+            // Auto-hide empty categories where all child links are hidden
+            document.querySelectorAll('.sidebar-nav .nav-category').forEach(cat => {
+                const navLinks = Array.from(cat.querySelectorAll('.nav-link'));
+                if (navLinks.length > 0) {
+                    const hasVisible = navLinks.some(l => l.style.display !== 'none');
+                    if (!hasVisible) {
+                        cat.style.display = 'none';
+                    }
                 }
             });
         }
@@ -6162,11 +6219,12 @@ const renderPermissionsSection = () => {
     const container = document.getElementById('permissions-container');
     if (!container)
         return;
+    ensureDefaultPermissions(state.settings);
     // Setup structure with titles, this also clears previous content
     container.innerHTML = `
-        <h3>الصلاحيات العامة</h3>
+        <h3>الصلاحيات العامة (حسب الأقسام)</h3>
         <div id="general-permissions-sub-container"></div>
-        <h3 style="margin-top: 2rem;">صلاحيات لوحة التحكم</h3>
+        <h3 style="margin-top: 2rem;">صلاحيات لوحة التحكم (البطاقات)</h3>
         <div id="dashboard-permissions-container"></div>
         <h3 style="margin-top: 2rem;">صلاحيات الأزرار</h3>
         <div id="button-permissions-container"></div>
@@ -6177,43 +6235,149 @@ const renderPermissionsSection = () => {
     if (!generalPermissionsContainer)
         return;
     const roles = state.settings.roles;
-    // --- Render General Permissions ---
     const permissions = state.settings.permissions;
     const table = document.createElement('table');
     table.className = 'permissions-table';
     // Header Row
     const thead = document.createElement('thead');
-    let headerRow = '<tr><th>الصلاحية</th>';
+    let headerRow = '<tr><th>الصلاحية / القسم</th>';
     roles.forEach(role => {
-        headerRow += `<th>${role.name}</th>`;
+        headerRow += `<th style="text-align: center;">${role.name}</th>`;
     });
     headerRow += '</tr>';
     thead.innerHTML = headerRow;
     table.appendChild(thead);
-    // Body Rows
+    // Defined Section Groups
+    const permissionGroups = [
+        {
+            title: 'لوحة التحكم والرئيسية',
+            icon: '📊',
+            keys: ['view_dashboard']
+        },
+        {
+            title: 'إدارة العدادات والإصلاحات',
+            icon: '⚡',
+            keys: ['view_meter_management_section', 'view_meters', 'add_meter', 'manage_meters', 'delete_meters', 'view_repaired_meters']
+        },
+        {
+            title: 'المذكـــرات',
+            icon: '📝',
+            keys: ['view_lost_meter_memos_section', 'manage_lost_meter_memos']
+        },
+        {
+            title: 'المشتركين والعمليات الموحدة وشحن الكروت',
+            icon: '👥',
+            keys: [
+                'view_subscribers_section', 'view_customer_management', 'view_subscriber_statement',
+                'view_subscribers_all', 'view_subscribers_new', 'view_subscribers_faults',
+                'view_subscribers_replacement', 'view_subscribers_substituted', 'view_subscribers_scrapped',
+                'view_subscribers_demolition', 'manage_charging_card', 'manage_clear_card', 'manage_replacement_cards'
+            ]
+        },
+        {
+            title: 'المقايسات والطلبات قيد الانتظار',
+            icon: '📐',
+            keys: ['view_mukayasat_section', 'manage_mukayasat', 'view_mukayasat_list', 'view_pending_requests']
+        },
+        {
+            title: 'الضبطية القضائية',
+            icon: '⚖️',
+            keys: ['view_judicial_control_section', 'view_judicial_control_list', 'manage_judicial_control']
+        },
+        {
+            title: 'التحصيل وزينات',
+            icon: '💰',
+            keys: ['view_collection_section', 'view_collection_judicial', 'view_collection_zinat', 'register_zinat', 'manage_collection']
+        },
+        {
+            title: 'كروت التحكم الذكية (Smart Cards)',
+            icon: '💳',
+            keys: ['view_control_cards_section', 'read_control_card', 'issue_control_card']
+        },
+        {
+            title: 'الاستثناءات والرسوم والدمغات والديون',
+            icon: '📑',
+            keys: ['view_debts_and_fees_section', 'debts_management', 'debt_types', 'fees_stamps', 'cleaning_fee_exceptions', 'peak_debt_settings']
+        },
+        {
+            title: 'إدارة المحولات والأحمال',
+            icon: '🔌',
+            keys: ['view_transformer_management_section', 'register_transformer', 'query_transformer', 'view_transformer_list', 'manage_transformer_loads', 'view_transformer_load_records']
+        },
+        {
+            title: 'نظام وتغيير المحاسبة',
+            icon: '🏢',
+            keys: ['view_accounting_system', 'accounting_save_registration', 'accounting_saved_records', 'accounting_query']
+        },
+        {
+            title: 'الإدارة والنظام والتقارير العامة',
+            icon: '⚙️',
+            keys: ['manage_users', 'manage_settings', 'view_activity_log', 'view_technicians', 'view_reports', 'view_excel_import', 'view_help_section']
+        }
+    ];
     const tbody = document.createElement('tbody');
-    Object.keys(permissions).forEach(permissionKey => {
-        const permission = permissions[permissionKey];
-        let bodyRow = `<tr><td>${permission.name}</td>`;
-        roles.forEach(role => {
-            const isChecked = permission.roles.includes(role.key);
-            const isDisabled = role.key === 'admin'; // Admin role is always checked and disabled
-            bodyRow += `
-                <td>
-                    <label class="switch">
-                        <input type="checkbox" 
-                               data-role="${role.key}" 
-                               data-permission="${permissionKey}" 
-                               ${isChecked ? 'checked' : ''}
-                               ${isDisabled ? 'disabled' : ''}>
-                        <span class="slider round"></span>
-                    </label>
-                </td>
-            `;
+    const renderedKeys = new Set();
+    permissionGroups.forEach(group => {
+        const availableKeys = group.keys.filter(k => permissions[k]);
+        if (availableKeys.length === 0)
+            return;
+        // Group Header Row
+        const groupHeaderTr = document.createElement('tr');
+        groupHeaderTr.innerHTML = `<th colspan="${roles.length + 1}" style="background: rgba(59, 130, 246, 0.15); color: var(--primary, #3b82f6); text-align: right; padding: 10px 14px; font-size: 0.95rem; font-weight: bold; border-top: 2px solid var(--primary, #3b82f6); border-bottom: 1px solid var(--border-color, #e2e8f0);"><span style="margin-left: 8px;">${group.icon}</span>${group.title}</th>`;
+        tbody.appendChild(groupHeaderTr);
+        availableKeys.forEach(permissionKey => {
+            renderedKeys.add(permissionKey);
+            const permission = permissions[permissionKey];
+            const tr = document.createElement('tr');
+            let rowHtml = `<td style="padding-right: 1.5rem; font-weight: 500;">${permission.name}</td>`;
+            roles.forEach(role => {
+                const isChecked = (permission.roles || []).includes(role.key);
+                const isDisabled = role.key === 'admin';
+                rowHtml += `
+                    <td style="text-align: center;">
+                        <label class="switch">
+                            <input type="checkbox" 
+                                   data-role="${role.key}" 
+                                   data-permission="${permissionKey}" 
+                                   ${isChecked ? 'checked' : ''}
+                                   ${isDisabled ? 'disabled' : ''}>
+                            <span class="slider round"></span>
+                        </label>
+                    </td>`;
+            });
+            tr.innerHTML = rowHtml;
+            tbody.appendChild(tr);
         });
-        bodyRow += '</tr>';
-        tbody.innerHTML += bodyRow;
     });
+    // Any leftover permissions not categorized
+    const remainingKeys = Object.keys(permissions).filter(k => !renderedKeys.has(k));
+    if (remainingKeys.length > 0) {
+        const otherHeader = document.createElement('tr');
+        otherHeader.innerHTML = `<th colspan="${roles.length + 1}" style="background: rgba(100, 116, 139, 0.15); text-align: right; padding: 10px 14px; font-weight: bold;">صلاحيات أخرى</th>`;
+        tbody.appendChild(otherHeader);
+        remainingKeys.forEach(permissionKey => {
+            const permission = permissions[permissionKey];
+            const tr = document.createElement('tr');
+            let rowHtml = `<td style="padding-right: 1.5rem;">${permission.name}</td>`;
+            roles.forEach(role => {
+                const isChecked = (permission.roles || []).includes(role.key);
+                const isDisabled = role.key === 'admin';
+                rowHtml += `
+                    <td style="text-align: center;">
+                        <label class="switch">
+                            <input type="checkbox" 
+                                   data-role="${role.key}" 
+                                   data-permission="${permissionKey}" 
+                                   ${isChecked ? 'checked' : ''}
+                                   ${isDisabled ? 'disabled' : ''}>
+                            <span class="slider round"></span>
+                        </label>
+                    </td>`;
+            });
+            tr.innerHTML = rowHtml;
+            tbody.appendChild(tr);
+        });
+    }
     table.appendChild(tbody);
     generalPermissionsContainer.appendChild(table);
     // --- Render other permission sections ---
@@ -17048,6 +17212,12 @@ function handleNavigation(event) {
     const targetId = targetLink.dataset.target;
     if (!targetId)
         return;
+    // Verify permission for target link
+    const requiredPermission = targetLink.dataset.permission;
+    if (requiredPermission && !hasPermission(requiredPermission)) {
+        showToast('ليس لديك صلاحية للوصول إلى هذا القسم.', 'error');
+        return;
+    }
     const pageLabel = ((_a = targetLink.querySelector('span')) === null || _a === void 0 ? void 0 : _a.textContent) || ((_b = targetLink.querySelector('h4')) === null || _b === void 0 ? void 0 : _b.textContent) || 'الصفحة';
     const pageIcon = getSectionIcon(targetId);
     showAppLoading(`جارٍ فتح ${pageLabel.trim()}...`, 'المنظومة الموحدة للعدادات', pageIcon);
@@ -18581,6 +18751,7 @@ class CloudSyncManager {
             }
             if (remoteState.settings) {
                 state.settings = mergeWithDefaults(remoteState.settings, state.settings);
+                ensureDefaultPermissions(state.settings);
             }
             // 5. الحفظ الفوري في قاعدة البيانات المحلية لهذا الجهاز IndexedDB
             await saveToIndexedDB('appState', state);
