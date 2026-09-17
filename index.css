@@ -3110,11 +3110,74 @@ html {
 }
 
 /* تخصيص الألوان عند التحويم حسب نوع الإجراء */
-.action-btn.edit:hover { background-color: var(--info-color); color: #ffffff; }
-.action-btn.delete:hover { background-color: var(--error-color); color: #ffffff; }
-.action-btn.view:hover { background-color: var(--text-color-muted); color: #ffffff; }
-.action-btn.print:hover { background-color: var(--text-color); color: #ffffff; }
-.action-btn.success:hover { background-color: var(--success-color); color: #ffffff; }
+/* ألوان وأيقونات أنيقة لأزرار الإجراءات */
+.action-btn.view {
+    color: #2563eb;
+    border-color: rgba(37, 99, 235, 0.28);
+    background-color: rgba(37, 99, 235, 0.08);
+}
+.action-btn.view:hover {
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+    border-color: #2563eb !important;
+    transform: translateY(-2px) scale(1.08);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+
+.action-btn.edit {
+    color: #0d9488;
+    border-color: rgba(13, 148, 136, 0.28);
+    background-color: rgba(13, 148, 136, 0.08);
+}
+.action-btn.edit:hover {
+    background-color: #0d9488 !important;
+    color: #ffffff !important;
+    border-color: #0d9488 !important;
+    transform: translateY(-2px) scale(1.08);
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.35);
+}
+
+.action-btn.delete:hover { 
+    background-color: var(--error-color); 
+    color: #ffffff; 
+}
+.action-btn.print:hover { 
+    background-color: var(--text-color); 
+    color: #ffffff; 
+}
+.action-btn.success:hover { 
+    background-color: var(--success-color); 
+    color: #ffffff; 
+}
+
+/* أزرار تسليم وحدة الرفع الأنيقة */
+.action-btn.lifting-delivered,
+.action-btn.btn-lifting-delivered {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    color: #ffffff !important;
+    border: 1px solid #047857 !important;
+    box-shadow: 0 2px 5px rgba(16, 185, 129, 0.3);
+}
+.action-btn.lifting-delivered:hover,
+.action-btn.btn-lifting-delivered:hover {
+    background: linear-gradient(135deg, #059669, #047857) !important;
+    transform: translateY(-2px) scale(1.08);
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.45);
+}
+
+.action-btn.lifting-pending,
+.action-btn.btn-lifting-pending {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    color: #ffffff !important;
+    border: 1px solid #b45309 !important;
+    box-shadow: 0 2px 5px rgba(245, 158, 11, 0.28);
+}
+.action-btn.lifting-pending:hover,
+.action-btn.btn-lifting-pending:hover {
+    background: linear-gradient(135deg, #d97706, #b45309) !important;
+    transform: translateY(-2px) scale(1.08);
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+}
 
 /* الحفاظ على تنسيق حقول مرجع الحساب كما هي (استثناء من تغيير الـ padding) */
 #meter-registration .input-group.compound .input-group-sub input {
