@@ -5680,7 +5680,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript -->
-  <script src="./dist/index.js?v=1789684172496"></script>
+  <script src="./dist/index.js?v=1789685546365"></script>
 
   <!-- HOTFIX: Ensure app container is hidden on logout -->
   <script>
@@ -6161,6 +6161,74 @@
             </form>
         </div>
     </div>
+
+    
+    <!-- نافذة تسليم العداد إلى وحدة الرفع -->
+    <div id="modal-lifting-unit-delivery" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+        <div class="modal-content" style="background: #fff; border-radius: 14px; max-width: 520px; width: 92%; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.25); position: relative; border-top: 5px solid #10b981;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+                <h3 style="margin: 0; color: #0f172a; display: flex; align-items: center; gap: 8px; font-size: 1.15rem;">
+                    <span style="background: #ecfdf5; padding: 6px; border-radius: 8px; color: #059669; display: inline-flex;">📦</span>
+                    <span>تسليم العداد إلى وحدة الرفع</span>
+                </h3>
+                <button type="button" class="btn-close-modal" onclick="document.getElementById('modal-lifting-unit-delivery').style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
+            </div>
+
+            <!-- بطاقة معلومات المشترك والعداد -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-size: 0.95rem; font-weight: bold; color: #1e293b;" id="lifting-modal-subscriber-name">-</div>
+                    <div id="lifting-modal-status-badge"></div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem; color: #475569;">
+                    <div><span style="font-weight: 600;">كود الاشتراك:</span> <span id="lifting-modal-subscription-code">-</span></div>
+                    <div><span style="font-weight: 600;">شاسية العداد:</span> <span id="lifting-modal-chassis-number" style="font-family: monospace; font-weight: bold; color: #0f172a;">-</span></div>
+                    <div style="grid-column: span 2;"><span style="font-weight: 600;">سبب الرفع:</span> <span id="lifting-modal-removal-reason">-</span></div>
+                </div>
+            </div>
+
+            <form id="form-lifting-unit-delivery">
+                <input type="hidden" id="lifting-delivery-meter-id">
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="lifting-delivery-date" style="font-weight: 600; display: block; margin-bottom: 6px; font-size: 0.9rem;">
+                        📅 تاريخ التسليم لوحدة الرفع <span style="color: #dc2626;">*</span>
+                    </label>
+                    <input type="date" id="lifting-delivery-date" class="form-control" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="lifting-recipient-name" style="font-weight: 600; display: block; margin-bottom: 6px; font-size: 0.9rem;">
+                        👤 اسم المستلم بوحدة الرفع <span style="color: #dc2626;">*</span>
+                    </label>
+                    <input type="text" id="lifting-recipient-name" list="lifting-recipients-list" class="form-control" placeholder="اختر أو اكتب اسم المستلم..." required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <datalist id="lifting-recipients-list"></datalist>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label for="lifting-delivery-notes" style="font-weight: 600; display: block; margin-bottom: 6px; font-size: 0.9rem;">
+                        📝 ملاحظات التسليم / رقم إذن الاستلام (اختياري)
+                    </label>
+                    <textarea id="lifting-delivery-notes" class="form-control" rows="2" placeholder="أدخل أي ملاحظات إضافية أو رقم حافظة التسليم..." style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; resize: vertical;"></textarea>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <div>
+                        <button type="button" id="btn-cancel-lifting-delivery" class="btn" style="background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; font-weight: 600; display: none; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem;">
+                            إلغاء التسليم ❌
+                        </button>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn secondary" onclick="document.getElementById('modal-lifting-unit-delivery').style.display='none'" style="padding: 6px 16px; border-radius: 6px;">إلغاء</button>
+                        <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: bold; border: none; padding: 8px 20px; border-radius: 6px;">
+                            حفظ وتأكيد التسليم ✔️
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
 
     <!-- نافذة تنبيه إيقاف الحساب اللحظي (غير قابلة للإغلاق) -->
     <div id="modal-account-suspended-alert" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.92); z-index: 999999; align-items: center; justify-content: center; backdrop-filter: blur(8px);">

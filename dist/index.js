@@ -1400,6 +1400,28 @@ const actionsColumn = {
         ${hasButtonPermission('edit_button') ? `<button class="btn btn-edit-details" data-id="${item.id}">تعديل</button>` : ''}
     `
 };
+const faultyMetersActionsColumn = {
+    key: 'actions',
+    header: 'إجراءات',
+    render: (item) => {
+        const isDelivered = !!item.deliveredToLiftingUnit;
+        const deliveryBtnClass = isDelivered ? 'btn-lifting-delivered' : 'btn-lifting-pending';
+        const deliveryBtnStyle = isDelivered
+            ? 'background: linear-gradient(135deg, #10b981, #059669); color: white; border: 1px solid #047857; font-weight: bold; padding: 4px 10px; border-radius: 6px; font-size: 11px; margin: 2px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);'
+            : 'background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: 1px solid #b45309; font-weight: bold; padding: 4px 10px; border-radius: 6px; font-size: 11px; margin: 2px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);';
+        const deliveryBtnText = isDelivered ? '✔️ تم التسليم لوحدة الرفع' : '📦 تسليم لوحدة الرفع';
+        const deliveryBtnTitle = isDelivered
+            ? `تم التسليم: ${item.liftingUnitDeliveryDate || ''} - المستلم: ${item.liftingUnitReceiver || ''}`
+            : 'اضغط لتسجيل تسليم العداد إلى وحدة الرفع';
+        return `
+            ${hasButtonPermission('view_button') ? `<button class="btn btn-view-details" data-id="${item.id}">عرض</button>` : ''}
+            ${hasButtonPermission('edit_button') ? `<button class="btn btn-edit-details" data-id="${item.id}">تعديل</button>` : ''}
+            <button type="button" class="btn ${deliveryBtnClass} btn-delivery-lifting-unit" data-id="${item.id}" style="${deliveryBtnStyle}" title="${deliveryBtnTitle}">
+                ${deliveryBtnText}
+            </button>
+        `;
+    }
+};
 const baseColumns = [
     { key: 'subscriberName', header: 'اسم المشترك' },
     { key: 'codeName', header: 'الاسم الكودي' },
@@ -1496,7 +1518,7 @@ const columnConfigs = {
         conditionalReadingColumn,
         conditionalCardStatusColumn,
         ...removalColumns,
-        actionsColumn
+        faultyMetersActionsColumn
     ],
     'subscribers-replacement': [
         { key: 'accountRefF', header: 'ف' },
@@ -7437,6 +7459,133 @@ const handlePrintSubscriberDetails = () => {
         printWindow.close();
     }, 500);
 };
+// --- وحدة الرفع: تسليم العدادات المرفوعة أعطال ---
+const openLiftingDeliveryModal = (meterId) => {
+    const meter = state.meters.find(m => m.id === meterId);
+    if (!meter) {
+        showToast('لم يتم العثور على بيانات العداد المطلوب.', 'error');
+        return;
+    }
+    const modal = document.getElementById('modal-lifting-unit-delivery');
+    if (!modal)
+        return;
+    const idInput = document.getElementById('lifting-delivery-meter-id');
+    if (idInput)
+        idInput.value = String(meter.id);
+    const subNameEl = document.getElementById('lifting-modal-subscriber-name');
+    if (subNameEl)
+        subNameEl.textContent = meter.subscriberName || 'غير محدد';
+    const subCodeEl = document.getElementById('lifting-modal-subscription-code');
+    if (subCodeEl)
+        subCodeEl.textContent = meter.subscriptionCode || 'غير محدد';
+    const chassisEl = document.getElementById('lifting-modal-chassis-number');
+    if (chassisEl)
+        chassisEl.textContent = meter.meterChassisNumber || 'غير محدد';
+    const removalReasonEl = document.getElementById('lifting-modal-removal-reason');
+    if (removalReasonEl)
+        removalReasonEl.textContent = meter.removalReason || meter.subscriberType || '-';
+    // ملء قائمة المستلمين المقترحين
+    const datalist = document.getElementById('lifting-recipients-list');
+    if (datalist) {
+        const recipientsSet = new Set();
+        (state.settings.technicians || []).forEach((t) => recipientsSet.add(t));
+        (state.settings.technicalEngineers || []).forEach((e) => recipientsSet.add(e));
+        (state.settings.headEngineers || []).forEach((h) => recipientsSet.add(h));
+        recipientsSet.add('وحدة الرفع');
+        recipientsSet.add('مسؤول وحدة الرفع');
+        datalist.innerHTML = Array.from(recipientsSet).map(name => `<option value="${name}">`).join('');
+    }
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dateInput = document.getElementById('lifting-delivery-date');
+    if (dateInput) {
+        dateInput.value = meter.liftingUnitDeliveryDate || todayStr;
+    }
+    const receiverInput = document.getElementById('lifting-recipient-name');
+    if (receiverInput) {
+        receiverInput.value = meter.liftingUnitReceiver || '';
+    }
+    const notesInput = document.getElementById('lifting-delivery-notes');
+    if (notesInput) {
+        notesInput.value = meter.liftingUnitNotes || '';
+    }
+    const cancelDeliveryBtn = document.getElementById('btn-cancel-lifting-delivery');
+    const statusBadge = document.getElementById('lifting-modal-status-badge');
+    if (meter.deliveredToLiftingUnit) {
+        if (cancelDeliveryBtn)
+            cancelDeliveryBtn.style.display = 'inline-block';
+        if (statusBadge) {
+            statusBadge.innerHTML = `<span style="background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold;">✔️ تم التسليم مسبقاً (${meter.liftingUnitDeliveryDate || ''})</span>`;
+        }
+    }
+    else {
+        if (cancelDeliveryBtn)
+            cancelDeliveryBtn.style.display = 'none';
+        if (statusBadge) {
+            statusBadge.innerHTML = `<span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold;">⏳ لم يُسلّم لوحدة الرفع بعد</span>`;
+        }
+    }
+    modal.style.display = 'flex';
+};
+window.openLiftingDeliveryModal = openLiftingDeliveryModal;
+const handleLiftingDeliverySubmit = async (e) => {
+    e.preventDefault();
+    const idInput = document.getElementById('lifting-delivery-meter-id');
+    const dateInput = document.getElementById('lifting-delivery-date');
+    const receiverInput = document.getElementById('lifting-recipient-name');
+    const notesInput = document.getElementById('lifting-delivery-notes');
+    if (!idInput || !idInput.value)
+        return;
+    const meterId = parseInt(idInput.value, 10);
+    const meter = state.meters.find(m => m.id === meterId);
+    if (!meter) {
+        showToast('لم يتم العثور على بيانات العداد.', 'error');
+        return;
+    }
+    const deliveryDate = (dateInput === null || dateInput === void 0 ? void 0 : dateInput.value.trim()) || new Date().toISOString().split('T')[0];
+    const receiverName = (receiverInput === null || receiverInput === void 0 ? void 0 : receiverInput.value.trim()) || '';
+    if (!receiverName) {
+        showToast('يرجى تحديد أو كتابة اسم المستلم بوحدة الرفع.', 'error');
+        receiverInput === null || receiverInput === void 0 ? void 0 : receiverInput.focus();
+        return;
+    }
+    meter.deliveredToLiftingUnit = true;
+    meter.liftingUnitDeliveryDate = deliveryDate;
+    meter.liftingUnitReceiver = receiverName;
+    meter.liftingUnitNotes = (notesInput === null || notesInput === void 0 ? void 0 : notesInput.value.trim()) || '';
+    meter.liftingUnitDeliveredBy = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مستخدم';
+    meter.liftingUnitDeliveredAt = new Date().toISOString();
+    await saveState();
+    const modal = document.getElementById('modal-lifting-unit-delivery');
+    if (modal)
+        modal.style.display = 'none';
+    renderFilteredMeterTable('subscribers-faults-table', ['مرفوع أعطال'], columnConfigs['subscribers-faults']);
+    filterTableByMultipleCriteria('subscribers-faults-table');
+    showToast(`تم حفظ تسليم العداد لوحدة الرفع بنجاح (المستلم: ${receiverName}).`, 'success');
+};
+const handleCancelLiftingDelivery = async () => {
+    const idInput = document.getElementById('lifting-delivery-meter-id');
+    if (!idInput || !idInput.value)
+        return;
+    const meterId = parseInt(idInput.value, 10);
+    const meter = state.meters.find(m => m.id === meterId);
+    if (!meter)
+        return;
+    showConfirmationDialog('تأكيد إلغاء التسليم', `هل تريد بالتأكيد إلغاء تسليم العداد (شاسية: ${meter.meterChassisNumber || '-'}) لوحدة الرفع وإعادته للحالة السابقة؟`, async () => {
+        meter.deliveredToLiftingUnit = false;
+        delete meter.liftingUnitDeliveryDate;
+        delete meter.liftingUnitReceiver;
+        delete meter.liftingUnitNotes;
+        delete meter.liftingUnitDeliveredBy;
+        delete meter.liftingUnitDeliveredAt;
+        await saveState();
+        const modal = document.getElementById('modal-lifting-unit-delivery');
+        if (modal)
+            modal.style.display = 'none';
+        renderFilteredMeterTable('subscribers-faults-table', ['مرفوع أعطال'], columnConfigs['subscribers-faults']);
+        filterTableByMultipleCriteria('subscribers-faults-table');
+        showToast('تم إلغاء حالة التسليم لوحدة الرفع بنجاح.');
+    });
+};
 const openSubscriberDetailsPage = (meterId, mode) => {
     var _a, _b;
     const meter = state.meters.find(m => m.id === meterId);
@@ -13342,6 +13491,14 @@ const updateReportFilters = () => {
             <input type="date" id="filter-date-to">
         </div>
         <div class="input-group">
+            <label for="filter-lifting-unit-status">وحدة الرفع</label>
+            <select id="filter-lifting-unit-status">
+                <option value="">الكل</option>
+                <option value="delivered">تم التسليم لوحدة الرفع</option>
+                <option value="not_delivered">لم يُسلّم لوحدة الرفع</option>
+            </select>
+        </div>
+        <div class="input-group">
             <label for="filter-meterType">نوع العداد</label>
             <div class="custom-multiselect" id="filter-meterType-multiselect">
                 <button type="button" class="multiselect-btn" data-placeholder="اختر نوعاً أو أكثر...">اختر نوعاً أو أكثر...</button>
@@ -14226,6 +14383,8 @@ const handleGenerateReport = (event) => {
     const collectorFilter = ((_c = document.getElementById('filter-collector')) === null || _c === void 0 ? void 0 : _c.value) || '';
     const technicianFilterEl = document.getElementById('filter-technician');
     const technicianFilter = technicianFilterEl ? technicianFilterEl.value : '';
+    const liftingUnitFilterEl = document.getElementById('filter-lifting-unit-status');
+    const liftingUnitFilter = liftingUnitFilterEl ? liftingUnitFilterEl.value : '';
     const accountRefFEl = document.getElementById('filter-accountRefF');
     const accountRefF = accountRefFEl ? accountRefFEl.value.trim() : '';
     const accountRefHEl = document.getElementById('filter-accountRefH');
@@ -14259,6 +14418,7 @@ const handleGenerateReport = (event) => {
                 { key: 'readingAtRemoval', header: 'القراءة عند الرفع' },
                 { key: 'removalDate', header: 'تاريخ الرفع' },
                 { key: 'installationDate', header: 'تاريخ التركيب' },
+                { key: 'liftingUnitStatus', header: 'وحدة الرفع' },
             ];
             break;
         case 'meters-by-status': {
@@ -14294,6 +14454,7 @@ const handleGenerateReport = (event) => {
                     { key: 'removalReason', header: 'سبب الرفع' },
                     { key: 'readingAtRemoval', header: 'القراءة عند الرفع' },
                     { key: 'removalDate', header: 'تاريخ الرفع' },
+                    { key: 'liftingUnitStatus', header: 'وحدة الرفع' },
                 ];
             }
             else if (status === 'مرفوع إحلال') {
@@ -14548,6 +14709,7 @@ const handleGenerateReport = (event) => {
                     { key: 'meterCapacity', header: 'قدرة العداد' },
                     { key: 'removalReason', header: 'سبب الرفع' },
                     { key: 'removalDate', header: 'تاريخ الرفع' },
+                    { key: 'liftingUnitStatus', header: 'وحدة الرفع' },
                 ];
             }
             else if (memoType === 'إحلال') {
@@ -14776,11 +14938,14 @@ const handleGenerateReport = (event) => {
             (!accountRefH || m.accountRefH === accountRefH) &&
             (!accountRefY || m.accountRefY === accountRefY) &&
             (!accountRefM || m.accountRefM === accountRefM);
+        const matchLiftingUnit = !liftingUnitFilter ||
+            (liftingUnitFilter === 'delivered' && !!m.deliveredToLiftingUnit) ||
+            (liftingUnitFilter === 'not_delivered' && !m.deliveredToLiftingUnit);
         // Report-Specific Filters
         const matchSpecificStatus = !specificStatusFilter || m.subscriberType === specificStatusFilter;
         const matchSpecificRepairStatus = !specificRepairStatusFilter || m.repairStatus === specificRepairStatusFilter;
         const matchMemoType = specificMemoTypes.length === 0 || specificMemoTypes.includes(m.subscriberType);
-        return inDateRange && matchMeterType && matchTech && matchAccountRef && matchSpecificStatus && matchSpecificRepairStatus && matchMemoType;
+        return inDateRange && matchMeterType && matchTech && matchAccountRef && matchSpecificStatus && matchSpecificRepairStatus && matchMemoType && matchLiftingUnit;
     });
     if (reportType === 'transformers') {
         const councilF = (_d = document.getElementById('filter-transformer-council')) === null || _d === void 0 ? void 0 : _d.value;
@@ -15020,6 +15185,16 @@ const renderReportResults = (data, columns, title, reportType = 'default', summa
                 const cellClass = col.key === 'cardStatus' ? 'col-card-status' : '';
                 if (col.key === 'seq') {
                     rowHTML += `<td class="${cellClass}" style="${tdStyle}">${index + 1}</td>`;
+                }
+                else if (col.key === 'liftingUnitStatus') {
+                    if (item.deliveredToLiftingUnit) {
+                        const dateStr = item.liftingUnitDeliveryDate || '';
+                        const receiverStr = item.liftingUnitReceiver ? ` (${item.liftingUnitReceiver})` : '';
+                        rowHTML += `<td class="${cellClass}" style="${tdStyle}; color: #047857; font-weight: bold; background: #ecfdf5;">تم التسليم${dateStr ? ` ${dateStr}` : ''}${receiverStr}</td>`;
+                    }
+                    else {
+                        rowHTML += `<td class="${cellClass}" style="${tdStyle}; color: #b45309; background: #fffbeb;">لم يُسلّم</td>`;
+                    }
                 }
                 else {
                     const value = item[col.key];
@@ -18951,7 +19126,7 @@ function handleNavigation(event) {
  * Sets up all the event listeners for the application.
  */
 const setupEventListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117;
     // Welcome Screen Listeners
     (_a = document.getElementById('start-new-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', handleStartNew);
     (_b = document.getElementById('import-from-welcome-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleImportFromWelcome);
@@ -19498,10 +19673,16 @@ const setupEventListeners = () => {
         if (!parentSection)
             return;
         if (parentSection.id.startsWith('subscribers-') || parentSection.id === 'meter-management' || parentSection.id === 'repaired-meters') {
+            const deliveryLiftingBtn = target.closest('.btn-delivery-lifting-unit');
             const editButton = target.closest('.btn-edit-details');
             const viewButton = target.closest('.btn-view-details');
             const deleteButton = target.closest('.btn-delete');
-            if (editButton) {
+            if (deliveryLiftingBtn) {
+                const meterId = parseInt(deliveryLiftingBtn.dataset.id, 10);
+                openLiftingDeliveryModal(meterId);
+                return;
+            }
+            else if (editButton) {
                 const meterId = parseInt(editButton.dataset.id, 10);
                 openSubscriberDetailsPage(meterId, 'edit');
             }
@@ -19732,26 +19913,28 @@ const setupEventListeners = () => {
     (_87 = document.getElementById('import-backup-btn')) === null || _87 === void 0 ? void 0 : _87.addEventListener('click', () => handleImportBackup());
     (_88 = document.getElementById('export-csv-btn')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', handleExportCSV);
     (_89 = document.getElementById('save-report-settings-btn')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', handleSaveReportSettings);
-    (_90 = document.getElementById('save-company-report-settings-btn')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', handleSaveCompanyReportSettings);
+    (_90 = document.getElementById('form-lifting-unit-delivery')) === null || _90 === void 0 ? void 0 : _90.addEventListener('submit', handleLiftingDeliverySubmit);
+    (_91 = document.getElementById('btn-cancel-lifting-delivery')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', handleCancelLiftingDelivery);
+    (_92 = document.getElementById('save-company-report-settings-btn')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', handleSaveCompanyReportSettings);
     // مستمعات أحداث الطلبات قيد الانتظار
-    (_91 = document.getElementById('add-area-dialog-confirm-btn')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', confirmAddPendingArea);
-    (_92 = document.getElementById('add-area-dialog-cancel-btn')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', hideAddPendingAreaDialog);
-    (_93 = document.getElementById('add-pending-area-dialog')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', (event) => {
+    (_93 = document.getElementById('add-area-dialog-confirm-btn')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', confirmAddPendingArea);
+    (_94 = document.getElementById('add-area-dialog-cancel-btn')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', hideAddPendingAreaDialog);
+    (_95 = document.getElementById('add-pending-area-dialog')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', (event) => {
         if (event.target === document.getElementById('add-pending-area-dialog')) {
             hideAddPendingAreaDialog();
         }
     });
-    (_94 = document.getElementById('import-pending-excel-trigger-btn')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_95 = document.getElementById('pending-excel-upload')) === null || _95 === void 0 ? void 0 : _95.addEventListener('change', handleImportPendingExcel);
-    (_96 = document.getElementById('print-pending-requests-btn')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', handlePrintPendingRequests);
-    (_97 = document.getElementById('export-pending-excel-btn')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', handleExportPendingRequestsToExcel);
+    (_96 = document.getElementById('import-pending-excel-trigger-btn')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_97 = document.getElementById('pending-excel-upload')) === null || _97 === void 0 ? void 0 : _97.addEventListener('change', handleImportPendingExcel);
+    (_98 = document.getElementById('print-pending-requests-btn')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', handlePrintPendingRequests);
+    (_99 = document.getElementById('export-pending-excel-btn')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', handleExportPendingRequestsToExcel);
     // ربط أزرار العمليات الجماعية في صفحة الانتظار
-    (_98 = document.getElementById('assign-pending-requests-btn')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', handleAssignSelectedPendingRequests);
-    (_99 = document.getElementById('move-to-mukayasat-btn')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', handleMovePendingToMukayasat);
-    (_100 = document.getElementById('mark-pending-inspected-btn')) === null || _100 === void 0 ? void 0 : _100.addEventListener('click', handleMarkSelectedPendingInspected);
-    (_101 = document.getElementById('print-pending-inspection-btn')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', handlePrintSelectedPendingInspections);
-    (_102 = document.getElementById('delete-selected-pending-btn')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', handleDeleteSelectedPendingRequests);
-    (_103 = document.getElementById('add-pending-address-tab-btn')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', handleAddNewPendingAddressTab);
+    (_100 = document.getElementById('assign-pending-requests-btn')) === null || _100 === void 0 ? void 0 : _100.addEventListener('click', handleAssignSelectedPendingRequests);
+    (_101 = document.getElementById('move-to-mukayasat-btn')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', handleMovePendingToMukayasat);
+    (_102 = document.getElementById('mark-pending-inspected-btn')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', handleMarkSelectedPendingInspected);
+    (_103 = document.getElementById('print-pending-inspection-btn')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', handlePrintSelectedPendingInspections);
+    (_104 = document.getElementById('delete-selected-pending-btn')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', handleDeleteSelectedPendingRequests);
+    (_105 = document.getElementById('add-pending-address-tab-btn')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', handleAddNewPendingAddressTab);
     const pendingFilters = document.getElementById('pending-filters');
     if (pendingFilters) {
         const resetPending = () => { currentPendingPage = 1; pendingSelectedRequests = []; renderPendingRequestsSection(); };
@@ -19991,7 +20174,7 @@ const setupEventListeners = () => {
         });
     }
     // Company Logo Settings Listeners
-    (_104 = document.getElementById('developer-image-password-cancel')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', () => {
+    (_106 = document.getElementById('developer-image-password-cancel')) === null || _106 === void 0 ? void 0 : _106.addEventListener('click', () => {
         const dialog = document.getElementById('developer-image-password-dialog');
         const input = document.getElementById('developer-image-password');
         dialog === null || dialog === void 0 ? void 0 : dialog.setAttribute('hidden', '');
@@ -19999,7 +20182,7 @@ const setupEventListeners = () => {
             input.value = '';
         developerImagePasswordCallback = null;
     });
-    (_105 = document.getElementById('developer-image-password-confirm')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', () => {
+    (_107 = document.getElementById('developer-image-password-confirm')) === null || _107 === void 0 ? void 0 : _107.addEventListener('click', () => {
         const input = document.getElementById('developer-image-password');
         const error = document.getElementById('developer-image-password-error');
         const dialog = document.getElementById('developer-image-password-dialog');
@@ -20015,18 +20198,18 @@ const setupEventListeners = () => {
         input.value = '';
         callback === null || callback === void 0 ? void 0 : callback();
     });
-    (_106 = document.getElementById('upload-logo-btn')) === null || _106 === void 0 ? void 0 : _106.addEventListener('click', () => {
+    (_108 = document.getElementById('upload-logo-btn')) === null || _108 === void 0 ? void 0 : _108.addEventListener('click', () => {
         var _a;
         (_a = document.getElementById('logo-upload-input')) === null || _a === void 0 ? void 0 : _a.click();
     });
-    (_107 = document.getElementById('remove-logo-btn')) === null || _107 === void 0 ? void 0 : _107.addEventListener('click', () => {
+    (_109 = document.getElementById('remove-logo-btn')) === null || _109 === void 0 ? void 0 : _109.addEventListener('click', () => {
         state.settings.companyLogo = null;
         saveState();
         updateUI();
         renderSettingsSection(); // To update the preview
         showToast('تمت إزالة الشعار بنجاح.');
     });
-    (_108 = document.getElementById('logo-upload-input')) === null || _108 === void 0 ? void 0 : _108.addEventListener('change', (event) => {
+    (_110 = document.getElementById('logo-upload-input')) === null || _110 === void 0 ? void 0 : _110.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -20050,10 +20233,10 @@ const setupEventListeners = () => {
         };
         reader.readAsDataURL(file);
     });
-    (_109 = document.getElementById('upload-developer-image-btn')) === null || _109 === void 0 ? void 0 : _109.addEventListener('click', () => {
+    (_111 = document.getElementById('upload-developer-image-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', () => {
         requestDeveloperImagePassword(() => { var _a; return (_a = document.getElementById('developer-image-upload-input')) === null || _a === void 0 ? void 0 : _a.click(); });
     });
-    (_110 = document.getElementById('remove-developer-image-btn')) === null || _110 === void 0 ? void 0 : _110.addEventListener('click', () => {
+    (_112 = document.getElementById('remove-developer-image-btn')) === null || _112 === void 0 ? void 0 : _112.addEventListener('click', () => {
         requestDeveloperImagePassword(() => {
             state.settings.developerImage = null;
             saveState();
@@ -20062,7 +20245,7 @@ const setupEventListeners = () => {
             showToast('تمت إزالة صورة المطور بنجاح.');
         });
     });
-    (_111 = document.getElementById('developer-image-upload-input')) === null || _111 === void 0 ? void 0 : _111.addEventListener('change', (event) => {
+    (_113 = document.getElementById('developer-image-upload-input')) === null || _113 === void 0 ? void 0 : _113.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -20083,7 +20266,7 @@ const setupEventListeners = () => {
         reader.onerror = () => showToast('حدث خطأ أثناء قراءة صورة المطور.', 'error');
         reader.readAsDataURL(file);
     });
-    (_112 = document.getElementById('logo-size-slider')) === null || _112 === void 0 ? void 0 : _112.addEventListener('input', (event) => {
+    (_114 = document.getElementById('logo-size-slider')) === null || _114 === void 0 ? void 0 : _114.addEventListener('input', (event) => {
         const slider = event.target;
         const newSize = parseInt(slider.value, 10);
         const valueDisplay = document.getElementById('logo-size-value');
@@ -20105,12 +20288,12 @@ const setupEventListeners = () => {
             <button class="btn btn-delete" id="btn-delete-selected-addresses" style="padding: 4px 8px; font-size: 0.8rem;">حذف المحدد</button>
         `;
         addressContainer.insertBefore(bulkActions, addressContainer.querySelector('ul'));
-        (_113 = document.getElementById('btn-select-all-addresses')) === null || _113 === void 0 ? void 0 : _113.addEventListener('click', () => {
+        (_115 = document.getElementById('btn-select-all-addresses')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', () => {
             const cbs = document.querySelectorAll('.address-bulk-checkbox');
             const allSelected = Array.from(cbs).every(cb => cb.checked);
             cbs.forEach(cb => cb.checked = !allSelected);
         });
-        (_114 = document.getElementById('btn-delete-selected-addresses')) === null || _114 === void 0 ? void 0 : _114.addEventListener('click', () => {
+        (_116 = document.getElementById('btn-delete-selected-addresses')) === null || _116 === void 0 ? void 0 : _116.addEventListener('click', () => {
             const selected = Array.from(document.querySelectorAll('.address-bulk-checkbox:checked'));
             if (selected.length === 0)
                 return showToast('يرجى تحديد عناوين أولاً', 'error');
@@ -20180,7 +20363,7 @@ const setupEventListeners = () => {
         }, { passive: true });
     };
     initMobileAdaptation();
-    (_115 = document.getElementById('sidebar-toggle')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', () => {
+    (_117 = document.getElementById('sidebar-toggle')) === null || _117 === void 0 ? void 0 : _117.addEventListener('click', () => {
         document.body.classList.toggle('sidebar-collapsed');
     });
     // Accordion behavior for sidebar categories: when one <details> opens, close the others

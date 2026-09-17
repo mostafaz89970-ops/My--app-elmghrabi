@@ -1640,6 +1640,30 @@ const actionsColumn: ColumnDefinition = {
     `
 };
 
+const faultyMetersActionsColumn: ColumnDefinition = {
+    key: 'actions',
+    header: 'إجراءات',
+    render: (item: DataItem) => {
+        const isDelivered = !!item.deliveredToLiftingUnit;
+        const deliveryBtnClass = isDelivered ? 'btn-lifting-delivered' : 'btn-lifting-pending';
+        const deliveryBtnStyle = isDelivered 
+            ? 'background: linear-gradient(135deg, #10b981, #059669); color: white; border: 1px solid #047857; font-weight: bold; padding: 4px 10px; border-radius: 6px; font-size: 11px; margin: 2px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);' 
+            : 'background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: 1px solid #b45309; font-weight: bold; padding: 4px 10px; border-radius: 6px; font-size: 11px; margin: 2px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);';
+        const deliveryBtnText = isDelivered ? '✔️ تم التسليم لوحدة الرفع' : '📦 تسليم لوحدة الرفع';
+        const deliveryBtnTitle = isDelivered 
+            ? `تم التسليم: ${item.liftingUnitDeliveryDate || ''} - المستلم: ${item.liftingUnitReceiver || ''}` 
+            : 'اضغط لتسجيل تسليم العداد إلى وحدة الرفع';
+
+        return `
+            ${hasButtonPermission('view_button') ? `<button class="btn btn-view-details" data-id="${item.id}">عرض</button>` : ''}
+            ${hasButtonPermission('edit_button') ? `<button class="btn btn-edit-details" data-id="${item.id}">تعديل</button>` : ''}
+            <button type="button" class="btn ${deliveryBtnClass} btn-delivery-lifting-unit" data-id="${item.id}" style="${deliveryBtnStyle}" title="${deliveryBtnTitle}">
+                ${deliveryBtnText}
+            </button>
+        `;
+    }
+};
+
 const baseColumns: ColumnDefinition[] = [
     { key: 'subscriberName', header: 'اسم المشترك' },
     { key: 'codeName', header: 'الاسم الكودي' },
@@ -1742,7 +1766,7 @@ const columnConfigs: { [key: string]: ColumnDefinition[] } = {
         conditionalReadingColumn,
         conditionalCardStatusColumn,
         ...removalColumns,
-        actionsColumn
+        faultyMetersActionsColumn
     ],
     'subscribers-replacement': [
         { key: 'accountRefF', header: 'ف' },
@@ -8042,6 +8066,147 @@ const renderJudicialCollectionSection = () => {
         }, 500);
     };
 
+    // --- وحدة الرفع: تسليم العدادات المرفوعة أعطال ---
+    const openLiftingDeliveryModal = (meterId: number) => {
+        const meter = state.meters.find(m => m.id === meterId);
+        if (!meter) {
+            showToast('لم يتم العثور على بيانات العداد المطلوب.', 'error');
+            return;
+        }
+
+        const modal = document.getElementById('modal-lifting-unit-delivery');
+        if (!modal) return;
+
+        const idInput = document.getElementById('lifting-delivery-meter-id') as HTMLInputElement | null;
+        if (idInput) idInput.value = String(meter.id);
+
+        const subNameEl = document.getElementById('lifting-modal-subscriber-name');
+        if (subNameEl) subNameEl.textContent = meter.subscriberName || 'غير محدد';
+
+        const subCodeEl = document.getElementById('lifting-modal-subscription-code');
+        if (subCodeEl) subCodeEl.textContent = meter.subscriptionCode || 'غير محدد';
+
+        const chassisEl = document.getElementById('lifting-modal-chassis-number');
+        if (chassisEl) chassisEl.textContent = meter.meterChassisNumber || 'غير محدد';
+
+        const removalReasonEl = document.getElementById('lifting-modal-removal-reason');
+        if (removalReasonEl) removalReasonEl.textContent = meter.removalReason || meter.subscriberType || '-';
+
+        // ملء قائمة المستلمين المقترحين
+        const datalist = document.getElementById('lifting-recipients-list');
+        if (datalist) {
+            const recipientsSet = new Set<string>();
+            (state.settings.technicians || []).forEach((t: string) => recipientsSet.add(t));
+            (state.settings.technicalEngineers || []).forEach((e: string) => recipientsSet.add(e));
+            (state.settings.headEngineers || []).forEach((h: string) => recipientsSet.add(h));
+            recipientsSet.add('وحدة الرفع');
+            recipientsSet.add('مسؤول وحدة الرفع');
+            datalist.innerHTML = Array.from(recipientsSet).map(name => `<option value="${name}">`).join('');
+        }
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('lifting-delivery-date') as HTMLInputElement | null;
+        if (dateInput) {
+            dateInput.value = meter.liftingUnitDeliveryDate || todayStr;
+        }
+
+        const receiverInput = document.getElementById('lifting-recipient-name') as HTMLInputElement | null;
+        if (receiverInput) {
+            receiverInput.value = meter.liftingUnitReceiver || '';
+        }
+
+        const notesInput = document.getElementById('lifting-delivery-notes') as HTMLTextAreaElement | null;
+        if (notesInput) {
+            notesInput.value = meter.liftingUnitNotes || '';
+        }
+
+        const cancelDeliveryBtn = document.getElementById('btn-cancel-lifting-delivery');
+        const statusBadge = document.getElementById('lifting-modal-status-badge');
+        if (meter.deliveredToLiftingUnit) {
+            if (cancelDeliveryBtn) cancelDeliveryBtn.style.display = 'inline-block';
+            if (statusBadge) {
+                statusBadge.innerHTML = `<span style="background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold;">✔️ تم التسليم مسبقاً (${meter.liftingUnitDeliveryDate || ''})</span>`;
+            }
+        } else {
+            if (cancelDeliveryBtn) cancelDeliveryBtn.style.display = 'none';
+            if (statusBadge) {
+                statusBadge.innerHTML = `<span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: bold;">⏳ لم يُسلّم لوحدة الرفع بعد</span>`;
+            }
+        }
+
+        modal.style.display = 'flex';
+    };
+    (window as any).openLiftingDeliveryModal = openLiftingDeliveryModal;
+
+    const handleLiftingDeliverySubmit = async (e: Event) => {
+        e.preventDefault();
+        const idInput = document.getElementById('lifting-delivery-meter-id') as HTMLInputElement | null;
+        const dateInput = document.getElementById('lifting-delivery-date') as HTMLInputElement | null;
+        const receiverInput = document.getElementById('lifting-recipient-name') as HTMLInputElement | null;
+        const notesInput = document.getElementById('lifting-delivery-notes') as HTMLTextAreaElement | null;
+
+        if (!idInput || !idInput.value) return;
+        const meterId = parseInt(idInput.value, 10);
+        const meter = state.meters.find(m => m.id === meterId);
+        if (!meter) {
+            showToast('لم يتم العثور على بيانات العداد.', 'error');
+            return;
+        }
+
+        const deliveryDate = dateInput?.value.trim() || new Date().toISOString().split('T')[0];
+        const receiverName = receiverInput?.value.trim() || '';
+
+        if (!receiverName) {
+            showToast('يرجى تحديد أو كتابة اسم المستلم بوحدة الرفع.', 'error');
+            receiverInput?.focus();
+            return;
+        }
+
+        meter.deliveredToLiftingUnit = true;
+        meter.liftingUnitDeliveryDate = deliveryDate;
+        meter.liftingUnitReceiver = receiverName;
+        meter.liftingUnitNotes = notesInput?.value.trim() || '';
+        meter.liftingUnitDeliveredBy = loggedInUser?.fullName || 'مستخدم';
+        meter.liftingUnitDeliveredAt = new Date().toISOString();
+
+        await saveState();
+
+        const modal = document.getElementById('modal-lifting-unit-delivery');
+        if (modal) modal.style.display = 'none';
+
+        renderFilteredMeterTable('subscribers-faults-table', ['مرفوع أعطال'], columnConfigs['subscribers-faults']);
+        filterTableByMultipleCriteria('subscribers-faults-table');
+
+        showToast(`تم حفظ تسليم العداد لوحدة الرفع بنجاح (المستلم: ${receiverName}).`, 'success');
+    };
+
+    const handleCancelLiftingDelivery = async () => {
+        const idInput = document.getElementById('lifting-delivery-meter-id') as HTMLInputElement | null;
+        if (!idInput || !idInput.value) return;
+        const meterId = parseInt(idInput.value, 10);
+        const meter = state.meters.find(m => m.id === meterId);
+        if (!meter) return;
+
+        showConfirmationDialog('تأكيد إلغاء التسليم', `هل تريد بالتأكيد إلغاء تسليم العداد (شاسية: ${meter.meterChassisNumber || '-'}) لوحدة الرفع وإعادته للحالة السابقة؟`, async () => {
+            meter.deliveredToLiftingUnit = false;
+            delete meter.liftingUnitDeliveryDate;
+            delete meter.liftingUnitReceiver;
+            delete meter.liftingUnitNotes;
+            delete meter.liftingUnitDeliveredBy;
+            delete meter.liftingUnitDeliveredAt;
+
+            await saveState();
+
+            const modal = document.getElementById('modal-lifting-unit-delivery');
+            if (modal) modal.style.display = 'none';
+
+            renderFilteredMeterTable('subscribers-faults-table', ['مرفوع أعطال'], columnConfigs['subscribers-faults']);
+            filterTableByMultipleCriteria('subscribers-faults-table');
+
+            showToast('تم إلغاء حالة التسليم لوحدة الرفع بنجاح.');
+        });
+    };
+
     const openSubscriberDetailsPage = (meterId: number, mode: 'view' | 'edit') => {
         const meter = state.meters.find(m => m.id === meterId);
         if (!meter) {
@@ -14179,6 +14344,14 @@ const renderJudicialCollectionSection = () => {
             <input type="date" id="filter-date-to">
         </div>
         <div class="input-group">
+            <label for="filter-lifting-unit-status">وحدة الرفع</label>
+            <select id="filter-lifting-unit-status">
+                <option value="">الكل</option>
+                <option value="delivered">تم التسليم لوحدة الرفع</option>
+                <option value="not_delivered">لم يُسلّم لوحدة الرفع</option>
+            </select>
+        </div>
+        <div class="input-group">
             <label for="filter-meterType">نوع العداد</label>
             <div class="custom-multiselect" id="filter-meterType-multiselect">
                 <button type="button" class="multiselect-btn" data-placeholder="اختر نوعاً أو أكثر...">اختر نوعاً أو أكثر...</button>
@@ -15152,6 +15325,9 @@ const renderJudicialCollectionSection = () => {
         const technicianFilterEl = document.getElementById('filter-technician') as HTMLSelectElement | null;
         const technicianFilter = technicianFilterEl ? technicianFilterEl.value : '';
 
+        const liftingUnitFilterEl = document.getElementById('filter-lifting-unit-status') as HTMLSelectElement | null;
+        const liftingUnitFilter = liftingUnitFilterEl ? liftingUnitFilterEl.value : '';
+
         const accountRefFEl = document.getElementById('filter-accountRefF') as HTMLInputElement | null;
         const accountRefF = accountRefFEl ? accountRefFEl.value.trim() : '';
         const accountRefHEl = document.getElementById('filter-accountRefH') as HTMLInputElement | null;
@@ -15188,6 +15364,7 @@ const renderJudicialCollectionSection = () => {
                     { key: 'readingAtRemoval', header: 'القراءة عند الرفع' },
                     { key: 'removalDate', header: 'تاريخ الرفع' },
                     { key: 'installationDate', header: 'تاريخ التركيب' },
+                    { key: 'liftingUnitStatus', header: 'وحدة الرفع' },
                 ];
                 break;
 
@@ -15224,6 +15401,7 @@ const renderJudicialCollectionSection = () => {
                         { key: 'removalReason', header: 'سبب الرفع' },
                         { key: 'readingAtRemoval', header: 'القراءة عند الرفع' },
                         { key: 'removalDate', header: 'تاريخ الرفع' },
+                        { key: 'liftingUnitStatus', header: 'وحدة الرفع' },
                     ];
                 } else if (status === 'مرفوع إحلال') {
                     columns = [
@@ -15469,6 +15647,7 @@ const renderJudicialCollectionSection = () => {
                         { key: 'meterCapacity', header: 'قدرة العداد' },
                         { key: 'removalReason', header: 'سبب الرفع' },
                         { key: 'removalDate', header: 'تاريخ الرفع' },
+                        { key: 'liftingUnitStatus', header: 'وحدة الرفع' },
                     ];
                 } else if (memoType === 'إحلال') {
                     columns = [
@@ -15697,12 +15876,16 @@ const renderJudicialCollectionSection = () => {
                 (!accountRefY || m.accountRefY === accountRefY) &&
                 (!accountRefM || m.accountRefM === accountRefM);
 
+            const matchLiftingUnit = !liftingUnitFilter ||
+                (liftingUnitFilter === 'delivered' && !!m.deliveredToLiftingUnit) ||
+                (liftingUnitFilter === 'not_delivered' && !m.deliveredToLiftingUnit);
+
             // Report-Specific Filters
             const matchSpecificStatus = !specificStatusFilter || m.subscriberType === specificStatusFilter;
             const matchSpecificRepairStatus = !specificRepairStatusFilter || m.repairStatus === specificRepairStatusFilter;
             const matchMemoType = specificMemoTypes.length === 0 || specificMemoTypes.includes(m.subscriberType);
 
-            return inDateRange && matchMeterType && matchTech && matchAccountRef && matchSpecificStatus && matchSpecificRepairStatus && matchMemoType;
+            return inDateRange && matchMeterType && matchTech && matchAccountRef && matchSpecificStatus && matchSpecificRepairStatus && matchMemoType && matchLiftingUnit;
         });
 
         if (reportType === 'transformers') {
@@ -15966,6 +16149,14 @@ const renderJudicialCollectionSection = () => {
                     const cellClass = col.key === 'cardStatus' ? 'col-card-status' : '';
                     if (col.key === 'seq') {
                         rowHTML += `<td class="${cellClass}" style="${tdStyle}">${index + 1}</td>`;
+                    } else if (col.key === 'liftingUnitStatus') {
+                        if (item.deliveredToLiftingUnit) {
+                            const dateStr = item.liftingUnitDeliveryDate || '';
+                            const receiverStr = item.liftingUnitReceiver ? ` (${item.liftingUnitReceiver})` : '';
+                            rowHTML += `<td class="${cellClass}" style="${tdStyle}; color: #047857; font-weight: bold; background: #ecfdf5;">تم التسليم${dateStr ? ` ${dateStr}` : ''}${receiverStr}</td>`;
+                        } else {
+                            rowHTML += `<td class="${cellClass}" style="${tdStyle}; color: #b45309; background: #fffbeb;">لم يُسلّم</td>`;
+                        }
                     } else {
                         const value = item[col.key as keyof DataItem];
                         const displayValue = (value !== undefined && value !== null) ? value : '';
@@ -20648,11 +20839,16 @@ const renderJudicialCollectionSection = () => {
             if (!parentSection) return;
 
             if (parentSection.id.startsWith('subscribers-') || parentSection.id === 'meter-management' || parentSection.id === 'repaired-meters') {
+                const deliveryLiftingBtn = target.closest('.btn-delivery-lifting-unit');
                 const editButton = target.closest('.btn-edit-details');
                 const viewButton = target.closest('.btn-view-details');
                 const deleteButton = target.closest('.btn-delete');
 
-                if (editButton) {
+                if (deliveryLiftingBtn) {
+                    const meterId = parseInt((deliveryLiftingBtn as HTMLElement).dataset.id!, 10);
+                    openLiftingDeliveryModal(meterId);
+                    return;
+                } else if (editButton) {
                     const meterId = parseInt((editButton as HTMLElement).dataset.id!, 10);
                     openSubscriberDetailsPage(meterId, 'edit');
                 } else if (viewButton) {
@@ -20885,6 +21081,8 @@ const renderJudicialCollectionSection = () => {
         document.getElementById('import-backup-btn')?.addEventListener('click', () => handleImportBackup());
         document.getElementById('export-csv-btn')?.addEventListener('click', handleExportCSV);
         document.getElementById('save-report-settings-btn')?.addEventListener('click', handleSaveReportSettings);
+        document.getElementById('form-lifting-unit-delivery')?.addEventListener('submit', handleLiftingDeliverySubmit);
+        document.getElementById('btn-cancel-lifting-delivery')?.addEventListener('click', handleCancelLiftingDelivery);
         document.getElementById('save-company-report-settings-btn')?.addEventListener('click', handleSaveCompanyReportSettings);
 
         // مستمعات أحداث الطلبات قيد الانتظار
