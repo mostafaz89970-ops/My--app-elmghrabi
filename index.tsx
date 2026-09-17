@@ -928,13 +928,17 @@ const populateUserDropdown = () => {
     const usernameSelect = document.getElementById('username') as HTMLSelectElement;
     if (!usernameSelect) return;
 
-    usernameSelect.innerHTML = ''; // Clear existing options
+    usernameSelect.innerHTML = '<option value="" disabled selected>اختر اسم المستخدم...</option>';
     state.users.forEach(user => {
         const option = document.createElement('option');
         option.value = user.username;
         option.textContent = user.fullName;
         usernameSelect.appendChild(option);
     });
+    usernameSelect.value = '';
+
+    const passwordInput = document.getElementById('password') as HTMLInputElement | null;
+    if (passwordInput) passwordInput.value = '';
 };
 
 /**
@@ -1357,6 +1361,15 @@ const handleLogin = async (event: Event) => {
     const username = (form.elements.namedItem('username') as HTMLSelectElement).value;
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
     const errorElement = document.getElementById('login-error');
+
+    if (!username) {
+        if (errorElement) {
+            errorElement.textContent = 'يرجى اختيار اسم المستخدم أولاً.';
+            errorElement.classList.remove('hidden');
+        }
+        showToast('يرجى اختيار اسم المستخدم أولاً.', 'error');
+        return;
+    }
 
     const user = state.users.find(u => u.username === username && u.password === password);
 
@@ -18708,7 +18721,15 @@ const renderJudicialCollectionSection = () => {
             }
         });
 
-        document.getElementById('login-form')?.addEventListener('submit', handleLogin);
+        document.getElementById('username')?.addEventListener('change', () => {
+        document.getElementById('login-error')?.classList.add('hidden');
+        const pass = document.getElementById('password') as HTMLInputElement | null;
+        if (pass) {
+            pass.value = '';
+            pass.focus();
+        }
+    });
+    document.getElementById('login-form')?.addEventListener('submit', handleLogin);
         document.getElementById('header-logout-btn')?.addEventListener('click', handleLogout);
 
         // Main App Listeners
