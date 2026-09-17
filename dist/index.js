@@ -39,6 +39,7 @@ let state = {
     ],
     settings: {
         companyName: 'ELMAGHRABI',
+        companyAddress: 'قطاع شمال المنيا - هندسة كهرباء بني مزار',
         footerText: 'منظومة العدادات 2025 - جميع الحقوق محفوظة ELMGHRABI © 2026',
         technicians: ['محمد علي', 'أحمد السيد', 'خالد محمود'],
         technicalEngineers: [],
@@ -3417,6 +3418,72 @@ window.openZinatPaymentModal = async (id) => {
 // =========================================================================
 // ====================== قسم الخزينة العامة والتصفيات ======================
 // =========================================================================
+function tafqeetNumber(num) {
+    if (isNaN(num) || num <= 0)
+        return 'صفر جنيه مصري';
+    const ones = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
+    const tens = ['', 'عشرة', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
+    const teens = ['عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
+    const hundreds = ['', 'مائة', 'مائتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
+    function convertChunk(n) {
+        let parts = [];
+        const h = Math.floor(n / 100);
+        const rem = n % 100;
+        if (h > 0)
+            parts.push(hundreds[h]);
+        if (rem > 0) {
+            if (rem < 10) {
+                parts.push(ones[rem]);
+            }
+            else if (rem >= 11 && rem <= 19) {
+                parts.push(teens[rem - 10]);
+            }
+            else if (rem === 10 || rem % 10 === 0) {
+                parts.push(tens[Math.floor(rem / 10)]);
+            }
+            else {
+                const unit = rem % 10;
+                const ten = Math.floor(rem / 10);
+                parts.push(ones[unit] + ' و' + tens[ten]);
+            }
+        }
+        return parts.join(' و');
+    }
+    const intPart = Math.floor(num);
+    const fractionPart = Math.round((num - intPart) * 100);
+    let words = [];
+    const millions = Math.floor(intPart / 1000000);
+    const thousands = Math.floor((intPart % 1000000) / 1000);
+    const remainder = intPart % 1000;
+    if (millions > 0) {
+        if (millions === 1)
+            words.push('مليون');
+        else if (millions === 2)
+            words.push('مليونان');
+        else if (millions >= 3 && millions <= 10)
+            words.push(convertChunk(millions) + ' ملايين');
+        else
+            words.push(convertChunk(millions) + ' مليون');
+    }
+    if (thousands > 0) {
+        if (thousands === 1)
+            words.push('ألف');
+        else if (thousands === 2)
+            words.push('ألفان');
+        else if (thousands >= 3 && thousands <= 10)
+            words.push(convertChunk(thousands) + ' آلاف');
+        else
+            words.push(convertChunk(thousands) + ' ألف');
+    }
+    if (remainder > 0) {
+        words.push(convertChunk(remainder));
+    }
+    let result = (words.length > 0 ? words.join(' و') : 'صفر') + ' جنيه مصري';
+    if (fractionPart > 0) {
+        result += ' و' + convertChunk(fractionPart) + ' قرشاً';
+    }
+    return result;
+}
 function normalizeDateStr(d) {
     if (!d)
         return '';
@@ -3599,11 +3666,12 @@ const renderTreasuryDashboard = () => {
     const tbody = document.querySelector('#treasury-dashboard-users-table tbody');
     if (tbody) {
         tbody.innerHTML = '';
-        if (totals.userSummaries.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:15px;">لا يوجد مستخدمون مسجلون.</td></tr>';
+        const relevantUsers = totals.userSummaries.filter(u => u.totalCollected > 0 || u.totalSettled > 0 || u.remaining > 0 || u.isSuspended);
+        if (relevantUsers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:20px;">لا توجد حركات تحصيل أو عهد معلقة لهذا اليوم.</td></tr>';
         }
         else {
-            totals.userSummaries.forEach(u => {
+            relevantUsers.forEach(u => {
                 const tr = document.createElement('tr');
                 let statusBadge = '<span class="badge" style="background:#f1f5f9; color:#64748b; padding:4px 8px; border-radius:10px;">⚪ لا توجد تحصيلات</span>';
                 if (u.status === 'unsettled') {
@@ -3651,6 +3719,8 @@ const renderTreasuryUserSettlements = () => {
         if (statusFilter === 'unsettled' && u.status !== 'unsettled')
             return false;
         if (statusFilter === 'settled' && u.status !== 'settled')
+            return false;
+        if (statusFilter === 'all' && u.totalCollected === 0 && u.totalSettled === 0 && !u.isSuspended)
             return false;
         if (searchVal) {
             const matchName = (u.fullName || '').toLowerCase().includes(searchVal);
@@ -3904,38 +3974,125 @@ window.printSingleTreasuryReceipt = (receiptNo, typeName, amount, collector, par
     if (!printWindow)
         return;
     const companyName = state.settings.companyName || 'ELMAGHRABI';
+    const companySubtitle = state.settings.replacementReportCompanyName || 'شركة مصر الوسطى لتوزيع الكهرباء';
+    const companyAddress = state.settings.companyAddress || (state.settings.addresses && state.settings.addresses[0]) || 'قطاع شمال المنيا - هندسة كهرباء بني مزار';
     const logoSrc = state.settings.companyLogo;
-    const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 60px; max-width: 60px; object-fit: contain;">` : '';
+    const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 75px; max-width: 95px; object-fit: contain;">` : '';
+    const tafqeet = tafqeetNumber(amount);
+    const printTime = new Date().toLocaleTimeString('ar-EG');
     printWindow.document.write(`
-            <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>إيصال توريد خزينة ${receiptNo}</title>
-            <style>
-                body { font-family: 'Tajawal', sans-serif; padding: 20px; color: #1e293b; }
-                .receipt-box { max-width: 500px; margin: 0 auto; border: 2px solid #0f172a; padding: 20px; border-radius: 8px; }
-                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
-                .title { text-align: center; font-size: 16px; font-weight: bold; margin: 10px 0; }
-                .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #cbd5e1; font-size: 13px; }
-                .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 16px; font-weight: bold; background: #f8fafc; border-top: 2px solid #0f172a; margin-top: 10px; }
-                .signatures { display: flex; justify-content: space-between; margin-top: 40px; font-size: 12px; font-weight: bold; }
-            </style></head><body>
-            <div class="receipt-box">
-                <div class="header">
-                    <div><b>${companyName}</b><br><small>إدارة الخزينة والتحصيل</small></div>
-                    <div>${logoHTML}</div>
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>إيصال توريد نقدية - ${receiptNo}</title>
+                <style>
+                    @page { size: auto; margin: 8mm; }
+                    * { box-sizing: border-box; }
+                    body { font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 15px; }
+                    .receipt-card { max-width: 580px; margin: 0 auto; background: #fff; border: 2px solid #0f172a; border-radius: 12px; padding: 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); position: relative; overflow: hidden; }
+                    .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 46pt; color: rgba(15, 23, 42, 0.035); font-weight: 900; pointer-events: none; white-space: nowrap; user-select: none; }
+                    .receipt-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 14px; gap: 10px; }
+                    .company-info h2 { margin: 0; font-size: 15pt; color: #0f172a; font-weight: 800; }
+                    .company-info .sub-title { font-size: 10.5pt; color: #334155; font-weight: 600; margin-top: 3px; }
+                    .company-info .address-badge { font-size: 9.5pt; color: #0369a1; font-weight: 600; margin-top: 3px; }
+                    .logo-box img { max-height: 70px; max-width: 90px; object-fit: contain; }
+                    .receipt-title-box { text-align: center; margin-bottom: 14px; }
+                    .receipt-title { display: inline-block; background: #0f172a; color: #fff; padding: 5px 22px; border-radius: 20px; font-size: 12pt; font-weight: 800; }
+                    .meta-strip { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 8px 14px; border-radius: 8px; font-size: 10pt; font-weight: bold; margin-bottom: 14px; border: 1px solid #e2e8f0; }
+                    .meta-item { display: flex; align-items: center; gap: 6px; }
+                    .amount-highlight-box { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px dashed #16a34a; border-radius: 10px; padding: 12px 16px; text-align: center; margin-bottom: 16px; }
+                    .amount-num { font-size: 20pt; font-weight: 900; color: #15803d; font-family: monospace, sans-serif; direction: ltr; display: inline-block; }
+                    .amount-words { font-size: 10.5pt; font-weight: 700; color: #166534; margin-top: 5px; }
+                    .details-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+                    .details-table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 10pt; }
+                    .details-table td.label { font-weight: 700; color: #475569; width: 32%; background: #f8fafc; }
+                    .details-table td.val { font-weight: 600; color: #0f172a; }
+                    .signatures-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 22px; padding-top: 14px; border-top: 1px dashed #cbd5e1; text-align: center; font-size: 9.5pt; }
+                    .sign-title { font-weight: 800; color: #334155; margin-bottom: 30px; }
+                    .sign-dots { border-bottom: 1px dotted #64748b; margin: 0 10px; }
+                    .official-footer { text-align: center; margin-top: 16px; font-size: 8pt; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 6px; }
+                    @media print {
+                        body { background: #fff !important; padding: 0 !important; }
+                        .receipt-card { box-shadow: none !important; border: 2px solid #000 !important; max-width: 100% !important; }
+                    }
+                    @media (max-width: 600px) {
+                        body { padding: 5px; }
+                        .receipt-card { padding: 14px; border-radius: 8px; }
+                        .company-info h2 { font-size: 13pt; }
+                        .signatures-grid { grid-template-columns: 1fr; gap: 18px; }
+                        .sign-title { margin-bottom: 18px; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="receipt-card">
+                    <div class="watermark">إيصال رسمي معتمد</div>
+                    <div class="receipt-header">
+                        <div class="company-info">
+                            <h2>${companyName}</h2>
+                            <div class="sub-title">${companySubtitle}</div>
+                            <div class="address-badge">📍 <span>${companyAddress}</span></div>
+                            <div style="font-size: 8.5pt; color: #64748b; margin-top: 2px;">إدارة الخزينة والمتحصلات النقدية</div>
+                        </div>
+                        <div class="logo-box">
+                            ${logoHTML}
+                        </div>
+                    </div>
+
+                    <div class="receipt-title-box">
+                        <span class="receipt-title">إيصال استلام نقدية بالخزينة</span>
+                    </div>
+
+                    <div class="meta-strip">
+                        <div class="meta-item"><span>رقم الإيصال:</span> <span style="font-family: monospace; color:#0369a1; font-size:11pt;">#${receiptNo}</span></div>
+                        <div class="meta-item"><span>تاريخ التوريد:</span> <span>${date} (${printTime})</span></div>
+                    </div>
+
+                    <div class="amount-highlight-box">
+                        <div style="font-size: 9pt; font-weight: 700; color: #166534; margin-bottom: 2px;">المبلغ المستلم نقدياً بالخزينة</div>
+                        <div class="amount-num">${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م</div>
+                        <div class="amount-words">فقط وقدره ${tafqeet} لا غير.</div>
+                    </div>
+
+                    <table class="details-table">
+                        <tr>
+                            <td class="label">المورد / المسلّم:</td>
+                            <td class="val"><b style="font-size: 10.5pt; color: #0f172a;">${collector}</b></td>
+                        </tr>
+                        <tr>
+                            <td class="label">صفة التوريد / العملية:</td>
+                            <td class="val"><span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: 700;">${typeName}</span></td>
+                        </tr>
+                        <tr>
+                            <td class="label">المستلم (مسؤول الخزينة):</td>
+                            <td class="val">${party}</td>
+                        </tr>
+                        ${notes ? `<tr><td class="label">البيان / ملاحظات:</td><td class="val">${notes}</td></tr>` : ''}
+                    </table>
+
+                    <div class="signatures-grid">
+                        <div>
+                            <div class="sign-title">توقيع المورّد (المسلّم)</div>
+                            <div class="sign-dots"></div>
+                        </div>
+                        <div>
+                            <div class="sign-title">مسؤول الخزينة (المستلم)</div>
+                            <div class="sign-dots"></div>
+                        </div>
+                        <div>
+                            <div class="sign-title">اعتماد الإدارة المالية</div>
+                            <div class="sign-dots"></div>
+                        </div>
+                    </div>
+
+                    <div class="official-footer">
+                        * هذا الإيصال محرر ومسجل آلياً عبر منظومة العدادات الموحدة ويعتبر سند تسوية واستلام رسمي معتمد *
+                    </div>
                 </div>
-                <div class="title">إيصال توريد نقدية بالخزينة</div>
-                <div class="row"><span>رقم الإيصال:</span><b>${receiptNo}</b></div>
-                <div class="row"><span>التاريخ:</span><span>${date}</span></div>
-                <div class="row"><span>نوع المعاملة:</span><span>${typeName}</span></div>
-                <div class="row"><span>المورد / المحصل:</span><b>${collector}</b></div>
-                <div class="row"><span>المستلم / الجهة:</span><span>${party}</span></div>
-                ${notes ? `<div class="row"><span>ملاحظات:</span><span>${notes}</span></div>` : ''}
-                <div class="total-row"><span>المبلغ المستلم:</span><span>${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م</span></div>
-                <div class="signatures">
-                    <div>توقيع المسلّم (المحصل):<br><br>.........................</div>
-                    <div>توقيع المستلم (مسؤول الخزينة):<br><br>.........................</div>
-                </div>
-            </div>
-            </body></html>
+            </body>
+            </html>
         `);
     printWindow.document.close();
     setTimeout(() => {
@@ -4029,63 +4186,120 @@ const handleTreasuryManualDepositSubmit = async (event) => {
     renderTreasuryTransactionsLog();
     window.printSingleTreasuryReceipt(receiptNumber, category, amount, depositorName, 'الخزينة العامة', activeTreasuryDateFilter, notes);
 };
-const handlePrintDailyTreasuryReport = (dateStr) => {
-    const targetDate = dateStr || activeTreasuryDateFilter;
+const handlePrintDailyTreasuryReport = (options) => {
+    const targetDate = (options === null || options === void 0 ? void 0 : options.dateStr) || activeTreasuryDateFilter;
     const totals = calculateTreasuryDailyTotals(targetDate);
+    const filterStatus = (options === null || options === void 0 ? void 0 : options.filterStatus) || 'all';
+    const searchQuery = ((options === null || options === void 0 ? void 0 : options.searchQuery) || '').toLowerCase().trim();
+    // فلترة المستخدمين حسب التصفية فقط، واستبعاد أي مستخدم ليس لديه حركات مالية
+    let usersToPrint = totals.userSummaries.filter(u => {
+        if (filterStatus === 'unsettled' && u.status !== 'unsettled')
+            return false;
+        if (filterStatus === 'settled' && u.status !== 'settled')
+            return false;
+        if (filterStatus === 'all' && u.totalCollected === 0 && u.totalSettled === 0 && !u.isSuspended)
+            return false;
+        if (searchQuery) {
+            const matchName = (u.fullName || '').toLowerCase().includes(searchQuery);
+            const matchUser = (u.username || '').toLowerCase().includes(searchQuery);
+            if (!matchName && !matchUser)
+                return false;
+        }
+        return true;
+    });
     const printWindow = window.open('', '_blank');
     if (!printWindow)
         return;
     const companyName = state.settings.companyName || 'ELMAGHRABI';
+    const companySubtitle = state.settings.replacementReportCompanyName || 'شركة مصر الوسطى لتوزيع الكهرباء';
+    const companyAddress = state.settings.companyAddress || (state.settings.addresses && state.settings.addresses[0]) || 'قطاع شمال المنيا - هندسة كهرباء بني مزار';
     const logoSrc = state.settings.companyLogo;
-    const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 70px; max-width: 70px; object-fit: contain;">` : '';
-    const rowsHtml = totals.userSummaries.map(u => `
-            <tr>
-                <td><b>${u.fullName}</b> (@${u.username})</td>
-                <td>${u.role}</td>
-                <td>${u.zinatAmount.toLocaleString()} ج.م</td>
-                <td>${u.judicialAmount.toLocaleString()} ج.م</td>
-                <td><b>${u.totalCollected.toLocaleString()} ج.م</b></td>
-                <td>${u.totalSettled.toLocaleString()} ج.م</td>
-                <td style="color:${u.remaining > 0 ? '#dc2626' : '#15803d'}; font-weight:bold;">${u.remaining.toLocaleString()} ج.م</td>
-                <td>${u.status === 'unsettled' ? '⚠️ لم يُصفّى' : (u.status === 'settled' ? '✔️ تمت التصفية' : '⚪ لا توجد تحصيلات')}</td>
-                <td>${u.isSuspended ? '⛔ موقوف' : 'نشط'}</td>
-            </tr>
-        `).join('');
+    const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 70px; max-width: 85px; object-fit: contain;">` : '';
+    let filterLabel = 'جميع المحصلين ذوي الحركات المالية النشطة';
+    if (filterStatus === 'unsettled') {
+        filterLabel = 'المحصلون المعلقون فقط ⚠️ (لم يتم تصفية العهدة بعد)';
+    }
+    else if (filterStatus === 'settled') {
+        filterLabel = 'المحصلون المنتهية عهدهم فقط ✔️ (تمت التصفية بالكامل)';
+    }
+    if (searchQuery) {
+        filterLabel += ` - تصفية بالبحث: "${searchQuery}"`;
+    }
+    const printedTotalCollected = usersToPrint.reduce((acc, u) => acc + u.totalCollected, 0);
+    const printedTotalSettled = usersToPrint.reduce((acc, u) => acc + u.totalSettled, 0);
+    const printedRemaining = usersToPrint.reduce((acc, u) => acc + u.remaining, 0);
+    const rowsHtml = usersToPrint.length === 0
+        ? '<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:25px; font-size:11pt;">لا توجد سجلات مطابقة لمعايير التصفية والفرز المحددة.</td></tr>'
+        : usersToPrint.map((u, idx) => `
+                <tr>
+                    <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+                    <td><b>${u.fullName}</b> <small style="color:#64748b;">(@${u.username})</small></td>
+                    <td>${u.role}</td>
+                    <td style="font-family:monospace;">${u.zinatAmount.toLocaleString()} ج.م</td>
+                    <td style="font-family:monospace;">${u.judicialAmount.toLocaleString()} ج.م</td>
+                    <td style="font-family:monospace; font-weight:bold;">${u.totalCollected.toLocaleString()} ج.م</td>
+                    <td style="font-family:monospace; color:#15803d; font-weight:bold;">${u.totalSettled.toLocaleString()} ج.م</td>
+                    <td style="font-family:monospace; color:${u.remaining > 0 ? '#dc2626' : '#15803d'}; font-weight:bold;">${u.remaining.toLocaleString()} ج.م</td>
+                    <td style="text-align:center;">${u.status === 'unsettled' ? '<span style="color:#dc2626; font-weight:bold;">⚠️ لم يُصفّى</span>' : (u.status === 'settled' ? '<span style="color:#15803d; font-weight:bold;">✔️ تمت التصفية</span>' : '⚪ لا توجد تحصيلات')}</td>
+                </tr>
+            `).join('');
     printWindow.document.write(`
-            <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير الخزينة اليومي - ${targetDate}</title>
-            <style>
-                body { font-family: 'Tajawal', sans-serif; padding: 25px; color: #1e293b; font-size: 11pt; }
-                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
-                .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
-                .kpi-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; text-align: center; background: #f8fafc; }
-                .kpi-val { font-size: 14pt; font-weight: bold; margin-top: 4px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10pt; }
-                th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: right; }
-                th { background: #0f172a; color: #fff; }
-                tr:nth-child(even) { background: #f8fafc; }
-                .signatures { display: flex; justify-content: space-between; margin-top: 45px; font-weight: bold; }
-            </style></head><body>
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>${(options === null || options === void 0 ? void 0 : options.sourceTitle) || 'تقرير حركة الخزينة وتصفيات العهد'} - ${targetDate}</title>
+                <style>
+                    body { font-family: 'Tajawal', sans-serif; padding: 25px; color: #1e293b; font-size: 11pt; }
+                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
+                    .header h2 { margin: 0; font-size: 16pt; color: #0f172a; }
+                    .sub-info { font-size: 10.5pt; color: #334155; font-weight: 600; margin-top: 2px; }
+                    .addr-info { font-size: 9.5pt; color: #0369a1; font-weight: 600; margin-top: 3px; }
+                    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+                    .kpi-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; text-align: center; background: #f8fafc; }
+                    .kpi-val { font-size: 13pt; font-weight: bold; margin-top: 4px; font-family: monospace; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9.5pt; }
+                    th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: right; }
+                    th { background: #0f172a; color: #fff; text-align: center; }
+                    tr:nth-child(even) { background: #f8fafc; }
+                    .filter-banner { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; font-size: 10pt; margin-bottom: 15px; font-weight: 600; display: flex; justify-content: space-between; }
+                    .signatures { display: flex; justify-content: space-between; margin-top: 45px; font-weight: bold; font-size: 10pt; }
+                    @media print {
+                        body { padding: 10px; }
+                    }
+                </style>
+            </head>
+            <body>
                 <div class="header">
                     <div>
-                        <h2 style="margin:0;">${companyName}</h2>
-                        <h4 style="margin:5px 0 0 0; color:#475569;">تقرير حركة الخزينة وتصفيات العهد اليومية</h4>
-                        <div style="font-size:10pt; margin-top:4px;">تاريخ التقرير: <b>${targetDate}</b></div>
+                        <h2>${companyName}</h2>
+                        <div class="sub-info">${companySubtitle}</div>
+                        <div class="addr-info">📍 ${companyAddress}</div>
+                        <h3 style="margin: 8px 0 0 0; color:#0f172a; font-size: 13pt;">${(options === null || options === void 0 ? void 0 : options.sourceTitle) || 'تقرير حركة الخزينة وتصفيات العهد اليومية'}</h3>
+                        <div style="font-size:9.5pt; margin-top:3px; color:#475569;">تاريخ الحركة: <b>${targetDate === 'all' ? 'جميع الفترات' : targetDate}</b></div>
                     </div>
                     <div>${logoHTML}</div>
                 </div>
 
-                <div class="kpi-grid">
-                    <div class="kpi-box"><div>إجمالي الإيرادات</div><div class="kpi-val" style="color:#059669;">${totals.totalRevenues.toLocaleString()} ج.م</div></div>
-                    <div class="kpi-box"><div>تحصيلات الزينات</div><div class="kpi-val" style="color:#2563eb;">${totals.totalZinat.toLocaleString()} ج.م</div></div>
-                    <div class="kpi-box"><div>تحصيلات الضبطية</div><div class="kpi-val" style="color:#7c3aed;">${totals.totalJudicial.toLocaleString()} ج.م</div></div>
-                    <div class="kpi-box"><div>المتبقي غير المصفى</div><div class="kpi-val" style="color:#dc2626;">${totals.pendingUnsettledTotal.toLocaleString()} ج.م</div></div>
+                <div class="filter-banner">
+                    <span>حالة التصفية المطبوعة: <b style="color:#0284c7;">${filterLabel}</b></span>
+                    <span>عدد المحصلين بالتقرير: <b>${usersToPrint.length}</b></span>
                 </div>
 
-                <h3>موقف عهد وتصفيات المحصلين:</h3>
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div>إجمالي المحصل المطلوب</div><div class="kpi-val" style="color:#0284c7;">${printedTotalCollected.toLocaleString()} ج.م</div></div>
+                    <div class="kpi-box"><div>المورد فعلياً للخزينة</div><div class="kpi-val" style="color:#059669;">${printedTotalSettled.toLocaleString()} ج.م</div></div>
+                    <div class="kpi-box"><div>المتبقي غير المصفى بالعهدة</div><div class="kpi-val" style="color:#dc2626;">${printedRemaining.toLocaleString()} ج.م</div></div>
+                    <div class="kpi-box"><div>وارد الخزينة الكلي لليوم</div><div class="kpi-val" style="color:#10b981;">${totals.totalRevenues.toLocaleString()} ج.م</div></div>
+                </div>
+
+                <h4 style="margin: 10px 0 6px 0;">بيان تفصيلي بعهد وتصفيات المحصلين المحددين:</h4>
                 <table>
                     <thead>
                         <tr>
-                            <th>المحصل</th>
+                            <th style="width: 35px;">م</th>
+                            <th>المحصل / المستخدم</th>
                             <th>الدور</th>
                             <th>الزينات</th>
                             <th>الضبطية</th>
@@ -4093,7 +4307,6 @@ const handlePrintDailyTreasuryReport = (dateStr) => {
                             <th>المورد للخزينة</th>
                             <th>المتبقي بالعهدة</th>
                             <th>حالة التصفية</th>
-                            <th>حالة الحساب</th>
                         </tr>
                     </thead>
                     <tbody>${rowsHtml}</tbody>
@@ -4104,7 +4317,176 @@ const handlePrintDailyTreasuryReport = (dateStr) => {
                     <div>مراجع الحسابات:<br><br>.....................................</div>
                     <div>اعتماد الإدارة المالية:<br><br>.....................................</div>
                 </div>
-            </body></html>
+            </body>
+            </html>
+        `);
+    printWindow.document.close();
+    setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+    }, 500);
+};
+const handlePrintTreasuryLog = () => {
+    const searchInput = document.getElementById('treasury-log-search');
+    const typeSelect = document.getElementById('treasury-log-type-filter');
+    const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const typeFilter = typeSelect ? typeSelect.value : 'all';
+    let list = [];
+    (state.zinatCollection || []).forEach((z) => {
+        if (activeTreasuryDateFilter !== 'all') {
+            const zDate = normalizeDateStr(z.createdDate || z.receiptDate || z.date);
+            if (zDate !== activeTreasuryDateFilter)
+                return;
+        }
+        list.push({
+            type: 'zinat',
+            typeName: 'تحصيل زينات وتوصيل',
+            amount: Number(z.collectedAmount || z.amount || 0),
+            date: z.createdDate || z.receiptDate || z.date || activeTreasuryDateFilter,
+            collector: z.collectorName || z.createdBy || z.technician || 'مجهول',
+            receiptNumber: z.receiptNumber || ('Z-' + (z.id || '')),
+            notes: z.notes || z.subscriberName || '-'
+        });
+    });
+    (state.judicialControl || []).forEach((j) => {
+        if (activeTreasuryDateFilter !== 'all') {
+            const jDate = normalizeDateStr(j.settlementDate || j.paidDate || j.date);
+            if (jDate !== activeTreasuryDateFilter)
+                return;
+        }
+        const amt = Number(j.paidAmount || j.fineAmount || 0);
+        if (amt > 0) {
+            list.push({
+                type: 'judicial',
+                typeName: 'تحصيل ضبطية قضائية',
+                amount: amt,
+                date: j.settlementDate || j.paidDate || j.date || activeTreasuryDateFilter,
+                collector: j.settledBy || j.officerName || j.recordedBy || 'مجهول',
+                receiptNumber: j.receiptNumber || ('JC-' + (j.id || '')),
+                notes: j.subscriberName || j.memoNumber || '-'
+            });
+        }
+    });
+    (state.treasuryTransactions || []).forEach((t) => {
+        if (activeTreasuryDateFilter !== 'all') {
+            const tDate = normalizeDateStr(t.date);
+            if (tDate !== activeTreasuryDateFilter)
+                return;
+        }
+        list.push({
+            type: t.type || 'deposit',
+            typeName: t.typeName || 'إيداع نقدي مباشر',
+            amount: Number(t.amount || 0),
+            date: t.date,
+            collector: t.depositorName || t.collectorName || '-',
+            receiptNumber: t.receiptNumber || ('TR-' + (t.id || '')),
+            notes: t.notes || '-'
+        });
+    });
+    (state.treasurySettlements || []).forEach((s) => {
+        if (activeTreasuryDateFilter !== 'all') {
+            const sDate = normalizeDateStr(s.settlementDate);
+            if (sDate !== activeTreasuryDateFilter)
+                return;
+        }
+        list.push({
+            type: 'settlement',
+            typeName: 'تصفية عهدة محصل',
+            amount: Number(s.totalAmount || 0),
+            date: s.settlementDate,
+            collector: s.collectorName || s.collectorUsername || '-',
+            receiptNumber: s.receiptNumber || ('SET-' + (s.id || '')),
+            notes: s.notes || '-'
+        });
+    });
+    let filtered = list.filter(item => {
+        if (typeFilter !== 'all' && item.type !== typeFilter)
+            return false;
+        if (searchQuery) {
+            const matchCol = (item.collector || '').toLowerCase().includes(searchQuery);
+            const matchRcpt = (item.receiptNumber || '').toLowerCase().includes(searchQuery);
+            const matchNotes = (item.notes || '').toLowerCase().includes(searchQuery);
+            if (!matchCol && !matchRcpt && !matchNotes)
+                return false;
+        }
+        return true;
+    });
+    const printWindow = window.open('', '_blank');
+    if (!printWindow)
+        return;
+    const companyName = state.settings.companyName || 'ELMAGHRABI';
+    const companySubtitle = state.settings.replacementReportCompanyName || 'شركة مصر الوسطى لتوزيع الكهرباء';
+    const companyAddress = state.settings.companyAddress || (state.settings.addresses && state.settings.addresses[0]) || 'قطاع شمال المنيا - هندسة كهرباء بني مزار';
+    const logoSrc = state.settings.companyLogo;
+    const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 70px; max-width: 85px; object-fit: contain;">` : '';
+    const totalSum = filtered.reduce((acc, it) => acc + it.amount, 0);
+    const rowsHtml = filtered.length === 0
+        ? '<tr><td colspan="7" style="text-align:center; padding:20px; color:#94a3b8;">لا توجد معاملات مطابقة لمعايير البحث.</td></tr>'
+        : filtered.map((it, idx) => `
+                <tr>
+                    <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+                    <td>${it.date}</td>
+                    <td><span style="font-weight:600;">${it.typeName}</span></td>
+                    <td><b>${it.collector}</b></td>
+                    <td style="font-family:monospace; font-weight:bold; color:#15803d;">${it.amount.toLocaleString()} ج.م</td>
+                    <td style="font-family:monospace; font-weight:600; color:#0369a1;">${it.receiptNumber}</td>
+                    <td>${it.notes}</td>
+                </tr>
+            `).join('');
+    printWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>سجل معاملات وحركات الخزينة</title>
+                <style>
+                    body { font-family: 'Tajawal', sans-serif; padding: 25px; color: #1e293b; font-size: 11pt; }
+                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
+                    .header h2 { margin: 0; font-size: 16pt; color: #0f172a; }
+                    .sub-info { font-size: 10.5pt; color: #334155; font-weight: 600; margin-top: 2px; }
+                    .addr-info { font-size: 9.5pt; color: #0369a1; font-weight: 600; margin-top: 3px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 9.5pt; }
+                    th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: right; }
+                    th { background: #0f172a; color: #fff; text-align: center; }
+                    tr:nth-child(even) { background: #f8fafc; }
+                    .signatures { display: flex; justify-content: space-between; margin-top: 45px; font-weight: bold; font-size: 10pt; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div>
+                        <h2>${companyName}</h2>
+                        <div class="sub-info">${companySubtitle}</div>
+                        <div class="addr-info">📍 ${companyAddress}</div>
+                        <h3 style="margin: 8px 0 0 0; color:#0f172a;">سجل توريدات وحركات الخزينة الرسمية</h3>
+                        <div style="font-size:9.5pt; margin-top:3px; color:#475569;">الفترة: <b>${activeTreasuryDateFilter === 'all' ? 'جميع الفترات' : activeTreasuryDateFilter}</b> | إجمالي المبالغ: <b style="color:#15803d;">${totalSum.toLocaleString()} ج.م</b> (عدد: ${filtered.length})</div>
+                    </div>
+                    <div>${logoHTML}</div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:35px;">م</th>
+                            <th>التاريخ</th>
+                            <th>نوع الحركة</th>
+                            <th>المورّد / القائم بالسداد</th>
+                            <th>المبلغ</th>
+                            <th>رقم الإيصال</th>
+                            <th>ملاحظات وبيان</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+
+                <div class="signatures">
+                    <div>إعداد مسؤول الخزينة:<br><br>.....................................</div>
+                    <div>مراجع الإيرادات:<br><br>.....................................</div>
+                    <div>اعتماد الإدارة المالية:<br><br>.....................................</div>
+                </div>
+            </body>
+            </html>
         `);
     printWindow.document.close();
     setTimeout(() => {
@@ -5359,7 +5741,7 @@ const handlePrintMukayasaDetails = () => {
 
             <div class="info-section">
                 <div class="info-row">
-                    <div style="width: 60%;">هندسة كهرباء : بني مزار شرق</div>
+                    <div style="width: 60%;">هندسة كهرباء : ${state.settings.companyAddress || (state.settings.addresses && state.settings.addresses[0]) || "بني مزار شرق"}</div>
                     <div style="width: 40%;">تاريخ المعاينة :</div>
                 </div>
                 
@@ -18364,13 +18746,26 @@ const setupEventListeners = () => {
         }
     });
     (_d = document.getElementById('treasury-print-daily-btn')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
-        handlePrintDailyTreasuryReport();
+        handlePrintDailyTreasuryReport({
+            dateStr: activeTreasuryDateFilter,
+            filterStatus: 'all',
+            sourceTitle: 'تقرير حركة الخزينة وتصفيات اليومية'
+        });
     });
     (_e = document.getElementById('treasury-print-settlements-btn')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => {
-        handlePrintDailyTreasuryReport();
+        var _a, _b, _c;
+        const stFilter = ((_a = document.getElementById('settlement-filter-status')) === null || _a === void 0 ? void 0 : _a.value) || 'unsettled';
+        const dFilter = ((_b = document.getElementById('settlement-filter-date')) === null || _b === void 0 ? void 0 : _b.value) || activeTreasuryDateFilter;
+        const sQuery = ((_c = document.getElementById('settlement-search-user')) === null || _c === void 0 ? void 0 : _c.value) || '';
+        handlePrintDailyTreasuryReport({
+            dateStr: dFilter,
+            filterStatus: stFilter,
+            searchQuery: sQuery,
+            sourceTitle: 'تقرير تصفيات وعهد المحصلين'
+        });
     });
     (_f = document.getElementById('treasury-print-log-btn')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
-        handlePrintDailyTreasuryReport();
+        handlePrintTreasuryLog();
     });
     (_g = document.getElementById('btn-treasury-today')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
         activeTreasuryDateFilter = new Date().toISOString().slice(0, 10);
