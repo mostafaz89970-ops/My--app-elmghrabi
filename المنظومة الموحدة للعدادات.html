@@ -832,6 +832,10 @@
           <div class="input-group">
             <label for="username">اسم المستخدم</label>
             <select id="username" name="username" required="" autocomplete="off"><option value="" disabled selected>اختر اسم المستخدم...</option></select>
+            <div id="login-user-affiliation" style="display: none; font-size: 0.85rem; color: #60a5fa; margin-top: 6px; font-weight: bold; background: rgba(30, 58, 138, 0.4); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(96, 165, 250, 0.3);">
+              <span style="margin-left: 4px;">🏢</span>
+              <span id="login-user-affiliation-text"></span>
+            </div>
           </div>
           <div class="input-group">
             <label for="password">كلمة المرور</label>
@@ -1075,6 +1079,26 @@
             <h3 id="header-company-name">ELMAGHRABI</h3>
         </div>
         <div class="header-actions" style="margin-right: auto; padding-left: 1rem; display: flex; align-items: center; gap: 10px;">
+            <!-- أداة تبديل نطاق الفروع والقطاعات للأدمن والمديرين -->
+            <div id="admin-scope-container" style="display: none; align-items: center; gap: 6px; background: rgba(241, 245, 249, 0.95); padding: 4px 10px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <span style="font-size: 0.82rem; font-weight: bold; color: #1e293b; display: flex; align-items: center; gap: 4px;">
+                    <span>🏢</span>
+                    <span>النطاق:</span>
+                </span>
+                <select id="scope-sector-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
+                    <option value="all">🌐 جميع القطاعات</option>
+                </select>
+                <select id="scope-branch-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
+                    <option value="all">🏛️ جميع الفروع / الهندسات</option>
+                </select>
+            </div>
+
+            <!-- شارة نطاق عمل المستخدم العادي -->
+            <div id="user-branch-badge" style="display: none; align-items: center; gap: 6px; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: bold;">
+                <span>🏢</span>
+                <span id="user-branch-text">قطاع شمال المنيا - هندسة بني مزار</span>
+            </div>
+
             <div id="cloud-sync-badge" class="cloud-sync-badge" style="display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; cursor: pointer; transition: all 0.3s ease;" title="المزامنة السحابية الفورية المباشرة">
                 <span id="cloud-sync-icon" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e;"></span>
                 <span id="cloud-sync-text">مزامنة سحابية لحظية</span>
@@ -3480,6 +3504,18 @@
                     <div class="input-group">
                         <label for="user-role">الصلاحية</label>
                         <select id="user-role" required></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="user-sector">القطاع التابع له</label>
+                        <select id="user-sector">
+                            <option value="all">🌐 جميع القطاعات (شامل)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="user-branch">الفرع / الهندسة</label>
+                        <select id="user-branch">
+                            <option value="all">🏛️ جميع الفروع / الهندسات (شامل)</option>
+                        </select>
                     </div>
                     <div class="input-group">
                         <label for="user-password">كلمة المرور (اتركه فارغاً للتجاهل عند التعديل)</label>

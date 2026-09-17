@@ -42,6 +42,24 @@ let state = {
         maintenanceMode: false,
         maintenanceMessage: 'يجري حالياً إجراء صيانة دورية وتحديثات هامة على المنظومة بواسطة المطور. تم إيقاف الدخول مؤقتاً لجميع المستخدمين لضمان دقة البيانات وسلامتها.',
         companyAddress: 'قطاع شمال المنيا - هندسة كهرباء بني مزار',
+        sectors: [
+            'قطاع شمال المنيا',
+            'قطاع جنوب المنيا',
+            'قطاع بني سويف',
+            'قطاع أسيوط'
+        ],
+        branches: [
+            'هندسة كهرباء بني مزار',
+            'فرع بني مزار شرق',
+            'فرع بني مزار غرب',
+            'هندسة كهرباء مغاغة',
+            'هندسة كهرباء العدوة',
+            'هندسة كهرباء مطاي',
+            'هندسة كهرباء سمالوط',
+            'هندسة كهرباء المنيا',
+            'هندسة كهرباء ملوي',
+            'هندسة كهرباء أبو قرقاص'
+        ],
         footerText: 'منظومة العدادات 2025 - جميع الحقوق محفوظة ELMGHRABI © 2026',
         technicians: ['محمد علي', 'أحمد السيد', 'خالد محمود'],
         technicalEngineers: [],
@@ -265,6 +283,210 @@ let state = {
             { key: 'user', name: 'مستخدم' }
         ]
     },
+};
+// =========================================================================
+// منظومة الفروع والقطاعات وعزل البيانات (Multi-Tenant Branch Isolation)
+// =========================================================================
+let currentAdminScopeSector = 'all';
+let currentAdminScopeBranch = 'all';
+const ensureDefaultScope = (stateObj) => {
+    if (!stateObj)
+        return;
+    if (!stateObj.settings)
+        stateObj.settings = {};
+    if (!stateObj.settings.sectors || !Array.isArray(stateObj.settings.sectors) || stateObj.settings.sectors.length === 0) {
+        stateObj.settings.sectors = [
+            'قطاع شمال المنيا',
+            'قطاع جنوب المنيا',
+            'قطاع بني سويف',
+            'قطاع أسيوط'
+        ];
+    }
+    if (!stateObj.settings.branches || !Array.isArray(stateObj.settings.branches) || stateObj.settings.branches.length === 0) {
+        stateObj.settings.branches = [
+            'هندسة كهرباء بني مزار',
+            'فرع بني مزار شرق',
+            'فرع بني مزار غرب',
+            'هندسة كهرباء مغاغة',
+            'هندسة كهرباء العدوة',
+            'هندسة كهرباء مطاي',
+            'هندسة كهرباء سمالوط',
+            'هندسة كهرباء المنيا',
+            'هندسة كهرباء ملوي',
+            'هندسة كهرباء أبو قرقاص'
+        ];
+    }
+    if (stateObj.users && Array.isArray(stateObj.users)) {
+        stateObj.users.forEach((u) => {
+            if (!u.sector) {
+                u.sector = (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') ? 'all' : 'قطاع شمال المنيا';
+            }
+            if (!u.branch) {
+                u.branch = (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') ? 'all' : 'هندسة كهرباء بني مزار';
+            }
+        });
+    }
+    if (stateObj.meters && Array.isArray(stateObj.meters)) {
+        stateObj.meters.forEach((m) => {
+            if (!m.sector)
+                m.sector = 'قطاع شمال المنيا';
+            if (!m.branch)
+                m.branch = 'هندسة كهرباء بني مزار';
+        });
+    }
+    ['mukayasat', 'judicialControl', 'lostMeterMemos', 'transformers', 'treasuryTransactions', 'treasurySettlements'].forEach(coll => {
+        if (stateObj[coll] && Array.isArray(stateObj[coll])) {
+            stateObj[coll].forEach((item) => {
+                if (!item.sector)
+                    item.sector = 'قطاع شمال المنيا';
+                if (!item.branch)
+                    item.branch = 'هندسة كهرباء بني مزار';
+            });
+        }
+    });
+};
+const getCurrentDataScope = () => {
+    if (!loggedInUser)
+        return { sector: 'all', branch: 'all', isGlobal: true };
+    const isAdmin = loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'supervisor';
+    if (isAdmin) {
+        return {
+            sector: currentAdminScopeSector,
+            branch: currentAdminScopeBranch,
+            isGlobal: currentAdminScopeSector === 'all' && currentAdminScopeBranch === 'all'
+        };
+    }
+    const userSector = loggedInUser.sector || 'قطاع شمال المنيا';
+    const userBranch = loggedInUser.branch || 'هندسة كهرباء بني مزار';
+    return {
+        sector: userSector,
+        branch: userBranch,
+        isGlobal: userSector === 'all' && userBranch === 'all'
+    };
+};
+const matchesCurrentScope = (item) => {
+    if (!item)
+        return false;
+    const scope = getCurrentDataScope();
+    if (scope.isGlobal)
+        return true;
+    const itemSector = item.sector || 'قطاع شمال المنيا';
+    const itemBranch = item.branch || 'هندسة كهرباء بني مزار';
+    if (scope.sector !== 'all' && itemSector !== scope.sector) {
+        return false;
+    }
+    if (scope.branch !== 'all' && itemBranch !== scope.branch) {
+        return false;
+    }
+    return true;
+};
+const stampItemWithScope = (item) => {
+    if (!item)
+        return item;
+    const scope = getCurrentDataScope();
+    if (!item.sector) {
+        item.sector = (!scope.isGlobal && scope.sector !== 'all')
+            ? scope.sector
+            : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector) && loggedInUser.sector !== 'all' ? loggedInUser.sector : (currentAdminScopeSector !== 'all' ? currentAdminScopeSector : 'قطاع شمال المنيا'));
+    }
+    if (!item.branch) {
+        item.branch = (!scope.isGlobal && scope.branch !== 'all')
+            ? scope.branch
+            : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) && loggedInUser.branch !== 'all' ? loggedInUser.branch : (currentAdminScopeBranch !== 'all' ? currentAdminScopeBranch : 'هندسة كهرباء بني مزار'));
+    }
+    return item;
+};
+const updateAdminScopeUI = () => {
+    const isAdmin = loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'supervisor');
+    const container = document.getElementById('admin-scope-container');
+    const badge = document.getElementById('user-branch-badge');
+    const badgeText = document.getElementById('user-branch-text');
+    if (isAdmin) {
+        if (container)
+            container.style.display = 'flex';
+        if (badge)
+            badge.style.display = 'none';
+        const secSelect = document.getElementById('scope-sector-select');
+        const brSelect = document.getElementById('scope-branch-select');
+        if (secSelect) {
+            secSelect.innerHTML = '<option value="all">🌐 جميع القطاعات</option>' +
+                (state.settings.sectors || []).map((s) => `<option value="${s}" ${currentAdminScopeSector === s ? 'selected' : ''}>${s}</option>`).join('');
+            secSelect.value = currentAdminScopeSector;
+        }
+        if (brSelect) {
+            brSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات</option>' +
+                (state.settings.branches || []).map((b) => `<option value="${b}" ${currentAdminScopeBranch === b ? 'selected' : ''}>${b}</option>`).join('');
+            brSelect.value = currentAdminScopeBranch;
+        }
+    }
+    else {
+        if (container)
+            container.style.display = 'none';
+        if (badge) {
+            badge.style.display = 'flex';
+            if (badgeText) {
+                const sec = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector) || 'قطاع شمال المنيا';
+                const br = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) || 'هندسة كهرباء بني مزار';
+                badgeText.textContent = `${sec} - ${br}`;
+            }
+        }
+    }
+};
+const refreshCurrentActiveSection = () => {
+    const activeSection = document.querySelector('.content-section.active');
+    if (!activeSection)
+        return;
+    const sectionId = activeSection.id;
+    if (sectionId === 'dashboard') {
+        renderDashboard();
+    }
+    else if (sectionId === 'subscribers-all') {
+        renderFilteredMeterTable('subscribers-all-table', ['جديد', 'مرفوع أعطال', 'مرفوع إحلال', 'استغناء', 'تغير عقد اشتراك', 'استبدال', 'هدم', 'تم الإصلاح', 'لا يمكن إصلاحه', 'تم استبداله'], columnConfigs['subscribers-all']);
+    }
+    else if (sectionId === 'subscribers-new') {
+        renderFilteredMeterTable('subscribers-new-table', ['جديد'], columnConfigs['subscribers-new']);
+    }
+    else if (sectionId === 'subscribers-faults') {
+        renderFilteredMeterTable('subscribers-faults-table', ['مرفوع أعطال'], columnConfigs['subscribers-faults']);
+    }
+    else if (sectionId === 'subscribers-replacement') {
+        renderFilteredMeterTable('subscribers-replacement-table', ['مرفوع إحلال'], columnConfigs['subscribers-replacement']);
+    }
+    else if (sectionId === 'subscribers-substituted') {
+        renderFilteredMeterTable('subscribers-substituted-table', ['استبدال'], columnConfigs['subscribers-substituted']);
+    }
+    else if (sectionId === 'subscribers-scrapped') {
+        renderFilteredMeterTable('subscribers-scrapped-table', ['استغناء'], columnConfigs['subscribers-scrapped']);
+    }
+    else if (sectionId === 'subscribers-demolition') {
+        renderFilteredMeterTable('subscribers-demolition-table', ['هدم'], columnConfigs['subscribers-demolition']);
+    }
+    else if (sectionId === 'mukayasat-list') {
+        renderMukayasatList();
+    }
+    else if (sectionId === 'judicial-control-list') {
+        renderJudicialControlSection();
+    }
+    else if (sectionId === 'lost-memos-search') {
+        renderLostMemosSection();
+    }
+    else if (sectionId === 'treasury-management' || sectionId === 'treasury-dashboard') {
+        renderTreasuryDashboard();
+        renderTreasuryUserSettlements();
+        renderTreasuryTransactionsLog();
+    }
+    else if (sectionId === 'collection-zinat') {
+        renderZinatCollectionSection();
+    }
+    else if (sectionId === 'collection-judicial') {
+        renderJudicialCollectionSection();
+    }
+    else if (sectionId === 'transformer-list') {
+        renderTransformerListSection();
+    }
+    else if (sectionId === 'transformer-load-records') {
+        renderTransformerLoadRecordsSection();
+    }
 };
 let loggedInUser = null;
 let currentForm = null; // This variable is declared but never used. Consider removing it.
@@ -762,6 +984,30 @@ const populateUserDropdown = () => {
     const passwordInput = document.getElementById('password');
     if (passwordInput)
         passwordInput.value = '';
+    const affBox = document.getElementById('login-user-affiliation');
+    if (affBox)
+        affBox.style.display = 'none';
+    usernameSelect.onchange = () => {
+        const val = usernameSelect.value;
+        const u = state.users.find(usr => usr.username === val);
+        const affBoxEl = document.getElementById('login-user-affiliation');
+        const affTextEl = document.getElementById('login-user-affiliation-text');
+        if (u && affBoxEl && affTextEl) {
+            if (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor' || u.sector === 'all') {
+                affTextEl.textContent = 'إدارة عامة وشاملة (جميع القطاعات والفروع)';
+                affBoxEl.style.display = 'block';
+            }
+            else {
+                const sec = u.sector || 'قطاع شمال المنيا';
+                const br = u.branch || 'هندسة كهرباء بني مزار';
+                affTextEl.textContent = `${sec} - ${br}`;
+                affBoxEl.style.display = 'block';
+            }
+        }
+        else if (affBoxEl) {
+            affBoxEl.style.display = 'none';
+        }
+    };
 };
 /**
  * Applies the logo size from settings to the UI via a CSS custom property.
@@ -776,6 +1022,7 @@ const applyLogoSize = (size) => {
  */
 const updateUI = () => {
     if (loggedInUser) {
+        updateAdminScopeUI();
         // App container elements
         document.getElementById('sidebar-user-name').textContent = loggedInUser.fullName;
         document.getElementById('sidebar-user-role').textContent = loggedInUser.role === 'admin' ? 'Admin' : 'User';
@@ -1202,8 +1449,17 @@ const handleLogin = async (event) => {
         }
         showAppLoading('جارٍ تسجيل الدخول والتحقق من الصلاحيات...', 'المنظومة الموحدة للعدادات - مزامنة سحابية ⚡', '🔐');
         await new Promise(r => setTimeout(r, 650));
-        loggedInUser = { fullName: user.fullName, role: user.role, username: user.username };
+        loggedInUser = {
+            fullName: user.fullName,
+            role: user.role,
+            username: user.username,
+            sector: user.sector || 'all',
+            branch: user.branch || 'all'
+        };
         localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
+        currentAdminScopeSector = 'all';
+        currentAdminScopeBranch = 'all';
+        updateAdminScopeUI();
         errorElement === null || errorElement === void 0 ? void 0 : errorElement.classList.add('hidden');
         document.getElementById('password').value = '';
         updateUI();
@@ -1253,25 +1509,31 @@ const renderDashboard = () => {
     if (!grid)
         return;
     grid.innerHTML = ''; // Clear existing cards
+    const scopedMeters = (state.meters || []).filter(matchesCurrentScope);
+    const scopedLostMemos = (state.lostMeterMemos || []).filter(matchesCurrentScope);
+    const scopedJudicial = (state.judicialControl || []).filter(matchesCurrentScope);
+    const scopedMukayasat = (state.mukayasat || []).filter(matchesCurrentScope);
+    const scopedTransformers = (state.transformers || []).filter(matchesCurrentScope);
+    const scopedZinat = (state.zinatCollection || []).filter(matchesCurrentScope);
     let cardData = [
-        { key: 'all-subscribers-card', id: 'subscribers-all', title: 'جميع المشتركين', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', count: state.meters.length, color: 'bg-primary' },
+        { key: 'all-subscribers-card', id: 'subscribers-all', title: 'جميع المشتركين', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', count: scopedMeters.length, color: 'bg-primary' },
         { key: 'new-meters-card', id: 'subscribers-new', filter: 'جديد', title: 'عدادات جديدة', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>' },
         { key: 'lifted-meters-card', id: 'subscribers-faults', filter: 'مرفوع أعطال', title: 'عدادات مرفوعة اعطال', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>' },
         { key: 'replacement-card', id: 'subscribers-replacement', filter: 'مرفوع إحلال', title: 'إحلال وتجديد', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>' },
-        { key: 'repairs-card', id: 'repaired-meters', title: 'الإصلاحات', icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>', count: state.meters.filter(m => m.repairStatus).length, color: 'bg-success' },
-        { key: 'lost-memos-card', id: 'lost-memos-search', title: 'المذكــــرات', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>', count: state.lostMeterMemos.length, color: 'bg-secondary' },
+        { key: 'repairs-card', id: 'repaired-meters', title: 'الإصلاحات', icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>', count: scopedMeters.filter(m => m.repairStatus).length, color: 'bg-success' },
+        { key: 'lost-memos-card', id: 'lost-memos-search', title: 'المذكــــرات', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>', count: scopedLostMemos.length, color: 'bg-secondary' },
         { key: 'scrapped-meters-card', id: 'subscribers-demolition', filter: 'هدم', title: 'عدادات هدم', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>', color: 'bg-error' },
-        { key: 'judicial-control-card', id: 'judicial-control-list', title: 'الضبطية القضائية', icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>', count: state.judicialControl.length, color: 'bg-warning' },
-        { key: 'mukayasat-card', id: 'mukayasat-list', title: 'المعاينات الفنية', icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/>', count: state.mukayasat.length, color: 'bg-info' },
+        { key: 'judicial-control-card', id: 'judicial-control-list', title: 'الضبطية القضائية', icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>', count: scopedJudicial.length, color: 'bg-warning' },
+        { key: 'mukayasat-card', id: 'mukayasat-list', title: 'المعاينات الفنية', icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/>', count: scopedMukayasat.length, color: 'bg-info' },
         {
-            key: 'transformers-card', id: 'transformer-list', title: 'إدارة المحولات', icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/><polyline points="7 12 12 7 17 12"></polyline><line x1="12" y1="22" x2="12" y2="7"></line>', count: state.transformers.length, color: 'bg-primary'
+            key: 'transformers-card', id: 'transformer-list', title: 'إدارة المحولات', icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/><polyline points="7 12 12 7 17 12"></polyline><line x1="12" y1="22" x2="12" y2="7"></line>', count: scopedTransformers.length, color: 'bg-primary'
         },
         {
             key: 'judicial-collection-card',
             id: 'collection-judicial',
             title: 'تحصيل الضبطية',
             icon: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-            count: state.judicialControl.filter(item => {
+            count: scopedJudicial.filter(item => {
                 const total = Number(item.reconciliationAmount || 0);
                 if (total === 0)
                     return false;
@@ -1285,7 +1547,7 @@ const renderDashboard = () => {
             id: 'collection-zinat',
             title: 'تحصيل زينات',
             icon: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-            count: state.zinatCollection.filter(item => {
+            count: scopedZinat.filter(item => {
                 const total = Number(item.amount || 0);
                 if (total === 0)
                     return false;
@@ -1322,7 +1584,7 @@ const renderDashboard = () => {
     if (loggedInUser && loggedInUser.role === 'معاينات') {
         cardData = [
             { key: 'mukaysa-add-card', id: 'mukayasat-registration', title: 'ادخال مقايسة', icon: '<path d="M12 5v14M5 12h14"/>' },
-            { key: 'mukayasat-list-card', id: 'mukayasat-list', title: 'المقايسات المحفوظة', icon: '<path d="M3 6h18M3 12h18M3 18h18"/>', count: state.mukayasat.length },
+            { key: 'mukayasat-list-card', id: 'mukayasat-list', title: 'المقايسات المحفوظة', icon: '<path d="M3 6h18M3 12h18M3 18h18"/>', count: scopedMukayasat.length },
         ];
     }
     const visibleCards = cardData.filter(card => {
@@ -1352,7 +1614,7 @@ const renderDashboard = () => {
         }
         else if (data.filter) {
             const filters = Array.isArray(data.filter) ? data.filter : [data.filter];
-            count = state.meters.filter(m => filters.includes(m.subscriberType)).length;
+            count = scopedMeters.filter(m => filters.includes(m.subscriberType)).length;
         }
         const filterString = Array.isArray(data.filter) ? data.filter.join(',') : data.filter;
         const cardHTML = `
@@ -1660,8 +1922,8 @@ const renderFilteredMeterTable = (tableElementId, filters, columns, dataOverride
         return;
     // Render header
     thead.innerHTML = `<tr>${columns.map(c => `<th>${c.header}</th>`).join('')}</tr>`;
-    // Filter data
-    const filteredMeters = dataOverride || state.meters.filter(meter => filters.includes(meter.subscriberType));
+    // Filter data with Branch & Sector Scope Isolation
+    const filteredMeters = dataOverride || state.meters.filter(meter => filters.includes(meter.subscriberType) && matchesCurrentScope(meter));
     // Render body
     tbody.innerHTML = '';
     if (filteredMeters.length === 0) {
@@ -2148,6 +2410,7 @@ const handleMeterFormSubmit = async (event) => {
     if (formData.subscriberType === 'جديد') {
         formData.installationStatus = 'تركيب جديد';
     }
+    stampItemWithScope(formData);
     if (existingId) {
         // Update existing record
         const index = state.meters.findIndex(m => m.id === existingId);
@@ -2190,6 +2453,7 @@ const handleMeterFormSubmit = async (event) => {
             cardStatus: newMeterType === 'مسبق الدفع' ? 'صالح' : undefined,
         };
         // Add the new meter record to the state.
+        stampItemWithScope(newMeterData);
         state.meters.push(newMeterData);
         logActivity('إنشاء سجل إحلال تلقائي', `إنشاء سجل عداد جديد تلقائياً للمشترك "${formData.subscriberName}"`, `شاسية جديد: ${newChassisNumber}`);
         showToast('تم حفظ سجل الإحلال وإنشاء السجل الجديد تلقائياً.');
@@ -2254,6 +2518,8 @@ const applyAndRenderJudicialControlList = () => {
         printExpiredBtn.style.display = 'none';
     }
     const filteredData = state.judicialControl.filter(item => {
+        if (!matchesCurrentScope(item))
+            return false;
         const textMatch = !textFilter ||
             (item.subscriberName || '').toLowerCase().includes(textFilter) ||
             (item.nationalId || '').toLowerCase().includes(textFilter) ||
@@ -2598,6 +2864,7 @@ const handleJudicialControlFormSubmit = async (event) => {
         }
     }
     else { // Adding
+        stampItemWithScope(newRecord);
         state.judicialControl.push(newRecord);
         logActivity('إضافة محضر', `تم إضافة محضر جديد للمخالف: ${newRecord.subscriberName}`);
         if (await saveState()) {
@@ -2809,6 +3076,8 @@ const renderJudicialCollectionSection = () => {
     tableBody.innerHTML = '';
     // Filter items that are 'Under Investigation' or 'Reconciled'
     const collectionItems = state.judicialControl.filter(item => {
+        if (!matchesCurrentScope(item))
+            return false;
         const isRelevantStatus = item.status === 'قيد التحقيق' || item.status === 'تم التصالح';
         if (!isRelevantStatus)
             return false;
@@ -3285,7 +3554,7 @@ const renderZinatCollectionSection = () => {
     let selectedAddresses = [];
     if (addressMultiselect) {
         const currentSelection = Array.from(addressMultiselect.querySelectorAll('input:checked')).map((i) => i.value);
-        const uniqueAddresses = [...new Set(state.zinatCollection.map(i => i.address).filter(a => a))].sort();
+        const uniqueAddresses = [...new Set(state.zinatCollection.filter(matchesCurrentScope).map(i => i.address).filter(a => a))].sort();
         addressMultiselect.innerHTML = uniqueAddresses.map(addr => `
             <label><input type="checkbox" class="address-checkbox" value="${addr}" ${currentSelection.includes(addr) ? 'checked' : ''}><span>${addr}</span></label>
         `).join('');
@@ -3295,6 +3564,8 @@ const renderZinatCollectionSection = () => {
     }
     const isAdmin = hasPermission('manage_collection');
     const filteredData = state.zinatCollection.filter(item => {
+        if (!matchesCurrentScope(item))
+            return false;
         const matchName = !nameFilter || (item.requesterName || '').toLowerCase().includes(nameFilter);
         const matchMobile = !mobileFilter || (item.mobile || '').toLowerCase().includes(mobileFilter);
         const matchDate = !dateFilter || item.requestDate === dateFilter;
@@ -3408,6 +3679,7 @@ const handleZinatFormSubmit = async (event) => {
         notes: document.getElementById('zinat-notes').value,
         payments: []
     };
+    stampItemWithScope(newItem);
     state.zinatCollection.push(newItem);
     logActivity('إضافة طلب زينات', `إضافة طلب زينات للمواطن / المشترك: ${newItem.requesterName}`);
     if (await saveState()) {
@@ -3711,7 +3983,7 @@ const calculateUserCustodySummary = (targetUser, dateFilter) => {
     const targetDate = (dateFilter && dateFilter !== 'all') ? normalizeDateStr(dateFilter) : null;
     let zinatAmount = 0;
     let zinatCount = 0;
-    (state.zinatCollection || []).forEach((item) => {
+    (state.zinatCollection || []).filter(matchesCurrentScope).forEach((item) => {
         (item.payments || []).forEach((p) => {
             const matchesUser = p.collectedBy === fullName || p.collectedBy === username || p.collectorUsername === username;
             const matchesDate = !targetDate || normalizeDateStr(p.date) === targetDate;
@@ -3723,7 +3995,7 @@ const calculateUserCustodySummary = (targetUser, dateFilter) => {
     });
     let judicialAmount = 0;
     let judicialCount = 0;
-    (state.judicialControl || []).forEach((item) => {
+    (state.judicialControl || []).filter(matchesCurrentScope).forEach((item) => {
         (item.payments || []).forEach((p) => {
             const matchesUser = p.collectedBy === fullName || p.collectedBy === username || p.collectorUsername === username;
             const matchesDate = !targetDate || normalizeDateStr(p.date) === targetDate;
@@ -3734,7 +4006,7 @@ const calculateUserCustodySummary = (targetUser, dateFilter) => {
         });
     });
     let manualAmount = 0;
-    (state.treasuryTransactions || []).forEach((t) => {
+    (state.treasuryTransactions || []).filter(matchesCurrentScope).forEach((t) => {
         const matchesUser = t.collectorUsername === username || t.collectorName === fullName;
         const matchesDate = !targetDate || normalizeDateStr(t.date) === targetDate;
         if (matchesUser && matchesDate && t.type === 'manual_deposit') {
@@ -3743,7 +4015,7 @@ const calculateUserCustodySummary = (targetUser, dateFilter) => {
     });
     const totalCollected = Number((zinatAmount + judicialAmount + manualAmount).toFixed(2));
     let totalSettled = 0;
-    (state.treasurySettlements || []).forEach((s) => {
+    (state.treasurySettlements || []).filter(matchesCurrentScope).forEach((s) => {
         const matchesUser = s.collectorUsername === username || s.collectorName === fullName;
         const matchesDate = !targetDate || normalizeDateStr(s.settlementDate) === targetDate;
         if (matchesUser && matchesDate) {
@@ -3781,7 +4053,7 @@ const calculateTreasuryDailyTotals = (dateFilter) => {
     const targetDate = (dateFilter && dateFilter !== 'all') ? normalizeDateStr(dateFilter) : normalizeDateStr(new Date().toISOString().slice(0, 10));
     let totalZinat = 0;
     let zinatCount = 0;
-    (state.zinatCollection || []).forEach((item) => {
+    (state.zinatCollection || []).filter(matchesCurrentScope).forEach((item) => {
         (item.payments || []).forEach((p) => {
             if (!targetDate || normalizeDateStr(p.date) === targetDate) {
                 totalZinat += Number(p.amount) || 0;
@@ -3791,7 +4063,7 @@ const calculateTreasuryDailyTotals = (dateFilter) => {
     });
     let totalJudicial = 0;
     let judicialCount = 0;
-    (state.judicialControl || []).forEach((item) => {
+    (state.judicialControl || []).filter(matchesCurrentScope).forEach((item) => {
         (item.payments || []).forEach((p) => {
             if (!targetDate || normalizeDateStr(p.date) === targetDate) {
                 totalJudicial += Number(p.amount) || 0;
@@ -3800,14 +4072,14 @@ const calculateTreasuryDailyTotals = (dateFilter) => {
         });
     });
     let totalManual = 0;
-    (state.treasuryTransactions || []).forEach((t) => {
+    (state.treasuryTransactions || []).filter(matchesCurrentScope).forEach((t) => {
         if (!targetDate || normalizeDateStr(t.date) === targetDate) {
             if (t.type === 'manual_deposit')
                 totalManual += Number(t.amount) || 0;
         }
     });
     const totalRevenues = Number((totalZinat + totalJudicial + totalManual).toFixed(2));
-    const userSummaries = state.users.map(u => calculateUserCustodySummary(u, dateFilter || 'today'));
+    const userSummaries = state.users.filter(matchesCurrentScope).map(u => calculateUserCustodySummary(u, dateFilter || 'today'));
     const pendingUnsettledTotal = userSummaries.reduce((sum, u) => sum + u.remaining, 0);
     const unsettledUsersCount = userSummaries.filter(u => u.status === 'unsettled').length;
     return {
@@ -3912,7 +4184,7 @@ const renderTreasuryUserSettlements = () => {
     const dateFilter = dateInput ? dateInput.value : activeTreasuryDateFilter;
     const statusFilter = statusSelect ? statusSelect.value : 'all';
     const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : '';
-    const allSummaries = state.users.map(u => calculateUserCustodySummary(u, dateFilter));
+    const allSummaries = state.users.filter(matchesCurrentScope).map(u => calculateUserCustodySummary(u, dateFilter));
     let filtered = allSummaries.filter(u => {
         if (statusFilter === 'unsettled' && u.status !== 'unsettled')
             return false;
@@ -3986,7 +4258,7 @@ const renderTreasuryTransactionsLog = () => {
     // Combine all transactions into one master log
     const list = [];
     // 1. Zinat collections
-    (state.zinatCollection || []).forEach((item) => {
+    (state.zinatCollection || []).filter(matchesCurrentScope).forEach((item) => {
         (item.payments || []).forEach((p, pIdx) => {
             list.push({
                 id: `zinat-${item.id}-${pIdx}`,
@@ -4003,7 +4275,7 @@ const renderTreasuryTransactionsLog = () => {
         });
     });
     // 2. Judicial collections
-    (state.judicialControl || []).forEach((item) => {
+    (state.judicialControl || []).filter(matchesCurrentScope).forEach((item) => {
         (item.payments || []).forEach((p, pIdx) => {
             list.push({
                 id: `judicial-${item.id}-${pIdx}`,
@@ -4020,7 +4292,7 @@ const renderTreasuryTransactionsLog = () => {
         });
     });
     // 3. Treasury settlements
-    (state.treasurySettlements || []).forEach((s) => {
+    (state.treasurySettlements || []).filter(matchesCurrentScope).forEach((s) => {
         list.push({
             id: `settle-${s.id}`,
             type: 'settlement',
@@ -4035,7 +4307,7 @@ const renderTreasuryTransactionsLog = () => {
         });
     });
     // 4. Manual deposits
-    (state.treasuryTransactions || []).forEach((t) => {
+    (state.treasuryTransactions || []).filter(matchesCurrentScope).forEach((t) => {
         list.push({
             id: `trans-${t.id}`,
             type: t.type || 'manual_deposit',
@@ -4339,6 +4611,7 @@ const handleTreasurySettlementSubmit = async (event) => {
     };
     if (!state.treasurySettlements)
         state.treasurySettlements = [];
+    stampItemWithScope(newSettlement);
     state.treasurySettlements.push(newSettlement);
     if (autoUnsuspend && user.isSuspended) {
         user.isSuspended = false;
@@ -4382,6 +4655,7 @@ const handleTreasuryManualDepositSubmit = async (event) => {
     };
     if (!state.treasuryTransactions)
         state.treasuryTransactions = [];
+    stampItemWithScope(newTrans);
     state.treasuryTransactions.push(newTrans);
     logActivity('إيداع نقدي بالخزينة', `تم إيداع مبلغ ${amount} ج.م من ${depositorName} (إيصال: ${receiptNumber})`);
     await saveState();
@@ -5251,6 +5525,7 @@ const handleMukayasatFormSubmit = async (event) => {
     }
     else {
         // Add new entry
+        stampItemWithScope(entry);
         state.mukayasat.push(entry);
         logActivity('إضافة مقايسة', `تمت إضافة مقايسة رقم ${entry.requestNumber} باسم ${entry.requesterName}`);
         showToast('تم حفظ المقايسة بنجاح.');
@@ -5345,11 +5620,12 @@ const renderMukayasatList = () => {
     if (!tableBody)
         return;
     tableBody.innerHTML = '';
-    if (!state.mukayasat || state.mukayasat.length === 0) {
+    const mukayasatToRender = (state.mukayasat || []).filter(matchesCurrentScope);
+    if (mukayasatToRender.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center;">لا توجد مقاييس محفوظة.</td></tr>`;
         return;
     }
-    state.mukayasat.forEach(item => {
+    mukayasatToRender.forEach(item => {
         // منطق زر الإجراء المتعدد
         let multiActionBtn = '';
         if (item.status === 'قيد المعالجة') {
@@ -5717,11 +5993,12 @@ const renderLostMemosSection = () => {
         </tr>
     `;
     tableBody.innerHTML = '';
-    if (state.lostMeterMemos.length === 0) {
+    const filteredMemos = (state.lostMeterMemos || []).filter(matchesCurrentScope);
+    if (filteredMemos.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center;">لا توجد مذكرات فقد مسجلة.</td></tr>`;
         return;
     }
-    state.lostMeterMemos.forEach((memo, index) => {
+    filteredMemos.forEach((memo, index) => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${index + 1}</td>
@@ -5823,6 +6100,7 @@ const handleLostMemoFormSubmit = async (event) => {
         }
     }
     else {
+        stampItemWithScope(memoData);
         state.lostMeterMemos.push(memoData);
         logActivity('إضافة مذكرة فقد', `إضافة مذكرة للمشترك: ${memoData.subscriberName}`);
         if (await saveState()) {
@@ -6167,6 +6445,8 @@ const handleMukayasatSearch = (event) => {
         return;
     tableBody.innerHTML = '';
     const results = state.mukayasat.filter(i => {
+        if (!matchesCurrentScope(i))
+            return false;
         const matchName = !name || (i.requesterName || '').toLowerCase().includes(name);
         const matchReq = !requestNumber || (i.requestNumber || '').toLowerCase().includes(requestNumber);
         const matchAddr = !address || (i.address || '').toLowerCase().includes(address);
@@ -6308,7 +6588,8 @@ const renderTransformerListSection = () => {
     console.log('Rendering transformer list. Current state.transformers:', state.transformers); // Added log
     const nameFilter = ((_a = document.getElementById('filter-transformer-name')) === null || _a === void 0 ? void 0 : _a.value.toLowerCase()) || '';
     const chassisFilter = ((_b = document.getElementById('filter-transformer-chassis')) === null || _b === void 0 ? void 0 : _b.value.toLowerCase()) || '';
-    const filtered = state.transformers.filter(t => (!nameFilter || (t.transformerName || '').toLowerCase().includes(nameFilter)) &&
+    const filtered = (state.transformers || []).filter(t => matchesCurrentScope(t) &&
+        (!nameFilter || (t.transformerName || '').toLowerCase().includes(nameFilter)) &&
         (!chassisFilter || (t.smartMeterChassis || '').toLowerCase().includes(chassisFilter)));
     tbody.innerHTML = '';
     if (filtered.length === 0) {
@@ -6448,8 +6729,9 @@ const renderTransformerLoadRecordsSection = () => {
     const dateTo = document.getElementById('transformer-load-records-date-to');
     const selectedName = (nameFilter === null || nameFilter === void 0 ? void 0 : nameFilter.value) || '';
     const selectedCouncil = (councilFilter === null || councilFilter === void 0 ? void 0 : councilFilter.value) || '';
+    const scopedTransForLoads = (state.transformers || []).filter(matchesCurrentScope);
     if (nameFilter) {
-        const transformerNames = Array.from(new Set(state.transformers.map(t => t.transformerName).filter(Boolean)));
+        const transformerNames = Array.from(new Set(scopedTransForLoads.map(t => t.transformerName).filter(Boolean)));
         nameFilter.innerHTML = '<option value="">كل المحولات</option>' + transformerNames.map(name => `<option value="${name}">${name}</option>`).join('');
         if (selectedName && transformerNames.includes(selectedName)) {
             nameFilter.value = selectedName;
@@ -6472,7 +6754,9 @@ const renderTransformerLoadRecordsSection = () => {
         const capacities = Array.from(new Set(state.transformers.map(t => t.transformerCapacityKVA !== undefined && t.transformerCapacityKVA !== null ? String(t.transformerCapacityKVA) : '').filter(Boolean)));
         capacityFilter.innerHTML = '<option value="">كل القدرات</option>' + capacities.map(capacity => `<option value="${capacity}">${capacity}</option>`).join('');
     }
-    const filtered = state.transformerLoads.filter(item => {
+    const filtered = (state.transformerLoads || []).filter(item => {
+        if (!matchesCurrentScope(item))
+            return false;
         const transformer = state.transformers.find(t => t.transformerName === item.transformerLoadName) || null;
         const itemCouncil = (transformer === null || transformer === void 0 ? void 0 : transformer.councilName) || '';
         const itemAddress = item.transformerLoadAddress || '';
@@ -7743,6 +8027,7 @@ const handleSaveDetails = () => {
     // Manually construct accountReference from its parts and also save individual parts
     updatedData.accountReference = `${updatedData.accountRefF || ''}${updatedData.accountRefH || ''}${updatedData.accountRefY || ''}${updatedData.accountRefM || ''}`;
     Object.assign(updatedData, { accountRefF: updatedData.accountRefF, accountRefH: updatedData.accountRefH, accountRefY: updatedData.accountRefY, accountRefM: updatedData.accountRefM });
+    stampItemWithScope(updatedData);
     state.meters[meterIndex] = Object.assign(Object.assign({}, originalMeter), updatedData);
     // Enhanced activity logging for edits
     const changes = [];
@@ -13210,6 +13495,7 @@ const handleRepairFormSubmit = (event) => {
         const newMeter = Object.assign(Object.assign({}, originalMeter), { id: Date.now(), meterChassisNumber: newChassisNumber, subscriberType: 'جديد', installationStatus: 'استبدال عداد تالف', installationDate: installationDate, installedBy: installedBy, meterSupplyCompany: supplyCompany, 
             // Clear fields related to the old meter's removal and repair
             repairStatus: undefined, newMeterChassisNumberForReplacement: undefined, installationDateForReplacement: undefined, removalDate: undefined, removedBy: undefined, removalReason: undefined, readingAtRemoval: undefined });
+        stampItemWithScope(newMeter);
         state.meters.push(newMeter);
         logActivity('تغيير عداد (إصلاح)', `تسجيل عداد جديد كبديل للمشترك "${originalMeter.subscriberName}".`, `شاسية جديد: ${newChassisNumber}`);
     }
@@ -13850,6 +14136,7 @@ const handleMovePendingToMukayasat = async () => {
     const onConfirm = async () => {
         const requestsToMove = state.pendingRequests.filter(req => selectedIds.includes(Number(req.id)));
         const newMukayasat = requestsToMove.map(req => (Object.assign(Object.assign({}, req), { status: 'تم عمل المعاينة', technicianName: '', technicalEngineer: '', headOfEngineering: '', requestType: req.requestType || 'تركيب عداد كودي' })));
+        newMukayasat.forEach(m => stampItemWithScope(m));
         state.mukayasat.push(...newMukayasat);
         state.pendingRequests = state.pendingRequests.filter(req => !selectedIds.includes(Number(req.id)));
         logActivity('تحويل طلبات للمقايسات', `تم تحويل ${requestsToMove.length} طلب من الانتظار إلى المقايسات بحالة "تم عمل المعاينة"`);
@@ -14928,6 +15215,8 @@ const handleGenerateReport = (event) => {
     }
     // --- Single-pass Filtering ---
     data = state.meters.filter(m => {
+        if (!matchesCurrentScope(m))
+            return false;
         // Common Filters
         const dates = [m.installationDate, m.removalDate, m.demolitionDate, m.installationDateForReplacement].filter(d => d);
         const inDateRange = (!dateFrom && !dateTo) || dates.some(d => (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo));
@@ -14951,19 +15240,24 @@ const handleGenerateReport = (event) => {
         const councilF = (_d = document.getElementById('filter-transformer-council')) === null || _d === void 0 ? void 0 : _d.value;
         const addressF = (_e = document.getElementById('filter-transformer-address')) === null || _e === void 0 ? void 0 : _e.value;
         const typeF = (_f = document.getElementById('filter-transformer-type')) === null || _f === void 0 ? void 0 : _f.value;
-        data = state.transformers.filter(t => (!councilF || t.councilName === councilF) &&
+        data = (state.transformers || []).filter(t => matchesCurrentScope(t) &&
+            (!councilF || t.councilName === councilF) &&
             (!addressF || t.transformerAddress === addressF) &&
             (!typeF || t.transformerType === typeF));
     }
     else if (reportType === 'mukayasat') {
-        data = state.mukayasat.filter(m => {
+        data = (state.mukayasat || []).filter(m => {
+            if (!matchesCurrentScope(m))
+                return false;
             const matchStatus = !mukayasaStatusFilter || m.status === mukayasaStatusFilter;
             // Assuming mukayasat doesn't have a date field yet, so skipping date filter for it.
             return matchStatus;
         });
     }
     else if (reportType === 'judicial_control') {
-        const filteredRawData = state.judicialControl.filter(m => {
+        const filteredRawData = (state.judicialControl || []).filter(m => {
+            if (!matchesCurrentScope(m))
+                return false;
             const matchStatus = !judicialStatusFilter || m.status === judicialStatusFilter;
             const matchReportType = !judicialReportTypeFilter || m.reportType === judicialReportTypeFilter;
             const inDateRange = (!dateFrom || (m.reportDate && m.reportDate >= dateFrom)) &&
@@ -14981,7 +15275,7 @@ const handleGenerateReport = (event) => {
     else if (reportType === 'judicial_collection_report') {
         data = [];
         if (state.judicialControl && Array.isArray(state.judicialControl)) {
-            state.judicialControl.forEach(item => {
+            state.judicialControl.filter(matchesCurrentScope).forEach(item => {
                 if (item.payments && Array.isArray(item.payments) && item.payments.length > 0) {
                     item.payments.forEach((p) => {
                         const pDateISO = parseDateToISO(p.date);
@@ -15013,7 +15307,7 @@ const handleGenerateReport = (event) => {
     else if (reportType === 'zinat_collection_report') {
         data = [];
         if (state.zinatCollection && Array.isArray(state.zinatCollection)) {
-            state.zinatCollection.forEach(item => {
+            state.zinatCollection.filter(matchesCurrentScope).forEach(item => {
                 if (item.payments && Array.isArray(item.payments) && item.payments.length > 0) {
                     item.payments.forEach((p) => {
                         const pDateISO = parseDateToISO(p.date);
@@ -15042,7 +15336,9 @@ const handleGenerateReport = (event) => {
         };
     }
     else if (reportType === 'installed_practice_meters') {
-        data = state.judicialControl.filter(m => {
+        data = (state.judicialControl || []).filter(m => {
+            if (!matchesCurrentScope(m))
+                return false;
             const matchStatus = m.status === 'تم تركيب عداد';
             const inDateRange = (!dateFrom || (m.reportDate && m.reportDate >= dateFrom)) &&
                 (!dateTo || (m.reportDate && m.reportDate <= dateTo));
@@ -17148,6 +17444,8 @@ const renderUserManagementSection = () => {
             <th>الاسم الكامل</th>
             <th>اسم المستخدم</th>
             <th>الدور الوظيفي</th>
+            <th>القطاع</th>
+            <th>الفرع / الهندسة</th>
             <th>حالة الحساب / الإيقاف</th>
             <th>إجراءات</th>
         </tr>
@@ -17168,10 +17466,18 @@ const renderUserManagementSection = () => {
             toggleSuspendBtn = `<button type="button" class="btn btn-sm" onclick="window.toggleUserSuspension('${user.username}')" style="margin-top:4px; padding:3px 8px; font-size:0.8rem; background:${isSusp ? '#10b981' : '#dc2626'}; color:#fff; border-radius:4px; border:none; cursor:pointer;">${isSusp ? 'تفعيل الحساب 🔓' : 'إيقاف الحساب ⛔'}</button>`;
         }
         const row = document.createElement('tr');
+        const secBadge = user.sector === 'all'
+            ? '<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">🌐 شامل (الكل)</span>'
+            : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.sector || 'قطاع شمال المنيا'}</span>`;
+        const brBadge = user.branch === 'all'
+            ? '<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">🏛️ شامل (الكل)</span>'
+            : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.branch || 'هندسة كهرباء بني مزار'}</span>`;
         row.innerHTML = ` 
             <td><b>${user.fullName}</b></td>
             <td><code>@${user.username}</code></td>
             <td><span class="badge" style="background:#f1f5f9; color:#334155;">${roleName}</span></td>
+            <td>${secBadge}</td>
+            <td>${brBadge}</td>
             <td>
                 ${statusHtml}
                 ${toggleSuspendBtn}
@@ -17197,6 +17503,18 @@ const renderUserManagementSection = () => {
         option.textContent = role.name;
         roleSelect.appendChild(option);
     });
+    const sectorSelect = form.querySelector('#user-sector');
+    if (sectorSelect) {
+        sectorSelect.innerHTML = '<option value="all">🌐 جميع القطاعات (شامل)</option>' +
+            (state.settings.sectors || []).map((s) => `<option value="${s}">${s}</option>`).join('');
+        sectorSelect.value = 'all';
+    }
+    const branchSelect = form.querySelector('#user-branch');
+    if (branchSelect) {
+        branchSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات (شامل)</option>' +
+            (state.settings.branches || []).map((b) => `<option value="${b}">${b}</option>`).join('');
+        branchSelect.value = 'all';
+    }
     // Hide form for non-admins
     const userFormContainer = document.querySelector('#user-management .form-container');
     if (userFormContainer) {
@@ -17204,6 +17522,7 @@ const renderUserManagementSection = () => {
     }
 };
 const handleUserFormSubmit = (event) => {
+    var _a, _b;
     event.preventDefault();
     const form = event.target;
     if (!validateForm(form)) {
@@ -17216,6 +17535,8 @@ const handleUserFormSubmit = (event) => {
     const username = form.querySelector('#user-username').value;
     const role = form.querySelector('#user-role').value;
     const password = form.querySelector('#user-password').value;
+    const sector = ((_a = form.querySelector('#user-sector')) === null || _a === void 0 ? void 0 : _a.value) || 'all';
+    const branch = ((_b = form.querySelector('#user-branch')) === null || _b === void 0 ? void 0 : _b.value) || 'all';
     const existingUser = state.users.find(u => u.username === username && u.id !== id);
     if (existingUser) {
         showFieldError(form.querySelector('#user-username'), 'اسم المستخدم هذا موجود بالفعل.');
@@ -17255,7 +17576,7 @@ const handleUserFormSubmit = (event) => {
             showToast('كلمة المرور مطلوبة للمستخدم الجديد.', 'error');
             return;
         }
-        state.users.push({ id, fullName, username, password, role });
+        state.users.push({ id, fullName, username, password, role, sector, branch });
         logActivity('إضافة مستخدم', `إضافة مستخدم جديد: "${fullName}".`, `اسم المستخدم: ${username}, الدور الوظيفي: ${role}`);
         showToast('تمت إضافة المستخدم بنجاح.');
     }
@@ -17274,6 +17595,18 @@ const openUserFormForEdit = (userId) => {
     form.querySelector('#user-username').value = user.username;
     form.querySelector('#user-role').value = user.role;
     form.querySelector('#user-password').value = '';
+    const editSecSelect = form.querySelector('#user-sector');
+    if (editSecSelect) {
+        editSecSelect.innerHTML = '<option value="all">🌐 جميع القطاعات (شامل)</option>' +
+            (state.settings.sectors || []).map((s) => `<option value="${s}" ${user.sector === s ? 'selected' : ''}>${s}</option>`).join('');
+        editSecSelect.value = user.sector || 'all';
+    }
+    const editBrSelect = form.querySelector('#user-branch');
+    if (editBrSelect) {
+        editBrSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات (شامل)</option>' +
+            (state.settings.branches || []).map((b) => `<option value="${b}" ${user.branch === b ? 'selected' : ''}>${b}</option>`).join('');
+        editBrSelect.value = user.branch || 'all';
+    }
     form.querySelector('#user-confirmPassword').value = '';
     // Admin user cannot have role changed
     const roleSelect = form.querySelector('#user-role');
@@ -18503,6 +18836,7 @@ const handleSaveExcelData = async () => {
     });
     await withAppLoading(`جارٍ استيراد ومعالجة ${importedExcelData.length} سجل...`, async () => {
         if (newMetersToAdd.length > 0) {
+            newMetersToAdd.forEach(m => stampItemWithScope(m));
             state.meters.push(...newMetersToAdd);
         }
         logActivity('استيراد اكسل', `تم فحص ${importedExcelData.length} سجل: إضافة ${addedCount} جديد، إكمال بيانات ${updatedCount} موجود، وتخطي ${skippedCount} مكرر.`);
@@ -19126,7 +19460,7 @@ function handleNavigation(event) {
  * Sets up all the event listeners for the application.
  */
 const setupEventListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119;
     // Welcome Screen Listeners
     (_a = document.getElementById('start-new-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', handleStartNew);
     (_b = document.getElementById('import-from-welcome-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleImportFromWelcome);
@@ -19309,48 +19643,59 @@ const setupEventListeners = () => {
     });
     (_2 = document.getElementById('login-form')) === null || _2 === void 0 ? void 0 : _2.addEventListener('submit', handleLogin);
     (_3 = document.getElementById('header-logout-btn')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', handleLogout);
+    // مستمعات شريط تبديل النطاق (القطاع والفرع) للأدمن
+    (_4 = document.getElementById('scope-sector-select')) === null || _4 === void 0 ? void 0 : _4.addEventListener('change', (e) => {
+        currentAdminScopeSector = e.target.value;
+        refreshCurrentActiveSection();
+        showToast(`تم تبديل عرض القطاع: ${currentAdminScopeSector === 'all' ? 'جميع القطاعات' : currentAdminScopeSector}`, 'info');
+    });
+    (_5 = document.getElementById('scope-branch-select')) === null || _5 === void 0 ? void 0 : _5.addEventListener('change', (e) => {
+        currentAdminScopeBranch = e.target.value;
+        refreshCurrentActiveSection();
+        showToast(`تم تبديل عرض الفرع: ${currentAdminScopeBranch === 'all' ? 'جميع الفروع' : currentAdminScopeBranch}`, 'info');
+    });
     // Main App Listeners
     document.querySelectorAll('.sidebar-nav .nav-link, .btn-back, .card.nav-link').forEach(link => {
         link.addEventListener('click', handleNavigation);
     });
     // Meter Management Listeners
-    (_4 = document.getElementById('add-meter-record-btn')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', () => openMeterForm());
-    (_5 = document.getElementById('meter-form')) === null || _5 === void 0 ? void 0 : _5.addEventListener('submit', handleMeterFormSubmit);
-    (_6 = document.getElementById('meterType')) === null || _6 === void 0 ? void 0 : _6.addEventListener('change', () => updateMeterFormVisibility());
-    (_7 = document.getElementById('sidebar-add-mukaysa-btn')) === null || _7 === void 0 ? void 0 : _7.addEventListener('click', (e) => { e.preventDefault(); openMukayasatForm(); });
-    (_8 = document.getElementById('mukayasat-form')) === null || _8 === void 0 ? void 0 : _8.addEventListener('submit', handleMukayasatFormSubmit);
-    (_9 = document.getElementById('print-mukayasa-btn')) === null || _9 === void 0 ? void 0 : _9.addEventListener('click', handlePrintMukayasaDetails);
+    (_6 = document.getElementById('add-meter-record-btn')) === null || _6 === void 0 ? void 0 : _6.addEventListener('click', () => openMeterForm());
+    (_7 = document.getElementById('meter-form')) === null || _7 === void 0 ? void 0 : _7.addEventListener('submit', handleMeterFormSubmit);
+    (_8 = document.getElementById('meterType')) === null || _8 === void 0 ? void 0 : _8.addEventListener('change', () => updateMeterFormVisibility());
+    (_9 = document.getElementById('sidebar-add-mukaysa-btn')) === null || _9 === void 0 ? void 0 : _9.addEventListener('click', (e) => { e.preventDefault(); openMukayasatForm(); });
+    (_10 = document.getElementById('mukayasat-form')) === null || _10 === void 0 ? void 0 : _10.addEventListener('submit', handleMukayasatFormSubmit);
+    (_11 = document.getElementById('print-mukayasa-btn')) === null || _11 === void 0 ? void 0 : _11.addEventListener('click', handlePrintMukayasaDetails);
     // Transformer Management Listeners
-    (_10 = document.getElementById('transformer-form')) === null || _10 === void 0 ? void 0 : _10.addEventListener('submit', handleTransformerRegistrationSubmit);
-    (_11 = document.getElementById('transformer-query-form')) === null || _11 === void 0 ? void 0 : _11.addEventListener('submit', handleTransformerQuerySearch);
-    (_12 = document.getElementById('transformer-load-form')) === null || _12 === void 0 ? void 0 : _12.addEventListener('submit', handleTransformerLoadSubmit);
-    (_13 = document.getElementById('transformer-load-name')) === null || _13 === void 0 ? void 0 : _13.addEventListener('change', handleTransformerLoadNameChange);
+    (_12 = document.getElementById('transformer-form')) === null || _12 === void 0 ? void 0 : _12.addEventListener('submit', handleTransformerRegistrationSubmit);
+    (_13 = document.getElementById('transformer-query-form')) === null || _13 === void 0 ? void 0 : _13.addEventListener('submit', handleTransformerQuerySearch);
+    (_14 = document.getElementById('transformer-load-form')) === null || _14 === void 0 ? void 0 : _14.addEventListener('submit', handleTransformerLoadSubmit);
+    (_15 = document.getElementById('transformer-load-name')) === null || _15 === void 0 ? void 0 : _15.addEventListener('change', handleTransformerLoadNameChange);
     initializeTransformerLoadRecordFilters();
     ['transformer-load-capacity', 'transformer-load-s1-r', 'transformer-load-s1-s', 'transformer-load-s1-t', 'transformer-load-s2-r', 'transformer-load-s2-s', 'transformer-load-s2-t', 'transformer-load-s3-r', 'transformer-load-s3-s', 'transformer-load-s3-t', 'transformer-load-s4-r', 'transformer-load-s4-s', 'transformer-load-s4-t', 'transformer-load-streets-r', 'transformer-load-streets-s', 'transformer-load-streets-t'].forEach((id) => {
         const element = document.getElementById(id);
         element === null || element === void 0 ? void 0 : element.addEventListener('input', calculateTransformerLoadAutoValues);
     });
-    (_14 = document.getElementById('print-transformers-list-btn')) === null || _14 === void 0 ? void 0 : _14.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
-    (_15 = document.getElementById('import-transformers-excel-trigger')) === null || _15 === void 0 ? void 0 : _15.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_16 = document.getElementById('transformers-excel-upload')) === null || _16 === void 0 ? void 0 : _16.addEventListener('change', handleImportTransformersExcel);
-    (_17 = document.getElementById('delete-selected-transformers-btn')) === null || _17 === void 0 ? void 0 : _17.addEventListener('click', handleDeleteSelectedTransformers);
+    (_16 = document.getElementById('print-transformers-list-btn')) === null || _16 === void 0 ? void 0 : _16.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
+    (_17 = document.getElementById('import-transformers-excel-trigger')) === null || _17 === void 0 ? void 0 : _17.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_18 = document.getElementById('transformers-excel-upload')) === null || _18 === void 0 ? void 0 : _18.addEventListener('change', handleImportTransformersExcel);
+    (_19 = document.getElementById('delete-selected-transformers-btn')) === null || _19 === void 0 ? void 0 : _19.addEventListener('click', handleDeleteSelectedTransformers);
     // Transformer List Filters
     ['filter-transformer-name', 'filter-transformer-chassis'].forEach(id => {
         var _a;
         (_a = document.getElementById(id)) === null || _a === void 0 ? void 0 : _a.addEventListener('input', () => renderTransformerListSection());
     });
-    (_18 = document.getElementById('select-all-transformers')) === null || _18 === void 0 ? void 0 : _18.addEventListener('change', (e) => {
+    (_20 = document.getElementById('select-all-transformers')) === null || _20 === void 0 ? void 0 : _20.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
         document.querySelectorAll('.transformer-row-checkbox').forEach(cb => cb.checked = isChecked);
     });
-    (_19 = document.getElementById('print-installation-details-btn')) === null || _19 === void 0 ? void 0 : _19.addEventListener('click', handlePrintInstallationDetails);
-    (_20 = document.getElementById('clear-mukayasa-form-btn')) === null || _20 === void 0 ? void 0 : _20.addEventListener('click', handleClearMukayasaForm);
+    (_21 = document.getElementById('print-installation-details-btn')) === null || _21 === void 0 ? void 0 : _21.addEventListener('click', handlePrintInstallationDetails);
+    (_22 = document.getElementById('clear-mukayasa-form-btn')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', handleClearMukayasaForm);
     // Judicial Control Listeners
-    (_21 = document.getElementById('print-judicial-control-btn')) === null || _21 === void 0 ? void 0 : _21.addEventListener('click', handlePrintJudicialControlDetails);
-    (_22 = document.getElementById('judicial-control-form')) === null || _22 === void 0 ? void 0 : _22.addEventListener('submit', handleJudicialControlFormSubmit);
+    (_23 = document.getElementById('print-judicial-control-btn')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', handlePrintJudicialControlDetails);
+    (_24 = document.getElementById('judicial-control-form')) === null || _24 === void 0 ? void 0 : _24.addEventListener('submit', handleJudicialControlFormSubmit);
     // Judicial Control Filter Listeners
-    (_23 = document.getElementById('add-zinat-btn')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', openZinatForm);
-    (_24 = document.getElementById('zinat-form')) === null || _24 === void 0 ? void 0 : _24.addEventListener('submit', handleZinatFormSubmit);
+    (_25 = document.getElementById('add-zinat-btn')) === null || _25 === void 0 ? void 0 : _25.addEventListener('click', openZinatForm);
+    (_26 = document.getElementById('zinat-form')) === null || _26 === void 0 ? void 0 : _26.addEventListener('submit', handleZinatFormSubmit);
     const zinatFilterForm = document.getElementById('zinat-collection-filter-form');
     zinatFilterForm === null || zinatFilterForm === void 0 ? void 0 : zinatFilterForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -19360,12 +19705,12 @@ const setupEventListeners = () => {
         setTimeout(() => renderZinatCollectionSection(), 0);
     });
     // Print List Buttons
-    (_25 = document.getElementById('print-lost-memos-list-btn')) === null || _25 === void 0 ? void 0 : _25.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
-    (_26 = document.getElementById('print-judicial-control-list-btn')) === null || _26 === void 0 ? void 0 : _26.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
-    (_27 = document.getElementById('print-collection-judicial-btn')) === null || _27 === void 0 ? void 0 : _27.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
-    (_28 = document.getElementById('print-collection-zinat-btn')) === null || _28 === void 0 ? void 0 : _28.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
+    (_27 = document.getElementById('print-lost-memos-list-btn')) === null || _27 === void 0 ? void 0 : _27.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
+    (_28 = document.getElementById('print-judicial-control-list-btn')) === null || _28 === void 0 ? void 0 : _28.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
+    (_29 = document.getElementById('print-collection-judicial-btn')) === null || _29 === void 0 ? void 0 : _29.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
+    (_30 = document.getElementById('print-collection-zinat-btn')) === null || _30 === void 0 ? void 0 : _30.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
     // Judicial Collection Filter Listener
-    (_29 = document.getElementById('judicial-collection-filter-form')) === null || _29 === void 0 ? void 0 : _29.addEventListener('input', () => {
+    (_31 = document.getElementById('judicial-collection-filter-form')) === null || _31 === void 0 ? void 0 : _31.addEventListener('input', () => {
         renderJudicialCollectionSection();
     });
     // Judicial Control Filter Listeners
@@ -19382,9 +19727,9 @@ const setupEventListeners = () => {
         setTimeout(() => applyAndRenderJudicialControlList(), 0); // Use timeout to allow form to reset first
     });
     // Lost Memo Listeners
-    (_30 = document.getElementById('add-lost-memo-btn')) === null || _30 === void 0 ? void 0 : _30.addEventListener('click', () => openLostMemoForm());
-    (_31 = document.getElementById('lost-memo-form')) === null || _31 === void 0 ? void 0 : _31.addEventListener('submit', handleLostMemoFormSubmit);
-    (_32 = document.getElementById('print-lost-memo-btn')) === null || _32 === void 0 ? void 0 : _32.addEventListener('click', handlePrintLostMemo);
+    (_32 = document.getElementById('add-lost-memo-btn')) === null || _32 === void 0 ? void 0 : _32.addEventListener('click', () => openLostMemoForm());
+    (_33 = document.getElementById('lost-memo-form')) === null || _33 === void 0 ? void 0 : _33.addEventListener('submit', handleLostMemoFormSubmit);
+    (_34 = document.getElementById('print-lost-memo-btn')) === null || _34 === void 0 ? void 0 : _34.addEventListener('click', handlePrintLostMemo);
     const mukSearchForm = document.getElementById('mukayasat-search-form');
     mukSearchForm === null || mukSearchForm === void 0 ? void 0 : mukSearchForm.addEventListener('submit', handleMukayasatSearch);
     if (mukSearchForm) {
@@ -19396,7 +19741,7 @@ const setupEventListeners = () => {
             handleGoBack();
         }
     });
-    (_33 = document.getElementById('meters-table-filter')) === null || _33 === void 0 ? void 0 : _33.addEventListener('input', (e) => {
+    (_35 = document.getElementById('meters-table-filter')) === null || _35 === void 0 ? void 0 : _35.addEventListener('input', (e) => {
         const filterValue = e.target.value.toLowerCase();
         const table = document.getElementById('meters-table');
         filterTable(table, filterValue);
@@ -19424,10 +19769,10 @@ const setupEventListeners = () => {
             });
         }
     });
-    (_34 = document.getElementById('btn-search-subscribers-all')) === null || _34 === void 0 ? void 0 : _34.addEventListener('click', handleAllSubscribersSearch);
-    (_35 = document.getElementById('btn-reset-subscribers-all')) === null || _35 === void 0 ? void 0 : _35.addEventListener('click', handleResetAllSubscribersSearch);
-    (_36 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _36 === void 0 ? void 0 : _36.addEventListener('click', handleDeleteSelectedSubscribersAll);
-    (_37 = document.getElementById('subscriberType')) === null || _37 === void 0 ? void 0 : _37.addEventListener('change', (e) => {
+    (_36 = document.getElementById('btn-search-subscribers-all')) === null || _36 === void 0 ? void 0 : _36.addEventListener('click', handleAllSubscribersSearch);
+    (_37 = document.getElementById('btn-reset-subscribers-all')) === null || _37 === void 0 ? void 0 : _37.addEventListener('click', handleResetAllSubscribersSearch);
+    (_38 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _38 === void 0 ? void 0 : _38.addEventListener('click', handleDeleteSelectedSubscribersAll);
+    (_39 = document.getElementById('subscriberType')) === null || _39 === void 0 ? void 0 : _39.addEventListener('change', (e) => {
         var _a;
         const select = e.target;
         const isSearchMode = !((_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.contains('hidden'));
@@ -19446,59 +19791,59 @@ const setupEventListeners = () => {
         updateMeterFormVisibility();
     });
     // Subscriber Statement Listener (الاستعلام عن مشترك)
-    (_38 = document.getElementById('subscriber-statement-form')) === null || _38 === void 0 ? void 0 : _38.addEventListener('submit', (e) => {
+    (_40 = document.getElementById('subscriber-statement-form')) === null || _40 === void 0 ? void 0 : _40.addEventListener('submit', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
-    (_39 = document.getElementById('statement-search-btn')) === null || _39 === void 0 ? void 0 : _39.addEventListener('click', (e) => {
+    (_41 = document.getElementById('statement-search-btn')) === null || _41 === void 0 ? void 0 : _41.addEventListener('click', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
     // قراءة الكارت الذكي
-    (_40 = document.getElementById('statement-read-card-btn')) === null || _40 === void 0 ? void 0 : _40.addEventListener('click', (e) => {
+    (_42 = document.getElementById('statement-read-card-btn')) === null || _42 === void 0 ? void 0 : _42.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadSmartCard();
     });
-    (_41 = document.getElementById('smart-card-close-btn')) === null || _41 === void 0 ? void 0 : _41.addEventListener('click', () => {
+    (_43 = document.getElementById('smart-card-close-btn')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_42 = document.getElementById('smart-card-close-x-btn')) === null || _42 === void 0 ? void 0 : _42.addEventListener('click', () => {
+    (_44 = document.getElementById('smart-card-close-x-btn')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_43 = document.getElementById('smart-card-search-now-btn')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', () => {
+    (_45 = document.getElementById('smart-card-search-now-btn')) === null || _45 === void 0 ? void 0 : _45.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
         handleSubscriberStatementSearch();
     });
     // كروت التحكم (Control Cards Event Listeners)
-    (_44 = document.getElementById('btn-read-control-card')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', (e) => {
+    (_46 = document.getElementById('btn-read-control-card')) === null || _46 === void 0 ? void 0 : _46.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadControlCard();
     });
-    (_45 = document.getElementById('btn-renew-control-card')) === null || _45 === void 0 ? void 0 : _45.addEventListener('click', (e) => {
+    (_47 = document.getElementById('btn-renew-control-card')) === null || _47 === void 0 ? void 0 : _47.addEventListener('click', (e) => {
         e.preventDefault();
         handleRenewControlCard();
     });
-    (_46 = document.getElementById('btn-print-control-card')) === null || _46 === void 0 ? void 0 : _46.addEventListener('click', (e) => {
+    (_48 = document.getElementById('btn-print-control-card')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', (e) => {
         e.preventDefault();
         handlePrintControlCardReport();
     });
-    (_47 = document.getElementById('control-card-meter-details-close')) === null || _47 === void 0 ? void 0 : _47.addEventListener('click', () => {
+    (_49 = document.getElementById('control-card-meter-details-close')) === null || _49 === void 0 ? void 0 : _49.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_48 = document.getElementById('control-card-meter-details-close-x')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', () => {
+    (_50 = document.getElementById('control-card-meter-details-close-x')) === null || _50 === void 0 ? void 0 : _50.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_49 = document.getElementById('ctrl-meters-filter')) === null || _49 === void 0 ? void 0 : _49.addEventListener('input', (e) => {
+    (_51 = document.getElementById('ctrl-meters-filter')) === null || _51 === void 0 ? void 0 : _51.addEventListener('input', (e) => {
         const term = e.target.value.trim().toLowerCase();
         const rows = document.querySelectorAll('#control-card-meters-tbody tr');
         rows.forEach(r => {
@@ -19507,15 +19852,15 @@ const setupEventListeners = () => {
             r.style.display = text.includes(term) ? '' : 'none';
         });
     });
-    (_50 = document.getElementById('issue-control-card-form')) === null || _50 === void 0 ? void 0 : _50.addEventListener('submit', (e) => {
+    (_52 = document.getElementById('issue-control-card-form')) === null || _52 === void 0 ? void 0 : _52.addEventListener('submit', (e) => {
         e.preventDefault();
         handleIssueControlCard(e);
     });
-    (_51 = document.getElementById('issue-meter-company')) === null || _51 === void 0 ? void 0 : _51.addEventListener('change', (e) => {
+    (_53 = document.getElementById('issue-meter-company')) === null || _53 === void 0 ? void 0 : _53.addEventListener('change', (e) => {
         const val = e.target.value;
         handleCompanyChange(val);
     });
-    (_52 = document.getElementById('issue-technician')) === null || _52 === void 0 ? void 0 : _52.addEventListener('change', (e) => {
+    (_54 = document.getElementById('issue-technician')) === null || _54 === void 0 ? void 0 : _54.addEventListener('change', (e) => {
         const sel = e.target;
         const opt = sel.options[sel.selectedIndex];
         const codeInput = document.getElementById('issue-tech-code');
@@ -19523,7 +19868,7 @@ const setupEventListeners = () => {
             codeInput.value = (opt === null || opt === void 0 ? void 0 : opt.getAttribute('data-code')) || '';
         }
     });
-    (_53 = document.getElementById('issue-control-op-type')) === null || _53 === void 0 ? void 0 : _53.addEventListener('change', (e) => {
+    (_55 = document.getElementById('issue-control-op-type')) === null || _55 === void 0 ? void 0 : _55.addEventListener('change', (e) => {
         const val = e.target.value;
         const tampersWrap = document.getElementById('container-tampers');
         const manualDateWrap = document.getElementById('container-manual-date');
@@ -19532,7 +19877,7 @@ const setupEventListeners = () => {
         if (manualDateWrap)
             manualDateWrap.style.display = val === '0' ? 'block' : 'none';
     });
-    (_54 = document.getElementById('issue-control-type-meter')) === null || _54 === void 0 ? void 0 : _54.addEventListener('change', (e) => {
+    (_56 = document.getElementById('issue-control-type-meter')) === null || _56 === void 0 ? void 0 : _56.addEventListener('change', (e) => {
         const val = e.target.value;
         const singleWrap = document.getElementById('container-single-meter');
         const multiWrap = document.getElementById('container-multi-meters');
@@ -19544,7 +19889,7 @@ const setupEventListeners = () => {
         if (countWrap)
             countWrap.style.display = val === '2' ? 'block' : 'none';
     });
-    (_55 = document.getElementById('btn-add-meter-to-list')) === null || _55 === void 0 ? void 0 : _55.addEventListener('click', () => {
+    (_57 = document.getElementById('btn-add-meter-to-list')) === null || _57 === void 0 ? void 0 : _57.addEventListener('click', () => {
         const inp = document.getElementById('issue-multi-meter-input');
         const val = (inp === null || inp === void 0 ? void 0 : inp.value.trim()) || '';
         if (!val)
@@ -19558,16 +19903,16 @@ const setupEventListeners = () => {
             inp.value = '';
         renderIssuedMetersTags();
     });
-    (_56 = document.getElementById('issue-is-manual-date')) === null || _56 === void 0 ? void 0 : _56.addEventListener('change', (e) => {
+    (_58 = document.getElementById('issue-is-manual-date')) === null || _58 === void 0 ? void 0 : _58.addEventListener('change', (e) => {
         const wrap = document.getElementById('manual-date-picker-wrap');
         if (wrap)
             wrap.style.display = e.target.checked ? 'block' : 'none';
     });
-    (_57 = document.getElementById('btn-issue-card-reset')) === null || _57 === void 0 ? void 0 : _57.addEventListener('click', () => {
+    (_59 = document.getElementById('btn-issue-card-reset')) === null || _59 === void 0 ? void 0 : _59.addEventListener('click', () => {
         issuedMetersList = [];
         renderIssuedMetersTags();
     });
-    (_58 = document.getElementById('btn-close-issued-dialog')) === null || _58 === void 0 ? void 0 : _58.addEventListener('click', () => {
+    (_60 = document.getElementById('btn-close-issued-dialog')) === null || _60 === void 0 ? void 0 : _60.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -19576,7 +19921,7 @@ const setupEventListeners = () => {
                 dlg.style.display = 'none';
         }
     });
-    (_59 = document.getElementById('btn-read-issued-card-now')) === null || _59 === void 0 ? void 0 : _59.addEventListener('click', () => {
+    (_61 = document.getElementById('btn-read-issued-card-now')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -19611,40 +19956,40 @@ const setupEventListeners = () => {
         });
     });
     // Customer Management Listeners
-    (_60 = document.getElementById('cm-filters-form')) === null || _60 === void 0 ? void 0 : _60.addEventListener('submit', (e) => {
+    (_62 = document.getElementById('cm-filters-form')) === null || _62 === void 0 ? void 0 : _62.addEventListener('submit', (e) => {
         e.preventDefault();
         loadCustomers(1);
     });
-    (_61 = document.getElementById('btn-cm-reset')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', () => {
+    (_63 = document.getElementById('btn-cm-reset')) === null || _63 === void 0 ? void 0 : _63.addEventListener('click', () => {
         const form = document.getElementById('cm-filters-form');
         if (form)
             form.reset();
         loadCustomers(1);
     });
-    (_62 = document.getElementById('btn-cm-refresh')) === null || _62 === void 0 ? void 0 : _62.addEventListener('click', () => {
+    (_64 = document.getElementById('btn-cm-refresh')) === null || _64 === void 0 ? void 0 : _64.addEventListener('click', () => {
         loadCustomers(customerState.page);
     });
-    (_63 = document.getElementById('btn-cm-card-search')) === null || _63 === void 0 ? void 0 : _63.addEventListener('click', () => {
+    (_65 = document.getElementById('btn-cm-card-search')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', () => {
         handleCustomerCardSearch();
     });
-    (_64 = document.getElementById('cm-page-size')) === null || _64 === void 0 ? void 0 : _64.addEventListener('change', (e) => {
+    (_66 = document.getElementById('cm-page-size')) === null || _66 === void 0 ? void 0 : _66.addEventListener('change', (e) => {
         customerState.pageSize = Number(e.target.value) || 10;
         loadCustomers(1);
     });
-    (_65 = document.getElementById('cm-btn-first')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', () => {
+    (_67 = document.getElementById('cm-btn-first')) === null || _67 === void 0 ? void 0 : _67.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(1);
     });
-    (_66 = document.getElementById('cm-btn-prev')) === null || _66 === void 0 ? void 0 : _66.addEventListener('click', () => {
+    (_68 = document.getElementById('cm-btn-prev')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(customerState.page - 1);
     });
-    (_67 = document.getElementById('cm-btn-next')) === null || _67 === void 0 ? void 0 : _67.addEventListener('click', () => {
+    (_69 = document.getElementById('cm-btn-next')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(customerState.page + 1);
     });
-    (_68 = document.getElementById('cm-btn-last')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', () => {
+    (_70 = document.getElementById('cm-btn-last')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(totalPages);
@@ -19765,10 +20110,10 @@ const setupEventListeners = () => {
             }
         }
     });
-    (_69 = document.getElementById('save-details-btn')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', handleSaveDetails);
-    (_70 = document.getElementById('delete-subscriber-btn')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', handleDeleteSubscriber);
-    (_71 = document.getElementById('details-meterType')) === null || _71 === void 0 ? void 0 : _71.addEventListener('change', () => updateMeterFormVisibility('details-'));
-    (_72 = document.getElementById('details-subscriberType')) === null || _72 === void 0 ? void 0 : _72.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_71 = document.getElementById('save-details-btn')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', handleSaveDetails);
+    (_72 = document.getElementById('delete-subscriber-btn')) === null || _72 === void 0 ? void 0 : _72.addEventListener('click', handleDeleteSubscriber);
+    (_73 = document.getElementById('details-meterType')) === null || _73 === void 0 ? void 0 : _73.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_74 = document.getElementById('details-subscriberType')) === null || _74 === void 0 ? void 0 : _74.addEventListener('change', () => updateMeterFormVisibility('details-'));
     document.body.addEventListener('click', (event) => {
         const target = event.target;
         if (target.id === 'delete-selected-meters') {
@@ -19781,13 +20126,13 @@ const setupEventListeners = () => {
             checkboxes.forEach(checkbox => checkbox.checked = selectAllCheckbox.checked);
         }
     });
-    (_73 = document.getElementById('select-all-meters')) === null || _73 === void 0 ? void 0 : _73.addEventListener('click', (event) => {
+    (_75 = document.getElementById('select-all-meters')) === null || _75 === void 0 ? void 0 : _75.addEventListener('click', (event) => {
         const isChecked = event.target.checked;
         document.querySelectorAll('#meters-table tbody input[type="checkbox"].select-row').forEach((checkbox) => {
             checkbox.checked = isChecked;
         });
     });
-    (_74 = document.getElementById('btn-delete-by-status')) === null || _74 === void 0 ? void 0 : _74.addEventListener('click', () => {
+    (_76 = document.getElementById('btn-delete-by-status')) === null || _76 === void 0 ? void 0 : _76.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         const select = document.getElementById('delete-status-select');
         if (dialog && select) {
@@ -19796,12 +20141,12 @@ const setupEventListeners = () => {
             dialog.hidden = false;
         }
     });
-    (_75 = document.getElementById('delete-by-status-cancel')) === null || _75 === void 0 ? void 0 : _75.addEventListener('click', () => {
+    (_77 = document.getElementById('delete-by-status-cancel')) === null || _77 === void 0 ? void 0 : _77.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         if (dialog)
             dialog.hidden = true;
     });
-    (_76 = document.getElementById('delete-by-status-confirm')) === null || _76 === void 0 ? void 0 : _76.addEventListener('click', () => {
+    (_78 = document.getElementById('delete-by-status-confirm')) === null || _78 === void 0 ? void 0 : _78.addEventListener('click', () => {
         const select = document.getElementById('delete-status-select');
         const status = select.value;
         if (!status) {
@@ -19834,13 +20179,13 @@ const setupEventListeners = () => {
         showConfirmationDialog('تأكيد الحذف الجماعي', `هل أنت متأكد من حذف جميع المشتركين (${count}) الذين حالتهم "${status}"؟ لا يمكن التراجع عن هذا الإجراء.`, onConfirm);
     });
     // Repaired Meters Listeners
-    (_77 = document.getElementById('repair-search-form')) === null || _77 === void 0 ? void 0 : _77.addEventListener('submit', handleFaultyMeterSearch);
-    (_78 = document.getElementById('repair-form')) === null || _78 === void 0 ? void 0 : _78.addEventListener('submit', handleRepairFormSubmit);
-    (_79 = document.getElementById('repairStatus')) === null || _79 === void 0 ? void 0 : _79.addEventListener('change', updateRepairFormVisibility);
+    (_79 = document.getElementById('repair-search-form')) === null || _79 === void 0 ? void 0 : _79.addEventListener('submit', handleFaultyMeterSearch);
+    (_80 = document.getElementById('repair-form')) === null || _80 === void 0 ? void 0 : _80.addEventListener('submit', handleRepairFormSubmit);
+    (_81 = document.getElementById('repairStatus')) === null || _81 === void 0 ? void 0 : _81.addEventListener('change', updateRepairFormVisibility);
     // Reports Listeners
-    (_80 = document.getElementById('report-type')) === null || _80 === void 0 ? void 0 : _80.addEventListener('change', updateReportFilters);
-    (_81 = document.getElementById('report-generation-form')) === null || _81 === void 0 ? void 0 : _81.addEventListener('submit', handleGenerateReport);
-    (_82 = document.getElementById('print-report-btn')) === null || _82 === void 0 ? void 0 : _82.addEventListener('click', handlePrintReport);
+    (_82 = document.getElementById('report-type')) === null || _82 === void 0 ? void 0 : _82.addEventListener('change', updateReportFilters);
+    (_83 = document.getElementById('report-generation-form')) === null || _83 === void 0 ? void 0 : _83.addEventListener('submit', handleGenerateReport);
+    (_84 = document.getElementById('print-report-btn')) === null || _84 === void 0 ? void 0 : _84.addEventListener('click', handlePrintReport);
     // Custom multiselect listener
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.multiselect-btn');
@@ -19891,11 +20236,11 @@ const setupEventListeners = () => {
         }
     });
     // Activity Log Listener
-    (_83 = document.getElementById('print-activity-log-btn')) === null || _83 === void 0 ? void 0 : _83.addEventListener('click', handlePrintActivityLog);
+    (_85 = document.getElementById('print-activity-log-btn')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', handlePrintActivityLog);
     // User Management Listeners
-    (_84 = document.getElementById('user-form')) === null || _84 === void 0 ? void 0 : _84.addEventListener('submit', handleUserFormSubmit);
+    (_86 = document.getElementById('user-form')) === null || _86 === void 0 ? void 0 : _86.addEventListener('submit', handleUserFormSubmit);
     // Permissions Listeners (delegated inside render function)
-    (_85 = document.getElementById('permissions')) === null || _85 === void 0 ? void 0 : _85.addEventListener('change', (event) => {
+    (_87 = document.getElementById('permissions')) === null || _87 === void 0 ? void 0 : _87.addEventListener('change', (event) => {
         const target = event.target;
         if (!target.matches('input[type="checkbox"]'))
             return;
@@ -19909,32 +20254,32 @@ const setupEventListeners = () => {
             handlePermissionChange(event);
     });
     // Settings Listeners
-    (_86 = document.getElementById('export-backup-btn')) === null || _86 === void 0 ? void 0 : _86.addEventListener('click', handleExportBackup);
-    (_87 = document.getElementById('import-backup-btn')) === null || _87 === void 0 ? void 0 : _87.addEventListener('click', () => handleImportBackup());
-    (_88 = document.getElementById('export-csv-btn')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', handleExportCSV);
-    (_89 = document.getElementById('save-report-settings-btn')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', handleSaveReportSettings);
-    (_90 = document.getElementById('form-lifting-unit-delivery')) === null || _90 === void 0 ? void 0 : _90.addEventListener('submit', handleLiftingDeliverySubmit);
-    (_91 = document.getElementById('btn-cancel-lifting-delivery')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', handleCancelLiftingDelivery);
-    (_92 = document.getElementById('save-company-report-settings-btn')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', handleSaveCompanyReportSettings);
+    (_88 = document.getElementById('export-backup-btn')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', handleExportBackup);
+    (_89 = document.getElementById('import-backup-btn')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', () => handleImportBackup());
+    (_90 = document.getElementById('export-csv-btn')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', handleExportCSV);
+    (_91 = document.getElementById('save-report-settings-btn')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', handleSaveReportSettings);
+    (_92 = document.getElementById('form-lifting-unit-delivery')) === null || _92 === void 0 ? void 0 : _92.addEventListener('submit', handleLiftingDeliverySubmit);
+    (_93 = document.getElementById('btn-cancel-lifting-delivery')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', handleCancelLiftingDelivery);
+    (_94 = document.getElementById('save-company-report-settings-btn')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', handleSaveCompanyReportSettings);
     // مستمعات أحداث الطلبات قيد الانتظار
-    (_93 = document.getElementById('add-area-dialog-confirm-btn')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', confirmAddPendingArea);
-    (_94 = document.getElementById('add-area-dialog-cancel-btn')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', hideAddPendingAreaDialog);
-    (_95 = document.getElementById('add-pending-area-dialog')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', (event) => {
+    (_95 = document.getElementById('add-area-dialog-confirm-btn')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', confirmAddPendingArea);
+    (_96 = document.getElementById('add-area-dialog-cancel-btn')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', hideAddPendingAreaDialog);
+    (_97 = document.getElementById('add-pending-area-dialog')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', (event) => {
         if (event.target === document.getElementById('add-pending-area-dialog')) {
             hideAddPendingAreaDialog();
         }
     });
-    (_96 = document.getElementById('import-pending-excel-trigger-btn')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_97 = document.getElementById('pending-excel-upload')) === null || _97 === void 0 ? void 0 : _97.addEventListener('change', handleImportPendingExcel);
-    (_98 = document.getElementById('print-pending-requests-btn')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', handlePrintPendingRequests);
-    (_99 = document.getElementById('export-pending-excel-btn')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', handleExportPendingRequestsToExcel);
+    (_98 = document.getElementById('import-pending-excel-trigger-btn')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_99 = document.getElementById('pending-excel-upload')) === null || _99 === void 0 ? void 0 : _99.addEventListener('change', handleImportPendingExcel);
+    (_100 = document.getElementById('print-pending-requests-btn')) === null || _100 === void 0 ? void 0 : _100.addEventListener('click', handlePrintPendingRequests);
+    (_101 = document.getElementById('export-pending-excel-btn')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', handleExportPendingRequestsToExcel);
     // ربط أزرار العمليات الجماعية في صفحة الانتظار
-    (_100 = document.getElementById('assign-pending-requests-btn')) === null || _100 === void 0 ? void 0 : _100.addEventListener('click', handleAssignSelectedPendingRequests);
-    (_101 = document.getElementById('move-to-mukayasat-btn')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', handleMovePendingToMukayasat);
-    (_102 = document.getElementById('mark-pending-inspected-btn')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', handleMarkSelectedPendingInspected);
-    (_103 = document.getElementById('print-pending-inspection-btn')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', handlePrintSelectedPendingInspections);
-    (_104 = document.getElementById('delete-selected-pending-btn')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', handleDeleteSelectedPendingRequests);
-    (_105 = document.getElementById('add-pending-address-tab-btn')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', handleAddNewPendingAddressTab);
+    (_102 = document.getElementById('assign-pending-requests-btn')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', handleAssignSelectedPendingRequests);
+    (_103 = document.getElementById('move-to-mukayasat-btn')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', handleMovePendingToMukayasat);
+    (_104 = document.getElementById('mark-pending-inspected-btn')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', handleMarkSelectedPendingInspected);
+    (_105 = document.getElementById('print-pending-inspection-btn')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', handlePrintSelectedPendingInspections);
+    (_106 = document.getElementById('delete-selected-pending-btn')) === null || _106 === void 0 ? void 0 : _106.addEventListener('click', handleDeleteSelectedPendingRequests);
+    (_107 = document.getElementById('add-pending-address-tab-btn')) === null || _107 === void 0 ? void 0 : _107.addEventListener('click', handleAddNewPendingAddressTab);
     const pendingFilters = document.getElementById('pending-filters');
     if (pendingFilters) {
         const resetPending = () => { currentPendingPage = 1; pendingSelectedRequests = []; renderPendingRequestsSection(); };
@@ -20174,7 +20519,7 @@ const setupEventListeners = () => {
         });
     }
     // Company Logo Settings Listeners
-    (_106 = document.getElementById('developer-image-password-cancel')) === null || _106 === void 0 ? void 0 : _106.addEventListener('click', () => {
+    (_108 = document.getElementById('developer-image-password-cancel')) === null || _108 === void 0 ? void 0 : _108.addEventListener('click', () => {
         const dialog = document.getElementById('developer-image-password-dialog');
         const input = document.getElementById('developer-image-password');
         dialog === null || dialog === void 0 ? void 0 : dialog.setAttribute('hidden', '');
@@ -20182,7 +20527,7 @@ const setupEventListeners = () => {
             input.value = '';
         developerImagePasswordCallback = null;
     });
-    (_107 = document.getElementById('developer-image-password-confirm')) === null || _107 === void 0 ? void 0 : _107.addEventListener('click', () => {
+    (_109 = document.getElementById('developer-image-password-confirm')) === null || _109 === void 0 ? void 0 : _109.addEventListener('click', () => {
         const input = document.getElementById('developer-image-password');
         const error = document.getElementById('developer-image-password-error');
         const dialog = document.getElementById('developer-image-password-dialog');
@@ -20198,18 +20543,18 @@ const setupEventListeners = () => {
         input.value = '';
         callback === null || callback === void 0 ? void 0 : callback();
     });
-    (_108 = document.getElementById('upload-logo-btn')) === null || _108 === void 0 ? void 0 : _108.addEventListener('click', () => {
+    (_110 = document.getElementById('upload-logo-btn')) === null || _110 === void 0 ? void 0 : _110.addEventListener('click', () => {
         var _a;
         (_a = document.getElementById('logo-upload-input')) === null || _a === void 0 ? void 0 : _a.click();
     });
-    (_109 = document.getElementById('remove-logo-btn')) === null || _109 === void 0 ? void 0 : _109.addEventListener('click', () => {
+    (_111 = document.getElementById('remove-logo-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', () => {
         state.settings.companyLogo = null;
         saveState();
         updateUI();
         renderSettingsSection(); // To update the preview
         showToast('تمت إزالة الشعار بنجاح.');
     });
-    (_110 = document.getElementById('logo-upload-input')) === null || _110 === void 0 ? void 0 : _110.addEventListener('change', (event) => {
+    (_112 = document.getElementById('logo-upload-input')) === null || _112 === void 0 ? void 0 : _112.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -20233,10 +20578,10 @@ const setupEventListeners = () => {
         };
         reader.readAsDataURL(file);
     });
-    (_111 = document.getElementById('upload-developer-image-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', () => {
+    (_113 = document.getElementById('upload-developer-image-btn')) === null || _113 === void 0 ? void 0 : _113.addEventListener('click', () => {
         requestDeveloperImagePassword(() => { var _a; return (_a = document.getElementById('developer-image-upload-input')) === null || _a === void 0 ? void 0 : _a.click(); });
     });
-    (_112 = document.getElementById('remove-developer-image-btn')) === null || _112 === void 0 ? void 0 : _112.addEventListener('click', () => {
+    (_114 = document.getElementById('remove-developer-image-btn')) === null || _114 === void 0 ? void 0 : _114.addEventListener('click', () => {
         requestDeveloperImagePassword(() => {
             state.settings.developerImage = null;
             saveState();
@@ -20245,7 +20590,7 @@ const setupEventListeners = () => {
             showToast('تمت إزالة صورة المطور بنجاح.');
         });
     });
-    (_113 = document.getElementById('developer-image-upload-input')) === null || _113 === void 0 ? void 0 : _113.addEventListener('change', (event) => {
+    (_115 = document.getElementById('developer-image-upload-input')) === null || _115 === void 0 ? void 0 : _115.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -20266,7 +20611,7 @@ const setupEventListeners = () => {
         reader.onerror = () => showToast('حدث خطأ أثناء قراءة صورة المطور.', 'error');
         reader.readAsDataURL(file);
     });
-    (_114 = document.getElementById('logo-size-slider')) === null || _114 === void 0 ? void 0 : _114.addEventListener('input', (event) => {
+    (_116 = document.getElementById('logo-size-slider')) === null || _116 === void 0 ? void 0 : _116.addEventListener('input', (event) => {
         const slider = event.target;
         const newSize = parseInt(slider.value, 10);
         const valueDisplay = document.getElementById('logo-size-value');
@@ -20288,12 +20633,12 @@ const setupEventListeners = () => {
             <button class="btn btn-delete" id="btn-delete-selected-addresses" style="padding: 4px 8px; font-size: 0.8rem;">حذف المحدد</button>
         `;
         addressContainer.insertBefore(bulkActions, addressContainer.querySelector('ul'));
-        (_115 = document.getElementById('btn-select-all-addresses')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', () => {
+        (_117 = document.getElementById('btn-select-all-addresses')) === null || _117 === void 0 ? void 0 : _117.addEventListener('click', () => {
             const cbs = document.querySelectorAll('.address-bulk-checkbox');
             const allSelected = Array.from(cbs).every(cb => cb.checked);
             cbs.forEach(cb => cb.checked = !allSelected);
         });
-        (_116 = document.getElementById('btn-delete-selected-addresses')) === null || _116 === void 0 ? void 0 : _116.addEventListener('click', () => {
+        (_118 = document.getElementById('btn-delete-selected-addresses')) === null || _118 === void 0 ? void 0 : _118.addEventListener('click', () => {
             const selected = Array.from(document.querySelectorAll('.address-bulk-checkbox:checked'));
             if (selected.length === 0)
                 return showToast('يرجى تحديد عناوين أولاً', 'error');
@@ -20363,7 +20708,7 @@ const setupEventListeners = () => {
         }, { passive: true });
     };
     initMobileAdaptation();
-    (_117 = document.getElementById('sidebar-toggle')) === null || _117 === void 0 ? void 0 : _117.addEventListener('click', () => {
+    (_119 = document.getElementById('sidebar-toggle')) === null || _119 === void 0 ? void 0 : _119.addEventListener('click', () => {
         document.body.classList.toggle('sidebar-collapsed');
     });
     // Accordion behavior for sidebar categories: when one <details> opens, close the others

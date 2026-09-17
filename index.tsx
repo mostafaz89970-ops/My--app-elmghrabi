@@ -80,6 +80,8 @@ interface AppUser {
     username: string;
     password: string;
     role: string;
+    sector?: string;
+    branch?: string;
     isSuspended?: boolean;
     suspendReason?: string;
     suspendedAt?: string;
@@ -92,6 +94,8 @@ interface AppSettings {
     maintenanceMessage?: string;
     companyName: string;
     companyAddress?: string;
+    sectors?: string[];
+    branches?: string[];
     footerText: string;
     technicians: string[];
     technicalEngineers: string[];
@@ -205,6 +209,24 @@ let state = {
         maintenanceMode: false,
         maintenanceMessage: 'يجري حالياً إجراء صيانة دورية وتحديثات هامة على المنظومة بواسطة المطور. تم إيقاف الدخول مؤقتاً لجميع المستخدمين لضمان دقة البيانات وسلامتها.',
         companyAddress: 'قطاع شمال المنيا - هندسة كهرباء بني مزار',
+        sectors: [
+            'قطاع شمال المنيا',
+            'قطاع جنوب المنيا',
+            'قطاع بني سويف',
+            'قطاع أسيوط'
+        ],
+        branches: [
+            'هندسة كهرباء بني مزار',
+            'فرع بني مزار شرق',
+            'فرع بني مزار غرب',
+            'هندسة كهرباء مغاغة',
+            'هندسة كهرباء العدوة',
+            'هندسة كهرباء مطاي',
+            'هندسة كهرباء سمالوط',
+            'هندسة كهرباء المنيا',
+            'هندسة كهرباء ملوي',
+            'هندسة كهرباء أبو قرقاص'
+        ],
         footerText: 'منظومة العدادات 2025 - جميع الحقوق محفوظة ELMGHRABI © 2026',
         technicians: ['محمد علي', 'أحمد السيد', 'خالد محمود'],
         technicalEngineers: [] as string[],
@@ -433,7 +455,199 @@ let state = {
 type State = typeof state;
 type StateKey = keyof Omit<State, 'users' | 'settings' | 'subscribers'>;
 
-let loggedInUser: { fullName: string; role: string; username?: string } | null = null;
+
+// =========================================================================
+// منظومة الفروع والقطاعات وعزل البيانات (Multi-Tenant Branch Isolation)
+// =========================================================================
+let currentAdminScopeSector: string = 'all';
+let currentAdminScopeBranch: string = 'all';
+
+const ensureDefaultScope = (stateObj: any) => {
+    if (!stateObj) return;
+    if (!stateObj.settings) stateObj.settings = {};
+    if (!stateObj.settings.sectors || !Array.isArray(stateObj.settings.sectors) || stateObj.settings.sectors.length === 0) {
+        stateObj.settings.sectors = [
+            'قطاع شمال المنيا',
+            'قطاع جنوب المنيا',
+            'قطاع بني سويف',
+            'قطاع أسيوط'
+        ];
+    }
+    if (!stateObj.settings.branches || !Array.isArray(stateObj.settings.branches) || stateObj.settings.branches.length === 0) {
+        stateObj.settings.branches = [
+            'هندسة كهرباء بني مزار',
+            'فرع بني مزار شرق',
+            'فرع بني مزار غرب',
+            'هندسة كهرباء مغاغة',
+            'هندسة كهرباء العدوة',
+            'هندسة كهرباء مطاي',
+            'هندسة كهرباء سمالوط',
+            'هندسة كهرباء المنيا',
+            'هندسة كهرباء ملوي',
+            'هندسة كهرباء أبو قرقاص'
+        ];
+    }
+    if (stateObj.users && Array.isArray(stateObj.users)) {
+        stateObj.users.forEach((u: any) => {
+            if (!u.sector) {
+                u.sector = (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') ? 'all' : 'قطاع شمال المنيا';
+            }
+            if (!u.branch) {
+                u.branch = (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') ? 'all' : 'هندسة كهرباء بني مزار';
+            }
+        });
+    }
+    if (stateObj.meters && Array.isArray(stateObj.meters)) {
+        stateObj.meters.forEach((m: any) => {
+            if (!m.sector) m.sector = 'قطاع شمال المنيا';
+            if (!m.branch) m.branch = 'هندسة كهرباء بني مزار';
+        });
+    }
+    ['mukayasat', 'judicialControl', 'lostMeterMemos', 'transformers', 'treasuryTransactions', 'treasurySettlements'].forEach(coll => {
+        if (stateObj[coll] && Array.isArray(stateObj[coll])) {
+            stateObj[coll].forEach((item: any) => {
+                if (!item.sector) item.sector = 'قطاع شمال المنيا';
+                if (!item.branch) item.branch = 'هندسة كهرباء بني مزار';
+            });
+        }
+    });
+};
+
+const getCurrentDataScope = () => {
+    if (!loggedInUser) return { sector: 'all', branch: 'all', isGlobal: true };
+    const isAdmin = loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'supervisor';
+    if (isAdmin) {
+        return {
+            sector: currentAdminScopeSector,
+            branch: currentAdminScopeBranch,
+            isGlobal: currentAdminScopeSector === 'all' && currentAdminScopeBranch === 'all'
+        };
+    }
+    const userSector = loggedInUser.sector || 'قطاع شمال المنيا';
+    const userBranch = loggedInUser.branch || 'هندسة كهرباء بني مزار';
+    return {
+        sector: userSector,
+        branch: userBranch,
+        isGlobal: userSector === 'all' && userBranch === 'all'
+    };
+};
+
+const matchesCurrentScope = (item: any): boolean => {
+    if (!item) return false;
+    const scope = getCurrentDataScope();
+    if (scope.isGlobal) return true;
+
+    const itemSector = item.sector || 'قطاع شمال المنيا';
+    const itemBranch = item.branch || 'هندسة كهرباء بني مزار';
+
+    if (scope.sector !== 'all' && itemSector !== scope.sector) {
+        return false;
+    }
+    if (scope.branch !== 'all' && itemBranch !== scope.branch) {
+        return false;
+    }
+    return true;
+};
+
+const stampItemWithScope = (item: any): any => {
+    if (!item) return item;
+    const scope = getCurrentDataScope();
+    if (!item.sector) {
+        item.sector = (!scope.isGlobal && scope.sector !== 'all') 
+            ? scope.sector 
+            : (loggedInUser?.sector && loggedInUser.sector !== 'all' ? loggedInUser.sector : (currentAdminScopeSector !== 'all' ? currentAdminScopeSector : 'قطاع شمال المنيا'));
+    }
+    if (!item.branch) {
+        item.branch = (!scope.isGlobal && scope.branch !== 'all') 
+            ? scope.branch 
+            : (loggedInUser?.branch && loggedInUser.branch !== 'all' ? loggedInUser.branch : (currentAdminScopeBranch !== 'all' ? currentAdminScopeBranch : 'هندسة كهرباء بني مزار'));
+    }
+    return item;
+};
+
+const updateAdminScopeUI = () => {
+    const isAdmin = loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'supervisor');
+    const container = document.getElementById('admin-scope-container');
+    const badge = document.getElementById('user-branch-badge');
+    const badgeText = document.getElementById('user-branch-text');
+
+    if (isAdmin) {
+        if (container) container.style.display = 'flex';
+        if (badge) badge.style.display = 'none';
+
+        const secSelect = document.getElementById('scope-sector-select') as HTMLSelectElement | null;
+        const brSelect = document.getElementById('scope-branch-select') as HTMLSelectElement | null;
+
+        if (secSelect) {
+            secSelect.innerHTML = '<option value="all">🌐 جميع القطاعات</option>' + 
+                (state.settings.sectors || []).map((s: string) => `<option value="${s}" ${currentAdminScopeSector === s ? 'selected' : ''}>${s}</option>`).join('');
+            secSelect.value = currentAdminScopeSector;
+        }
+
+        if (brSelect) {
+            brSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات</option>' + 
+                (state.settings.branches || []).map((b: string) => `<option value="${b}" ${currentAdminScopeBranch === b ? 'selected' : ''}>${b}</option>`).join('');
+            brSelect.value = currentAdminScopeBranch;
+        }
+    } else {
+        if (container) container.style.display = 'none';
+        if (badge) {
+            badge.style.display = 'flex';
+            if (badgeText) {
+                const sec = loggedInUser?.sector || 'قطاع شمال المنيا';
+                const br = loggedInUser?.branch || 'هندسة كهرباء بني مزار';
+                badgeText.textContent = `${sec} - ${br}`;
+            }
+        }
+    }
+};
+
+const refreshCurrentActiveSection = () => {
+    const activeSection = document.querySelector('.content-section.active');
+    if (!activeSection) return;
+    const sectionId = activeSection.id;
+
+    if (sectionId === 'dashboard') {
+        renderDashboard();
+    } else if (sectionId === 'subscribers-all') {
+        renderFilteredMeterTable('subscribers-all-table',
+            ['جديد', 'مرفوع أعطال', 'مرفوع إحلال', 'استغناء', 'تغير عقد اشتراك', 'استبدال', 'هدم', 'تم الإصلاح', 'لا يمكن إصلاحه', 'تم استبداله'],
+            columnConfigs['subscribers-all']
+        );
+    } else if (sectionId === 'subscribers-new') {
+        renderFilteredMeterTable('subscribers-new-table', ['جديد'], columnConfigs['subscribers-new']);
+    } else if (sectionId === 'subscribers-faults') {
+        renderFilteredMeterTable('subscribers-faults-table', ['مرفوع أعطال'], columnConfigs['subscribers-faults']);
+    } else if (sectionId === 'subscribers-replacement') {
+        renderFilteredMeterTable('subscribers-replacement-table', ['مرفوع إحلال'], columnConfigs['subscribers-replacement']);
+    } else if (sectionId === 'subscribers-substituted') {
+        renderFilteredMeterTable('subscribers-substituted-table', ['استبدال'], columnConfigs['subscribers-substituted']);
+    } else if (sectionId === 'subscribers-scrapped') {
+        renderFilteredMeterTable('subscribers-scrapped-table', ['استغناء'], columnConfigs['subscribers-scrapped']);
+    } else if (sectionId === 'subscribers-demolition') {
+        renderFilteredMeterTable('subscribers-demolition-table', ['هدم'], columnConfigs['subscribers-demolition']);
+    } else if (sectionId === 'mukayasat-list') {
+        renderMukayasatList();
+    } else if (sectionId === 'judicial-control-list') {
+        renderJudicialControlSection();
+    } else if (sectionId === 'lost-memos-search') {
+        renderLostMemosSection();
+    } else if (sectionId === 'treasury-management' || sectionId === 'treasury-dashboard') {
+        renderTreasuryDashboard();
+        renderTreasuryUserSettlements();
+        renderTreasuryTransactionsLog();
+    } else if (sectionId === 'collection-zinat') {
+        renderZinatCollectionSection();
+    } else if (sectionId === 'collection-judicial') {
+        renderJudicialCollectionSection();
+    } else if (sectionId === 'transformer-list') {
+        renderTransformerListSection();
+    } else if (sectionId === 'transformer-load-records') {
+        renderTransformerLoadRecordsSection();
+    }
+};
+
+let loggedInUser: { fullName: string; role: string; username?: string; sector?: string; branch?: string } | null = null;
 let currentForm: HTMLFormElement | null = null; // This variable is declared but never used. Consider removing it.
 let currentFormParent: HTMLElement | null = null;
 
@@ -965,6 +1179,29 @@ const populateUserDropdown = () => {
 
     const passwordInput = document.getElementById('password') as HTMLInputElement | null;
     if (passwordInput) passwordInput.value = '';
+
+    const affBox = document.getElementById('login-user-affiliation');
+    if (affBox) affBox.style.display = 'none';
+
+    usernameSelect.onchange = () => {
+        const val = usernameSelect.value;
+        const u = state.users.find(usr => usr.username === val);
+        const affBoxEl = document.getElementById('login-user-affiliation');
+        const affTextEl = document.getElementById('login-user-affiliation-text');
+        if (u && affBoxEl && affTextEl) {
+            if (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor' || u.sector === 'all') {
+                affTextEl.textContent = 'إدارة عامة وشاملة (جميع القطاعات والفروع)';
+                affBoxEl.style.display = 'block';
+            } else {
+                const sec = u.sector || 'قطاع شمال المنيا';
+                const br = u.branch || 'هندسة كهرباء بني مزار';
+                affTextEl.textContent = `${sec} - ${br}`;
+                affBoxEl.style.display = 'block';
+            }
+        } else if (affBoxEl) {
+            affBoxEl.style.display = 'none';
+        }
+    };
 };
 
 /**
@@ -982,6 +1219,7 @@ const applyLogoSize = (size: number) => {
  */
 const updateUI = () => {
     if (loggedInUser) {
+        updateAdminScopeUI();
         // App container elements
         document.getElementById('sidebar-user-name')!.textContent = loggedInUser.fullName;
         document.getElementById('sidebar-user-role')!.textContent = loggedInUser.role === 'admin' ? 'Admin' : 'User';
@@ -1425,8 +1663,17 @@ const handleLogin = async (event: Event) => {
 
         showAppLoading('جارٍ تسجيل الدخول والتحقق من الصلاحيات...', 'المنظومة الموحدة للعدادات - مزامنة سحابية ⚡', '🔐');
         await new Promise(r => setTimeout(r, 650));
-        loggedInUser = { fullName: user.fullName, role: user.role, username: user.username };
+        loggedInUser = {
+            fullName: user.fullName,
+            role: user.role,
+            username: user.username,
+            sector: user.sector || 'all',
+            branch: user.branch || 'all'
+        };
         localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
+        currentAdminScopeSector = 'all';
+        currentAdminScopeBranch = 'all';
+        updateAdminScopeUI();
         errorElement?.classList.add('hidden');
         (document.getElementById('password') as HTMLInputElement).value = '';
         updateUI();
@@ -1486,25 +1733,32 @@ const renderDashboard = () => {
         color?: string;
     };
 
+    const scopedMeters = (state.meters || []).filter(matchesCurrentScope);
+    const scopedLostMemos = (state.lostMeterMemos || []).filter(matchesCurrentScope);
+    const scopedJudicial = (state.judicialControl || []).filter(matchesCurrentScope);
+    const scopedMukayasat = (state.mukayasat || []).filter(matchesCurrentScope);
+    const scopedTransformers = (state.transformers || []).filter(matchesCurrentScope);
+    const scopedZinat = (state.zinatCollection || []).filter(matchesCurrentScope);
+
     let cardData: DashboardCard[] = [
-        { key: 'all-subscribers-card', id: 'subscribers-all', title: 'جميع المشتركين', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', count: state.meters.length, color: 'bg-primary' },
+        { key: 'all-subscribers-card', id: 'subscribers-all', title: 'جميع المشتركين', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', count: scopedMeters.length, color: 'bg-primary' },
         { key: 'new-meters-card', id: 'subscribers-new', filter: 'جديد', title: 'عدادات جديدة', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>' },
         { key: 'lifted-meters-card', id: 'subscribers-faults', filter: 'مرفوع أعطال', title: 'عدادات مرفوعة اعطال', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>' },
         { key: 'replacement-card', id: 'subscribers-replacement', filter: 'مرفوع إحلال', title: 'إحلال وتجديد', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>' },
-        { key: 'repairs-card', id: 'repaired-meters', title: 'الإصلاحات', icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>', count: state.meters.filter(m => m.repairStatus).length, color: 'bg-success' },
-        { key: 'lost-memos-card', id: 'lost-memos-search', title: 'المذكــــرات', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>', count: state.lostMeterMemos.length, color: 'bg-secondary' },
+        { key: 'repairs-card', id: 'repaired-meters', title: 'الإصلاحات', icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>', count: scopedMeters.filter(m => m.repairStatus).length, color: 'bg-success' },
+        { key: 'lost-memos-card', id: 'lost-memos-search', title: 'المذكــــرات', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>', count: scopedLostMemos.length, color: 'bg-secondary' },
         { key: 'scrapped-meters-card', id: 'subscribers-demolition', filter: 'هدم', title: 'عدادات هدم', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>', color: 'bg-error' },
-        { key: 'judicial-control-card', id: 'judicial-control-list', title: 'الضبطية القضائية', icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>', count: state.judicialControl.length, color: 'bg-warning' },
-        { key: 'mukayasat-card', id: 'mukayasat-list', title: 'المعاينات الفنية', icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/>', count: state.mukayasat.length, color: 'bg-info' },
+        { key: 'judicial-control-card', id: 'judicial-control-list', title: 'الضبطية القضائية', icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>', count: scopedJudicial.length, color: 'bg-warning' },
+        { key: 'mukayasat-card', id: 'mukayasat-list', title: 'المعاينات الفنية', icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/>', count: scopedMukayasat.length, color: 'bg-info' },
         {
-            key: 'transformers-card', id: 'transformer-list', title: 'إدارة المحولات', icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/><polyline points="7 12 12 7 17 12"></polyline><line x1="12" y1="22" x2="12" y2="7"></line>', count: state.transformers.length, color: 'bg-primary'
+            key: 'transformers-card', id: 'transformer-list', title: 'إدارة المحولات', icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/><polyline points="7 12 12 7 17 12"></polyline><line x1="12" y1="22" x2="12" y2="7"></line>', count: scopedTransformers.length, color: 'bg-primary'
         },
         {
             key: 'judicial-collection-card',
             id: 'collection-judicial',
             title: 'تحصيل الضبطية',
             icon: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-            count: state.judicialControl.filter(item => {
+            count: scopedJudicial.filter(item => {
                 const total = Number(item.reconciliationAmount || 0);
                 if (total === 0) return false;
                 const paid = (item.payments || []).reduce((sum: number, p: Payment) => sum + p.amount, 0);
@@ -1517,7 +1771,7 @@ const renderDashboard = () => {
             id: 'collection-zinat',
             title: 'تحصيل زينات',
             icon: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-            count: state.zinatCollection.filter(item => {
+            count: scopedZinat.filter(item => {
                 const total = Number(item.amount || 0);
                 if (total === 0) return false;
                 const paid = (item.payments || []).reduce((sum: number, p: Payment) => sum + p.amount, 0);
@@ -1554,7 +1808,7 @@ const renderDashboard = () => {
     if (loggedInUser && loggedInUser.role === 'معاينات') {
         cardData = [
             { key: 'mukaysa-add-card', id: 'mukayasat-registration', title: 'ادخال مقايسة', icon: '<path d="M12 5v14M5 12h14"/>' },
-            { key: 'mukayasat-list-card', id: 'mukayasat-list', title: 'المقايسات المحفوظة', icon: '<path d="M3 6h18M3 12h18M3 18h18"/>', count: state.mukayasat.length },
+            { key: 'mukayasat-list-card', id: 'mukayasat-list', title: 'المقايسات المحفوظة', icon: '<path d="M3 6h18M3 12h18M3 18h18"/>', count: scopedMukayasat.length },
         ] as DashboardCard[];
     }
 
@@ -1586,7 +1840,7 @@ const renderDashboard = () => {
             count = data.count;
         } else if (data.filter) {
             const filters = Array.isArray(data.filter) ? data.filter : [data.filter];
-            count = state.meters.filter(m => filters.includes(m.subscriberType)).length;
+            count = scopedMeters.filter(m => filters.includes(m.subscriberType)).length;
         }
 
         const filterString = Array.isArray(data.filter) ? data.filter.join(',') : data.filter;
@@ -1913,9 +2167,9 @@ const renderFilteredMeterTable = (tableElementId: string, filters: string[], col
     // Render header
     thead.innerHTML = `<tr>${columns.map(c => `<th>${c.header}</th>`).join('')}</tr>`;
 
-    // Filter data
+    // Filter data with Branch & Sector Scope Isolation
     const filteredMeters = dataOverride || state.meters.filter(meter =>
-        filters.includes(meter.subscriberType)
+        filters.includes(meter.subscriberType) && matchesCurrentScope(meter)
     );
 
     // Render body
@@ -2460,6 +2714,7 @@ const handleMeterFormSubmit = async (event: Event) => {
         formData.installationStatus = 'تركيب جديد';
     }
 
+    stampItemWithScope(formData);
     if (existingId) {
         // Update existing record
         const index = state.meters.findIndex(m => m.id === existingId);
@@ -2504,6 +2759,7 @@ const handleMeterFormSubmit = async (event: Event) => {
         };
 
         // Add the new meter record to the state.
+        stampItemWithScope(newMeterData);
         state.meters.push(newMeterData);
         logActivity('إنشاء سجل إحلال تلقائي', `إنشاء سجل عداد جديد تلقائياً للمشترك "${formData.subscriberName}"`, `شاسية جديد: ${newChassisNumber}`);
         showToast('تم حفظ سجل الإحلال وإنشاء السجل الجديد تلقائياً.');
@@ -2566,6 +2822,7 @@ const applyAndRenderJudicialControlList = () => {
     } else if (printExpiredBtn) { printExpiredBtn.style.display = 'none'; }
 
     const filteredData = state.judicialControl.filter(item => {
+        if (!matchesCurrentScope(item)) return false;
         const textMatch = !textFilter ||
             (item.subscriberName || '').toLowerCase().includes(textFilter) ||
             (item.nationalId || '').toLowerCase().includes(textFilter) ||
@@ -2938,6 +3195,7 @@ const handleJudicialControlFormSubmit = async (event: Event) => {
             }
         }
     } else { // Adding
+        stampItemWithScope(newRecord);
         state.judicialControl.push(newRecord);
         logActivity('إضافة محضر', `تم إضافة محضر جديد للمخالف: ${newRecord.subscriberName}`);
 
@@ -3165,6 +3423,7 @@ const renderJudicialCollectionSection = () => {
     tableBody.innerHTML = '';
     // Filter items that are 'Under Investigation' or 'Reconciled'
     const collectionItems = state.judicialControl.filter(item => {
+        if (!matchesCurrentScope(item)) return false;
         const isRelevantStatus = item.status === 'قيد التحقيق' || item.status === 'تم التصالح';
         if (!isRelevantStatus) return false;
 
@@ -3679,7 +3938,7 @@ const renderJudicialCollectionSection = () => {
 
         if (addressMultiselect) {
             const currentSelection = Array.from(addressMultiselect.querySelectorAll('input:checked')).map((i: any) => i.value);
-            const uniqueAddresses = [...new Set(state.zinatCollection.map(i => i.address).filter(a => a))].sort();
+            const uniqueAddresses = [...new Set(state.zinatCollection.filter(matchesCurrentScope).map(i => i.address).filter(a => a))].sort();
 
             addressMultiselect.innerHTML = uniqueAddresses.map(addr => `
             <label><input type="checkbox" class="address-checkbox" value="${addr}" ${currentSelection.includes(addr) ? 'checked' : ''}><span>${addr}</span></label>
@@ -3692,6 +3951,7 @@ const renderJudicialCollectionSection = () => {
         const isAdmin = hasPermission('manage_collection');
 
         const filteredData = state.zinatCollection.filter(item => {
+            if (!matchesCurrentScope(item)) return false;
             const matchName = !nameFilter || (item.requesterName || '').toLowerCase().includes(nameFilter);
             const matchMobile = !mobileFilter || (item.mobile || '').toLowerCase().includes(mobileFilter);
             const matchDate = !dateFilter || item.requestDate === dateFilter;
@@ -3815,6 +4075,7 @@ const renderJudicialCollectionSection = () => {
             payments: []
         };
 
+        stampItemWithScope(newItem);
         state.zinatCollection.push(newItem);
         logActivity('إضافة طلب زينات', `إضافة طلب زينات للمواطن / المشترك: ${newItem.requesterName}`);
         if (await saveState()) {
@@ -4142,7 +4403,7 @@ const renderJudicialCollectionSection = () => {
 
         let zinatAmount = 0;
         let zinatCount = 0;
-        (state.zinatCollection || []).forEach((item: any) => {
+        (state.zinatCollection || []).filter(matchesCurrentScope).forEach((item: any) => {
             (item.payments || []).forEach((p: any) => {
                 const matchesUser = p.collectedBy === fullName || p.collectedBy === username || p.collectorUsername === username;
                 const matchesDate = !targetDate || normalizeDateStr(p.date) === targetDate;
@@ -4155,7 +4416,7 @@ const renderJudicialCollectionSection = () => {
 
         let judicialAmount = 0;
         let judicialCount = 0;
-        (state.judicialControl || []).forEach((item: any) => {
+        (state.judicialControl || []).filter(matchesCurrentScope).forEach((item: any) => {
             (item.payments || []).forEach((p: any) => {
                 const matchesUser = p.collectedBy === fullName || p.collectedBy === username || p.collectorUsername === username;
                 const matchesDate = !targetDate || normalizeDateStr(p.date) === targetDate;
@@ -4167,7 +4428,7 @@ const renderJudicialCollectionSection = () => {
         });
 
         let manualAmount = 0;
-        (state.treasuryTransactions || []).forEach((t: any) => {
+        (state.treasuryTransactions || []).filter(matchesCurrentScope).forEach((t: any) => {
             const matchesUser = t.collectorUsername === username || t.collectorName === fullName;
             const matchesDate = !targetDate || normalizeDateStr(t.date) === targetDate;
             if (matchesUser && matchesDate && t.type === 'manual_deposit') {
@@ -4178,7 +4439,7 @@ const renderJudicialCollectionSection = () => {
         const totalCollected = Number((zinatAmount + judicialAmount + manualAmount).toFixed(2));
 
         let totalSettled = 0;
-        (state.treasurySettlements || []).forEach((s: any) => {
+        (state.treasurySettlements || []).filter(matchesCurrentScope).forEach((s: any) => {
             const matchesUser = s.collectorUsername === username || s.collectorName === fullName;
             const matchesDate = !targetDate || normalizeDateStr(s.settlementDate) === targetDate;
             if (matchesUser && matchesDate) {
@@ -4220,7 +4481,7 @@ const renderJudicialCollectionSection = () => {
 
         let totalZinat = 0;
         let zinatCount = 0;
-        (state.zinatCollection || []).forEach((item: any) => {
+        (state.zinatCollection || []).filter(matchesCurrentScope).forEach((item: any) => {
             (item.payments || []).forEach((p: any) => {
                 if (!targetDate || normalizeDateStr(p.date) === targetDate) {
                     totalZinat += Number(p.amount) || 0;
@@ -4231,7 +4492,7 @@ const renderJudicialCollectionSection = () => {
 
         let totalJudicial = 0;
         let judicialCount = 0;
-        (state.judicialControl || []).forEach((item: any) => {
+        (state.judicialControl || []).filter(matchesCurrentScope).forEach((item: any) => {
             (item.payments || []).forEach((p: any) => {
                 if (!targetDate || normalizeDateStr(p.date) === targetDate) {
                     totalJudicial += Number(p.amount) || 0;
@@ -4241,7 +4502,7 @@ const renderJudicialCollectionSection = () => {
         });
 
         let totalManual = 0;
-        (state.treasuryTransactions || []).forEach((t: any) => {
+        (state.treasuryTransactions || []).filter(matchesCurrentScope).forEach((t: any) => {
             if (!targetDate || normalizeDateStr(t.date) === targetDate) {
                 if (t.type === 'manual_deposit') totalManual += Number(t.amount) || 0;
             }
@@ -4249,7 +4510,7 @@ const renderJudicialCollectionSection = () => {
 
         const totalRevenues = Number((totalZinat + totalJudicial + totalManual).toFixed(2));
 
-        const userSummaries = state.users.map(u => calculateUserCustodySummary(u, dateFilter || 'today'));
+        const userSummaries = state.users.filter(matchesCurrentScope).map(u => calculateUserCustodySummary(u, dateFilter || 'today'));
         const pendingUnsettledTotal = userSummaries.reduce((sum, u) => sum + u.remaining, 0);
         const unsettledUsersCount = userSummaries.filter(u => u.status === 'unsettled').length;
 
@@ -4360,7 +4621,7 @@ const renderJudicialCollectionSection = () => {
         const statusFilter = statusSelect ? statusSelect.value : 'all';
         const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
-        const allSummaries = state.users.map(u => calculateUserCustodySummary(u, dateFilter));
+        const allSummaries = state.users.filter(matchesCurrentScope).map(u => calculateUserCustodySummary(u, dateFilter));
 
         let filtered = allSummaries.filter(u => {
             if (statusFilter === 'unsettled' && u.status !== 'unsettled') return false;
@@ -4440,7 +4701,7 @@ const renderJudicialCollectionSection = () => {
         const list: any[] = [];
 
         // 1. Zinat collections
-        (state.zinatCollection || []).forEach((item: any) => {
+        (state.zinatCollection || []).filter(matchesCurrentScope).forEach((item: any) => {
             (item.payments || []).forEach((p: any, pIdx: number) => {
                 list.push({
                     id: `zinat-${item.id}-${pIdx}`,
@@ -4458,7 +4719,7 @@ const renderJudicialCollectionSection = () => {
         });
 
         // 2. Judicial collections
-        (state.judicialControl || []).forEach((item: any) => {
+        (state.judicialControl || []).filter(matchesCurrentScope).forEach((item: any) => {
             (item.payments || []).forEach((p: any, pIdx: number) => {
                 list.push({
                     id: `judicial-${item.id}-${pIdx}`,
@@ -4476,7 +4737,7 @@ const renderJudicialCollectionSection = () => {
         });
 
         // 3. Treasury settlements
-        (state.treasurySettlements || []).forEach((s: any) => {
+        (state.treasurySettlements || []).filter(matchesCurrentScope).forEach((s: any) => {
             list.push({
                 id: `settle-${s.id}`,
                 type: 'settlement',
@@ -4492,7 +4753,7 @@ const renderJudicialCollectionSection = () => {
         });
 
         // 4. Manual deposits
-        (state.treasuryTransactions || []).forEach((t: any) => {
+        (state.treasuryTransactions || []).filter(matchesCurrentScope).forEach((t: any) => {
             list.push({
                 id: `trans-${t.id}`,
                 type: t.type || 'manual_deposit',
@@ -4811,6 +5072,7 @@ const renderJudicialCollectionSection = () => {
         };
 
         if (!state.treasurySettlements) state.treasurySettlements = [];
+        stampItemWithScope(newSettlement);
         state.treasurySettlements.push(newSettlement);
 
         if (autoUnsuspend && user.isSuspended) {
@@ -4862,6 +5124,7 @@ const renderJudicialCollectionSection = () => {
         };
 
         if (!state.treasuryTransactions) state.treasuryTransactions = [];
+        stampItemWithScope(newTrans);
         state.treasuryTransactions.push(newTrans);
 
         logActivity('إيداع نقدي بالخزينة', `تم إيداع مبلغ ${amount} ج.م من ${depositorName} (إيصال: ${receiptNumber})`);
@@ -5747,6 +6010,7 @@ const renderJudicialCollectionSection = () => {
             }
         } else {
             // Add new entry
+            stampItemWithScope(entry);
             state.mukayasat.push(entry);
             logActivity('إضافة مقايسة', `تمت إضافة مقايسة رقم ${entry.requestNumber} باسم ${entry.requesterName}`);
             showToast('تم حفظ المقايسة بنجاح.');
@@ -5840,12 +6104,13 @@ const renderJudicialCollectionSection = () => {
         if (!tableBody) return;
         tableBody.innerHTML = '';
 
-        if (!state.mukayasat || state.mukayasat.length === 0) {
+        const mukayasatToRender = (state.mukayasat || []).filter(matchesCurrentScope);
+        if (mukayasatToRender.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center;">لا توجد مقاييس محفوظة.</td></tr>`;
             return;
         }
 
-        state.mukayasat.forEach(item => {
+        mukayasatToRender.forEach(item => {
             // منطق زر الإجراء المتعدد
             let multiActionBtn = '';
             if (item.status === 'قيد المعالجة') {
@@ -6244,12 +6509,13 @@ const renderJudicialCollectionSection = () => {
     `;
 
         tableBody.innerHTML = '';
-        if (state.lostMeterMemos.length === 0) {
+        const filteredMemos = (state.lostMeterMemos || []).filter(matchesCurrentScope);
+        if (filteredMemos.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center;">لا توجد مذكرات فقد مسجلة.</td></tr>`;
             return;
         }
 
-        state.lostMeterMemos.forEach((memo, index) => {
+        filteredMemos.forEach((memo, index) => {
             const row = document.createElement('tr');
             row.innerHTML = `
             <td>${index + 1}</td>
@@ -6352,6 +6618,7 @@ const renderJudicialCollectionSection = () => {
                 }
             }
         } else {
+            stampItemWithScope(memoData);
             state.lostMeterMemos.push(memoData);
             logActivity('إضافة مذكرة فقد', `إضافة مذكرة للمشترك: ${memoData.subscriberName}`);
             if (await saveState()) {
@@ -6701,6 +6968,7 @@ const renderJudicialCollectionSection = () => {
         tableBody.innerHTML = '';
 
         const results = state.mukayasat.filter(i => {
+            if (!matchesCurrentScope(i)) return false;
             const matchName = !name || (i.requesterName || '').toLowerCase().includes(name);
             const matchReq = !requestNumber || (i.requestNumber || '').toLowerCase().includes(requestNumber);
             const matchAddr = !address || (i.address || '').toLowerCase().includes(address);
@@ -6847,7 +7115,8 @@ const renderJudicialCollectionSection = () => {
         const nameFilter = (document.getElementById('filter-transformer-name') as HTMLInputElement)?.value.toLowerCase() || '';
         const chassisFilter = (document.getElementById('filter-transformer-chassis') as HTMLInputElement)?.value.toLowerCase() || '';
 
-        const filtered = state.transformers.filter(t =>
+        const filtered = (state.transformers || []).filter(t =>
+            matchesCurrentScope(t) &&
             (!nameFilter || (t.transformerName || '').toLowerCase().includes(nameFilter)) &&
             (!chassisFilter || (t.smartMeterChassis || '').toLowerCase().includes(chassisFilter))
         );
@@ -7005,8 +7274,9 @@ const renderJudicialCollectionSection = () => {
         const selectedName = nameFilter?.value || '';
         const selectedCouncil = councilFilter?.value || '';
 
+        const scopedTransForLoads = (state.transformers || []).filter(matchesCurrentScope);
         if (nameFilter) {
-            const transformerNames = Array.from(new Set(state.transformers.map(t => t.transformerName).filter(Boolean))) as string[];
+            const transformerNames = Array.from(new Set(scopedTransForLoads.map(t => t.transformerName).filter(Boolean))) as string[];
             nameFilter.innerHTML = '<option value="">كل المحولات</option>' + transformerNames.map(name => `<option value="${name}">${name}</option>`).join('');
             if (selectedName && transformerNames.includes(selectedName)) {
                 nameFilter.value = selectedName;
@@ -7030,7 +7300,8 @@ const renderJudicialCollectionSection = () => {
             capacityFilter.innerHTML = '<option value="">كل القدرات</option>' + capacities.map(capacity => `<option value="${capacity}">${capacity}</option>`).join('');
         }
 
-        const filtered = state.transformerLoads.filter(item => {
+        const filtered = (state.transformerLoads || []).filter(item => {
+            if (!matchesCurrentScope(item)) return false;
             const transformer = state.transformers.find(t => t.transformerName === item.transformerLoadName) || null;
             const itemCouncil = transformer?.councilName || '';
             const itemAddress = item.transformerLoadAddress || '';
@@ -8380,6 +8651,7 @@ const renderJudicialCollectionSection = () => {
         updatedData.accountReference = `${updatedData.accountRefF || ''}${updatedData.accountRefH || ''}${updatedData.accountRefY || ''}${updatedData.accountRefM || ''}`;
         Object.assign(updatedData, { accountRefF: updatedData.accountRefF, accountRefH: updatedData.accountRefH, accountRefY: updatedData.accountRefY, accountRefM: updatedData.accountRefM });
 
+        stampItemWithScope(updatedData);
         state.meters[meterIndex] = { ...originalMeter, ...updatedData };
 
         // Enhanced activity logging for edits
@@ -14027,6 +14299,7 @@ const renderJudicialCollectionSection = () => {
                 readingAtRemoval: undefined,
             };
 
+            stampItemWithScope(newMeter);
             state.meters.push(newMeter);
             logActivity('تغيير عداد (إصلاح)', `تسجيل عداد جديد كبديل للمشترك "${originalMeter.subscriberName}".`, `شاسية جديد: ${newChassisNumber}`);
 
@@ -14736,6 +15009,7 @@ const renderJudicialCollectionSection = () => {
                 requestType: req.requestType || 'تركيب عداد كودي'
             }));
 
+            newMukayasat.forEach(m => stampItemWithScope(m));
             state.mukayasat.push(...newMukayasat);
             state.pendingRequests = state.pendingRequests.filter(req => !selectedIds.includes(Number(req.id)));
 
@@ -15865,6 +16139,7 @@ const renderJudicialCollectionSection = () => {
 
         // --- Single-pass Filtering ---
         data = state.meters.filter(m => {
+            if (!matchesCurrentScope(m)) return false;
             // Common Filters
             const dates = [m.installationDate, m.removalDate, m.demolitionDate, m.installationDateForReplacement].filter(d => d);
             const inDateRange = (!dateFrom && !dateTo) || dates.some(d => (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo));
@@ -15892,19 +16167,22 @@ const renderJudicialCollectionSection = () => {
             const councilF = (document.getElementById('filter-transformer-council') as HTMLSelectElement)?.value;
             const addressF = (document.getElementById('filter-transformer-address') as HTMLSelectElement)?.value;
             const typeF = (document.getElementById('filter-transformer-type') as HTMLSelectElement)?.value;
-            data = state.transformers.filter(t =>
+            data = (state.transformers || []).filter(t =>
+                matchesCurrentScope(t) &&
                 (!councilF || t.councilName === councilF) &&
                 (!addressF || t.transformerAddress === addressF) &&
                 (!typeF || t.transformerType === typeF)
             );
         } else if (reportType === 'mukayasat') {
-            data = state.mukayasat.filter(m => {
+            data = (state.mukayasat || []).filter(m => {
+                if (!matchesCurrentScope(m)) return false;
                 const matchStatus = !mukayasaStatusFilter || m.status === mukayasaStatusFilter;
                 // Assuming mukayasat doesn't have a date field yet, so skipping date filter for it.
                 return matchStatus;
             });
         } else if (reportType === 'judicial_control') {
-            const filteredRawData = state.judicialControl.filter(m => {
+            const filteredRawData = (state.judicialControl || []).filter(m => {
+                if (!matchesCurrentScope(m)) return false;
                 const matchStatus = !judicialStatusFilter || m.status === judicialStatusFilter;
                 const matchReportType = !judicialReportTypeFilter || m.reportType === judicialReportTypeFilter;
                 const inDateRange = (!dateFrom || (m.reportDate && m.reportDate >= dateFrom)) &&
@@ -15924,7 +16202,7 @@ const renderJudicialCollectionSection = () => {
         } else if (reportType === 'judicial_collection_report') {
             data = [];
             if (state.judicialControl && Array.isArray(state.judicialControl)) {
-                state.judicialControl.forEach(item => {
+                state.judicialControl.filter(matchesCurrentScope).forEach(item => {
                     if (item.payments && Array.isArray(item.payments) && item.payments.length > 0) {
                         item.payments.forEach((p: Payment) => {
                             const pDateISO = parseDateToISO(p.date);
@@ -15957,7 +16235,7 @@ const renderJudicialCollectionSection = () => {
         } else if (reportType === 'zinat_collection_report') {
             data = [];
             if (state.zinatCollection && Array.isArray(state.zinatCollection)) {
-                state.zinatCollection.forEach(item => {
+                state.zinatCollection.filter(matchesCurrentScope).forEach(item => {
                     if (item.payments && Array.isArray(item.payments) && item.payments.length > 0) {
                         item.payments.forEach((p: Payment) => {
                             const pDateISO = parseDateToISO(p.date);
@@ -15987,7 +16265,8 @@ const renderJudicialCollectionSection = () => {
                 totalPaid,
             };
         } else if (reportType === 'installed_practice_meters') {
-            data = state.judicialControl.filter(m => {
+            data = (state.judicialControl || []).filter(m => {
+                if (!matchesCurrentScope(m)) return false;
                 const matchStatus = m.status === 'تم تركيب عداد';
                 const inDateRange = (!dateFrom || (m.reportDate && m.reportDate >= dateFrom)) &&
                     (!dateTo || (m.reportDate && m.reportDate <= dateTo));
@@ -18184,6 +18463,8 @@ const renderJudicialCollectionSection = () => {
             <th>الاسم الكامل</th>
             <th>اسم المستخدم</th>
             <th>الدور الوظيفي</th>
+            <th>القطاع</th>
+            <th>الفرع / الهندسة</th>
             <th>حالة الحساب / الإيقاف</th>
             <th>إجراءات</th>
         </tr>
@@ -18208,10 +18489,19 @@ const renderJudicialCollectionSection = () => {
             }
 
             const row = document.createElement('tr');
+            const secBadge = user.sector === 'all' 
+                ? '<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">🌐 شامل (الكل)</span>' 
+                : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.sector || 'قطاع شمال المنيا'}</span>`;
+            const brBadge = user.branch === 'all' 
+                ? '<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">🏛️ شامل (الكل)</span>' 
+                : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.branch || 'هندسة كهرباء بني مزار'}</span>`;
+
             row.innerHTML = ` 
             <td><b>${user.fullName}</b></td>
             <td><code>@${user.username}</code></td>
             <td><span class="badge" style="background:#f1f5f9; color:#334155;">${roleName}</span></td>
+            <td>${secBadge}</td>
+            <td>${brBadge}</td>
             <td>
                 ${statusHtml}
                 ${toggleSuspendBtn}
@@ -18240,6 +18530,20 @@ const renderJudicialCollectionSection = () => {
             roleSelect.appendChild(option);
         });
 
+        const sectorSelect = form.querySelector('#user-sector') as HTMLSelectElement | null;
+        if (sectorSelect) {
+            sectorSelect.innerHTML = '<option value="all">🌐 جميع القطاعات (شامل)</option>' + 
+                (state.settings.sectors || []).map((s: string) => `<option value="${s}">${s}</option>`).join('');
+            sectorSelect.value = 'all';
+        }
+
+        const branchSelect = form.querySelector('#user-branch') as HTMLSelectElement | null;
+        if (branchSelect) {
+            branchSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات (شامل)</option>' + 
+                (state.settings.branches || []).map((b: string) => `<option value="${b}">${b}</option>`).join('');
+            branchSelect.value = 'all';
+        }
+
         // Hide form for non-admins
         const userFormContainer = document.querySelector('#user-management .form-container');
         if (userFormContainer) {
@@ -18262,6 +18566,8 @@ const renderJudicialCollectionSection = () => {
         const username = (form.querySelector('#user-username') as HTMLInputElement).value;
         const role = (form.querySelector('#user-role') as HTMLSelectElement).value;
         const password = (form.querySelector('#user-password') as HTMLInputElement).value;
+        const sector = (form.querySelector('#user-sector') as HTMLSelectElement)?.value || 'all';
+        const branch = (form.querySelector('#user-branch') as HTMLSelectElement)?.value || 'all';
 
         const existingUser = state.users.find(u => u.username === username && u.id !== id);
         if (existingUser) {
@@ -18303,7 +18609,7 @@ const renderJudicialCollectionSection = () => {
                 showToast('كلمة المرور مطلوبة للمستخدم الجديد.', 'error');
                 return;
             }
-            state.users.push({ id, fullName, username, password, role });
+            state.users.push({ id, fullName, username, password, role, sector, branch });
             logActivity('إضافة مستخدم', `إضافة مستخدم جديد: "${fullName}".`, `اسم المستخدم: ${username}, الدور الوظيفي: ${role}`);
             showToast('تمت إضافة المستخدم بنجاح.');
         }
@@ -18324,6 +18630,20 @@ const renderJudicialCollectionSection = () => {
         (form.querySelector('#user-username') as HTMLInputElement).value = user.username;
         (form.querySelector('#user-role') as HTMLSelectElement).value = user.role;
         (form.querySelector('#user-password') as HTMLInputElement).value = '';
+
+        const editSecSelect = form.querySelector('#user-sector') as HTMLSelectElement | null;
+        if (editSecSelect) {
+            editSecSelect.innerHTML = '<option value="all">🌐 جميع القطاعات (شامل)</option>' + 
+                (state.settings.sectors || []).map((s: string) => `<option value="${s}" ${user.sector === s ? 'selected' : ''}>${s}</option>`).join('');
+            editSecSelect.value = user.sector || 'all';
+        }
+
+        const editBrSelect = form.querySelector('#user-branch') as HTMLSelectElement | null;
+        if (editBrSelect) {
+            editBrSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات (شامل)</option>' + 
+                (state.settings.branches || []).map((b: string) => `<option value="${b}" ${user.branch === b ? 'selected' : ''}>${b}</option>`).join('');
+            editBrSelect.value = user.branch || 'all';
+        }
         (form.querySelector('#user-confirmPassword') as HTMLInputElement).value = '';
 
         // Admin user cannot have role changed
@@ -19646,6 +19966,7 @@ const renderJudicialCollectionSection = () => {
 
         await withAppLoading(`جارٍ استيراد ومعالجة ${importedExcelData.length} سجل...`, async () => {
             if (newMetersToAdd.length > 0) {
+                newMetersToAdd.forEach(m => stampItemWithScope(m));
                 state.meters.push(...newMetersToAdd);
             }
             logActivity('استيراد اكسل', `تم فحص ${importedExcelData.length} سجل: إضافة ${addedCount} جديد، إكمال بيانات ${updatedCount} موجود، وتخطي ${skippedCount} مكرر.`);
@@ -20472,6 +20793,18 @@ const renderJudicialCollectionSection = () => {
     });
     document.getElementById('login-form')?.addEventListener('submit', handleLogin);
         document.getElementById('header-logout-btn')?.addEventListener('click', handleLogout);
+        // مستمعات شريط تبديل النطاق (القطاع والفرع) للأدمن
+        document.getElementById('scope-sector-select')?.addEventListener('change', (e) => {
+            currentAdminScopeSector = (e.target as HTMLSelectElement).value;
+            refreshCurrentActiveSection();
+            showToast(`تم تبديل عرض القطاع: ${currentAdminScopeSector === 'all' ? 'جميع القطاعات' : currentAdminScopeSector}`, 'info');
+        });
+
+        document.getElementById('scope-branch-select')?.addEventListener('change', (e) => {
+            currentAdminScopeBranch = (e.target as HTMLSelectElement).value;
+            refreshCurrentActiveSection();
+            showToast(`تم تبديل عرض الفرع: ${currentAdminScopeBranch === 'all' ? 'جميع الفروع' : currentAdminScopeBranch}`, 'info');
+        });
 
         // Main App Listeners
         document.querySelectorAll('.sidebar-nav .nav-link, .btn-back, .card.nav-link').forEach(link => {
