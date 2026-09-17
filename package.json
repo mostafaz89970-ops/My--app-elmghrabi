@@ -44,6 +44,8 @@
       "internalCardServer.js",
       "debts_store.json",
       "card_store.json",
+      "initial_data.json",
+      "public/**/*",
       "read_card.ps1",
       "package.json"
     ],

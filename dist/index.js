@@ -435,6 +435,37 @@ const loadState = async () => {
                 loadedState = JSON.parse(savedStateJSON_LS);
             }
         }
+        // Automatic initial seed: If no state or no meters exist, fetch initial_data.json
+        const needsInitialData = !loadedState || !loadedState.meters || loadedState.meters.length === 0;
+        if (needsInitialData) {
+            try {
+                console.log("Fetching initial dataset (initial_data.json)...");
+                const res = await fetch('./initial_data.json');
+                if (res.ok) {
+                    const seedData = await res.json();
+                    if (seedData && seedData.meters && seedData.meters.length > 0) {
+                        loadedState = mergeWithDefaults(loadedState || {}, seedData);
+                        loadedState.meters = seedData.meters;
+                        if (seedData.debts)
+                            loadedState.debts = seedData.debts;
+                        if (seedData.debtTypes)
+                            loadedState.debtTypes = seedData.debtTypes;
+                        if (seedData.fees)
+                            loadedState.fees = seedData.fees;
+                        if (seedData.users)
+                            loadedState.users = seedData.users;
+                        if (seedData.transformers)
+                            loadedState.transformers = seedData.transformers;
+                        if (seedData.settings)
+                            loadedState.settings = mergeWithDefaults(loadedState.settings || {}, seedData.settings);
+                        console.log(`Loaded ${seedData.meters.length} meters from initial_data.json successfully!`);
+                    }
+                }
+            }
+            catch (seedErr) {
+                console.warn("Could not load initial_data.json:", seedErr);
+            }
+        }
         if (!loadedState) {
             console.log("No saved state found in IndexedDB or localStorage.");
             return; // Start with default state
@@ -474,7 +505,7 @@ const loadState = async () => {
             delete mergedState.settings.signatures;
         }
         const keysThatShouldBeArrays = [
-            'meters', 'subscribers', 'users', 'activityLog', 'judicialControl', 'lostMeterMemos', 'zinatCollection', 'mukayasat', 'transformers'
+            'meters', 'subscribers', 'users', 'activityLog', 'judicialControl', 'lostMeterMemos', 'zinatCollection', 'mukayasat', 'transformers', 'debts'
         ];
         for (const key of keysThatShouldBeArrays) { // Add 'transformers' to this list
             if (!Array.isArray(mergedState[key])) {
