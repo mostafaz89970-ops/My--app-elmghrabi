@@ -4,7 +4,11 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1f2937">
   <title>المنظومة الموحدة للعدادات</title>
   <link rel="stylesheet" href="index.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1030,6 +1034,7 @@
           </div>
         </footer>
     </aside>
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
 
     <main class="main-content">
       <header class="main-header">
@@ -5331,6 +5336,30 @@
       <footer class="main-footer">
         <p id="main-footer-text">المنظومة الموحدة للعدادات - جميع الحقوق محفوظة © 2026</p>
       </footer>
+    
+    <!-- Mobile Bottom Navigation Bar (شريط التنقل السريع للهواتف) -->
+    <nav id="mobile-bottom-bar" class="mobile-bottom-bar">
+        <button type="button" class="mobile-bottom-bar-item active" data-target="dashboard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            <span>الرئيسية</span>
+        </button>
+        <button type="button" class="mobile-bottom-bar-item" data-target="meter-management">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+            <span>العدادات</span>
+        </button>
+        <button type="button" class="mobile-bottom-bar-item" data-target="customer-management">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+            <span>المشتركين</span>
+        </button>
+        <button type="button" class="mobile-bottom-bar-item" data-target="mukayasat-list">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/></svg>
+            <span>المقايسات</span>
+        </button>
+        <button type="button" class="mobile-bottom-bar-item" data-target="toggle-menu" id="mobile-menu-toggle-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            <span>القائمة</span>
+        </button>
+    </nav>
     </main>
   </div>
 
@@ -5342,7 +5371,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript -->
-  <script src="./dist/index.js?v=1789645611689"></script>
+  <script src="./dist/index.js?v=1789646043551"></script>
 
   <!-- HOTFIX: Ensure app container is hidden on logout -->
   <script>

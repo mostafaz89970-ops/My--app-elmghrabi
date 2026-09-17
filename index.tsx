@@ -18306,6 +18306,15 @@ const renderJudicialCollectionSection = () => {
 
         localStorage.setItem('lastActiveSection', targetId);
 
+        // Update mobile bottom bar active item if target matches
+        document.querySelectorAll('.mobile-bottom-bar-item').forEach(btn => {
+            if ((btn as HTMLElement).dataset.target === targetId) {
+                btn.classList.add('active');
+            } else if ((btn as HTMLElement).dataset.target !== 'toggle-menu') {
+                btn.classList.remove('active');
+            }
+        });
+
         if (targetId === 'meter-registration' && targetLink.id === 'sidebar-add-meter-btn') {
             openMeterForm();
             return; // Stop further execution to avoid double navigation logic
@@ -19572,6 +19581,72 @@ const renderJudicialCollectionSection = () => {
         }
 
         // Sidebar toggle
+        
+// --- Mobile Adaptation Logic ---
+const initMobileAdaptation = () => {
+    const checkAndApplyMobile = () => {
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            document.body.classList.add('sidebar-collapsed');
+        }
+    };
+
+    // Apply on load
+    checkAndApplyMobile();
+
+    // Backdrop click closes sidebar
+    document.getElementById('sidebar-backdrop')?.addEventListener('click', () => {
+        document.body.classList.add('sidebar-collapsed');
+    });
+
+    // Nav-link click on mobile closes sidebar
+    document.querySelectorAll('.sidebar-nav .nav-link').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                document.body.classList.add('sidebar-collapsed');
+            }
+        });
+    });
+
+    // Mobile Bottom Bar item click handlers
+    document.querySelectorAll('.mobile-bottom-bar-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = (btn as HTMLElement).dataset.target;
+            if (target === 'toggle-menu') {
+                document.body.classList.toggle('sidebar-collapsed');
+                return;
+            }
+            if (target) {
+                document.querySelectorAll('.mobile-bottom-bar-item').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // Trigger navigation through sidebar link or direct handler
+                const sidebarLink = document.querySelector(`.sidebar-nav .nav-link[data-target="${target}"]`) as HTMLElement;
+                if (sidebarLink) {
+                    sidebarLink.click();
+                }
+            }
+        });
+    });
+
+    // Swipe gesture support to close sidebar on mobile (RTL swipe right closes)
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.querySelector('.sidebar')?.addEventListener('touchstart', (e: any) => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    document.querySelector('.sidebar')?.addEventListener('touchend', (e: any) => {
+        touchEndX = e.changedTouches[0].screenX;
+        if (touchEndX - touchStartX > 60) {
+            document.body.classList.add('sidebar-collapsed');
+        }
+    }, { passive: true });
+};
+
+        initMobileAdaptation();
+
         document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
             document.body.classList.toggle('sidebar-collapsed');
         });

@@ -17222,6 +17222,15 @@ function handleNavigation(event) {
     const pageIcon = getSectionIcon(targetId);
     showAppLoading(`جارٍ فتح ${pageLabel.trim()}...`, 'المنظومة الموحدة للعدادات', pageIcon);
     localStorage.setItem('lastActiveSection', targetId);
+    // Update mobile bottom bar active item if target matches
+    document.querySelectorAll('.mobile-bottom-bar-item').forEach(btn => {
+        if (btn.dataset.target === targetId) {
+            btn.classList.add('active');
+        }
+        else if (btn.dataset.target !== 'toggle-menu') {
+            btn.classList.remove('active');
+        }
+    });
     if (targetId === 'meter-registration' && targetLink.id === 'sidebar-add-meter-btn') {
         openMeterForm();
         return; // Stop further execution to avoid double navigation logic
@@ -18513,6 +18522,62 @@ const setupEventListeners = () => {
         });
     }
     // Sidebar toggle
+    // --- Mobile Adaptation Logic ---
+    const initMobileAdaptation = () => {
+        var _a, _b, _c;
+        const checkAndApplyMobile = () => {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                document.body.classList.add('sidebar-collapsed');
+            }
+        };
+        // Apply on load
+        checkAndApplyMobile();
+        // Backdrop click closes sidebar
+        (_a = document.getElementById('sidebar-backdrop')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => {
+            document.body.classList.add('sidebar-collapsed');
+        });
+        // Nav-link click on mobile closes sidebar
+        document.querySelectorAll('.sidebar-nav .nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    document.body.classList.add('sidebar-collapsed');
+                }
+            });
+        });
+        // Mobile Bottom Bar item click handlers
+        document.querySelectorAll('.mobile-bottom-bar-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const target = btn.dataset.target;
+                if (target === 'toggle-menu') {
+                    document.body.classList.toggle('sidebar-collapsed');
+                    return;
+                }
+                if (target) {
+                    document.querySelectorAll('.mobile-bottom-bar-item').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    // Trigger navigation through sidebar link or direct handler
+                    const sidebarLink = document.querySelector(`.sidebar-nav .nav-link[data-target="${target}"]`);
+                    if (sidebarLink) {
+                        sidebarLink.click();
+                    }
+                }
+            });
+        });
+        // Swipe gesture support to close sidebar on mobile (RTL swipe right closes)
+        let touchStartX = 0;
+        let touchEndX = 0;
+        (_b = document.querySelector('.sidebar')) === null || _b === void 0 ? void 0 : _b.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+        (_c = document.querySelector('.sidebar')) === null || _c === void 0 ? void 0 : _c.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            if (touchEndX - touchStartX > 60) {
+                document.body.classList.add('sidebar-collapsed');
+            }
+        }, { passive: true });
+    };
+    initMobileAdaptation();
     (_91 = document.getElementById('sidebar-toggle')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', () => {
         document.body.classList.toggle('sidebar-collapsed');
     });
