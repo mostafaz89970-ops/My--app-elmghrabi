@@ -1332,6 +1332,10 @@
                     <fieldset id="details-repaired-info-fields" class="form-grid-group hidden">
                         <legend>بيانات الإصلاح</legend>
                         <div class="input-group">
+                            <label for="details-repairStatus">حالة الإصلاح</label>
+                            <select id="details-repairStatus"></select>
+                        </div>
+                        <div class="input-group">
                             <label for="details-repairDate">تاريخ الإصلاح</label>
                             <input type="date" id="details-repairDate">
                         </div>
@@ -1340,6 +1344,23 @@
                             <input type="date" id="details-reinstallationDate">
                         </div>
                     </fieldset>
+
+                    <fieldset id="details-change-subscription-fields" class="form-grid-group hidden">
+                        <legend>بيانات تغيير التعاقد</legend>
+                        <div class="input-group">
+                            <label for="details-newSubscriberName">اسم المشترك الجديد</label>
+                            <input type="text" id="details-newSubscriberName">
+                        </div>
+                        <div class="input-group">
+                            <label for="details-contractDate">تاريخ التعاقد</label>
+                            <input type="date" id="details-contractDate">
+                        </div>
+                    </fieldset>
+
+                    <div class="input-group full-width">
+                        <label for="details-notes">ملاحظات</label>
+                        <textarea id="details-notes" rows="2" placeholder="أي ملاحظات إضافية حول المشترك أو العداد..."></textarea>
+                    </div>
                  </form>
                  <div class="form-actions">
                     <button id="save-details-btn" class="btn">حفظ التعديلات</button>
@@ -5377,7 +5398,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript -->
-  <script src="./dist/index.js?v=1789646532190"></script>
+  <script src="./dist/index.js?v=1789647657323"></script>
 
   <!-- HOTFIX: Ensure app container is hidden on logout -->
   <script>

@@ -1835,7 +1835,7 @@ const ensureMeterSupplyCompanyField = (prefix) => {
     if (select) {
         div = select.closest('.input-group');
         const val = select.value;
-        select.required = true;
+        select.required = false;
         populateSelect(select, state.settings.meterSupplyCompanies, 'اختر شركة التوريد');
         select.value = val;
         return;
@@ -1848,7 +1848,7 @@ const ensureMeterSupplyCompanyField = (prefix) => {
             <select id="${prefix}meterSupplyCompany"></select>
         `;
         select = div.querySelector('select');
-        select.required = true;
+        select.required = false;
         populateSelect(select, state.settings.meterSupplyCompanies, 'اختر شركة التوريد');
     }
     const targetInput = document.getElementById(`${prefix}newMeterType`);
@@ -5632,25 +5632,30 @@ const handleGoBack = () => {
     }
 };
 const updateMeterFormVisibility = (formPrefix = '') => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u;
     const meterTypeSelect = document.getElementById(`${formPrefix}meterType`);
     const subscriberTypeSelect = document.getElementById(`${formPrefix}subscriberType`);
     const removalReasonSelect = document.getElementById(`${formPrefix}removalReason`);
     const readingAtRemovalGroup = document.getElementById(`${formPrefix}reading-field-container`);
     if (!subscriberTypeSelect)
         return;
-    const subscriberType = subscriberTypeSelect.value || '';
+    const subscriberType = (subscriberTypeSelect.value || '').trim();
     const meterType = meterTypeSelect ? meterTypeSelect.value : '';
     const isNewSubscriber = subscriberType === 'جديد';
+    const isReplacement = ['مرفوع إحلال', 'استبدال', 'تم استبداله', 'تم تغير العداد'].includes(subscriberType);
+    const isFaulty = subscriberType === 'مرفوع أعطال';
+    const isDemolition = ['هدم', 'استغناء'].includes(subscriberType);
+    const isChangeContract = subscriberType === 'تغير عقد اشتراك';
+    const isRepaired = ['تم الإصلاح', 'لا يمكن إصلاحه'].includes(subscriberType);
     const isImported = subscriberType.includes('مستورد');
-    // --- Hide/show fields based on 'جديد' status (never hide for imported records) ---
+    // --- Hide/show fields based on 'جديد' status ---
     const meterChassisInput = document.getElementById(`${formPrefix}meterChassisNumber`);
     const meterChassisGroup = meterChassisInput === null || meterChassisInput === void 0 ? void 0 : meterChassisInput.closest('.input-group');
     const meterTypeGroup = meterTypeSelect === null || meterTypeSelect === void 0 ? void 0 : meterTypeSelect.closest('.input-group');
     meterChassisGroup === null || meterChassisGroup === void 0 ? void 0 : meterChassisGroup.classList.toggle('hidden', isNewSubscriber && !isImported);
     meterTypeGroup === null || meterTypeGroup === void 0 ? void 0 : meterTypeGroup.classList.toggle('hidden', isNewSubscriber && !isImported);
     readingAtRemovalGroup === null || readingAtRemovalGroup === void 0 ? void 0 : readingAtRemovalGroup.classList.toggle('hidden', isNewSubscriber && !isImported);
-    // --- Adjust labels in installation section for clarity ---
+    // --- Adjust labels for clarity ---
     const newChassisLabel = document.querySelector(`label[for="${formPrefix}newMeterChassisNumber"]`);
     const newTypeLabel = document.querySelector(`label[for="${formPrefix}newMeterType"]`);
     if (newChassisLabel) {
@@ -5659,60 +5664,105 @@ const updateMeterFormVisibility = (formPrefix = '') => {
     if (newTypeLabel) {
         newTypeLabel.textContent = isNewSubscriber ? 'نوع العداد' : 'نوع العداد الجديد';
     }
-    // فحص وجود بيانات فعلية في الحقول لضمان عدم إخفاء أي حقل يحتوي على بيانات مسجلة أو مستوردة
+    const chassisLabel = document.querySelector(`label[for="${formPrefix}meterChassisNumber"]`);
+    const typeLabel = document.querySelector(`label[for="${formPrefix}meterType"]`);
+    if (chassisLabel && chassisLabel.firstChild) {
+        chassisLabel.firstChild.textContent = isReplacement ? 'شاسية العداد القديم ' : 'شاسية العداد ';
+    }
+    if (typeLabel && typeLabel.firstChild) {
+        typeLabel.firstChild.textContent = isReplacement ? 'نوع العداد القديم ' : 'نوع العداد ';
+    }
+    // Check if actual data exists in each section (used for imported or untyped records)
     const hasRemovalData = !!(((_a = document.getElementById(`${formPrefix}removalDate`)) === null || _a === void 0 ? void 0 : _a.value) ||
         ((_b = document.getElementById(`${formPrefix}removalReason`)) === null || _b === void 0 ? void 0 : _b.value) ||
-        ((_c = document.getElementById(`${formPrefix}removedBy`)) === null || _c === void 0 ? void 0 : _c.value) ||
-        ((_d = document.getElementById(`${formPrefix}readingAtRemoval`)) === null || _d === void 0 ? void 0 : _d.value));
-    const hasInstallData = !!(((_e = document.getElementById(`${formPrefix}installationDate`)) === null || _e === void 0 ? void 0 : _e.value) ||
-        ((_f = document.getElementById(`${formPrefix}installedBy`)) === null || _f === void 0 ? void 0 : _f.value) ||
-        ((_g = document.getElementById(`${formPrefix}meterSupplyCompany`)) === null || _g === void 0 ? void 0 : _g.value) ||
-        ((_h = document.getElementById(`${formPrefix}newMeterChassisNumber`)) === null || _h === void 0 ? void 0 : _h.value) ||
-        ((_j = document.getElementById(`${formPrefix}newMeterType`)) === null || _j === void 0 ? void 0 : _j.value) ||
-        ((_k = document.getElementById(`${formPrefix}installationStatus`)) === null || _k === void 0 ? void 0 : _k.value));
-    const hasDemolitionData = !!(((_l = document.getElementById(`${formPrefix}demolitionDate`)) === null || _l === void 0 ? void 0 : _l.value) ||
-        ((_m = document.getElementById(`${formPrefix}demolitionType`)) === null || _m === void 0 ? void 0 : _m.value) ||
-        ((_o = document.getElementById(`${formPrefix}meterReceivedBy`)) === null || _o === void 0 ? void 0 : _o.value));
-    const hasChangeSubData = !!(((_p = document.getElementById(`${formPrefix}newSubscriberName`)) === null || _p === void 0 ? void 0 : _p.value) ||
-        ((_q = document.getElementById(`${formPrefix}contractDate`)) === null || _q === void 0 ? void 0 : _q.value));
-    const hasCardStatusData = !!((_r = document.getElementById(`${formPrefix}cardStatus`)) === null || _r === void 0 ? void 0 : _r.value);
-    // --- Subscriber Type dependent fields ---
-    const showRemoval = ['مرفوع أعطال', 'مرفوع إحلال', 'استبدال'].includes(subscriberType) || (isImported && hasRemovalData);
-    const showInstallation = ['جديد', 'مرفوع إحلال', 'استبدال'].includes(subscriberType) || isImported || hasInstallData;
-    const showDemolition = ['هدم', 'استغناء'].includes(subscriberType) || (isImported && hasDemolitionData);
-    const showChangeSubscription = subscriberType === 'تغير عقد اشتراك' || (isImported && hasChangeSubData);
-    // Show repair info fields if status is 'تم الإصلاح'
-    const showRepairedInfo = subscriberType === 'تم الإصلاح';
-    (_s = document.getElementById(`${formPrefix}repaired-info-fields`)) === null || _s === void 0 ? void 0 : _s.classList.toggle('hidden', !showRepairedInfo);
-    (_t = document.getElementById(`${formPrefix}removal-fields`)) === null || _t === void 0 ? void 0 : _t.classList.toggle('hidden', !showRemoval);
-    (_u = document.getElementById(`${formPrefix}installation-fields`)) === null || _u === void 0 ? void 0 : _u.classList.toggle('hidden', !showInstallation);
-    // Inject change subscription fields if not exist
-    let changeSubFields = document.getElementById(`${formPrefix}change-subscription-fields`);
-    if (!changeSubFields) {
-        const parent = (_v = document.getElementById(`${formPrefix}demolition-fields`)) === null || _v === void 0 ? void 0 : _v.parentNode;
-        const refNode = document.getElementById(`${formPrefix}demolition-fields`);
-        if (parent && refNode) {
-            changeSubFields = document.createElement('fieldset');
-            changeSubFields.id = `${formPrefix}change-subscription-fields`;
-            changeSubFields.className = 'form-grid-group hidden';
-            changeSubFields.innerHTML = `
-                <legend>بيانات تغيير التعاقد</legend>
-                <div class="input-group">
-                    <label for="${formPrefix}newSubscriberName">اسم المشترك الجديد</label>
-                    <input type="text" id="${formPrefix}newSubscriberName">
-                </div>
-                <div class="input-group">
-                    <label for="${formPrefix}contractDate">تاريخ التعاقد</label>
-                    <input type="date" id="${formPrefix}contractDate">
-                </div>
-             `;
-            parent.insertBefore(changeSubFields, refNode.nextSibling);
-        }
+        ((_c = document.getElementById(`${formPrefix}removedBy`)) === null || _c === void 0 ? void 0 : _c.value));
+    const hasInstallData = !!(((_d = document.getElementById(`${formPrefix}installationDate`)) === null || _d === void 0 ? void 0 : _d.value) ||
+        ((_e = document.getElementById(`${formPrefix}newMeterChassisNumber`)) === null || _e === void 0 ? void 0 : _e.value) ||
+        ((_f = document.getElementById(`${formPrefix}installedBy`)) === null || _f === void 0 ? void 0 : _f.value));
+    const hasDemolitionData = !!(((_g = document.getElementById(`${formPrefix}demolitionDate`)) === null || _g === void 0 ? void 0 : _g.value) ||
+        ((_h = document.getElementById(`${formPrefix}demolitionType`)) === null || _h === void 0 ? void 0 : _h.value) ||
+        ((_j = document.getElementById(`${formPrefix}meterReceivedBy`)) === null || _j === void 0 ? void 0 : _j.value));
+    const hasChangeSubData = !!(((_k = document.getElementById(`${formPrefix}newSubscriberName`)) === null || _k === void 0 ? void 0 : _k.value) ||
+        ((_l = document.getElementById(`${formPrefix}contractDate`)) === null || _l === void 0 ? void 0 : _l.value));
+    const hasRepairedData = !!(((_m = document.getElementById(`${formPrefix}repairDate`)) === null || _m === void 0 ? void 0 : _m.value) ||
+        ((_o = document.getElementById(`${formPrefix}reinstallationDate`)) === null || _o === void 0 ? void 0 : _o.value) ||
+        ((_p = document.getElementById(`${formPrefix}repairStatus`)) === null || _p === void 0 ? void 0 : _p.value));
+    const hasCardStatusData = !!((_q = document.getElementById(`${formPrefix}cardStatus`)) === null || _q === void 0 ? void 0 : _q.value);
+    // --- Determine fieldset visibility strictly according to subscriber status ---
+    let showRemoval = false;
+    let showInstallation = false;
+    let showDemolition = false;
+    let showChangeSubscription = false;
+    let showRepairedInfo = false;
+    if (isNewSubscriber) {
+        showInstallation = true;
+        showRemoval = false;
+        showDemolition = false;
+        showChangeSubscription = false;
+        showRepairedInfo = false;
     }
-    if (changeSubFields) {
-        changeSubFields.classList.toggle('hidden', !showChangeSubscription);
-        const inputs = changeSubFields.querySelectorAll('input');
-        inputs.forEach(input => input.required = showChangeSubscription && !isImported);
+    else if (isFaulty) {
+        showRemoval = true;
+        showInstallation = false;
+        showDemolition = false;
+        showChangeSubscription = false;
+        showRepairedInfo = false;
+    }
+    else if (isReplacement) {
+        showRemoval = true;
+        showInstallation = true;
+        showDemolition = false;
+        showChangeSubscription = false;
+        showRepairedInfo = false;
+    }
+    else if (isDemolition) {
+        showDemolition = true;
+        showRemoval = false;
+        showInstallation = false;
+        showChangeSubscription = false;
+        showRepairedInfo = false;
+    }
+    else if (isChangeContract) {
+        showChangeSubscription = true;
+        showRemoval = false;
+        showInstallation = false;
+        showDemolition = false;
+        showRepairedInfo = false;
+    }
+    else if (isRepaired) {
+        showRepairedInfo = true;
+        showRemoval = true;
+        showInstallation = false;
+        showDemolition = false;
+        showChangeSubscription = false;
+    }
+    else if (isImported) {
+        // For imported records with unspecified subtype, show whichever fieldsets actually have recorded data
+        showRemoval = hasRemovalData;
+        showInstallation = hasInstallData;
+        showDemolition = hasDemolitionData;
+        showChangeSubscription = hasChangeSubData;
+        showRepairedInfo = hasRepairedData;
+    }
+    else {
+        // Fallback for custom or untyped statuses
+        showRemoval = hasRemovalData;
+        showInstallation = hasInstallData;
+        showDemolition = hasDemolitionData;
+        showChangeSubscription = hasChangeSubData;
+        showRepairedInfo = hasRepairedData;
+    }
+    // Apply visibility to containers
+    const removalFields = document.getElementById(`${formPrefix}removal-fields`);
+    if (removalFields)
+        removalFields.classList.toggle('hidden', !showRemoval);
+    const installationFields = document.getElementById(`${formPrefix}installation-fields`);
+    if (installationFields) {
+        installationFields.classList.toggle('hidden', !showInstallation);
+        const legend = installationFields.querySelector('legend');
+        if (legend) {
+            legend.textContent = isReplacement ? 'بيانات تركيب العداد الجديد / البديل' : 'بيانات التركيب';
+        }
     }
     const demolitionFields = document.getElementById(`${formPrefix}demolition-fields`);
     if (demolitionFields) {
@@ -5724,6 +5774,86 @@ const updateMeterFormVisibility = (formPrefix = '') => {
         const demolitionTypeLabel = document.querySelector(`label[for="${formPrefix}demolitionType"]`);
         if (demolitionTypeLabel) {
             demolitionTypeLabel.textContent = subscriberType === 'استغناء' ? 'نوع الاستغناء' : 'نوع الهدم';
+        }
+    }
+    const repairedInfoFields = document.getElementById(`${formPrefix}repaired-info-fields`);
+    if (repairedInfoFields)
+        repairedInfoFields.classList.toggle('hidden', !showRepairedInfo);
+    // Manage Change Subscription Fields
+    let changeSubFields = document.getElementById(`${formPrefix}change-subscription-fields`);
+    if (!changeSubFields) {
+        const parent = (_r = document.getElementById(`${formPrefix}demolition-fields`)) === null || _r === void 0 ? void 0 : _r.parentNode;
+        const refNode = document.getElementById(`${formPrefix}demolition-fields`);
+        if (parent && refNode) {
+            changeSubFields = document.createElement('fieldset');
+            changeSubFields.id = `${formPrefix}change-subscription-fields`;
+            changeSubFields.className = 'form-grid-group hidden';
+            changeSubFields.innerHTML = `
+                    <legend>بيانات تغيير التعاقد</legend>
+                    <div class="input-group">
+                        <label for="${formPrefix}newSubscriberName">اسم المشترك الجديد</label>
+                        <input type="text" id="${formPrefix}newSubscriberName">
+                    </div>
+                    <div class="input-group">
+                        <label for="${formPrefix}contractDate">تاريخ التعاقد</label>
+                        <input type="date" id="${formPrefix}contractDate">
+                    </div>
+                `;
+            parent.insertBefore(changeSubFields, refNode.nextSibling);
+        }
+    }
+    if (changeSubFields) {
+        changeSubFields.classList.toggle('hidden', !showChangeSubscription);
+        const inputs = changeSubFields.querySelectorAll('input');
+        inputs.forEach(input => input.required = showChangeSubscription && !isImported);
+    }
+    // --- Meter Supply Company Field Logic ---
+    const supplyCompanySelect = document.getElementById(`${formPrefix}meterSupplyCompany`);
+    if (supplyCompanySelect) {
+        const wrapper = supplyCompanySelect.closest('.input-group');
+        if (isFaulty && removalFields) {
+            const targetInput = document.getElementById(`${formPrefix}removedBy`);
+            const targetGroup = targetInput === null || targetInput === void 0 ? void 0 : targetInput.closest('.input-group');
+            if (targetGroup && targetGroup.parentNode === removalFields) {
+                removalFields.insertBefore(wrapper, targetGroup);
+            }
+            else {
+                removalFields.appendChild(wrapper);
+            }
+            wrapper.classList.toggle('hidden', meterType !== 'مسبق الدفع' && !supplyCompanySelect.value);
+        }
+        else if (isDemolition && demolitionFields) {
+            const targetInput = document.getElementById(`${formPrefix}meterReceivedBy`);
+            const targetGroup = targetInput === null || targetInput === void 0 ? void 0 : targetInput.closest('.input-group');
+            if (targetGroup && targetGroup.parentNode === demolitionFields) {
+                demolitionFields.insertBefore(wrapper, targetGroup);
+            }
+            else {
+                demolitionFields.appendChild(wrapper);
+            }
+            wrapper.classList.toggle('hidden', meterType !== 'مسبق الدفع' && !supplyCompanySelect.value);
+        }
+        else if ((isNewSubscriber || isReplacement) && installationFields) {
+            const targetInput = document.getElementById(`${formPrefix}newMeterType`);
+            const targetGroup = targetInput === null || targetInput === void 0 ? void 0 : targetInput.closest('.input-group');
+            if (targetGroup && targetGroup.parentNode === installationFields) {
+                installationFields.insertBefore(wrapper, targetGroup.nextSibling);
+            }
+            else {
+                installationFields.appendChild(wrapper);
+            }
+            wrapper.classList.remove('hidden');
+        }
+        else if (removalFields && showRemoval) {
+            removalFields.appendChild(wrapper);
+            wrapper.classList.toggle('hidden', meterType !== 'مسبق الدفع' && !supplyCompanySelect.value);
+        }
+        else if (installationFields && showInstallation) {
+            installationFields.appendChild(wrapper);
+            wrapper.classList.remove('hidden');
+        }
+        else {
+            wrapper.classList.add('hidden');
         }
     }
     // --- Search Mode Logic for Save Button ---
@@ -5741,23 +5871,11 @@ const updateMeterFormVisibility = (formPrefix = '') => {
         }
     }
     else if (formPrefix === '' && saveBtn) {
-        // Reset to default if not in search mode
         saveBtn.style.display = 'block';
         saveBtn.textContent = 'حفظ البيانات';
         saveBtn.classList.add('btn-primary');
         saveBtn.classList.remove('btn-danger');
     }
-    // --- Dynamically manage 'required' attributes for validation ---
-    const newMeterChassisInput = document.getElementById(`${formPrefix}newMeterChassisNumber`);
-    if (meterChassisInput)
-        meterChassisInput.required = !isNewSubscriber && !isImported;
-    if (newMeterChassisInput)
-        newMeterChassisInput.required = (isNewSubscriber || showInstallation) && !isImported;
-    // --- Meter Type dependent fields ---
-    const showReadingField = !isNewSubscriber && ['ميكانيكي', 'ديجيتال'].includes(meterType);
-    const hasReading = !!((_w = document.getElementById(`${formPrefix}readingAtRemoval`)) === null || _w === void 0 ? void 0 : _w.value);
-    (_x = document.getElementById(`${formPrefix}reading-field-container`)) === null || _x === void 0 ? void 0 : _x.classList.toggle('hidden', !(showReadingField || (isImported && hasReading)));
-    (_y = document.getElementById(`${formPrefix}card-status-field-container`)) === null || _y === void 0 ? void 0 : _y.classList.toggle('hidden', !(meterType === 'مسبق الدفع' || isImported || hasCardStatusData));
     // Automatically set removal reason for 'مرفوع إحلال'
     if (subscriberType === 'مرفوع إحلال') {
         if (removalReasonSelect) {
@@ -5775,64 +5893,17 @@ const updateMeterFormVisibility = (formPrefix = '') => {
             }
         }
     }
-    // --- Meter Supply Company Field Logic ---
-    const supplyCompanySelect = document.getElementById(`${formPrefix}meterSupplyCompany`);
-    if (supplyCompanySelect) {
-        const wrapper = supplyCompanySelect.closest('.input-group');
-        const removalContainer = document.getElementById(`${formPrefix}removal-fields`);
-        const demolitionContainer = document.getElementById(`${formPrefix}demolition-fields`);
-        const installationContainer = document.getElementById(`${formPrefix}installation-fields`);
-        if (['مرفوع أعطال'].includes(subscriberType)) {
-            if (removalContainer) {
-                const targetInput = document.getElementById(`${formPrefix}removedBy`);
-                const targetGroup = targetInput === null || targetInput === void 0 ? void 0 : targetInput.closest('.input-group');
-                if (targetGroup && targetGroup.parentNode === removalContainer) {
-                    removalContainer.insertBefore(wrapper, targetGroup);
-                }
-                else {
-                    removalContainer.appendChild(wrapper);
-                }
-                wrapper.classList.toggle('hidden', meterType !== 'مسبق الدفع');
-            }
-        }
-        else if (['هدم', 'استغناء'].includes(subscriberType)) {
-            if (demolitionContainer) {
-                const targetInput = document.getElementById(`${formPrefix}meterReceivedBy`);
-                const targetGroup = targetInput === null || targetInput === void 0 ? void 0 : targetInput.closest('.input-group');
-                if (targetGroup && targetGroup.parentNode === demolitionContainer) {
-                    demolitionContainer.insertBefore(wrapper, targetGroup);
-                }
-                else {
-                    demolitionContainer.appendChild(wrapper);
-                }
-                wrapper.classList.toggle('hidden', meterType !== 'مسبق الدفع');
-            }
-        }
-        else if (subscriberType === 'استبدال') {
-            if (installationContainer) {
-                installationContainer.appendChild(wrapper);
-                wrapper.classList.toggle('hidden', meterType !== 'مسبق الدفع');
-            }
-        }
-        else if (['جديد', 'مرفوع إحلال'].includes(subscriberType) || isImported || hasInstallData) {
-            if (installationContainer) {
-                if (wrapper.parentElement !== installationContainer) {
-                    const targetInput = document.getElementById(`${formPrefix}newMeterType`);
-                    const targetGroup = targetInput === null || targetInput === void 0 ? void 0 : targetInput.closest('.input-group');
-                    if (targetGroup && targetGroup.parentNode === installationContainer) {
-                        installationContainer.insertBefore(wrapper, targetGroup.nextSibling);
-                    }
-                    else {
-                        installationContainer.appendChild(wrapper);
-                    }
-                }
-                wrapper.classList.remove('hidden');
-            }
-        }
-        else {
-            wrapper.classList.add('hidden');
-        }
-    }
+    // --- Dynamically manage 'required' attributes for validation ---
+    const newMeterChassisInput = document.getElementById(`${formPrefix}newMeterChassisNumber`);
+    if (meterChassisInput)
+        meterChassisInput.required = !isNewSubscriber && !isImported;
+    if (newMeterChassisInput)
+        newMeterChassisInput.required = (isNewSubscriber || isReplacement) && !isImported;
+    // --- Dynamic reading and card status visibility ---
+    const showReadingField = !isNewSubscriber && ['ميكانيكي', 'ديجيتال'].includes(meterType);
+    const hasReading = !!((_s = document.getElementById(`${formPrefix}readingAtRemoval`)) === null || _s === void 0 ? void 0 : _s.value);
+    (_t = document.getElementById(`${formPrefix}reading-field-container`)) === null || _t === void 0 ? void 0 : _t.classList.toggle('hidden', !(showReadingField || (isImported && hasReading)));
+    (_u = document.getElementById(`${formPrefix}card-status-field-container`)) === null || _u === void 0 ? void 0 : _u.classList.toggle('hidden', !(meterType === 'مسبق الدفع' || isImported || hasCardStatusData));
 };
 // --- Confirmation Dialog ---
 let confirmCallback = null;
@@ -5917,14 +5988,20 @@ const handlePrintSubscriberDetails = () => {
         createRow('اسم المشترك', meter.subscriberName),
         createRow('كود الاشتراك', meter.subscriptionCode),
         createRow('العنوان', meter.address),
+        createRow('الميدان المخصص', meter.assignedArea),
         createRow('وصف المكان', meter.locationDescription),
         createRow('رقم اللوحة', meter.panelNumber),
         createRow('مرجع الحساب', `ف: ${meter.accountRefF || ''} | ح: ${meter.accountRefH || ''} | ي: ${meter.accountRefY || ''} | م: ${meter.accountRefM || ''}`),
         createRow('نوع النشاط', meter.activityType),
         createRow('نوع الاشتراك', meter.subscriptionType),
-        createRow('الحالة', meter.subscriberType)
+        createRow('الحالة', meter.subscriberType),
+        createRow('ملاحظات', meter.notes)
     ].join('');
     const isNewRecord = meter.subscriberType === 'جديد';
+    const isFaultyRecord = meter.subscriberType === 'مرفوع أعطال';
+    const isDemolitionRecord = ['هدم', 'استغناء'].includes(meter.subscriberType);
+    const isReplacementRecord = ['مرفوع إحلال', 'استبدال', 'تم استبداله', 'تم تغير العداد'].includes(meter.subscriberType);
+    const isRepairedRecord = ['تم الإصلاح', 'لا يمكن إصلاحه'].includes(meter.subscriberType);
     const hasNewMeterData = (meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement) && !isNewRecord;
     const meterItems = [
         createRow(hasNewMeterData ? 'شاسية العداد القديم' : 'شاسية العداد', meter.meterChassisNumber),
@@ -5932,22 +6009,26 @@ const handlePrintSubscriberDetails = () => {
         createRow('قدرة العداد', meter.meterCapacity),
         (meter.meterType === 'مسبق الدفع' ? createRow('حالة الكارت', meter.cardStatus) : '')
     ].join('');
-    const installItems = (meter.installationDate || meter.installedBy || hasNewMeterData) ? [
-        createRow('شاسية العداد الجديد', meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement),
-        createRow('نوع العداد الجديد', meter.newMeterType),
-        createRow('تاريخ التركيب', meter.installationDate),
+    // Install items: ONLY for new subscribers, replacement records, or records genuinely having install data (never for faulty or demolition)
+    const shouldShowInstallInPrint = isNewRecord || isReplacementRecord || (!isFaultyRecord && !isDemolitionRecord && !isRepairedRecord && (meter.installationDate || meter.installedBy || hasNewMeterData));
+    const installItems = shouldShowInstallInPrint ? [
+        createRow(isNewRecord ? 'شاسية العداد' : 'شاسية العداد الجديد', meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement || (isNewRecord ? meter.meterChassisNumber : '')),
+        createRow(isNewRecord ? 'نوع العداد' : 'نوع العداد الجديد', meter.newMeterType || (isNewRecord ? meter.meterType : '')),
+        createRow('تاريخ التركيب', meter.installationDate || meter.installationDateForReplacement),
         createRow('القائم بالتركيب', meter.installedBy),
         createRow('شركة توريد العداد', meter.meterSupplyCompany),
         createRow('حالة التركيب', meter.installationStatus)
     ].join('') : '';
-    const removalItems = ((meter.removalDate || meter.removalReason) && !['هدم', 'استغناء'].includes(meter.subscriberType)) ? [
+    // Removal items: ONLY for faulty, replacement, repaired, or when removal date exists (never for new or demolition)
+    const shouldShowRemovalInPrint = isFaultyRecord || isReplacementRecord || isRepairedRecord || (!isNewRecord && !isDemolitionRecord && (meter.removalDate || meter.removalReason));
+    const removalItems = shouldShowRemovalInPrint ? [
         createRow('تاريخ الرفع', meter.removalDate),
         createRow('سبب الرفع', meter.removalReason),
         createRow('القائم بالرفع', meter.removedBy),
         createRow('القراءة عند الرفع', meter.readingAtRemoval)
     ].join('') : '';
     let repairItems = '';
-    if (meter.repairStatus) {
+    if (isRepairedRecord || meter.repairStatus || meter.repairDate) {
         let durationRow = '';
         const start = meter.removalDate;
         const end = meter.reinstallationDate || meter.installationDateForReplacement;
@@ -5962,17 +6043,17 @@ const handlePrintSubscriberDetails = () => {
         }
         repairItems = [
             createRow('حالة الإصلاح', meter.repairStatus),
-            createRow('تاريخ الرفع', meter.removalDate),
-            createRow('تاريخ التركيب', meter.reinstallationDate || meter.installationDateForReplacement),
+            createRow('تاريخ الإصلاح', meter.repairDate),
+            createRow('تاريخ الرجوع للتركيب', meter.reinstallationDate || meter.installationDateForReplacement),
             durationRow
         ].join('');
     }
-    const demolitionItems = (['هدم', 'استغناء'].includes(meter.subscriberType) && (meter.demolitionDate || meter.demolitionType)) ? [
+    const demolitionItems = (isDemolitionRecord || (meter.demolitionDate || meter.demolitionType)) ? [
         createRow(meter.subscriberType === 'استغناء' ? 'تاريخ الاستغناء' : 'تاريخ الهدم', meter.demolitionDate),
         createRow(meter.subscriberType === 'استغناء' ? 'نوع الاستغناء' : 'نوع الهدم', meter.demolitionType),
         createRow('القائم بالاستلام', meter.meterReceivedBy)
     ].join('') : '';
-    const contractItems = (meter.newSubscriberName || meter.contractDate) ? [
+    const contractItems = (meter.subscriberType === 'تغير عقد اشتراك' || meter.newSubscriberName || meter.contractDate) ? [
         createRow('اسم المشترك الجديد', meter.newSubscriberName),
         createRow('تاريخ التعاقد', meter.contractDate)
     ].join('') : '';
@@ -6074,6 +6155,17 @@ const openSubscriberDetailsPage = (meterId, mode) => {
     const activeSection = document.querySelector('.content-section.active');
     previousPageId = activeSection ? activeSection.id : 'meter-management';
     const form = document.getElementById('subscriber-details-form');
+    // 1. Reset and completely clear all inputs to avoid residual values
+    form.reset();
+    const allInputs = form.querySelectorAll('input, select, textarea');
+    allInputs.forEach(el => {
+        if (el.type === 'checkbox' || el.type === 'radio') {
+            el.checked = false;
+        }
+        else {
+            el.value = '';
+        }
+    });
     clearFormErrors(form);
     const title = document.getElementById('subscriber-details-title');
     const saveButton = document.getElementById('save-details-btn');
@@ -6105,6 +6197,7 @@ const openSubscriberDetailsPage = (meterId, mode) => {
     populateSelect(document.getElementById('details-meterReceivedBy'), state.settings.technicians, 'اختر القائم بالاستلام...');
     populateSelect(document.getElementById('details-demolitionType'), state.settings.demolitionTypes, 'اختر نوع الهدم...');
     populateSelect(document.getElementById('details-cardStatus'), state.settings.cardStatuses, 'اختر حالة الكارت...');
+    populateSelect(document.getElementById('details-repairStatus'), state.settings.repairStatuses, 'اختر حالة الإصلاح...');
     populateSelect(document.getElementById('details-subscriberType'), ['جديد', 'مرفوع أعطال', 'مرفوع إحلال', 'استغناء', 'تغير عقد اشتراك', 'استبدال', 'هدم', 'تم الإصلاح', 'لا يمكن إصلاحه', 'تم استبداله', 'تم تغير العداد', 'بيانات مستوردة من إكسل', 'بيانات مستوردة'], 'اختر حالة المشترك...');
     populateSelect(document.getElementById('details-locationDescription'), state.settings.placeDescriptions, 'اختر وصف المكان...');
     // Populate form fields from meter object
@@ -6112,7 +6205,6 @@ const openSubscriberDetailsPage = (meterId, mode) => {
         const input = document.getElementById(`details-${key}`);
         if (input) {
             const val = meter[key];
-            // التأكد من وجود القيمة في القائمة المنسدلة حتى لا يظهر الحقل فارغاً في حال كانت القيمة مستوردة وغير مسجلة في الإعدادات
             if (input instanceof HTMLSelectElement && val && val !== 'غير محدد') {
                 const exists = Array.from(input.options).some(opt => opt.value === val);
                 if (!exists) {
@@ -6125,11 +6217,35 @@ const openSubscriberDetailsPage = (meterId, mode) => {
             input.value = (val !== undefined && val !== null) ? String(val) : '';
         }
     });
-    // Special handling for 'new' subscribers to show chassis number in the correct field
+    // Specific fields mapping based on status
     if (meter.subscriberType === 'جديد') {
-        document.getElementById('details-newMeterChassisNumber').value = meter.meterChassisNumber || '';
+        const newChassisEl = document.getElementById('details-newMeterChassisNumber');
+        const newTypeEl = document.getElementById('details-newMeterType');
+        if (newChassisEl)
+            newChassisEl.value = meter.meterChassisNumber || meter.newMeterChassisNumber || '';
+        if (newTypeEl) {
+            const mType = meter.meterType || meter.newMeterType || '';
+            if (mType && !Array.from(newTypeEl.options).some(opt => opt.value === mType)) {
+                const opt = document.createElement('option');
+                opt.value = mType;
+                opt.textContent = mType;
+                newTypeEl.appendChild(opt);
+            }
+            newTypeEl.value = mType;
+        }
     }
-    // ضمان تثبيت قيمة شركة توريد العداد
+    else {
+        // Replacement or lifted meter fields
+        const newChassisEl = document.getElementById('details-newMeterChassisNumber');
+        if (newChassisEl && !newChassisEl.value && meter.newMeterChassisNumberForReplacement) {
+            newChassisEl.value = meter.newMeterChassisNumberForReplacement;
+        }
+        const installDateEl = document.getElementById('details-installationDate');
+        if (installDateEl && !installDateEl.value && meter.installationDateForReplacement) {
+            installDateEl.value = meter.installationDateForReplacement;
+        }
+    }
+    // Supply company mapping
     if (meter.meterSupplyCompany) {
         const supplySelect = document.getElementById('details-meterSupplyCompany');
         if (supplySelect) {
@@ -6154,7 +6270,7 @@ const openSubscriberDetailsPage = (meterId, mode) => {
     // Navigate to the details section
     document.querySelectorAll('.content-section.active').forEach(s => s.classList.remove('active'));
     (_b = document.getElementById('subscriber-details')) === null || _b === void 0 ? void 0 : _b.classList.add('active');
-    setPageTitle('تفاصيل المحضر');
+    setPageTitle('تفاصيل المشترك');
 };
 const handleSaveDetails = () => {
     if (currentMeterIdForDetails === null)
