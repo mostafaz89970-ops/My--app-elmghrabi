@@ -74,6 +74,19 @@ type DataItem = {
 };
 
 // تعريف واجهة صريحة لإعدادات التطبيق لضمان التعرف على جميع الخصائص
+interface AppUser {
+    id: number;
+    fullName: string;
+    username: string;
+    password: string;
+    role: string;
+    isSuspended?: boolean;
+    suspendReason?: string;
+    suspendedAt?: string;
+    suspendedBy?: string;
+    [key: string]: any;
+}
+
 interface AppSettings {
     companyName: string;
     footerText: string;
@@ -166,6 +179,8 @@ let state = {
     pendingRequests: [] as DataItem[], // الحالة الجديدة للطلبات المستوردة
     judicialControl: [] as DataItem[], // قسم الضبطية القضائية
     zinatCollection: [] as DataItem[], // قسم تحصيل زينات
+    treasuryTransactions: [] as any[], // المعاملات المالية بالخزينة
+    treasurySettlements: [] as any[], // سجل تصفيات العهد اليومية للمستخدمين
     activityLog: [] as ActivityLogEntry[],
     debts: [] as any[],
     debtTypes: [] as any[],
@@ -181,7 +196,7 @@ let state = {
     } as any,
     users: [
         { id: 1, fullName: 'Admin User', username: 'admin', password: '123450', role: 'admin' }
-    ],
+    ] as AppUser[],
     settings: { // تم تطبيق الواجهة AppSettings هنا
         companyName: 'ELMAGHRABI',
         footerText: 'منظومة العدادات 2025 - جميع الحقوق محفوظة ELMGHRABI © 2026',
@@ -337,6 +352,10 @@ let state = {
             'view_lost_meter_memos_section': { name: 'عرض قسم مذكرات الفقد', roles: ['admin', 'supervisor'] },
             'manage_lost_meter_memos': { name: 'إدارة مذكرات الفقد', roles: ['admin', 'supervisor'] },
             'view_activity_log': { name: 'عرض سجل النشاط', roles: ['admin', 'supervisor'] },
+            'view_treasury_section': { name: 'عرض قسم الخزينة العامة', roles: ['admin', 'supervisor'] },
+            'view_treasury_dashboard': { name: 'عرض لوحة الخزينة اليومية', roles: ['admin', 'supervisor'] },
+            'manage_treasury_settlements': { name: 'إدارة تصفيات العهد ووقف الحسابات', roles: ['admin', 'supervisor'] },
+            'view_treasury_transactions': { name: 'عرض سجل المعاملات المالية بالخزينة', roles: ['admin', 'supervisor'] },
             'view_collection_section': { name: 'عرض قسم التحصيل', roles: ['admin', 'supervisor', 'user'] },
             'view_collection_judicial': { name: 'عرض وإدارة تحصيل الضبطية', roles: ['admin', 'supervisor', 'user'] },
             'view_collection_zinat': { name: 'عرض وإدارة تحصيل زينات', roles: ['admin', 'supervisor', 'user'] },
@@ -368,6 +387,7 @@ let state = {
             'show_transformers_card': { name: 'عرض بطاقة إدارة المحولات', roles: ['admin', 'supervisor', 'user'] },
             'show_judicial_collection_card': { name: 'عرض بطاقة تحصيل الضبطية', roles: ['admin', 'supervisor', 'user'] },
             'show_zinat_collection_card': { name: 'عرض بطاقة تحصيل زينات', roles: ['admin', 'supervisor', 'user'] },
+            'show_treasury_card': { name: 'عرض بطاقة الخزينة العامة والتوريدات', roles: ['admin', 'supervisor'] },
             'show_zinat_registration_card': { name: 'عرض بطاقة إضافة زينات', roles: ['admin', 'supervisor', 'user'] },
             'show_accounting_card': { name: 'عرض بطاقة نظام المحاسبة', roles: ['admin', 'supervisor'] },
             'show_users_card': { name: 'عرض بطاقة المستخدمين', roles: ['admin', 'supervisor'] },
@@ -932,7 +952,7 @@ const populateUserDropdown = () => {
     state.users.forEach(user => {
         const option = document.createElement('option');
         option.value = user.username;
-        option.textContent = user.fullName;
+        option.textContent = user.fullName + (user.isSuspended ? ' ⛔ (موقوف من الخزينة)' : '');
         usernameSelect.appendChild(option);
     });
     usernameSelect.value = '';
@@ -1488,6 +1508,14 @@ const renderDashboard = () => {
             id: 'accounting-system',
             title: 'نظام المحاسبة',
             icon: '<path d="M4 19h16M7 16V8m5 8V5m5 11v-7"/><path d="M7 8h10"/>',
+            color: 'bg-primary'
+        },
+        {
+            key: 'treasury-card',
+            id: 'treasury-dashboard',
+            title: 'الخزينة العامة',
+            icon: '<rect x="2" y="4" width="20" height="16" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M12 9v1"></path><path d="M12 14v1"></path><path d="M14 12h1"></path><path d="M9 12h1"></path>',
+            count: calculateTreasuryDailyTotals().unsettledUsersCount,
             color: 'bg-primary'
         },
         { key: 'users-card', id: 'user-management', title: 'المستخدمين', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', count: state.users.length, color: 'bg-muted' },
@@ -3788,6 +3816,781 @@ const renderJudicialCollectionSection = () => {
                 item.payments.pop(); // Revert if save failed
             }
         }
+    };
+
+
+    // =========================================================================
+    // ====================== قسم الخزينة العامة والتصفيات ======================
+    // =========================================================================
+
+    function normalizeDateStr(d: any): string {
+        if (!d) return '';
+        if (typeof d !== 'string') d = String(d);
+        d = d.replace(/[٠-٩]/g, (ch: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(ch).toString()).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+        const parts = d.split(/[/\-.]/);
+        if (parts.length === 3) {
+            if (parts[0].length === 4) {
+                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+            } else if (parts[2].length === 4) {
+                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+        }
+        const parsed = new Date(d);
+        if (!isNaN(parsed.getTime())) {
+            return parsed.toISOString().slice(0, 10);
+        }
+        return d;
+    }
+
+    interface UserCustodySummary {
+        user: any;
+        username: string;
+        fullName: string;
+        role: string;
+        zinatAmount: number;
+        zinatCount: number;
+        judicialAmount: number;
+        judicialCount: number;
+        manualAmount: number;
+        totalCollected: number;
+        totalSettled: number;
+        remaining: number;
+        status: 'unsettled' | 'settled' | 'none';
+        isSuspended: boolean;
+        suspendReason?: string;
+    }
+
+    const calculateUserCustodySummary = (targetUser: any, dateFilter?: string): UserCustodySummary => {
+        const username = targetUser.username;
+        const fullName = targetUser.fullName || username;
+        const targetDate = (dateFilter && dateFilter !== 'all') ? normalizeDateStr(dateFilter) : null;
+
+        let zinatAmount = 0;
+        let zinatCount = 0;
+        (state.zinatCollection || []).forEach((item: any) => {
+            (item.payments || []).forEach((p: any) => {
+                const matchesUser = p.collectedBy === fullName || p.collectedBy === username || p.collectorUsername === username;
+                const matchesDate = !targetDate || normalizeDateStr(p.date) === targetDate;
+                if (matchesUser && matchesDate) {
+                    zinatAmount += Number(p.amount) || 0;
+                    zinatCount++;
+                }
+            });
+        });
+
+        let judicialAmount = 0;
+        let judicialCount = 0;
+        (state.judicialControl || []).forEach((item: any) => {
+            (item.payments || []).forEach((p: any) => {
+                const matchesUser = p.collectedBy === fullName || p.collectedBy === username || p.collectorUsername === username;
+                const matchesDate = !targetDate || normalizeDateStr(p.date) === targetDate;
+                if (matchesUser && matchesDate) {
+                    judicialAmount += Number(p.amount) || 0;
+                    judicialCount++;
+                }
+            });
+        });
+
+        let manualAmount = 0;
+        (state.treasuryTransactions || []).forEach((t: any) => {
+            const matchesUser = t.collectorUsername === username || t.collectorName === fullName;
+            const matchesDate = !targetDate || normalizeDateStr(t.date) === targetDate;
+            if (matchesUser && matchesDate && t.type === 'manual_deposit') {
+                manualAmount += Number(t.amount) || 0;
+            }
+        });
+
+        const totalCollected = Number((zinatAmount + judicialAmount + manualAmount).toFixed(2));
+
+        let totalSettled = 0;
+        (state.treasurySettlements || []).forEach((s: any) => {
+            const matchesUser = s.collectorUsername === username || s.collectorName === fullName;
+            const matchesDate = !targetDate || normalizeDateStr(s.settlementDate) === targetDate;
+            if (matchesUser && matchesDate) {
+                totalSettled += Number(s.totalAmount) || 0;
+            }
+        });
+        totalSettled = Number(totalSettled.toFixed(2));
+
+        const remaining = Number(Math.max(0, totalCollected - totalSettled).toFixed(2));
+
+        let status: 'unsettled' | 'settled' | 'none' = 'none';
+        if (totalCollected > 0 && remaining > 0.009) {
+            status = 'unsettled';
+        } else if (totalCollected > 0 && remaining <= 0.009) {
+            status = 'settled';
+        }
+
+        return {
+            user: targetUser,
+            username,
+            fullName,
+            role: targetUser.role || 'user',
+            zinatAmount: Number(zinatAmount.toFixed(2)),
+            zinatCount,
+            judicialAmount: Number(judicialAmount.toFixed(2)),
+            judicialCount,
+            manualAmount: Number(manualAmount.toFixed(2)),
+            totalCollected,
+            totalSettled,
+            remaining,
+            status,
+            isSuspended: Boolean(targetUser.isSuspended),
+            suspendReason: targetUser.suspendReason
+        };
+    };
+
+    const calculateTreasuryDailyTotals = (dateFilter?: string) => {
+        const targetDate = (dateFilter && dateFilter !== 'all') ? normalizeDateStr(dateFilter) : normalizeDateStr(new Date().toISOString().slice(0, 10));
+
+        let totalZinat = 0;
+        let zinatCount = 0;
+        (state.zinatCollection || []).forEach((item: any) => {
+            (item.payments || []).forEach((p: any) => {
+                if (!targetDate || normalizeDateStr(p.date) === targetDate) {
+                    totalZinat += Number(p.amount) || 0;
+                    zinatCount++;
+                }
+            });
+        });
+
+        let totalJudicial = 0;
+        let judicialCount = 0;
+        (state.judicialControl || []).forEach((item: any) => {
+            (item.payments || []).forEach((p: any) => {
+                if (!targetDate || normalizeDateStr(p.date) === targetDate) {
+                    totalJudicial += Number(p.amount) || 0;
+                    judicialCount++;
+                }
+            });
+        });
+
+        let totalManual = 0;
+        (state.treasuryTransactions || []).forEach((t: any) => {
+            if (!targetDate || normalizeDateStr(t.date) === targetDate) {
+                if (t.type === 'manual_deposit') totalManual += Number(t.amount) || 0;
+            }
+        });
+
+        const totalRevenues = Number((totalZinat + totalJudicial + totalManual).toFixed(2));
+
+        const userSummaries = state.users.map(u => calculateUserCustodySummary(u, dateFilter || 'today'));
+        const pendingUnsettledTotal = userSummaries.reduce((sum, u) => sum + u.remaining, 0);
+        const unsettledUsersCount = userSummaries.filter(u => u.status === 'unsettled').length;
+
+        return {
+            targetDate,
+            totalRevenues,
+            totalZinat: Number(totalZinat.toFixed(2)),
+            zinatCount,
+            totalJudicial: Number(totalJudicial.toFixed(2)),
+            judicialCount,
+            totalManual: Number(totalManual.toFixed(2)),
+            pendingUnsettledTotal: Number(pendingUnsettledTotal.toFixed(2)),
+            unsettledUsersCount,
+            userSummaries
+        };
+    };
+
+    let activeTreasuryDateFilter = new Date().toISOString().slice(0, 10);
+
+    const renderTreasuryDashboard = () => {
+        const totals = calculateTreasuryDailyTotals(activeTreasuryDateFilter);
+
+        const dateInput = document.getElementById('treasury-date-filter') as HTMLInputElement | null;
+        if (dateInput) dateInput.value = activeTreasuryDateFilter;
+
+        const dateIndicator = document.getElementById('treasury-date-status-indicator');
+        if (dateIndicator) {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            if (activeTreasuryDateFilter === todayStr) {
+                dateIndicator.innerHTML = 'الحركة المعروضة: <b style="color:#10b981;">اليوم (' + todayStr + ')</b>';
+            } else {
+                dateIndicator.innerHTML = 'الحركة المعروضة: <b>' + activeTreasuryDateFilter + '</b>';
+            }
+        }
+
+        const kpiTotal = document.getElementById('kpi-treasury-total-today');
+        if (kpiTotal) kpiTotal.textContent = totals.totalRevenues.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' ج.م';
+
+        const kpiZinat = document.getElementById('kpi-treasury-zinat-today');
+        if (kpiZinat) kpiZinat.textContent = totals.totalZinat.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' ج.م';
+        const kpiZinatCount = document.getElementById('kpi-treasury-zinat-count');
+        if (kpiZinatCount) kpiZinatCount.textContent = totals.zinatCount + ' معاملة تحصيل';
+
+        const kpiJudicial = document.getElementById('kpi-treasury-judicial-today');
+        if (kpiJudicial) kpiJudicial.textContent = totals.totalJudicial.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' ج.م';
+        const kpiJudicialCount = document.getElementById('kpi-treasury-judicial-count');
+        if (kpiJudicialCount) kpiJudicialCount.textContent = totals.judicialCount + ' محضر مسدد';
+
+        const kpiPending = document.getElementById('kpi-treasury-pending-unsettled');
+        if (kpiPending) kpiPending.textContent = totals.pendingUnsettledTotal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' ج.م';
+
+        const kpiUnsettledUsers = document.getElementById('kpi-treasury-unsettled-users-count');
+        if (kpiUnsettledUsers) kpiUnsettledUsers.textContent = totals.unsettledUsersCount + ' مستخدم';
+
+        // Render compact dashboard users table
+        const tbody = document.querySelector('#treasury-dashboard-users-table tbody');
+        if (tbody) {
+            tbody.innerHTML = '';
+            if (totals.userSummaries.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:15px;">لا يوجد مستخدمون مسجلون.</td></tr>';
+            } else {
+                totals.userSummaries.forEach(u => {
+                    const tr = document.createElement('tr');
+                    let statusBadge = '<span class="badge" style="background:#f1f5f9; color:#64748b; padding:4px 8px; border-radius:10px;">⚪ لا توجد تحصيلات</span>';
+                    if (u.status === 'unsettled') {
+                        statusBadge = `<span class="badge" style="background:#fee2e2; color:#dc2626; border:1px solid #f87171; font-weight:700; padding:4px 10px; border-radius:12px;">⚠️ لم يُصفّى (${u.remaining.toLocaleString()} ج.م)</span>`;
+                    } else if (u.status === 'settled') {
+                        statusBadge = '<span class="badge" style="background:#dcfce7; color:#166534; border:1px solid #86efac; font-weight:700; padding:4px 10px; border-radius:12px;">✔️ تمت التصفية</span>';
+                    }
+
+                    let accountBadge = u.isSuspended
+                        ? '<span class="badge" style="background:#dc2626; color:#fff; font-weight:700; padding:4px 8px; border-radius:6px;">⛔ موقوف</span>'
+                        : '<span class="badge" style="background:#dcfce7; color:#15803d; font-weight:700; padding:4px 8px; border-radius:6px;">نشط 🟢</span>';
+
+                    tr.innerHTML = `
+                        <td><b>${u.fullName}</b> <small style="color:#64748b;">(@${u.username})</small></td>
+                        <td>${u.zinatAmount.toLocaleString()} ج.م</td>
+                        <td>${u.judicialAmount.toLocaleString()} ج.م</td>
+                        <td><b>${u.totalCollected.toLocaleString()} ج.م</b></td>
+                        <td>${u.totalSettled.toLocaleString()} ج.م</td>
+                        <td style="color:${u.remaining > 0 ? '#dc2626' : '#15803d'}; font-weight:bold;">${u.remaining.toLocaleString()} ج.م</td>
+                        <td>${statusBadge}</td>
+                        <td>${accountBadge}</td>
+                        <td>
+                            <div style="display:flex; gap:6px;">
+                                ${u.remaining > 0 ? `<button class="btn btn-sm" onclick="window.openTreasurySettlementModal('${u.username}')" style="background:#10b981; color:#fff; padding:3px 8px; font-size:0.8rem; border-radius:4px;">تصفية 💵</button>` : ''}
+                                ${u.username !== 'admin' ? `<button class="btn btn-sm" onclick="window.toggleUserSuspension('${u.username}')" style="background:${u.isSuspended ? '#3b82f6' : '#ef4444'}; color:#fff; padding:3px 8px; font-size:0.8rem; border-radius:4px;">${u.isSuspended ? 'تفعيل 🔓' : 'إيقاف ⛔'}</button>` : ''}
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+    };
+
+    const renderTreasuryUserSettlements = () => {
+        const dateInput = document.getElementById('settlement-filter-date') as HTMLInputElement | null;
+        const statusSelect = document.getElementById('settlement-filter-status') as HTMLSelectElement | null;
+        const searchInput = document.getElementById('settlement-search-user') as HTMLInputElement | null;
+
+        if (dateInput && !dateInput.value) {
+            dateInput.value = activeTreasuryDateFilter;
+        }
+
+        const dateFilter = dateInput ? dateInput.value : activeTreasuryDateFilter;
+        const statusFilter = statusSelect ? statusSelect.value : 'all';
+        const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+        const allSummaries = state.users.map(u => calculateUserCustodySummary(u, dateFilter));
+
+        let filtered = allSummaries.filter(u => {
+            if (statusFilter === 'unsettled' && u.status !== 'unsettled') return false;
+            if (statusFilter === 'settled' && u.status !== 'settled') return false;
+            if (searchVal) {
+                const matchName = (u.fullName || '').toLowerCase().includes(searchVal);
+                const matchUser = (u.username || '').toLowerCase().includes(searchVal);
+                if (!matchName && !matchUser) return false;
+            }
+            return true;
+        });
+
+        const countBadge = document.getElementById('settlement-count-badge');
+        if (countBadge) countBadge.textContent = filtered.length + ' محصل';
+
+        const tbody = document.querySelector('#treasury-user-settlements-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#94a3b8; padding:20px;">لا توجد سجلات مطابقة لمعايير البحث والتصفية.</td></tr>';
+            return;
+        }
+
+        filtered.forEach(u => {
+            const tr = document.createElement('tr');
+
+            let statusBadge = '<span class="badge" style="background:#f1f5f9; color:#64748b; padding:4px 8px; border-radius:10px;">⚪ لا توجد تحصيلات</span>';
+            if (u.status === 'unsettled') {
+                statusBadge = `<span class="badge" style="background:#fee2e2; color:#dc2626; border:1px solid #f87171; font-weight:700; padding:5px 12px; border-radius:12px;">⚠️ لم يُصفّى (${u.remaining.toLocaleString()} ج.م)</span>`;
+            } else if (u.status === 'settled') {
+                statusBadge = '<span class="badge" style="background:#dcfce7; color:#166534; border:1px solid #86efac; font-weight:700; padding:5px 12px; border-radius:12px;">✔️ تمت التصفية بالكامل</span>';
+            }
+
+            let accountBadge = u.isSuspended
+                ? '<span class="badge" style="background:#dc2626; color:#fff; font-weight:700; padding:4px 10px; border-radius:8px;">⛔ موقوف من الخزينة</span>'
+                : '<span class="badge" style="background:#dcfce7; color:#15803d; font-weight:700; padding:4px 10px; border-radius:8px;">نشط 🟢</span>';
+
+            const userSettlementRecord = (state.treasurySettlements || []).filter((s: any) => s.collectorUsername === u.username);
+            const hasPastSettlements = userSettlementRecord.length > 0;
+
+            tr.innerHTML = `
+                <td><b>${u.fullName}</b> <br><small style="color:#64748b;">اسم الدخول: @${u.username}</small></td>
+                <td><span class="badge" style="background:#f3f4f6; color:#374151;">${u.role}</span></td>
+                <td>${u.zinatAmount.toLocaleString()} ج.م <br><small style="color:#64748b;">(${u.zinatCount} إيصال)</small></td>
+                <td>${u.judicialAmount.toLocaleString()} ج.م <br><small style="color:#64748b;">(${u.judicialCount} محضر)</small></td>
+                <td><b style="font-size:1.05rem;">${u.totalCollected.toLocaleString()} ج.م</b></td>
+                <td style="color:#10b981; font-weight:bold;">${u.totalSettled.toLocaleString()} ج.م</td>
+                <td style="color:${u.remaining > 0 ? '#dc2626' : '#15803d'}; font-weight:bold; font-size:1.05rem;">${u.remaining.toLocaleString()} ج.م</td>
+                <td>${statusBadge}</td>
+                <td>${accountBadge}</td>
+                <td>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        ${u.remaining > 0 ? `<button class="btn btn-sm btn-primary" onclick="window.openTreasurySettlementModal('${u.username}')" style="background:#10b981; border-color:#10b981; padding:4px 10px; font-weight:bold;">تصفية العهدة 💵</button>` : ''}
+                        ${u.username !== 'admin' ? `<button class="btn btn-sm" onclick="window.toggleUserSuspension('${u.username}')" style="background:${u.isSuspended ? '#2563eb' : '#dc2626'}; color:#fff; padding:4px 10px; font-weight:bold;">${u.isSuspended ? 'إعادة التفعيل 🔓' : 'إيقاف الحساب ⛔'}</button>` : ''}
+                        ${hasPastSettlements ? `<button class="btn btn-sm secondary" onclick="window.handlePrintLatestSettlementReceipt('${u.username}')" title="طباعة إيصال آخر تصفية">إيصال 🖨️</button>` : ''}
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    };
+
+    const renderTreasuryTransactionsLog = () => {
+        const searchInput = document.getElementById('treasury-log-search') as HTMLInputElement | null;
+        const typeSelect = document.getElementById('treasury-log-type-filter') as HTMLSelectElement | null;
+        const fromDateInput = document.getElementById('treasury-log-date-from') as HTMLInputElement | null;
+        const toDateInput = document.getElementById('treasury-log-date-to') as HTMLInputElement | null;
+
+        const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        const typeVal = typeSelect ? typeSelect.value : 'all';
+        const fromDate = fromDateInput ? fromDateInput.value : '';
+        const toDate = toDateInput ? toDateInput.value : '';
+
+        // Combine all transactions into one master log
+        const list: any[] = [];
+
+        // 1. Zinat collections
+        (state.zinatCollection || []).forEach((item: any) => {
+            (item.payments || []).forEach((p: any, pIdx: number) => {
+                list.push({
+                    id: `zinat-${item.id}-${pIdx}`,
+                    type: 'zinat',
+                    typeName: 'تحصيل زينات',
+                    date: normalizeDateStr(p.date),
+                    time: p.time || '',
+                    collector: p.collectedBy || item.technician || 'غير معروف',
+                    party: item.requesterName || 'مواطن / مشترك',
+                    amount: Number(p.amount) || 0,
+                    receiptNumber: p.receiptNumber || '-',
+                    notes: item.notes || ''
+                });
+            });
+        });
+
+        // 2. Judicial collections
+        (state.judicialControl || []).forEach((item: any) => {
+            (item.payments || []).forEach((p: any, pIdx: number) => {
+                list.push({
+                    id: `judicial-${item.id}-${pIdx}`,
+                    type: 'judicial',
+                    typeName: 'تحصيل ضبطية قضائية',
+                    date: normalizeDateStr(p.date),
+                    time: p.time || '',
+                    collector: p.collectedBy || 'غير معروف',
+                    party: item.subscriberName || 'مخالف',
+                    amount: Number(p.amount) || 0,
+                    receiptNumber: p.receiptNumber || '-',
+                    notes: item.notes || ''
+                });
+            });
+        });
+
+        // 3. Treasury settlements
+        (state.treasurySettlements || []).forEach((s: any) => {
+            list.push({
+                id: `settle-${s.id}`,
+                type: 'settlement',
+                typeName: 'تصفية وتوريد عهدة للخزينة',
+                date: normalizeDateStr(s.settlementDate),
+                time: s.settlementTime || '',
+                collector: s.collectorName || s.collectorUsername,
+                party: `مسؤول الخزينة: ${s.settledBy}`,
+                amount: Number(s.totalAmount) || 0,
+                receiptNumber: s.receiptNumber || '-',
+                notes: s.notes || ''
+            });
+        });
+
+        // 4. Manual deposits
+        (state.treasuryTransactions || []).forEach((t: any) => {
+            list.push({
+                id: `trans-${t.id}`,
+                type: t.type || 'manual_deposit',
+                typeName: t.typeName || 'إيداع نقدي مباشر',
+                date: normalizeDateStr(t.date),
+                time: t.time || '',
+                collector: t.collectorName || 'مورد',
+                party: t.depositorName || 'الخزينة',
+                amount: Number(t.amount) || 0,
+                receiptNumber: t.receiptNumber || '-',
+                notes: t.notes || ''
+            });
+        });
+
+        // Sort descending by date
+        list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+
+        // Apply filters
+        const filtered = list.filter(item => {
+            if (typeVal !== 'all' && item.type !== typeVal) return false;
+            if (fromDate && item.date && item.date < fromDate) return false;
+            if (toDate && item.date && item.date > toDate) return false;
+            if (searchVal) {
+                const matchParty = (item.party || '').toLowerCase().includes(searchVal);
+                const matchCollector = (item.collector || '').toLowerCase().includes(searchVal);
+                const matchReceipt = (item.receiptNumber || '').toLowerCase().includes(searchVal);
+                if (!matchParty && !matchCollector && !matchReceipt) return false;
+            }
+            return true;
+        });
+
+        const totalAmt = filtered.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        const totalBadge = document.getElementById('treasury-log-total-amount');
+        if (totalBadge) totalBadge.textContent = 'الإجمالي: ' + totalAmt.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' ج.م';
+
+        const tbody = document.querySelector('#treasury-transactions-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:20px;">لا توجد حركات مطابقة لمعايير البحث.</td></tr>';
+            return;
+        }
+
+        filtered.forEach(item => {
+            const tr = document.createElement('tr');
+            let typeColor = '#3b82f6';
+            if (item.type === 'judicial') typeColor = '#8b5cf6';
+            if (item.type === 'settlement') typeColor = '#10b981';
+            if (item.type === 'manual_deposit') typeColor = '#059669';
+
+            tr.innerHTML = `
+                <td><b>${item.receiptNumber}</b></td>
+                <td>${item.date} ${item.time ? `<small style="color:#64748b;">(${item.time})</small>` : ''}</td>
+                <td><span class="badge" style="background:${typeColor}15; color:${typeColor}; border:1px solid ${typeColor}40; font-weight:700; padding:4px 8px; border-radius:6px;">${item.typeName}</span></td>
+                <td>${item.collector}</td>
+                <td>${item.party}</td>
+                <td style="font-weight:bold; color:#0f172a; font-family:monospace;">${Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م</td>
+                <td style="font-size:0.85rem; color:#64748b;">${item.notes || '-'}</td>
+                <td>
+                    <button class="btn btn-sm secondary" onclick="window.printSingleTreasuryReceipt('${item.receiptNumber}', '${item.typeName}', ${item.amount}, '${item.collector}', '${item.party}', '${item.date}')" title="طباعة إيصال">إيصال 🖨️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    };
+
+    // --- Modal and Action Handlers ---
+
+    (window as any).openTreasurySettlementModal = (username: string) => {
+        const user = state.users.find(u => u.username === username);
+        if (!user) return;
+
+        const summary = calculateUserCustodySummary(user, activeTreasuryDateFilter);
+
+        const modal = document.getElementById('modal-treasury-settlement');
+        if (!modal) return;
+
+        (document.getElementById('settle-target-username') as HTMLInputElement).value = username;
+        document.getElementById('settle-collector-name')!.textContent = `المحصل: ${summary.fullName} (@${username})`;
+        document.getElementById('settle-zinat-amount')!.textContent = summary.zinatAmount.toLocaleString() + ' ج.م';
+        document.getElementById('settle-judicial-amount')!.textContent = summary.judicialAmount.toLocaleString() + ' ج.م';
+        document.getElementById('settle-total-collected')!.textContent = summary.totalCollected.toLocaleString() + ' ج.م';
+        document.getElementById('settle-remaining-amount')!.textContent = summary.remaining.toLocaleString() + ' ج.م';
+
+        const paidInput = document.getElementById('settle-paid-amount') as HTMLInputElement;
+        paidInput.value = summary.remaining.toString();
+        paidInput.max = summary.remaining.toString();
+
+        const randSeq = Math.floor(1000 + Math.random() * 9000);
+        const receiptInput = document.getElementById('settle-receipt-no') as HTMLInputElement;
+        receiptInput.value = `TR-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randSeq}`;
+
+        const notesInput = document.getElementById('settle-notes') as HTMLTextAreaElement;
+        notesInput.value = `تصفية عهدة يومية عن تاريخ ${activeTreasuryDateFilter}`;
+
+        modal.style.display = 'flex';
+    };
+
+    (window as any).toggleUserSuspension = async (username: string) => {
+        const user = state.users.find(u => u.username === username);
+        if (!user) return;
+
+        if (user.username === 'admin' || user.role === 'admin') {
+            showToast('لا يمكن إيقاف حساب المدير العام للنظام.', 'error');
+            return;
+        }
+
+        if (user.isSuspended) {
+            user.isSuspended = false;
+            user.suspendReason = '';
+            showToast(`تم رفع الإيقاف وإعادة تفعيل حساب المستخدم "${user.fullName}" بنجاح.`, 'success');
+            logActivity('تفعيل حساب مستخدم', `قام مسؤول الخزينة بتفعيل حساب "${user.fullName}" (@${user.username})`);
+        } else {
+            const confirmed = confirm(`هل أنت متأكد من إيقاف حساب المستخدم "${user.fullName}"؟\n\nلن يتمكن من تسجيل الدخول للنظام حتى يقوم بتصفية العهدة المالية بالخزينة.`);
+            if (!confirmed) return;
+
+            user.isSuspended = true;
+            user.suspendReason = 'عدم تصفية العهدة المالية بالخزينة';
+            user.suspendedAt = new Date().toLocaleString('ar-EG');
+            user.suspendedBy = loggedInUser?.fullName || 'مسؤول الخزينة';
+
+            showToast(`تم إيقاف حساب المستخدم "${user.fullName}" بنجاح ومنعه من تسجيل الدخول.`, 'warning');
+            logActivity('إيقاف حساب مستخدم', `قام مسؤول الخزينة بإيقاف حساب "${user.fullName}" (@${user.username}) لعدم تصفية العهدة المالية`);
+        }
+
+        await saveState();
+        renderTreasuryDashboard();
+        renderTreasuryUserSettlements();
+    };
+
+    (window as any).handlePrintLatestSettlementReceipt = (username: string) => {
+        const settlements = (state.treasurySettlements || []).filter((s: any) => s.collectorUsername === username);
+        if (settlements.length === 0) {
+            showToast('لا توجد إيصالات تصفية سابقة لهذا المستخدم.', 'warning');
+            return;
+        }
+        const latest = settlements[settlements.length - 1];
+        (window as any).printSingleTreasuryReceipt(latest.receiptNumber, 'تصفية عهدة محصل', latest.totalAmount, latest.collectorName || username, 'الخزينة العامة', latest.settlementDate, latest.notes);
+    };
+
+    (window as any).printSingleTreasuryReceipt = (receiptNo: string, typeName: string, amount: number, collector: string, party: string, date: string, notes?: string) => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        const companyName = state.settings.companyName || 'ELMAGHRABI';
+        const logoSrc = state.settings.companyLogo;
+        const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 60px; max-width: 60px; object-fit: contain;">` : '';
+
+        printWindow.document.write(`
+            <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>إيصال توريد خزينة ${receiptNo}</title>
+            <style>
+                body { font-family: 'Tajawal', sans-serif; padding: 20px; color: #1e293b; }
+                .receipt-box { max-width: 500px; margin: 0 auto; border: 2px solid #0f172a; padding: 20px; border-radius: 8px; }
+                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+                .title { text-align: center; font-size: 16px; font-weight: bold; margin: 10px 0; }
+                .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #cbd5e1; font-size: 13px; }
+                .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 16px; font-weight: bold; background: #f8fafc; border-top: 2px solid #0f172a; margin-top: 10px; }
+                .signatures { display: flex; justify-content: space-between; margin-top: 40px; font-size: 12px; font-weight: bold; }
+            </style></head><body>
+            <div class="receipt-box">
+                <div class="header">
+                    <div><b>${companyName}</b><br><small>إدارة الخزينة والتحصيل</small></div>
+                    <div>${logoHTML}</div>
+                </div>
+                <div class="title">إيصال توريد نقدية بالخزينة</div>
+                <div class="row"><span>رقم الإيصال:</span><b>${receiptNo}</b></div>
+                <div class="row"><span>التاريخ:</span><span>${date}</span></div>
+                <div class="row"><span>نوع المعاملة:</span><span>${typeName}</span></div>
+                <div class="row"><span>المورد / المحصل:</span><b>${collector}</b></div>
+                <div class="row"><span>المستلم / الجهة:</span><span>${party}</span></div>
+                ${notes ? `<div class="row"><span>ملاحظات:</span><span>${notes}</span></div>` : ''}
+                <div class="total-row"><span>المبلغ المستلم:</span><span>${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م</span></div>
+                <div class="signatures">
+                    <div>توقيع المسلّم (المحصل):<br><br>.........................</div>
+                    <div>توقيع المستلم (مسؤول الخزينة):<br><br>.........................</div>
+                </div>
+            </div>
+            </body></html>
+        `);
+        printWindow.document.close();
+        setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+        }, 500);
+    };
+
+    const handleTreasurySettlementSubmit = async (event: Event) => {
+        event.preventDefault();
+        const form = event.target as HTMLFormElement;
+        const username = (document.getElementById('settle-target-username') as HTMLInputElement).value;
+        const paidAmount = Number((document.getElementById('settle-paid-amount') as HTMLInputElement).value);
+        const receiptNumber = (document.getElementById('settle-receipt-no') as HTMLInputElement).value.trim();
+        const notes = (document.getElementById('settle-notes') as HTMLTextAreaElement).value.trim();
+        const autoUnsuspend = (document.getElementById('settle-auto-unsuspend') as HTMLInputElement).checked;
+
+        if (!username || paidAmount <= 0 || !receiptNumber) {
+            showToast('يرجى التأكد من ملء جميع الحقول بمبالغ صحيحة.', 'error');
+            return;
+        }
+
+        const user = state.users.find(u => u.username === username);
+        if (!user) return;
+
+        const summary = calculateUserCustodySummary(user, activeTreasuryDateFilter);
+
+        const newSettlement = {
+            id: Date.now(),
+            settlementDate: activeTreasuryDateFilter,
+            settlementTime: new Date().toLocaleTimeString('ar-EG'),
+            collectorUsername: user.username,
+            collectorName: user.fullName || user.username,
+            totalAmount: paidAmount,
+            zinatAmount: summary.zinatAmount,
+            judicialAmount: summary.judicialAmount,
+            receiptNumber,
+            settledBy: loggedInUser?.fullName || 'مسؤول الخزينة',
+            notes
+        };
+
+        if (!state.treasurySettlements) state.treasurySettlements = [];
+        state.treasurySettlements.push(newSettlement);
+
+        if (autoUnsuspend && user.isSuspended) {
+            user.isSuspended = false;
+            user.suspendReason = '';
+        }
+
+        logActivity('تصفية عهدة بالخزينة', `تم تصفية عهدة المحصل "${user.fullName}" بمبلغ ${paidAmount} ج.م (إيصال: ${receiptNumber})`);
+        await saveState();
+
+        showToast(`تمت تصفية عهدة ${user.fullName} وتوريد مبلغ ${paidAmount.toLocaleString()} ج.م للخزينة بنجاح.`, 'success');
+
+        const modal = document.getElementById('modal-treasury-settlement');
+        if (modal) modal.style.display = 'none';
+
+        renderTreasuryDashboard();
+        renderTreasuryUserSettlements();
+        renderTreasuryTransactionsLog();
+
+        // Print receipt
+        (window as any).printSingleTreasuryReceipt(receiptNumber, 'تصفية عهدة محصل', paidAmount, user.fullName, 'الخزينة العامة', activeTreasuryDateFilter, notes);
+    };
+
+    const handleTreasuryManualDepositSubmit = async (event: Event) => {
+        event.preventDefault();
+        const amount = Number((document.getElementById('deposit-amount') as HTMLInputElement).value);
+        const depositorName = (document.getElementById('deposit-depositor-name') as HTMLInputElement).value.trim();
+        const category = (document.getElementById('deposit-category') as HTMLSelectElement).value;
+        const receiptNumber = (document.getElementById('deposit-receipt-no') as HTMLInputElement).value.trim();
+        const notes = (document.getElementById('deposit-notes') as HTMLTextAreaElement).value.trim();
+
+        if (amount <= 0 || !depositorName || !receiptNumber) {
+            showToast('يرجى ملء جميع الحقول المطلوبة.', 'error');
+            return;
+        }
+
+        const newTrans = {
+            id: Date.now(),
+            type: 'manual_deposit',
+            typeName: category,
+            amount,
+            date: activeTreasuryDateFilter,
+            time: new Date().toLocaleTimeString('ar-EG'),
+            depositorName,
+            collectorName: loggedInUser?.fullName || 'مسؤول الخزينة',
+            collectorUsername: loggedInUser?.username || 'treasury',
+            receiptNumber,
+            notes
+        };
+
+        if (!state.treasuryTransactions) state.treasuryTransactions = [];
+        state.treasuryTransactions.push(newTrans);
+
+        logActivity('إيداع نقدي بالخزينة', `تم إيداع مبلغ ${amount} ج.م من ${depositorName} (إيصال: ${receiptNumber})`);
+        await saveState();
+
+        showToast(`تم تسجيل الإيداع بمبلغ ${amount.toLocaleString()} ج.م بنجاح.`, 'success');
+
+        const modal = document.getElementById('modal-treasury-deposit');
+        if (modal) modal.style.display = 'none';
+
+        renderTreasuryDashboard();
+        renderTreasuryTransactionsLog();
+
+        (window as any).printSingleTreasuryReceipt(receiptNumber, category, amount, depositorName, 'الخزينة العامة', activeTreasuryDateFilter, notes);
+    };
+
+    const handlePrintDailyTreasuryReport = (dateStr?: string) => {
+        const targetDate = dateStr || activeTreasuryDateFilter;
+        const totals = calculateTreasuryDailyTotals(targetDate);
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        const companyName = state.settings.companyName || 'ELMAGHRABI';
+        const logoSrc = state.settings.companyLogo;
+        const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 70px; max-width: 70px; object-fit: contain;">` : '';
+
+        const rowsHtml = totals.userSummaries.map(u => `
+            <tr>
+                <td><b>${u.fullName}</b> (@${u.username})</td>
+                <td>${u.role}</td>
+                <td>${u.zinatAmount.toLocaleString()} ج.م</td>
+                <td>${u.judicialAmount.toLocaleString()} ج.م</td>
+                <td><b>${u.totalCollected.toLocaleString()} ج.م</b></td>
+                <td>${u.totalSettled.toLocaleString()} ج.م</td>
+                <td style="color:${u.remaining > 0 ? '#dc2626' : '#15803d'}; font-weight:bold;">${u.remaining.toLocaleString()} ج.م</td>
+                <td>${u.status === 'unsettled' ? '⚠️ لم يُصفّى' : (u.status === 'settled' ? '✔️ تمت التصفية' : '⚪ لا توجد تحصيلات')}</td>
+                <td>${u.isSuspended ? '⛔ موقوف' : 'نشط'}</td>
+            </tr>
+        `).join('');
+
+        printWindow.document.write(`
+            <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير الخزينة اليومي - ${targetDate}</title>
+            <style>
+                body { font-family: 'Tajawal', sans-serif; padding: 25px; color: #1e293b; font-size: 11pt; }
+                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
+                .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+                .kpi-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; text-align: center; background: #f8fafc; }
+                .kpi-val { font-size: 14pt; font-weight: bold; margin-top: 4px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10pt; }
+                th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: right; }
+                th { background: #0f172a; color: #fff; }
+                tr:nth-child(even) { background: #f8fafc; }
+                .signatures { display: flex; justify-content: space-between; margin-top: 45px; font-weight: bold; }
+            </style></head><body>
+                <div class="header">
+                    <div>
+                        <h2 style="margin:0;">${companyName}</h2>
+                        <h4 style="margin:5px 0 0 0; color:#475569;">تقرير حركة الخزينة وتصفيات العهد اليومية</h4>
+                        <div style="font-size:10pt; margin-top:4px;">تاريخ التقرير: <b>${targetDate}</b></div>
+                    </div>
+                    <div>${logoHTML}</div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div>إجمالي الإيرادات</div><div class="kpi-val" style="color:#059669;">${totals.totalRevenues.toLocaleString()} ج.م</div></div>
+                    <div class="kpi-box"><div>تحصيلات الزينات</div><div class="kpi-val" style="color:#2563eb;">${totals.totalZinat.toLocaleString()} ج.م</div></div>
+                    <div class="kpi-box"><div>تحصيلات الضبطية</div><div class="kpi-val" style="color:#7c3aed;">${totals.totalJudicial.toLocaleString()} ج.م</div></div>
+                    <div class="kpi-box"><div>المتبقي غير المصفى</div><div class="kpi-val" style="color:#dc2626;">${totals.pendingUnsettledTotal.toLocaleString()} ج.م</div></div>
+                </div>
+
+                <h3>موقف عهد وتصفيات المحصلين:</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>المحصل</th>
+                            <th>الدور</th>
+                            <th>الزينات</th>
+                            <th>الضبطية</th>
+                            <th>إجمالي المحصل</th>
+                            <th>المورد للخزينة</th>
+                            <th>المتبقي بالعهدة</th>
+                            <th>حالة التصفية</th>
+                            <th>حالة الحساب</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+
+                <div class="signatures">
+                    <div>إعداد مسؤول الخزينة:<br><br>.....................................</div>
+                    <div>مراجع الحسابات:<br><br>.....................................</div>
+                    <div>اعتماد الإدارة المالية:<br><br>.....................................</div>
+                </div>
+            </body></html>
+        `);
+        printWindow.document.close();
+        setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+        }, 500);
     };
 
     // --- Canvas Logic ---
@@ -6948,6 +7751,11 @@ const renderJudicialCollectionSection = () => {
                 title: 'الضبطية القضائية',
                 icon: '⚖️',
                 keys: ['view_judicial_control_section', 'view_judicial_control_list', 'manage_judicial_control']
+            },
+            {
+                title: 'الخزينة العامة وتصفيات العهد والرقابة المالية',
+                icon: '🏦',
+                keys: ['view_treasury_section', 'view_treasury_dashboard', 'manage_treasury_settlements', 'view_treasury_transactions']
             },
             {
                 title: 'التحصيل وزينات',
@@ -18639,6 +19447,12 @@ const renderJudicialCollectionSection = () => {
             renderJudicialCollectionSection();
         } else if (targetId === 'collection-zinat') {
             renderZinatCollectionSection();
+        } else if (targetId === 'treasury-dashboard') {
+            renderTreasuryDashboard();
+        } else if (targetId === 'treasury-user-settlements') {
+            renderTreasuryUserSettlements();
+        } else if (targetId === 'treasury-transactions-log') {
+            renderTreasuryTransactionsLog();
         } else if (targetId === 'zinat-registration') {
             openZinatForm();
         } else if (targetId === 'help-error-codes') {
@@ -18665,6 +19479,81 @@ const renderJudicialCollectionSection = () => {
         // Welcome Screen Listeners
         document.getElementById('start-new-btn')?.addEventListener('click', handleStartNew);
         document.getElementById('import-from-welcome-btn')?.addEventListener('click', handleImportFromWelcome);
+
+        // ================= Treasury Event Listeners =================
+        document.getElementById('treasury-open-deposit-btn')?.addEventListener('click', () => {
+            const modal = document.getElementById('modal-treasury-deposit');
+            if (modal) {
+                const randSeq = Math.floor(1000 + Math.random() * 9000);
+                const rcpt = document.getElementById('deposit-receipt-no') as HTMLInputElement | null;
+                if (rcpt) rcpt.value = `DEP-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randSeq}`;
+                modal.style.display = 'flex';
+            }
+        });
+
+        document.getElementById('treasury-print-daily-btn')?.addEventListener('click', () => {
+            handlePrintDailyTreasuryReport();
+        });
+
+        document.getElementById('treasury-print-settlements-btn')?.addEventListener('click', () => {
+            handlePrintDailyTreasuryReport();
+        });
+
+        document.getElementById('treasury-print-log-btn')?.addEventListener('click', () => {
+            handlePrintDailyTreasuryReport();
+        });
+
+        document.getElementById('btn-treasury-today')?.addEventListener('click', () => {
+            activeTreasuryDateFilter = new Date().toISOString().slice(0, 10);
+            renderTreasuryDashboard();
+        });
+
+        document.getElementById('btn-treasury-yesterday')?.addEventListener('click', () => {
+            const y = new Date();
+            y.setDate(y.getDate() - 1);
+            activeTreasuryDateFilter = y.toISOString().slice(0, 10);
+            renderTreasuryDashboard();
+        });
+
+        document.getElementById('btn-treasury-all-dates')?.addEventListener('click', () => {
+            activeTreasuryDateFilter = 'all';
+            renderTreasuryDashboard();
+        });
+
+        document.getElementById('treasury-date-filter')?.addEventListener('change', (e) => {
+            const val = (e.target as HTMLInputElement).value;
+            if (val) {
+                activeTreasuryDateFilter = val;
+                renderTreasuryDashboard();
+            }
+        });
+
+        document.getElementById('settlement-filter-date')?.addEventListener('change', () => {
+            renderTreasuryUserSettlements();
+        });
+        document.getElementById('settlement-filter-status')?.addEventListener('change', () => {
+            renderTreasuryUserSettlements();
+        });
+        document.getElementById('settlement-search-user')?.addEventListener('input', () => {
+            renderTreasuryUserSettlements();
+        });
+
+        document.getElementById('treasury-log-search')?.addEventListener('input', () => {
+            renderTreasuryTransactionsLog();
+        });
+        document.getElementById('treasury-log-type-filter')?.addEventListener('change', () => {
+            renderTreasuryTransactionsLog();
+        });
+        document.getElementById('treasury-log-date-from')?.addEventListener('change', () => {
+            renderTreasuryTransactionsLog();
+        });
+        document.getElementById('treasury-log-date-to')?.addEventListener('change', () => {
+            renderTreasuryTransactionsLog();
+        });
+
+        document.getElementById('form-treasury-settlement')?.addEventListener('submit', handleTreasurySettlementSubmit);
+        document.getElementById('form-treasury-manual-deposit')?.addEventListener('submit', handleTreasuryManualDepositSubmit);
+
 
         // Dialog Listeners
         setupDialogListeners();

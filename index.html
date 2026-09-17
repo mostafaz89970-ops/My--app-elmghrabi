@@ -956,6 +956,25 @@
                     </details>
                 </li>
 
+                <!-- قسم الخزينة والتصفيات المالية اليومية -->
+                <li class="nav-category" data-permission="view_treasury_section">
+                    <details>
+                        <summary>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M12 9v1"></path><path d="M12 14v1"></path><path d="M14 12h1"></path><path d="M9 12h1"></path>
+                            </svg>
+                            <span>الخزينة العامة</span>
+                        </summary>
+                        <ul>
+                            <li><a href="#" class="nav-link" data-target="treasury-dashboard" data-permission="view_treasury_dashboard"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg><span>لوحة الخزينة اليومية</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="treasury-user-settlements" data-permission="manage_treasury_settlements"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span>تصفيات وعهد المستخدمين</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="treasury-transactions-log" data-permission="view_treasury_transactions"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg><span>سجل التوريدات والمعاملات</span></a></li>
+                        </ul>
+                    </details>
+                </li>
+
                 <!-- قسم كروت التحكم (MEEDCO Unified Card Service) -->
                 <li class="nav-category" data-permission="view_control_cards_section">
                     <details>
@@ -2418,6 +2437,249 @@
                     </table>
                     <div id="zinat-summary-by-address" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: none;"><h4>ملخص المبالغ حسب العنوان</h4><div class="summary-content" style="display: flex; flex-wrap: wrap; gap: 15px;"></div></div>
                 </div>
+            </div>
+        </section>
+
+        <!-- ================= قسم الخزينة العامة ================= -->
+        <!-- 1. لوحة الخزينة اليومية -->
+        <section id="treasury-dashboard" class="content-section">
+            <div class="section-header">
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M12 9v1"></path><path d="M12 14v1"></path><path d="M14 12h1"></path><path d="M9 12h1"></path></svg>
+                        لوحة الخزينة العامة - الحركة اليومية
+                    </h3>
+                    <p style="color: #64748b; margin: 4px 0 0 0; font-size: 0.9rem;">متابعة الإيرادات اليومية وتوريدات الزينات والضبطية القضائية وتصفية عهد المحصلين</p>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button id="treasury-open-deposit-btn" class="btn btn-primary" style="background: #10b981; border-color: #10b981;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span>إيداع نقدي مباشر</span>
+                    </button>
+                    <button id="treasury-print-daily-btn" class="btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        <span>طباعة تقرير الخزينة</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- شريط تصفية التاريخ -->
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <label for="treasury-date-filter" style="font-weight: 700; color: #1e293b; font-size: 0.95rem;">تاريخ الحركة:</label>
+                    <input type="date" id="treasury-date-filter" class="form-control" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600;">
+                    <button type="button" class="btn secondary btn-sm" id="btn-treasury-today">اليوم</button>
+                    <button type="button" class="btn secondary btn-sm" id="btn-treasury-yesterday">أمس</button>
+                    <button type="button" class="btn secondary btn-sm" id="btn-treasury-all-dates">جميع الفترات</button>
+                </div>
+                <div style="font-size: 0.85rem; color: #64748b;" id="treasury-date-status-indicator">
+                    الحركة المعروضة: <b>اليوم</b>
+                </div>
+            </div>
+
+            <!-- بطاقات الإحصائيات (KPIs) -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                <!-- إجمالي الإيرادات اليومية -->
+                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; padding: 18px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; opacity: 0.9; margin-bottom: 6px;">
+                        <span style="font-size: 0.9rem; font-weight: 600;">إجمالي إيرادات اليوم</span>
+                        <span>💵</span>
+                    </div>
+                    <div id="kpi-treasury-total-today" style="font-size: 1.7rem; font-weight: 800; font-family: monospace;">0.00 ج.م</div>
+                    <div style="font-size: 0.78rem; opacity: 0.85; margin-top: 6px;">إجمالي المبالغ المحصلة والموردة</div>
+                </div>
+
+                <!-- تحصيلات الزينات -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #3b82f6; padding: 18px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; color: #64748b; margin-bottom: 6px;">
+                        <span style="font-size: 0.9rem; font-weight: 600;">تحصيلات الزينات</span>
+                        <span>🎪</span>
+                    </div>
+                    <div id="kpi-treasury-zinat-today" style="font-size: 1.5rem; font-weight: 800; color: #1e40af; font-family: monospace;">0.00 ج.م</div>
+                    <div id="kpi-treasury-zinat-count" style="font-size: 0.8rem; color: #64748b; margin-top: 6px;">0 معاملة تحصيل</div>
+                </div>
+
+                <!-- تحصيلات الضبطية القضائية -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #8b5cf6; padding: 18px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; color: #64748b; margin-bottom: 6px;">
+                        <span style="font-size: 0.9rem; font-weight: 600;">تحصيلات الضبطية</span>
+                        <span>⚖️</span>
+                    </div>
+                    <div id="kpi-treasury-judicial-today" style="font-size: 1.5rem; font-weight: 800; color: #6d28d9; font-family: monospace;">0.00 ج.م</div>
+                    <div id="kpi-treasury-judicial-count" style="font-size: 0.8rem; color: #64748b; margin-top: 6px;">0 محضر مسدد</div>
+                </div>
+
+                <!-- مبالغ معلقة غير مصفاة -->
+                <div style="background: #ffffff; border: 1px solid #fecaca; border-top: 4px solid #ef4444; padding: 18px; border-radius: 12px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.05);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; color: #991b1b; margin-bottom: 6px;">
+                        <span style="font-size: 0.9rem; font-weight: 700;">المبالغ المعلقة (لم تُصفّى)</span>
+                        <span>⚠️</span>
+                    </div>
+                    <div id="kpi-treasury-pending-unsettled" style="font-size: 1.5rem; font-weight: 800; color: #dc2626; font-family: monospace;">0.00 ج.م</div>
+                    <div style="font-size: 0.8rem; color: #b91c1c; margin-top: 6px;">مستحقة التوريد من المحصلين</div>
+                </div>
+
+                <!-- المستخدمون غير المصفين -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #f59e0b; padding: 18px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; color: #b45309; margin-bottom: 6px;">
+                        <span style="font-size: 0.9rem; font-weight: 700;">مستخدمون لم يُصفوا</span>
+                        <span>👥</span>
+                    </div>
+                    <div id="kpi-treasury-unsettled-users-count" style="font-size: 1.5rem; font-weight: 800; color: #d97706;">0 مستخدم</div>
+                    <div style="font-size: 0.8rem; color: #64748b; margin-top: 6px;">عليهم عهدة مالية معلقة</div>
+                </div>
+            </div>
+
+            <!-- جدول ملخص تصفيات اليوم المباشر -->
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 25px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                    <h4 style="margin: 0; display: flex; align-items: center; gap: 6px;">
+                        <span>📋</span>
+                        <span>موقف عهد وتصفيات المحصلين اليومية</span>
+                    </h4>
+                    <a href="#" class="nav-link" data-target="treasury-user-settlements" style="font-size: 0.9rem; color: #2563eb; font-weight: 600; text-decoration: none;">
+                        عرض صفحة التصفيات والتحكم الكاملة &larr;
+                    </a>
+                </div>
+                <div class="responsive-table">
+                    <table id="treasury-dashboard-users-table" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>المحصل / المستخدم</th>
+                                <th>تحصيلات الزينات</th>
+                                <th>تحصيلات الضبطية</th>
+                                <th>إجمالي التحصيل</th>
+                                <th>المورد للخزينة</th>
+                                <th>المتبقي بالعهدة</th>
+                                <th>حالة التصفية</th>
+                                <th>حالة الحساب</th>
+                                <th>إجراء سريع</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. قسم تصفيات وعهد المستخدمين (يوم بيوم) -->
+        <section id="treasury-user-settlements" class="content-section">
+            <div class="section-header">
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        تصفيات وعهد المستخدمين (يوم بيوم)
+                    </h3>
+                    <p style="color: #64748b; margin: 4px 0 0 0; font-size: 0.9rem;">رصد عهدة كل مستخدم، تصفية المبالغ المستلمة، وتجميد/إيقاف حساب من لم يصفِ عهدته</p>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-back-page" title="رجوع"><span>رجوع</span></button>
+                    <button id="treasury-print-settlements-btn" class="btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        <span>طباعة تقرير العهد والتصفيات</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- فلاتر الجدول -->
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label for="settlement-filter-date" style="font-weight: 600; font-size: 0.9rem;">تاريخ العهدة:</label>
+                        <input type="date" id="settlement-filter-date" class="form-control" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label for="settlement-filter-status" style="font-weight: 600; font-size: 0.9rem;">حالة التصفية:</label>
+                        <select id="settlement-filter-status" class="form-control" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <option value="all">جميع الحالات</option>
+                            <option value="unsettled" selected>لم يُصفّى فقط ⚠️</option>
+                            <option value="settled">تمت التصفية ✔️</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <input type="text" id="settlement-search-user" class="form-control" placeholder="بحث باسم المستخدم أو الفني..." style="padding: 6px 14px; border-radius: 6px; border: 1px solid #cbd5e1; width: 220px;">
+                    </div>
+                </div>
+                <div>
+                    <span id="settlement-count-badge" class="badge" style="background: #f1f5f9; color: #475569; font-weight: bold; padding: 6px 12px; border-radius: 6px;">0 محصل</span>
+                </div>
+            </div>
+
+            <div class="responsive-table" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                <table id="treasury-user-settlements-table" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>المحصل / المستخدم</th>
+                            <th>الدور الوظيفي</th>
+                            <th>تحصيلات الزينات</th>
+                            <th>تحصيلات الضبطية</th>
+                            <th>إجمالي المحصل</th>
+                            <th>المورد للخزينة</th>
+                            <th>المتبقي بالعهدة</th>
+                            <th>حالة التصفية</th>
+                            <th>حالة الحساب</th>
+                            <th style="min-width: 220px;">إجراءات مسؤول الخزينة</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 3. قسم سجل التوريدات والمعاملات المالية -->
+        <section id="treasury-transactions-log" class="content-section">
+            <div class="section-header">
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                        سجل توريدات وحركات الخزينة
+                    </h3>
+                    <p style="color: #64748b; margin: 4px 0 0 0; font-size: 0.9rem;">السجل الشامل لجميع حركات التحصيل والتوريد والتصفيات السابقة</p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-back-page" title="رجوع"><span>رجوع</span></button>
+                    <button id="treasury-print-log-btn" class="btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        <span>طباعة السجل</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- فلاتر السجل -->
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <input type="text" id="treasury-log-search" class="form-control" placeholder="بحث باسم المشترك، المحصل، أو رقم الإيصال..." style="padding: 6px 14px; border-radius: 6px; border: 1px solid #cbd5e1; width: 280px;">
+                    <select id="treasury-log-type-filter" class="form-control" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                        <option value="all">جميع أنواع العمليات</option>
+                        <option value="zinat">تحصيلات الزينات</option>
+                        <option value="judicial">تحصيلات الضبطية القضائية</option>
+                        <option value="settlement">تصفيات وتوريدات العهد</option>
+                        <option value="manual_deposit">إيداعات نقدية مباشرة</option>
+                    </select>
+                    <input type="date" id="treasury-log-date-from" class="form-control" title="من تاريخ" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                    <input type="date" id="treasury-log-date-to" class="form-control" title="إلى تاريخ" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                </div>
+                <div>
+                    <span id="treasury-log-total-amount" class="badge" style="background: #dcfce7; color: #15803d; font-weight: 800; font-size: 1rem; padding: 6px 14px; border-radius: 6px;">الإجمالي: 0.00 ج.م</span>
+                </div>
+            </div>
+
+            <div class="responsive-table" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                <table id="treasury-transactions-table" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>رقم الحركة / الإيصال</th>
+                            <th>التاريخ والوقت</th>
+                            <th>نوع المعاملة</th>
+                            <th>المحصل / المورد</th>
+                            <th>الطرف الآخر / المشترك</th>
+                            <th>المبلغ (ج.م)</th>
+                            <th>ملاحظات</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
         </section>
 
@@ -5398,7 +5660,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript -->
-  <script src="./dist/index.js?v=1789648207407"></script>
+  <script src="./dist/index.js?v=1789681588245"></script>
 
   <!-- HOTFIX: Ensure app container is hidden on logout -->
   <script>
@@ -5735,5 +5997,108 @@
             renderSaved();
         });
     -->
+
+    <!-- نافذة تصفية عهدة محصل -->
+    <div id="modal-treasury-settlement" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+        <div style="background: #ffffff; border-radius: 14px; max-width: 520px; width: 92%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); overflow: hidden; animation: fadeIn 0.2s ease-out;">
+            <div style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #ffffff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem;">
+                    <span>💵</span>
+                    <span>تصفية عهدة وتوريد للخزينة</span>
+                </h4>
+                <button type="button" class="btn-close-modal" onclick="document.getElementById('modal-treasury-settlement').style.display='none'" style="background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+            </div>
+            <form id="form-treasury-settlement" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+                <input type="hidden" id="settle-target-username">
+                
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                    <div style="font-weight: 700; color: #1e293b; font-size: 1rem; margin-bottom: 8px;" id="settle-collector-name">-</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem; color: #475569;">
+                        <div>تحصيلات الزينات: <b id="settle-zinat-amount" style="color: #1e40af;">0.00 ج.م</b></div>
+                        <div>تحصيلات الضبطية: <b id="settle-judicial-amount" style="color: #6d28d9;">0.00 ج.م</b></div>
+                        <div>إجمالي التحصيل: <b id="settle-total-collected" style="color: #0f172a;">0.00 ج.م</b></div>
+                        <div>المتبقي المطلوب توريده: <b id="settle-remaining-amount" style="color: #dc2626; font-size: 0.95rem;">0.00 ج.م</b></div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="settle-paid-amount" style="font-weight: 700; color: #0f172a;">المبلغ المورد والمستلم بالخزينة (ج.م):</label>
+                    <input type="number" step="0.01" min="1" id="settle-paid-amount" class="form-control" required style="padding: 10px; font-weight: 800; font-size: 1.15rem; color: #16a34a; border: 2px solid #86efac; border-radius: 8px;">
+                </div>
+
+                <div class="input-group">
+                    <label for="settle-receipt-no" style="font-weight: 600;">رقم إيصال توريد الخزينة:</label>
+                    <input type="text" id="settle-receipt-no" class="form-control" required placeholder="مثال: TR-98210" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                </div>
+
+                <div class="input-group">
+                    <label for="settle-notes" style="font-weight: 600;">ملاحظات مسؤول الخزينة:</label>
+                    <textarea id="settle-notes" class="form-control" rows="2" placeholder="ملاحظات حول التوريد أو استلام النقدية..." style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;"></textarea>
+                </div>
+
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="settle-auto-unsuspend" checked style="width: 18px; height: 18px; cursor: pointer;">
+                    <label for="settle-auto-unsuspend" style="font-size: 0.88rem; color: #1e40af; cursor: pointer; margin: 0;">
+                        إلغاء إيقاف حساب المستخدم وتفعيله تلقائياً فور تأكيد التصفية
+                    </label>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                    <button type="button" class="btn secondary" onclick="document.getElementById('modal-treasury-settlement').style.display='none'">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" style="background: #10b981; border-color: #10b981; font-weight: 700; padding: 8px 20px;">
+                        <span>تأكيد التصفية واستلام المبلغ</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- نافذة إيداع نقدي مباشر بالخزينة -->
+    <div id="modal-treasury-deposit" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+        <div style="background: #ffffff; border-radius: 14px; max-width: 480px; width: 92%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); overflow: hidden; animation: fadeIn 0.2s ease-out;">
+            <div style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem;">
+                    <span>📥</span>
+                    <span>تسجيل إيداع نقدي مباشر بالخزينة</span>
+                </h4>
+                <button type="button" class="btn-close-modal" onclick="document.getElementById('modal-treasury-deposit').style.display='none'" style="background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+            </div>
+            <form id="form-treasury-manual-deposit" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+                <div class="input-group">
+                    <label for="deposit-amount" style="font-weight: 700;">المبلغ المودع (ج.م):</label>
+                    <input type="number" step="0.01" min="1" id="deposit-amount" class="form-control" required placeholder="0.00" style="padding: 10px; font-weight: 800; font-size: 1.15rem; color: #16a34a; border: 2px solid #86efac; border-radius: 8px;">
+                </div>
+                <div class="input-group">
+                    <label for="deposit-depositor-name" style="font-weight: 600;">اسم المودع / الجهة:</label>
+                    <input type="text" id="deposit-depositor-name" class="form-control" required placeholder="اسم الشخص أو الفني أو الإدارة المودعة..." style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                </div>
+                <div class="input-group">
+                    <label for="deposit-category" style="font-weight: 600;">بند الإيداع:</label>
+                    <select id="deposit-category" class="form-control" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                        <option value="إيداع نقدي عام">إيداع نقدي عام</option>
+                        <option value="توريد زينات يدوي">توريد زينات يدوي</option>
+                        <option value="توريد ضبطية يدوي">توريد ضبطية يدوي</option>
+                        <option value="سداد متأخرات نقدية">سداد متأخرات نقدية</option>
+                        <option value="تسوية خزينة">تسوية خزينة</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="deposit-receipt-no" style="font-weight: 600;">رقم إيصال التوريد:</label>
+                    <input type="text" id="deposit-receipt-no" class="form-control" required placeholder="مثال: DEP-2026-001" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                </div>
+                <div class="input-group">
+                    <label for="deposit-notes" style="font-weight: 600;">ملاحظات:</label>
+                    <textarea id="deposit-notes" class="form-control" rows="2" placeholder="أي تفاصيل أو ملاحظات إضافية..." style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1;"></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                    <button type="button" class="btn secondary" onclick="document.getElementById('modal-treasury-deposit').style.display='none'">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" style="background: #10b981; border-color: #10b981; font-weight: 700; padding: 8px 20px;">
+                        <span>تأكيد الإيداع</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </body>
 </html>

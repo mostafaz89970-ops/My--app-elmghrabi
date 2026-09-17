@@ -19,6 +19,8 @@ let state = {
     pendingRequests: [], // الحالة الجديدة للطلبات المستوردة
     judicialControl: [], // قسم الضبطية القضائية
     zinatCollection: [], // قسم تحصيل زينات
+    treasuryTransactions: [], // المعاملات المالية بالخزينة
+    treasurySettlements: [], // سجل تصفيات العهد اليومية للمستخدمين
     activityLog: [],
     debts: [],
     debtTypes: [],
@@ -190,6 +192,10 @@ let state = {
             'view_lost_meter_memos_section': { name: 'عرض قسم مذكرات الفقد', roles: ['admin', 'supervisor'] },
             'manage_lost_meter_memos': { name: 'إدارة مذكرات الفقد', roles: ['admin', 'supervisor'] },
             'view_activity_log': { name: 'عرض سجل النشاط', roles: ['admin', 'supervisor'] },
+            'view_treasury_section': { name: 'عرض قسم الخزينة العامة', roles: ['admin', 'supervisor'] },
+            'view_treasury_dashboard': { name: 'عرض لوحة الخزينة اليومية', roles: ['admin', 'supervisor'] },
+            'manage_treasury_settlements': { name: 'إدارة تصفيات العهد ووقف الحسابات', roles: ['admin', 'supervisor'] },
+            'view_treasury_transactions': { name: 'عرض سجل المعاملات المالية بالخزينة', roles: ['admin', 'supervisor'] },
             'view_collection_section': { name: 'عرض قسم التحصيل', roles: ['admin', 'supervisor', 'user'] },
             'view_collection_judicial': { name: 'عرض وإدارة تحصيل الضبطية', roles: ['admin', 'supervisor', 'user'] },
             'view_collection_zinat': { name: 'عرض وإدارة تحصيل زينات', roles: ['admin', 'supervisor', 'user'] },
@@ -221,6 +227,7 @@ let state = {
             'show_transformers_card': { name: 'عرض بطاقة إدارة المحولات', roles: ['admin', 'supervisor', 'user'] },
             'show_judicial_collection_card': { name: 'عرض بطاقة تحصيل الضبطية', roles: ['admin', 'supervisor', 'user'] },
             'show_zinat_collection_card': { name: 'عرض بطاقة تحصيل زينات', roles: ['admin', 'supervisor', 'user'] },
+            'show_treasury_card': { name: 'عرض بطاقة الخزينة العامة والتوريدات', roles: ['admin', 'supervisor'] },
             'show_zinat_registration_card': { name: 'عرض بطاقة إضافة زينات', roles: ['admin', 'supervisor', 'user'] },
             'show_accounting_card': { name: 'عرض بطاقة نظام المحاسبة', roles: ['admin', 'supervisor'] },
             'show_users_card': { name: 'عرض بطاقة المستخدمين', roles: ['admin', 'supervisor'] },
@@ -745,7 +752,7 @@ const populateUserDropdown = () => {
     state.users.forEach(user => {
         const option = document.createElement('option');
         option.value = user.username;
-        option.textContent = user.fullName;
+        option.textContent = user.fullName + (user.isSuspended ? ' ⛔ (موقوف من الخزينة)' : '');
         usernameSelect.appendChild(option);
     });
     usernameSelect.value = '';
@@ -1275,6 +1282,14 @@ const renderDashboard = () => {
             id: 'accounting-system',
             title: 'نظام المحاسبة',
             icon: '<path d="M4 19h16M7 16V8m5 8V5m5 11v-7"/><path d="M7 8h10"/>',
+            color: 'bg-primary'
+        },
+        {
+            key: 'treasury-card',
+            id: 'treasury-dashboard',
+            title: 'الخزينة العامة',
+            icon: '<rect x="2" y="4" width="20" height="16" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M12 9v1"></path><path d="M12 14v1"></path><path d="M14 12h1"></path><path d="M9 12h1"></path>',
+            count: calculateTreasuryDailyTotals().unsettledUsersCount,
             color: 'bg-primary'
         },
         { key: 'users-card', id: 'user-management', title: 'المستخدمين', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', count: state.users.length, color: 'bg-muted' },
@@ -3398,6 +3413,705 @@ window.openZinatPaymentModal = async (id) => {
             item.payments.pop(); // Revert if save failed
         }
     }
+};
+// =========================================================================
+// ====================== قسم الخزينة العامة والتصفيات ======================
+// =========================================================================
+function normalizeDateStr(d) {
+    if (!d)
+        return '';
+    if (typeof d !== 'string')
+        d = String(d);
+    d = d.replace(/[٠-٩]/g, (ch) => '٠١٢٣٤٥٦٧٨٩'.indexOf(ch).toString()).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d))
+        return d;
+    const parts = d.split(/[/\-.]/);
+    if (parts.length === 3) {
+        if (parts[0].length === 4) {
+            return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+        }
+        else if (parts[2].length === 4) {
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+    }
+    const parsed = new Date(d);
+    if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().slice(0, 10);
+    }
+    return d;
+}
+const calculateUserCustodySummary = (targetUser, dateFilter) => {
+    const username = targetUser.username;
+    const fullName = targetUser.fullName || username;
+    const targetDate = (dateFilter && dateFilter !== 'all') ? normalizeDateStr(dateFilter) : null;
+    let zinatAmount = 0;
+    let zinatCount = 0;
+    (state.zinatCollection || []).forEach((item) => {
+        (item.payments || []).forEach((p) => {
+            const matchesUser = p.collectedBy === fullName || p.collectedBy === username || p.collectorUsername === username;
+            const matchesDate = !targetDate || normalizeDateStr(p.date) === targetDate;
+            if (matchesUser && matchesDate) {
+                zinatAmount += Number(p.amount) || 0;
+                zinatCount++;
+            }
+        });
+    });
+    let judicialAmount = 0;
+    let judicialCount = 0;
+    (state.judicialControl || []).forEach((item) => {
+        (item.payments || []).forEach((p) => {
+            const matchesUser = p.collectedBy === fullName || p.collectedBy === username || p.collectorUsername === username;
+            const matchesDate = !targetDate || normalizeDateStr(p.date) === targetDate;
+            if (matchesUser && matchesDate) {
+                judicialAmount += Number(p.amount) || 0;
+                judicialCount++;
+            }
+        });
+    });
+    let manualAmount = 0;
+    (state.treasuryTransactions || []).forEach((t) => {
+        const matchesUser = t.collectorUsername === username || t.collectorName === fullName;
+        const matchesDate = !targetDate || normalizeDateStr(t.date) === targetDate;
+        if (matchesUser && matchesDate && t.type === 'manual_deposit') {
+            manualAmount += Number(t.amount) || 0;
+        }
+    });
+    const totalCollected = Number((zinatAmount + judicialAmount + manualAmount).toFixed(2));
+    let totalSettled = 0;
+    (state.treasurySettlements || []).forEach((s) => {
+        const matchesUser = s.collectorUsername === username || s.collectorName === fullName;
+        const matchesDate = !targetDate || normalizeDateStr(s.settlementDate) === targetDate;
+        if (matchesUser && matchesDate) {
+            totalSettled += Number(s.totalAmount) || 0;
+        }
+    });
+    totalSettled = Number(totalSettled.toFixed(2));
+    const remaining = Number(Math.max(0, totalCollected - totalSettled).toFixed(2));
+    let status = 'none';
+    if (totalCollected > 0 && remaining > 0.009) {
+        status = 'unsettled';
+    }
+    else if (totalCollected > 0 && remaining <= 0.009) {
+        status = 'settled';
+    }
+    return {
+        user: targetUser,
+        username,
+        fullName,
+        role: targetUser.role || 'user',
+        zinatAmount: Number(zinatAmount.toFixed(2)),
+        zinatCount,
+        judicialAmount: Number(judicialAmount.toFixed(2)),
+        judicialCount,
+        manualAmount: Number(manualAmount.toFixed(2)),
+        totalCollected,
+        totalSettled,
+        remaining,
+        status,
+        isSuspended: Boolean(targetUser.isSuspended),
+        suspendReason: targetUser.suspendReason
+    };
+};
+const calculateTreasuryDailyTotals = (dateFilter) => {
+    const targetDate = (dateFilter && dateFilter !== 'all') ? normalizeDateStr(dateFilter) : normalizeDateStr(new Date().toISOString().slice(0, 10));
+    let totalZinat = 0;
+    let zinatCount = 0;
+    (state.zinatCollection || []).forEach((item) => {
+        (item.payments || []).forEach((p) => {
+            if (!targetDate || normalizeDateStr(p.date) === targetDate) {
+                totalZinat += Number(p.amount) || 0;
+                zinatCount++;
+            }
+        });
+    });
+    let totalJudicial = 0;
+    let judicialCount = 0;
+    (state.judicialControl || []).forEach((item) => {
+        (item.payments || []).forEach((p) => {
+            if (!targetDate || normalizeDateStr(p.date) === targetDate) {
+                totalJudicial += Number(p.amount) || 0;
+                judicialCount++;
+            }
+        });
+    });
+    let totalManual = 0;
+    (state.treasuryTransactions || []).forEach((t) => {
+        if (!targetDate || normalizeDateStr(t.date) === targetDate) {
+            if (t.type === 'manual_deposit')
+                totalManual += Number(t.amount) || 0;
+        }
+    });
+    const totalRevenues = Number((totalZinat + totalJudicial + totalManual).toFixed(2));
+    const userSummaries = state.users.map(u => calculateUserCustodySummary(u, dateFilter || 'today'));
+    const pendingUnsettledTotal = userSummaries.reduce((sum, u) => sum + u.remaining, 0);
+    const unsettledUsersCount = userSummaries.filter(u => u.status === 'unsettled').length;
+    return {
+        targetDate,
+        totalRevenues,
+        totalZinat: Number(totalZinat.toFixed(2)),
+        zinatCount,
+        totalJudicial: Number(totalJudicial.toFixed(2)),
+        judicialCount,
+        totalManual: Number(totalManual.toFixed(2)),
+        pendingUnsettledTotal: Number(pendingUnsettledTotal.toFixed(2)),
+        unsettledUsersCount,
+        userSummaries
+    };
+};
+let activeTreasuryDateFilter = new Date().toISOString().slice(0, 10);
+const renderTreasuryDashboard = () => {
+    const totals = calculateTreasuryDailyTotals(activeTreasuryDateFilter);
+    const dateInput = document.getElementById('treasury-date-filter');
+    if (dateInput)
+        dateInput.value = activeTreasuryDateFilter;
+    const dateIndicator = document.getElementById('treasury-date-status-indicator');
+    if (dateIndicator) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (activeTreasuryDateFilter === todayStr) {
+            dateIndicator.innerHTML = 'الحركة المعروضة: <b style="color:#10b981;">اليوم (' + todayStr + ')</b>';
+        }
+        else {
+            dateIndicator.innerHTML = 'الحركة المعروضة: <b>' + activeTreasuryDateFilter + '</b>';
+        }
+    }
+    const kpiTotal = document.getElementById('kpi-treasury-total-today');
+    if (kpiTotal)
+        kpiTotal.textContent = totals.totalRevenues.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' ج.م';
+    const kpiZinat = document.getElementById('kpi-treasury-zinat-today');
+    if (kpiZinat)
+        kpiZinat.textContent = totals.totalZinat.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' ج.م';
+    const kpiZinatCount = document.getElementById('kpi-treasury-zinat-count');
+    if (kpiZinatCount)
+        kpiZinatCount.textContent = totals.zinatCount + ' معاملة تحصيل';
+    const kpiJudicial = document.getElementById('kpi-treasury-judicial-today');
+    if (kpiJudicial)
+        kpiJudicial.textContent = totals.totalJudicial.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' ج.م';
+    const kpiJudicialCount = document.getElementById('kpi-treasury-judicial-count');
+    if (kpiJudicialCount)
+        kpiJudicialCount.textContent = totals.judicialCount + ' محضر مسدد';
+    const kpiPending = document.getElementById('kpi-treasury-pending-unsettled');
+    if (kpiPending)
+        kpiPending.textContent = totals.pendingUnsettledTotal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' ج.م';
+    const kpiUnsettledUsers = document.getElementById('kpi-treasury-unsettled-users-count');
+    if (kpiUnsettledUsers)
+        kpiUnsettledUsers.textContent = totals.unsettledUsersCount + ' مستخدم';
+    // Render compact dashboard users table
+    const tbody = document.querySelector('#treasury-dashboard-users-table tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+        if (totals.userSummaries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:15px;">لا يوجد مستخدمون مسجلون.</td></tr>';
+        }
+        else {
+            totals.userSummaries.forEach(u => {
+                const tr = document.createElement('tr');
+                let statusBadge = '<span class="badge" style="background:#f1f5f9; color:#64748b; padding:4px 8px; border-radius:10px;">⚪ لا توجد تحصيلات</span>';
+                if (u.status === 'unsettled') {
+                    statusBadge = `<span class="badge" style="background:#fee2e2; color:#dc2626; border:1px solid #f87171; font-weight:700; padding:4px 10px; border-radius:12px;">⚠️ لم يُصفّى (${u.remaining.toLocaleString()} ج.م)</span>`;
+                }
+                else if (u.status === 'settled') {
+                    statusBadge = '<span class="badge" style="background:#dcfce7; color:#166534; border:1px solid #86efac; font-weight:700; padding:4px 10px; border-radius:12px;">✔️ تمت التصفية</span>';
+                }
+                let accountBadge = u.isSuspended
+                    ? '<span class="badge" style="background:#dc2626; color:#fff; font-weight:700; padding:4px 8px; border-radius:6px;">⛔ موقوف</span>'
+                    : '<span class="badge" style="background:#dcfce7; color:#15803d; font-weight:700; padding:4px 8px; border-radius:6px;">نشط 🟢</span>';
+                tr.innerHTML = `
+                        <td><b>${u.fullName}</b> <small style="color:#64748b;">(@${u.username})</small></td>
+                        <td>${u.zinatAmount.toLocaleString()} ج.م</td>
+                        <td>${u.judicialAmount.toLocaleString()} ج.م</td>
+                        <td><b>${u.totalCollected.toLocaleString()} ج.م</b></td>
+                        <td>${u.totalSettled.toLocaleString()} ج.م</td>
+                        <td style="color:${u.remaining > 0 ? '#dc2626' : '#15803d'}; font-weight:bold;">${u.remaining.toLocaleString()} ج.م</td>
+                        <td>${statusBadge}</td>
+                        <td>${accountBadge}</td>
+                        <td>
+                            <div style="display:flex; gap:6px;">
+                                ${u.remaining > 0 ? `<button class="btn btn-sm" onclick="window.openTreasurySettlementModal('${u.username}')" style="background:#10b981; color:#fff; padding:3px 8px; font-size:0.8rem; border-radius:4px;">تصفية 💵</button>` : ''}
+                                ${u.username !== 'admin' ? `<button class="btn btn-sm" onclick="window.toggleUserSuspension('${u.username}')" style="background:${u.isSuspended ? '#3b82f6' : '#ef4444'}; color:#fff; padding:3px 8px; font-size:0.8rem; border-radius:4px;">${u.isSuspended ? 'تفعيل 🔓' : 'إيقاف ⛔'}</button>` : ''}
+                            </div>
+                        </td>
+                    `;
+                tbody.appendChild(tr);
+            });
+        }
+    }
+};
+const renderTreasuryUserSettlements = () => {
+    const dateInput = document.getElementById('settlement-filter-date');
+    const statusSelect = document.getElementById('settlement-filter-status');
+    const searchInput = document.getElementById('settlement-search-user');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = activeTreasuryDateFilter;
+    }
+    const dateFilter = dateInput ? dateInput.value : activeTreasuryDateFilter;
+    const statusFilter = statusSelect ? statusSelect.value : 'all';
+    const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const allSummaries = state.users.map(u => calculateUserCustodySummary(u, dateFilter));
+    let filtered = allSummaries.filter(u => {
+        if (statusFilter === 'unsettled' && u.status !== 'unsettled')
+            return false;
+        if (statusFilter === 'settled' && u.status !== 'settled')
+            return false;
+        if (searchVal) {
+            const matchName = (u.fullName || '').toLowerCase().includes(searchVal);
+            const matchUser = (u.username || '').toLowerCase().includes(searchVal);
+            if (!matchName && !matchUser)
+                return false;
+        }
+        return true;
+    });
+    const countBadge = document.getElementById('settlement-count-badge');
+    if (countBadge)
+        countBadge.textContent = filtered.length + ' محصل';
+    const tbody = document.querySelector('#treasury-user-settlements-table tbody');
+    if (!tbody)
+        return;
+    tbody.innerHTML = '';
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#94a3b8; padding:20px;">لا توجد سجلات مطابقة لمعايير البحث والتصفية.</td></tr>';
+        return;
+    }
+    filtered.forEach(u => {
+        const tr = document.createElement('tr');
+        let statusBadge = '<span class="badge" style="background:#f1f5f9; color:#64748b; padding:4px 8px; border-radius:10px;">⚪ لا توجد تحصيلات</span>';
+        if (u.status === 'unsettled') {
+            statusBadge = `<span class="badge" style="background:#fee2e2; color:#dc2626; border:1px solid #f87171; font-weight:700; padding:5px 12px; border-radius:12px;">⚠️ لم يُصفّى (${u.remaining.toLocaleString()} ج.م)</span>`;
+        }
+        else if (u.status === 'settled') {
+            statusBadge = '<span class="badge" style="background:#dcfce7; color:#166534; border:1px solid #86efac; font-weight:700; padding:5px 12px; border-radius:12px;">✔️ تمت التصفية بالكامل</span>';
+        }
+        let accountBadge = u.isSuspended
+            ? '<span class="badge" style="background:#dc2626; color:#fff; font-weight:700; padding:4px 10px; border-radius:8px;">⛔ موقوف من الخزينة</span>'
+            : '<span class="badge" style="background:#dcfce7; color:#15803d; font-weight:700; padding:4px 10px; border-radius:8px;">نشط 🟢</span>';
+        const userSettlementRecord = (state.treasurySettlements || []).filter((s) => s.collectorUsername === u.username);
+        const hasPastSettlements = userSettlementRecord.length > 0;
+        tr.innerHTML = `
+                <td><b>${u.fullName}</b> <br><small style="color:#64748b;">اسم الدخول: @${u.username}</small></td>
+                <td><span class="badge" style="background:#f3f4f6; color:#374151;">${u.role}</span></td>
+                <td>${u.zinatAmount.toLocaleString()} ج.م <br><small style="color:#64748b;">(${u.zinatCount} إيصال)</small></td>
+                <td>${u.judicialAmount.toLocaleString()} ج.م <br><small style="color:#64748b;">(${u.judicialCount} محضر)</small></td>
+                <td><b style="font-size:1.05rem;">${u.totalCollected.toLocaleString()} ج.م</b></td>
+                <td style="color:#10b981; font-weight:bold;">${u.totalSettled.toLocaleString()} ج.م</td>
+                <td style="color:${u.remaining > 0 ? '#dc2626' : '#15803d'}; font-weight:bold; font-size:1.05rem;">${u.remaining.toLocaleString()} ج.م</td>
+                <td>${statusBadge}</td>
+                <td>${accountBadge}</td>
+                <td>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        ${u.remaining > 0 ? `<button class="btn btn-sm btn-primary" onclick="window.openTreasurySettlementModal('${u.username}')" style="background:#10b981; border-color:#10b981; padding:4px 10px; font-weight:bold;">تصفية العهدة 💵</button>` : ''}
+                        ${u.username !== 'admin' ? `<button class="btn btn-sm" onclick="window.toggleUserSuspension('${u.username}')" style="background:${u.isSuspended ? '#2563eb' : '#dc2626'}; color:#fff; padding:4px 10px; font-weight:bold;">${u.isSuspended ? 'إعادة التفعيل 🔓' : 'إيقاف الحساب ⛔'}</button>` : ''}
+                        ${hasPastSettlements ? `<button class="btn btn-sm secondary" onclick="window.handlePrintLatestSettlementReceipt('${u.username}')" title="طباعة إيصال آخر تصفية">إيصال 🖨️</button>` : ''}
+                    </div>
+                </td>
+            `;
+        tbody.appendChild(tr);
+    });
+};
+const renderTreasuryTransactionsLog = () => {
+    const searchInput = document.getElementById('treasury-log-search');
+    const typeSelect = document.getElementById('treasury-log-type-filter');
+    const fromDateInput = document.getElementById('treasury-log-date-from');
+    const toDateInput = document.getElementById('treasury-log-date-to');
+    const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const typeVal = typeSelect ? typeSelect.value : 'all';
+    const fromDate = fromDateInput ? fromDateInput.value : '';
+    const toDate = toDateInput ? toDateInput.value : '';
+    // Combine all transactions into one master log
+    const list = [];
+    // 1. Zinat collections
+    (state.zinatCollection || []).forEach((item) => {
+        (item.payments || []).forEach((p, pIdx) => {
+            list.push({
+                id: `zinat-${item.id}-${pIdx}`,
+                type: 'zinat',
+                typeName: 'تحصيل زينات',
+                date: normalizeDateStr(p.date),
+                time: p.time || '',
+                collector: p.collectedBy || item.technician || 'غير معروف',
+                party: item.requesterName || 'مواطن / مشترك',
+                amount: Number(p.amount) || 0,
+                receiptNumber: p.receiptNumber || '-',
+                notes: item.notes || ''
+            });
+        });
+    });
+    // 2. Judicial collections
+    (state.judicialControl || []).forEach((item) => {
+        (item.payments || []).forEach((p, pIdx) => {
+            list.push({
+                id: `judicial-${item.id}-${pIdx}`,
+                type: 'judicial',
+                typeName: 'تحصيل ضبطية قضائية',
+                date: normalizeDateStr(p.date),
+                time: p.time || '',
+                collector: p.collectedBy || 'غير معروف',
+                party: item.subscriberName || 'مخالف',
+                amount: Number(p.amount) || 0,
+                receiptNumber: p.receiptNumber || '-',
+                notes: item.notes || ''
+            });
+        });
+    });
+    // 3. Treasury settlements
+    (state.treasurySettlements || []).forEach((s) => {
+        list.push({
+            id: `settle-${s.id}`,
+            type: 'settlement',
+            typeName: 'تصفية وتوريد عهدة للخزينة',
+            date: normalizeDateStr(s.settlementDate),
+            time: s.settlementTime || '',
+            collector: s.collectorName || s.collectorUsername,
+            party: `مسؤول الخزينة: ${s.settledBy}`,
+            amount: Number(s.totalAmount) || 0,
+            receiptNumber: s.receiptNumber || '-',
+            notes: s.notes || ''
+        });
+    });
+    // 4. Manual deposits
+    (state.treasuryTransactions || []).forEach((t) => {
+        list.push({
+            id: `trans-${t.id}`,
+            type: t.type || 'manual_deposit',
+            typeName: t.typeName || 'إيداع نقدي مباشر',
+            date: normalizeDateStr(t.date),
+            time: t.time || '',
+            collector: t.collectorName || 'مورد',
+            party: t.depositorName || 'الخزينة',
+            amount: Number(t.amount) || 0,
+            receiptNumber: t.receiptNumber || '-',
+            notes: t.notes || ''
+        });
+    });
+    // Sort descending by date
+    list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+    // Apply filters
+    const filtered = list.filter(item => {
+        if (typeVal !== 'all' && item.type !== typeVal)
+            return false;
+        if (fromDate && item.date && item.date < fromDate)
+            return false;
+        if (toDate && item.date && item.date > toDate)
+            return false;
+        if (searchVal) {
+            const matchParty = (item.party || '').toLowerCase().includes(searchVal);
+            const matchCollector = (item.collector || '').toLowerCase().includes(searchVal);
+            const matchReceipt = (item.receiptNumber || '').toLowerCase().includes(searchVal);
+            if (!matchParty && !matchCollector && !matchReceipt)
+                return false;
+        }
+        return true;
+    });
+    const totalAmt = filtered.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const totalBadge = document.getElementById('treasury-log-total-amount');
+    if (totalBadge)
+        totalBadge.textContent = 'الإجمالي: ' + totalAmt.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' ج.م';
+    const tbody = document.querySelector('#treasury-transactions-table tbody');
+    if (!tbody)
+        return;
+    tbody.innerHTML = '';
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:20px;">لا توجد حركات مطابقة لمعايير البحث.</td></tr>';
+        return;
+    }
+    filtered.forEach(item => {
+        const tr = document.createElement('tr');
+        let typeColor = '#3b82f6';
+        if (item.type === 'judicial')
+            typeColor = '#8b5cf6';
+        if (item.type === 'settlement')
+            typeColor = '#10b981';
+        if (item.type === 'manual_deposit')
+            typeColor = '#059669';
+        tr.innerHTML = `
+                <td><b>${item.receiptNumber}</b></td>
+                <td>${item.date} ${item.time ? `<small style="color:#64748b;">(${item.time})</small>` : ''}</td>
+                <td><span class="badge" style="background:${typeColor}15; color:${typeColor}; border:1px solid ${typeColor}40; font-weight:700; padding:4px 8px; border-radius:6px;">${item.typeName}</span></td>
+                <td>${item.collector}</td>
+                <td>${item.party}</td>
+                <td style="font-weight:bold; color:#0f172a; font-family:monospace;">${Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م</td>
+                <td style="font-size:0.85rem; color:#64748b;">${item.notes || '-'}</td>
+                <td>
+                    <button class="btn btn-sm secondary" onclick="window.printSingleTreasuryReceipt('${item.receiptNumber}', '${item.typeName}', ${item.amount}, '${item.collector}', '${item.party}', '${item.date}')" title="طباعة إيصال">إيصال 🖨️</button>
+                </td>
+            `;
+        tbody.appendChild(tr);
+    });
+};
+// --- Modal and Action Handlers ---
+window.openTreasurySettlementModal = (username) => {
+    const user = state.users.find(u => u.username === username);
+    if (!user)
+        return;
+    const summary = calculateUserCustodySummary(user, activeTreasuryDateFilter);
+    const modal = document.getElementById('modal-treasury-settlement');
+    if (!modal)
+        return;
+    document.getElementById('settle-target-username').value = username;
+    document.getElementById('settle-collector-name').textContent = `المحصل: ${summary.fullName} (@${username})`;
+    document.getElementById('settle-zinat-amount').textContent = summary.zinatAmount.toLocaleString() + ' ج.م';
+    document.getElementById('settle-judicial-amount').textContent = summary.judicialAmount.toLocaleString() + ' ج.م';
+    document.getElementById('settle-total-collected').textContent = summary.totalCollected.toLocaleString() + ' ج.م';
+    document.getElementById('settle-remaining-amount').textContent = summary.remaining.toLocaleString() + ' ج.م';
+    const paidInput = document.getElementById('settle-paid-amount');
+    paidInput.value = summary.remaining.toString();
+    paidInput.max = summary.remaining.toString();
+    const randSeq = Math.floor(1000 + Math.random() * 9000);
+    const receiptInput = document.getElementById('settle-receipt-no');
+    receiptInput.value = `TR-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randSeq}`;
+    const notesInput = document.getElementById('settle-notes');
+    notesInput.value = `تصفية عهدة يومية عن تاريخ ${activeTreasuryDateFilter}`;
+    modal.style.display = 'flex';
+};
+window.toggleUserSuspension = async (username) => {
+    const user = state.users.find(u => u.username === username);
+    if (!user)
+        return;
+    if (user.username === 'admin' || user.role === 'admin') {
+        showToast('لا يمكن إيقاف حساب المدير العام للنظام.', 'error');
+        return;
+    }
+    if (user.isSuspended) {
+        user.isSuspended = false;
+        user.suspendReason = '';
+        showToast(`تم رفع الإيقاف وإعادة تفعيل حساب المستخدم "${user.fullName}" بنجاح.`, 'success');
+        logActivity('تفعيل حساب مستخدم', `قام مسؤول الخزينة بتفعيل حساب "${user.fullName}" (@${user.username})`);
+    }
+    else {
+        const confirmed = confirm(`هل أنت متأكد من إيقاف حساب المستخدم "${user.fullName}"؟\n\nلن يتمكن من تسجيل الدخول للنظام حتى يقوم بتصفية العهدة المالية بالخزينة.`);
+        if (!confirmed)
+            return;
+        user.isSuspended = true;
+        user.suspendReason = 'عدم تصفية العهدة المالية بالخزينة';
+        user.suspendedAt = new Date().toLocaleString('ar-EG');
+        user.suspendedBy = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الخزينة';
+        showToast(`تم إيقاف حساب المستخدم "${user.fullName}" بنجاح ومنعه من تسجيل الدخول.`, 'warning');
+        logActivity('إيقاف حساب مستخدم', `قام مسؤول الخزينة بإيقاف حساب "${user.fullName}" (@${user.username}) لعدم تصفية العهدة المالية`);
+    }
+    await saveState();
+    renderTreasuryDashboard();
+    renderTreasuryUserSettlements();
+};
+window.handlePrintLatestSettlementReceipt = (username) => {
+    const settlements = (state.treasurySettlements || []).filter((s) => s.collectorUsername === username);
+    if (settlements.length === 0) {
+        showToast('لا توجد إيصالات تصفية سابقة لهذا المستخدم.', 'warning');
+        return;
+    }
+    const latest = settlements[settlements.length - 1];
+    window.printSingleTreasuryReceipt(latest.receiptNumber, 'تصفية عهدة محصل', latest.totalAmount, latest.collectorName || username, 'الخزينة العامة', latest.settlementDate, latest.notes);
+};
+window.printSingleTreasuryReceipt = (receiptNo, typeName, amount, collector, party, date, notes) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow)
+        return;
+    const companyName = state.settings.companyName || 'ELMAGHRABI';
+    const logoSrc = state.settings.companyLogo;
+    const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 60px; max-width: 60px; object-fit: contain;">` : '';
+    printWindow.document.write(`
+            <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>إيصال توريد خزينة ${receiptNo}</title>
+            <style>
+                body { font-family: 'Tajawal', sans-serif; padding: 20px; color: #1e293b; }
+                .receipt-box { max-width: 500px; margin: 0 auto; border: 2px solid #0f172a; padding: 20px; border-radius: 8px; }
+                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+                .title { text-align: center; font-size: 16px; font-weight: bold; margin: 10px 0; }
+                .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #cbd5e1; font-size: 13px; }
+                .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 16px; font-weight: bold; background: #f8fafc; border-top: 2px solid #0f172a; margin-top: 10px; }
+                .signatures { display: flex; justify-content: space-between; margin-top: 40px; font-size: 12px; font-weight: bold; }
+            </style></head><body>
+            <div class="receipt-box">
+                <div class="header">
+                    <div><b>${companyName}</b><br><small>إدارة الخزينة والتحصيل</small></div>
+                    <div>${logoHTML}</div>
+                </div>
+                <div class="title">إيصال توريد نقدية بالخزينة</div>
+                <div class="row"><span>رقم الإيصال:</span><b>${receiptNo}</b></div>
+                <div class="row"><span>التاريخ:</span><span>${date}</span></div>
+                <div class="row"><span>نوع المعاملة:</span><span>${typeName}</span></div>
+                <div class="row"><span>المورد / المحصل:</span><b>${collector}</b></div>
+                <div class="row"><span>المستلم / الجهة:</span><span>${party}</span></div>
+                ${notes ? `<div class="row"><span>ملاحظات:</span><span>${notes}</span></div>` : ''}
+                <div class="total-row"><span>المبلغ المستلم:</span><span>${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م</span></div>
+                <div class="signatures">
+                    <div>توقيع المسلّم (المحصل):<br><br>.........................</div>
+                    <div>توقيع المستلم (مسؤول الخزينة):<br><br>.........................</div>
+                </div>
+            </div>
+            </body></html>
+        `);
+    printWindow.document.close();
+    setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+    }, 500);
+};
+const handleTreasurySettlementSubmit = async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const username = document.getElementById('settle-target-username').value;
+    const paidAmount = Number(document.getElementById('settle-paid-amount').value);
+    const receiptNumber = document.getElementById('settle-receipt-no').value.trim();
+    const notes = document.getElementById('settle-notes').value.trim();
+    const autoUnsuspend = document.getElementById('settle-auto-unsuspend').checked;
+    if (!username || paidAmount <= 0 || !receiptNumber) {
+        showToast('يرجى التأكد من ملء جميع الحقول بمبالغ صحيحة.', 'error');
+        return;
+    }
+    const user = state.users.find(u => u.username === username);
+    if (!user)
+        return;
+    const summary = calculateUserCustodySummary(user, activeTreasuryDateFilter);
+    const newSettlement = {
+        id: Date.now(),
+        settlementDate: activeTreasuryDateFilter,
+        settlementTime: new Date().toLocaleTimeString('ar-EG'),
+        collectorUsername: user.username,
+        collectorName: user.fullName || user.username,
+        totalAmount: paidAmount,
+        zinatAmount: summary.zinatAmount,
+        judicialAmount: summary.judicialAmount,
+        receiptNumber,
+        settledBy: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الخزينة',
+        notes
+    };
+    if (!state.treasurySettlements)
+        state.treasurySettlements = [];
+    state.treasurySettlements.push(newSettlement);
+    if (autoUnsuspend && user.isSuspended) {
+        user.isSuspended = false;
+        user.suspendReason = '';
+    }
+    logActivity('تصفية عهدة بالخزينة', `تم تصفية عهدة المحصل "${user.fullName}" بمبلغ ${paidAmount} ج.م (إيصال: ${receiptNumber})`);
+    await saveState();
+    showToast(`تمت تصفية عهدة ${user.fullName} وتوريد مبلغ ${paidAmount.toLocaleString()} ج.م للخزينة بنجاح.`, 'success');
+    const modal = document.getElementById('modal-treasury-settlement');
+    if (modal)
+        modal.style.display = 'none';
+    renderTreasuryDashboard();
+    renderTreasuryUserSettlements();
+    renderTreasuryTransactionsLog();
+    // Print receipt
+    window.printSingleTreasuryReceipt(receiptNumber, 'تصفية عهدة محصل', paidAmount, user.fullName, 'الخزينة العامة', activeTreasuryDateFilter, notes);
+};
+const handleTreasuryManualDepositSubmit = async (event) => {
+    event.preventDefault();
+    const amount = Number(document.getElementById('deposit-amount').value);
+    const depositorName = document.getElementById('deposit-depositor-name').value.trim();
+    const category = document.getElementById('deposit-category').value;
+    const receiptNumber = document.getElementById('deposit-receipt-no').value.trim();
+    const notes = document.getElementById('deposit-notes').value.trim();
+    if (amount <= 0 || !depositorName || !receiptNumber) {
+        showToast('يرجى ملء جميع الحقول المطلوبة.', 'error');
+        return;
+    }
+    const newTrans = {
+        id: Date.now(),
+        type: 'manual_deposit',
+        typeName: category,
+        amount,
+        date: activeTreasuryDateFilter,
+        time: new Date().toLocaleTimeString('ar-EG'),
+        depositorName,
+        collectorName: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الخزينة',
+        collectorUsername: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.username) || 'treasury',
+        receiptNumber,
+        notes
+    };
+    if (!state.treasuryTransactions)
+        state.treasuryTransactions = [];
+    state.treasuryTransactions.push(newTrans);
+    logActivity('إيداع نقدي بالخزينة', `تم إيداع مبلغ ${amount} ج.م من ${depositorName} (إيصال: ${receiptNumber})`);
+    await saveState();
+    showToast(`تم تسجيل الإيداع بمبلغ ${amount.toLocaleString()} ج.م بنجاح.`, 'success');
+    const modal = document.getElementById('modal-treasury-deposit');
+    if (modal)
+        modal.style.display = 'none';
+    renderTreasuryDashboard();
+    renderTreasuryTransactionsLog();
+    window.printSingleTreasuryReceipt(receiptNumber, category, amount, depositorName, 'الخزينة العامة', activeTreasuryDateFilter, notes);
+};
+const handlePrintDailyTreasuryReport = (dateStr) => {
+    const targetDate = dateStr || activeTreasuryDateFilter;
+    const totals = calculateTreasuryDailyTotals(targetDate);
+    const printWindow = window.open('', '_blank');
+    if (!printWindow)
+        return;
+    const companyName = state.settings.companyName || 'ELMAGHRABI';
+    const logoSrc = state.settings.companyLogo;
+    const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 70px; max-width: 70px; object-fit: contain;">` : '';
+    const rowsHtml = totals.userSummaries.map(u => `
+            <tr>
+                <td><b>${u.fullName}</b> (@${u.username})</td>
+                <td>${u.role}</td>
+                <td>${u.zinatAmount.toLocaleString()} ج.م</td>
+                <td>${u.judicialAmount.toLocaleString()} ج.م</td>
+                <td><b>${u.totalCollected.toLocaleString()} ج.م</b></td>
+                <td>${u.totalSettled.toLocaleString()} ج.م</td>
+                <td style="color:${u.remaining > 0 ? '#dc2626' : '#15803d'}; font-weight:bold;">${u.remaining.toLocaleString()} ج.م</td>
+                <td>${u.status === 'unsettled' ? '⚠️ لم يُصفّى' : (u.status === 'settled' ? '✔️ تمت التصفية' : '⚪ لا توجد تحصيلات')}</td>
+                <td>${u.isSuspended ? '⛔ موقوف' : 'نشط'}</td>
+            </tr>
+        `).join('');
+    printWindow.document.write(`
+            <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير الخزينة اليومي - ${targetDate}</title>
+            <style>
+                body { font-family: 'Tajawal', sans-serif; padding: 25px; color: #1e293b; font-size: 11pt; }
+                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
+                .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+                .kpi-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; text-align: center; background: #f8fafc; }
+                .kpi-val { font-size: 14pt; font-weight: bold; margin-top: 4px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10pt; }
+                th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: right; }
+                th { background: #0f172a; color: #fff; }
+                tr:nth-child(even) { background: #f8fafc; }
+                .signatures { display: flex; justify-content: space-between; margin-top: 45px; font-weight: bold; }
+            </style></head><body>
+                <div class="header">
+                    <div>
+                        <h2 style="margin:0;">${companyName}</h2>
+                        <h4 style="margin:5px 0 0 0; color:#475569;">تقرير حركة الخزينة وتصفيات العهد اليومية</h4>
+                        <div style="font-size:10pt; margin-top:4px;">تاريخ التقرير: <b>${targetDate}</b></div>
+                    </div>
+                    <div>${logoHTML}</div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-box"><div>إجمالي الإيرادات</div><div class="kpi-val" style="color:#059669;">${totals.totalRevenues.toLocaleString()} ج.م</div></div>
+                    <div class="kpi-box"><div>تحصيلات الزينات</div><div class="kpi-val" style="color:#2563eb;">${totals.totalZinat.toLocaleString()} ج.م</div></div>
+                    <div class="kpi-box"><div>تحصيلات الضبطية</div><div class="kpi-val" style="color:#7c3aed;">${totals.totalJudicial.toLocaleString()} ج.م</div></div>
+                    <div class="kpi-box"><div>المتبقي غير المصفى</div><div class="kpi-val" style="color:#dc2626;">${totals.pendingUnsettledTotal.toLocaleString()} ج.م</div></div>
+                </div>
+
+                <h3>موقف عهد وتصفيات المحصلين:</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>المحصل</th>
+                            <th>الدور</th>
+                            <th>الزينات</th>
+                            <th>الضبطية</th>
+                            <th>إجمالي المحصل</th>
+                            <th>المورد للخزينة</th>
+                            <th>المتبقي بالعهدة</th>
+                            <th>حالة التصفية</th>
+                            <th>حالة الحساب</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+
+                <div class="signatures">
+                    <div>إعداد مسؤول الخزينة:<br><br>.....................................</div>
+                    <div>مراجع الحسابات:<br><br>.....................................</div>
+                    <div>اعتماد الإدارة المالية:<br><br>.....................................</div>
+                </div>
+            </body></html>
+        `);
+    printWindow.document.close();
+    setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+    }, 500);
 };
 // --- Canvas Logic ---
 const initSketchCanvas = () => {
@@ -6411,6 +7125,11 @@ const renderPermissionsSection = () => {
             title: 'الضبطية القضائية',
             icon: '⚖️',
             keys: ['view_judicial_control_section', 'view_judicial_control_list', 'manage_judicial_control']
+        },
+        {
+            title: 'الخزينة العامة وتصفيات العهد والرقابة المالية',
+            icon: '🏦',
+            keys: ['view_treasury_section', 'view_treasury_dashboard', 'manage_treasury_settlements', 'view_treasury_transactions']
         },
         {
             title: 'التحصيل وزينات',
@@ -17593,6 +18312,15 @@ function handleNavigation(event) {
     else if (targetId === 'collection-zinat') {
         renderZinatCollectionSection();
     }
+    else if (targetId === 'treasury-dashboard') {
+        renderTreasuryDashboard();
+    }
+    else if (targetId === 'treasury-user-settlements') {
+        renderTreasuryUserSettlements();
+    }
+    else if (targetId === 'treasury-transactions-log') {
+        renderTreasuryTransactionsLog();
+    }
     else if (targetId === 'zinat-registration') {
         openZinatForm();
     }
@@ -17620,10 +18348,74 @@ function handleNavigation(event) {
  * Sets up all the event listeners for the application.
  */
 const setupEventListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110;
     // Welcome Screen Listeners
     (_a = document.getElementById('start-new-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', handleStartNew);
     (_b = document.getElementById('import-from-welcome-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleImportFromWelcome);
+    // ================= Treasury Event Listeners =================
+    (_c = document.getElementById('treasury-open-deposit-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => {
+        const modal = document.getElementById('modal-treasury-deposit');
+        if (modal) {
+            const randSeq = Math.floor(1000 + Math.random() * 9000);
+            const rcpt = document.getElementById('deposit-receipt-no');
+            if (rcpt)
+                rcpt.value = `DEP-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randSeq}`;
+            modal.style.display = 'flex';
+        }
+    });
+    (_d = document.getElementById('treasury-print-daily-btn')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
+        handlePrintDailyTreasuryReport();
+    });
+    (_e = document.getElementById('treasury-print-settlements-btn')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => {
+        handlePrintDailyTreasuryReport();
+    });
+    (_f = document.getElementById('treasury-print-log-btn')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
+        handlePrintDailyTreasuryReport();
+    });
+    (_g = document.getElementById('btn-treasury-today')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
+        activeTreasuryDateFilter = new Date().toISOString().slice(0, 10);
+        renderTreasuryDashboard();
+    });
+    (_h = document.getElementById('btn-treasury-yesterday')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', () => {
+        const y = new Date();
+        y.setDate(y.getDate() - 1);
+        activeTreasuryDateFilter = y.toISOString().slice(0, 10);
+        renderTreasuryDashboard();
+    });
+    (_j = document.getElementById('btn-treasury-all-dates')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', () => {
+        activeTreasuryDateFilter = 'all';
+        renderTreasuryDashboard();
+    });
+    (_k = document.getElementById('treasury-date-filter')) === null || _k === void 0 ? void 0 : _k.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val) {
+            activeTreasuryDateFilter = val;
+            renderTreasuryDashboard();
+        }
+    });
+    (_l = document.getElementById('settlement-filter-date')) === null || _l === void 0 ? void 0 : _l.addEventListener('change', () => {
+        renderTreasuryUserSettlements();
+    });
+    (_m = document.getElementById('settlement-filter-status')) === null || _m === void 0 ? void 0 : _m.addEventListener('change', () => {
+        renderTreasuryUserSettlements();
+    });
+    (_o = document.getElementById('settlement-search-user')) === null || _o === void 0 ? void 0 : _o.addEventListener('input', () => {
+        renderTreasuryUserSettlements();
+    });
+    (_p = document.getElementById('treasury-log-search')) === null || _p === void 0 ? void 0 : _p.addEventListener('input', () => {
+        renderTreasuryTransactionsLog();
+    });
+    (_q = document.getElementById('treasury-log-type-filter')) === null || _q === void 0 ? void 0 : _q.addEventListener('change', () => {
+        renderTreasuryTransactionsLog();
+    });
+    (_r = document.getElementById('treasury-log-date-from')) === null || _r === void 0 ? void 0 : _r.addEventListener('change', () => {
+        renderTreasuryTransactionsLog();
+    });
+    (_s = document.getElementById('treasury-log-date-to')) === null || _s === void 0 ? void 0 : _s.addEventListener('change', () => {
+        renderTreasuryTransactionsLog();
+    });
+    (_t = document.getElementById('form-treasury-settlement')) === null || _t === void 0 ? void 0 : _t.addEventListener('submit', handleTreasurySettlementSubmit);
+    (_u = document.getElementById('form-treasury-manual-deposit')) === null || _u === void 0 ? void 0 : _u.addEventListener('submit', handleTreasuryManualDepositSubmit);
     // Dialog Listeners
     setupDialogListeners();
     // Dark Mode Toggle
@@ -17659,7 +18451,7 @@ const setupEventListeners = () => {
     passwordConfirmBtn === null || passwordConfirmBtn === void 0 ? void 0 : passwordConfirmBtn.addEventListener('click', handlePasswordChange);
     // Login Screen Listeners
     // Toggle password visibility button
-    (_c = document.getElementById('toggle-password-visibility')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => {
+    (_v = document.getElementById('toggle-password-visibility')) === null || _v === void 0 ? void 0 : _v.addEventListener('click', () => {
         const passwordInput = document.getElementById('password');
         const eyeOpen = document.getElementById('eye-icon-open');
         const eyeClosed = document.getElementById('eye-icon-closed');
@@ -17680,7 +18472,7 @@ const setupEventListeners = () => {
                 eyeClosed.style.display = 'none';
         }
     });
-    (_d = document.getElementById('username')) === null || _d === void 0 ? void 0 : _d.addEventListener('change', () => {
+    (_w = document.getElementById('username')) === null || _w === void 0 ? void 0 : _w.addEventListener('change', () => {
         var _a;
         (_a = document.getElementById('login-error')) === null || _a === void 0 ? void 0 : _a.classList.add('hidden');
         const pass = document.getElementById('password');
@@ -17689,50 +18481,50 @@ const setupEventListeners = () => {
             pass.focus();
         }
     });
-    (_e = document.getElementById('login-form')) === null || _e === void 0 ? void 0 : _e.addEventListener('submit', handleLogin);
-    (_f = document.getElementById('header-logout-btn')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', handleLogout);
+    (_x = document.getElementById('login-form')) === null || _x === void 0 ? void 0 : _x.addEventListener('submit', handleLogin);
+    (_y = document.getElementById('header-logout-btn')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', handleLogout);
     // Main App Listeners
     document.querySelectorAll('.sidebar-nav .nav-link, .btn-back, .card.nav-link').forEach(link => {
         link.addEventListener('click', handleNavigation);
     });
     // Meter Management Listeners
-    (_g = document.getElementById('add-meter-record-btn')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => openMeterForm());
-    (_h = document.getElementById('meter-form')) === null || _h === void 0 ? void 0 : _h.addEventListener('submit', handleMeterFormSubmit);
-    (_j = document.getElementById('meterType')) === null || _j === void 0 ? void 0 : _j.addEventListener('change', () => updateMeterFormVisibility());
-    (_k = document.getElementById('sidebar-add-mukaysa-btn')) === null || _k === void 0 ? void 0 : _k.addEventListener('click', (e) => { e.preventDefault(); openMukayasatForm(); });
-    (_l = document.getElementById('mukayasat-form')) === null || _l === void 0 ? void 0 : _l.addEventListener('submit', handleMukayasatFormSubmit);
-    (_m = document.getElementById('print-mukayasa-btn')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', handlePrintMukayasaDetails);
+    (_z = document.getElementById('add-meter-record-btn')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', () => openMeterForm());
+    (_0 = document.getElementById('meter-form')) === null || _0 === void 0 ? void 0 : _0.addEventListener('submit', handleMeterFormSubmit);
+    (_1 = document.getElementById('meterType')) === null || _1 === void 0 ? void 0 : _1.addEventListener('change', () => updateMeterFormVisibility());
+    (_2 = document.getElementById('sidebar-add-mukaysa-btn')) === null || _2 === void 0 ? void 0 : _2.addEventListener('click', (e) => { e.preventDefault(); openMukayasatForm(); });
+    (_3 = document.getElementById('mukayasat-form')) === null || _3 === void 0 ? void 0 : _3.addEventListener('submit', handleMukayasatFormSubmit);
+    (_4 = document.getElementById('print-mukayasa-btn')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', handlePrintMukayasaDetails);
     // Transformer Management Listeners
-    (_o = document.getElementById('transformer-form')) === null || _o === void 0 ? void 0 : _o.addEventListener('submit', handleTransformerRegistrationSubmit);
-    (_p = document.getElementById('transformer-query-form')) === null || _p === void 0 ? void 0 : _p.addEventListener('submit', handleTransformerQuerySearch);
-    (_q = document.getElementById('transformer-load-form')) === null || _q === void 0 ? void 0 : _q.addEventListener('submit', handleTransformerLoadSubmit);
-    (_r = document.getElementById('transformer-load-name')) === null || _r === void 0 ? void 0 : _r.addEventListener('change', handleTransformerLoadNameChange);
+    (_5 = document.getElementById('transformer-form')) === null || _5 === void 0 ? void 0 : _5.addEventListener('submit', handleTransformerRegistrationSubmit);
+    (_6 = document.getElementById('transformer-query-form')) === null || _6 === void 0 ? void 0 : _6.addEventListener('submit', handleTransformerQuerySearch);
+    (_7 = document.getElementById('transformer-load-form')) === null || _7 === void 0 ? void 0 : _7.addEventListener('submit', handleTransformerLoadSubmit);
+    (_8 = document.getElementById('transformer-load-name')) === null || _8 === void 0 ? void 0 : _8.addEventListener('change', handleTransformerLoadNameChange);
     initializeTransformerLoadRecordFilters();
     ['transformer-load-capacity', 'transformer-load-s1-r', 'transformer-load-s1-s', 'transformer-load-s1-t', 'transformer-load-s2-r', 'transformer-load-s2-s', 'transformer-load-s2-t', 'transformer-load-s3-r', 'transformer-load-s3-s', 'transformer-load-s3-t', 'transformer-load-s4-r', 'transformer-load-s4-s', 'transformer-load-s4-t', 'transformer-load-streets-r', 'transformer-load-streets-s', 'transformer-load-streets-t'].forEach((id) => {
         const element = document.getElementById(id);
         element === null || element === void 0 ? void 0 : element.addEventListener('input', calculateTransformerLoadAutoValues);
     });
-    (_s = document.getElementById('print-transformers-list-btn')) === null || _s === void 0 ? void 0 : _s.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
-    (_t = document.getElementById('import-transformers-excel-trigger')) === null || _t === void 0 ? void 0 : _t.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_u = document.getElementById('transformers-excel-upload')) === null || _u === void 0 ? void 0 : _u.addEventListener('change', handleImportTransformersExcel);
-    (_v = document.getElementById('delete-selected-transformers-btn')) === null || _v === void 0 ? void 0 : _v.addEventListener('click', handleDeleteSelectedTransformers);
+    (_9 = document.getElementById('print-transformers-list-btn')) === null || _9 === void 0 ? void 0 : _9.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
+    (_10 = document.getElementById('import-transformers-excel-trigger')) === null || _10 === void 0 ? void 0 : _10.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_11 = document.getElementById('transformers-excel-upload')) === null || _11 === void 0 ? void 0 : _11.addEventListener('change', handleImportTransformersExcel);
+    (_12 = document.getElementById('delete-selected-transformers-btn')) === null || _12 === void 0 ? void 0 : _12.addEventListener('click', handleDeleteSelectedTransformers);
     // Transformer List Filters
     ['filter-transformer-name', 'filter-transformer-chassis'].forEach(id => {
         var _a;
         (_a = document.getElementById(id)) === null || _a === void 0 ? void 0 : _a.addEventListener('input', () => renderTransformerListSection());
     });
-    (_w = document.getElementById('select-all-transformers')) === null || _w === void 0 ? void 0 : _w.addEventListener('change', (e) => {
+    (_13 = document.getElementById('select-all-transformers')) === null || _13 === void 0 ? void 0 : _13.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
         document.querySelectorAll('.transformer-row-checkbox').forEach(cb => cb.checked = isChecked);
     });
-    (_x = document.getElementById('print-installation-details-btn')) === null || _x === void 0 ? void 0 : _x.addEventListener('click', handlePrintInstallationDetails);
-    (_y = document.getElementById('clear-mukayasa-form-btn')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', handleClearMukayasaForm);
+    (_14 = document.getElementById('print-installation-details-btn')) === null || _14 === void 0 ? void 0 : _14.addEventListener('click', handlePrintInstallationDetails);
+    (_15 = document.getElementById('clear-mukayasa-form-btn')) === null || _15 === void 0 ? void 0 : _15.addEventListener('click', handleClearMukayasaForm);
     // Judicial Control Listeners
-    (_z = document.getElementById('print-judicial-control-btn')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', handlePrintJudicialControlDetails);
-    (_0 = document.getElementById('judicial-control-form')) === null || _0 === void 0 ? void 0 : _0.addEventListener('submit', handleJudicialControlFormSubmit);
+    (_16 = document.getElementById('print-judicial-control-btn')) === null || _16 === void 0 ? void 0 : _16.addEventListener('click', handlePrintJudicialControlDetails);
+    (_17 = document.getElementById('judicial-control-form')) === null || _17 === void 0 ? void 0 : _17.addEventListener('submit', handleJudicialControlFormSubmit);
     // Judicial Control Filter Listeners
-    (_1 = document.getElementById('add-zinat-btn')) === null || _1 === void 0 ? void 0 : _1.addEventListener('click', openZinatForm);
-    (_2 = document.getElementById('zinat-form')) === null || _2 === void 0 ? void 0 : _2.addEventListener('submit', handleZinatFormSubmit);
+    (_18 = document.getElementById('add-zinat-btn')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', openZinatForm);
+    (_19 = document.getElementById('zinat-form')) === null || _19 === void 0 ? void 0 : _19.addEventListener('submit', handleZinatFormSubmit);
     const zinatFilterForm = document.getElementById('zinat-collection-filter-form');
     zinatFilterForm === null || zinatFilterForm === void 0 ? void 0 : zinatFilterForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -17742,12 +18534,12 @@ const setupEventListeners = () => {
         setTimeout(() => renderZinatCollectionSection(), 0);
     });
     // Print List Buttons
-    (_3 = document.getElementById('print-lost-memos-list-btn')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
-    (_4 = document.getElementById('print-judicial-control-list-btn')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
-    (_5 = document.getElementById('print-collection-judicial-btn')) === null || _5 === void 0 ? void 0 : _5.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
-    (_6 = document.getElementById('print-collection-zinat-btn')) === null || _6 === void 0 ? void 0 : _6.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
+    (_20 = document.getElementById('print-lost-memos-list-btn')) === null || _20 === void 0 ? void 0 : _20.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
+    (_21 = document.getElementById('print-judicial-control-list-btn')) === null || _21 === void 0 ? void 0 : _21.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
+    (_22 = document.getElementById('print-collection-judicial-btn')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
+    (_23 = document.getElementById('print-collection-zinat-btn')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
     // Judicial Collection Filter Listener
-    (_7 = document.getElementById('judicial-collection-filter-form')) === null || _7 === void 0 ? void 0 : _7.addEventListener('input', () => {
+    (_24 = document.getElementById('judicial-collection-filter-form')) === null || _24 === void 0 ? void 0 : _24.addEventListener('input', () => {
         renderJudicialCollectionSection();
     });
     // Judicial Control Filter Listeners
@@ -17764,9 +18556,9 @@ const setupEventListeners = () => {
         setTimeout(() => applyAndRenderJudicialControlList(), 0); // Use timeout to allow form to reset first
     });
     // Lost Memo Listeners
-    (_8 = document.getElementById('add-lost-memo-btn')) === null || _8 === void 0 ? void 0 : _8.addEventListener('click', () => openLostMemoForm());
-    (_9 = document.getElementById('lost-memo-form')) === null || _9 === void 0 ? void 0 : _9.addEventListener('submit', handleLostMemoFormSubmit);
-    (_10 = document.getElementById('print-lost-memo-btn')) === null || _10 === void 0 ? void 0 : _10.addEventListener('click', handlePrintLostMemo);
+    (_25 = document.getElementById('add-lost-memo-btn')) === null || _25 === void 0 ? void 0 : _25.addEventListener('click', () => openLostMemoForm());
+    (_26 = document.getElementById('lost-memo-form')) === null || _26 === void 0 ? void 0 : _26.addEventListener('submit', handleLostMemoFormSubmit);
+    (_27 = document.getElementById('print-lost-memo-btn')) === null || _27 === void 0 ? void 0 : _27.addEventListener('click', handlePrintLostMemo);
     const mukSearchForm = document.getElementById('mukayasat-search-form');
     mukSearchForm === null || mukSearchForm === void 0 ? void 0 : mukSearchForm.addEventListener('submit', handleMukayasatSearch);
     if (mukSearchForm) {
@@ -17778,7 +18570,7 @@ const setupEventListeners = () => {
             handleGoBack();
         }
     });
-    (_11 = document.getElementById('meters-table-filter')) === null || _11 === void 0 ? void 0 : _11.addEventListener('input', (e) => {
+    (_28 = document.getElementById('meters-table-filter')) === null || _28 === void 0 ? void 0 : _28.addEventListener('input', (e) => {
         const filterValue = e.target.value.toLowerCase();
         const table = document.getElementById('meters-table');
         filterTable(table, filterValue);
@@ -17806,10 +18598,10 @@ const setupEventListeners = () => {
             });
         }
     });
-    (_12 = document.getElementById('btn-search-subscribers-all')) === null || _12 === void 0 ? void 0 : _12.addEventListener('click', handleAllSubscribersSearch);
-    (_13 = document.getElementById('btn-reset-subscribers-all')) === null || _13 === void 0 ? void 0 : _13.addEventListener('click', handleResetAllSubscribersSearch);
-    (_14 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _14 === void 0 ? void 0 : _14.addEventListener('click', handleDeleteSelectedSubscribersAll);
-    (_15 = document.getElementById('subscriberType')) === null || _15 === void 0 ? void 0 : _15.addEventListener('change', (e) => {
+    (_29 = document.getElementById('btn-search-subscribers-all')) === null || _29 === void 0 ? void 0 : _29.addEventListener('click', handleAllSubscribersSearch);
+    (_30 = document.getElementById('btn-reset-subscribers-all')) === null || _30 === void 0 ? void 0 : _30.addEventListener('click', handleResetAllSubscribersSearch);
+    (_31 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _31 === void 0 ? void 0 : _31.addEventListener('click', handleDeleteSelectedSubscribersAll);
+    (_32 = document.getElementById('subscriberType')) === null || _32 === void 0 ? void 0 : _32.addEventListener('change', (e) => {
         var _a;
         const select = e.target;
         const isSearchMode = !((_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.contains('hidden'));
@@ -17828,59 +18620,59 @@ const setupEventListeners = () => {
         updateMeterFormVisibility();
     });
     // Subscriber Statement Listener (الاستعلام عن مشترك)
-    (_16 = document.getElementById('subscriber-statement-form')) === null || _16 === void 0 ? void 0 : _16.addEventListener('submit', (e) => {
+    (_33 = document.getElementById('subscriber-statement-form')) === null || _33 === void 0 ? void 0 : _33.addEventListener('submit', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
-    (_17 = document.getElementById('statement-search-btn')) === null || _17 === void 0 ? void 0 : _17.addEventListener('click', (e) => {
+    (_34 = document.getElementById('statement-search-btn')) === null || _34 === void 0 ? void 0 : _34.addEventListener('click', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
     // قراءة الكارت الذكي
-    (_18 = document.getElementById('statement-read-card-btn')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', (e) => {
+    (_35 = document.getElementById('statement-read-card-btn')) === null || _35 === void 0 ? void 0 : _35.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadSmartCard();
     });
-    (_19 = document.getElementById('smart-card-close-btn')) === null || _19 === void 0 ? void 0 : _19.addEventListener('click', () => {
+    (_36 = document.getElementById('smart-card-close-btn')) === null || _36 === void 0 ? void 0 : _36.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_20 = document.getElementById('smart-card-close-x-btn')) === null || _20 === void 0 ? void 0 : _20.addEventListener('click', () => {
+    (_37 = document.getElementById('smart-card-close-x-btn')) === null || _37 === void 0 ? void 0 : _37.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_21 = document.getElementById('smart-card-search-now-btn')) === null || _21 === void 0 ? void 0 : _21.addEventListener('click', () => {
+    (_38 = document.getElementById('smart-card-search-now-btn')) === null || _38 === void 0 ? void 0 : _38.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
         handleSubscriberStatementSearch();
     });
     // كروت التحكم (Control Cards Event Listeners)
-    (_22 = document.getElementById('btn-read-control-card')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', (e) => {
+    (_39 = document.getElementById('btn-read-control-card')) === null || _39 === void 0 ? void 0 : _39.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadControlCard();
     });
-    (_23 = document.getElementById('btn-renew-control-card')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', (e) => {
+    (_40 = document.getElementById('btn-renew-control-card')) === null || _40 === void 0 ? void 0 : _40.addEventListener('click', (e) => {
         e.preventDefault();
         handleRenewControlCard();
     });
-    (_24 = document.getElementById('btn-print-control-card')) === null || _24 === void 0 ? void 0 : _24.addEventListener('click', (e) => {
+    (_41 = document.getElementById('btn-print-control-card')) === null || _41 === void 0 ? void 0 : _41.addEventListener('click', (e) => {
         e.preventDefault();
         handlePrintControlCardReport();
     });
-    (_25 = document.getElementById('control-card-meter-details-close')) === null || _25 === void 0 ? void 0 : _25.addEventListener('click', () => {
+    (_42 = document.getElementById('control-card-meter-details-close')) === null || _42 === void 0 ? void 0 : _42.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_26 = document.getElementById('control-card-meter-details-close-x')) === null || _26 === void 0 ? void 0 : _26.addEventListener('click', () => {
+    (_43 = document.getElementById('control-card-meter-details-close-x')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_27 = document.getElementById('ctrl-meters-filter')) === null || _27 === void 0 ? void 0 : _27.addEventListener('input', (e) => {
+    (_44 = document.getElementById('ctrl-meters-filter')) === null || _44 === void 0 ? void 0 : _44.addEventListener('input', (e) => {
         const term = e.target.value.trim().toLowerCase();
         const rows = document.querySelectorAll('#control-card-meters-tbody tr');
         rows.forEach(r => {
@@ -17889,15 +18681,15 @@ const setupEventListeners = () => {
             r.style.display = text.includes(term) ? '' : 'none';
         });
     });
-    (_28 = document.getElementById('issue-control-card-form')) === null || _28 === void 0 ? void 0 : _28.addEventListener('submit', (e) => {
+    (_45 = document.getElementById('issue-control-card-form')) === null || _45 === void 0 ? void 0 : _45.addEventListener('submit', (e) => {
         e.preventDefault();
         handleIssueControlCard(e);
     });
-    (_29 = document.getElementById('issue-meter-company')) === null || _29 === void 0 ? void 0 : _29.addEventListener('change', (e) => {
+    (_46 = document.getElementById('issue-meter-company')) === null || _46 === void 0 ? void 0 : _46.addEventListener('change', (e) => {
         const val = e.target.value;
         handleCompanyChange(val);
     });
-    (_30 = document.getElementById('issue-technician')) === null || _30 === void 0 ? void 0 : _30.addEventListener('change', (e) => {
+    (_47 = document.getElementById('issue-technician')) === null || _47 === void 0 ? void 0 : _47.addEventListener('change', (e) => {
         const sel = e.target;
         const opt = sel.options[sel.selectedIndex];
         const codeInput = document.getElementById('issue-tech-code');
@@ -17905,7 +18697,7 @@ const setupEventListeners = () => {
             codeInput.value = (opt === null || opt === void 0 ? void 0 : opt.getAttribute('data-code')) || '';
         }
     });
-    (_31 = document.getElementById('issue-control-op-type')) === null || _31 === void 0 ? void 0 : _31.addEventListener('change', (e) => {
+    (_48 = document.getElementById('issue-control-op-type')) === null || _48 === void 0 ? void 0 : _48.addEventListener('change', (e) => {
         const val = e.target.value;
         const tampersWrap = document.getElementById('container-tampers');
         const manualDateWrap = document.getElementById('container-manual-date');
@@ -17914,7 +18706,7 @@ const setupEventListeners = () => {
         if (manualDateWrap)
             manualDateWrap.style.display = val === '0' ? 'block' : 'none';
     });
-    (_32 = document.getElementById('issue-control-type-meter')) === null || _32 === void 0 ? void 0 : _32.addEventListener('change', (e) => {
+    (_49 = document.getElementById('issue-control-type-meter')) === null || _49 === void 0 ? void 0 : _49.addEventListener('change', (e) => {
         const val = e.target.value;
         const singleWrap = document.getElementById('container-single-meter');
         const multiWrap = document.getElementById('container-multi-meters');
@@ -17926,7 +18718,7 @@ const setupEventListeners = () => {
         if (countWrap)
             countWrap.style.display = val === '2' ? 'block' : 'none';
     });
-    (_33 = document.getElementById('btn-add-meter-to-list')) === null || _33 === void 0 ? void 0 : _33.addEventListener('click', () => {
+    (_50 = document.getElementById('btn-add-meter-to-list')) === null || _50 === void 0 ? void 0 : _50.addEventListener('click', () => {
         const inp = document.getElementById('issue-multi-meter-input');
         const val = (inp === null || inp === void 0 ? void 0 : inp.value.trim()) || '';
         if (!val)
@@ -17940,16 +18732,16 @@ const setupEventListeners = () => {
             inp.value = '';
         renderIssuedMetersTags();
     });
-    (_34 = document.getElementById('issue-is-manual-date')) === null || _34 === void 0 ? void 0 : _34.addEventListener('change', (e) => {
+    (_51 = document.getElementById('issue-is-manual-date')) === null || _51 === void 0 ? void 0 : _51.addEventListener('change', (e) => {
         const wrap = document.getElementById('manual-date-picker-wrap');
         if (wrap)
             wrap.style.display = e.target.checked ? 'block' : 'none';
     });
-    (_35 = document.getElementById('btn-issue-card-reset')) === null || _35 === void 0 ? void 0 : _35.addEventListener('click', () => {
+    (_52 = document.getElementById('btn-issue-card-reset')) === null || _52 === void 0 ? void 0 : _52.addEventListener('click', () => {
         issuedMetersList = [];
         renderIssuedMetersTags();
     });
-    (_36 = document.getElementById('btn-close-issued-dialog')) === null || _36 === void 0 ? void 0 : _36.addEventListener('click', () => {
+    (_53 = document.getElementById('btn-close-issued-dialog')) === null || _53 === void 0 ? void 0 : _53.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -17958,7 +18750,7 @@ const setupEventListeners = () => {
                 dlg.style.display = 'none';
         }
     });
-    (_37 = document.getElementById('btn-read-issued-card-now')) === null || _37 === void 0 ? void 0 : _37.addEventListener('click', () => {
+    (_54 = document.getElementById('btn-read-issued-card-now')) === null || _54 === void 0 ? void 0 : _54.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -17993,40 +18785,40 @@ const setupEventListeners = () => {
         });
     });
     // Customer Management Listeners
-    (_38 = document.getElementById('cm-filters-form')) === null || _38 === void 0 ? void 0 : _38.addEventListener('submit', (e) => {
+    (_55 = document.getElementById('cm-filters-form')) === null || _55 === void 0 ? void 0 : _55.addEventListener('submit', (e) => {
         e.preventDefault();
         loadCustomers(1);
     });
-    (_39 = document.getElementById('btn-cm-reset')) === null || _39 === void 0 ? void 0 : _39.addEventListener('click', () => {
+    (_56 = document.getElementById('btn-cm-reset')) === null || _56 === void 0 ? void 0 : _56.addEventListener('click', () => {
         const form = document.getElementById('cm-filters-form');
         if (form)
             form.reset();
         loadCustomers(1);
     });
-    (_40 = document.getElementById('btn-cm-refresh')) === null || _40 === void 0 ? void 0 : _40.addEventListener('click', () => {
+    (_57 = document.getElementById('btn-cm-refresh')) === null || _57 === void 0 ? void 0 : _57.addEventListener('click', () => {
         loadCustomers(customerState.page);
     });
-    (_41 = document.getElementById('btn-cm-card-search')) === null || _41 === void 0 ? void 0 : _41.addEventListener('click', () => {
+    (_58 = document.getElementById('btn-cm-card-search')) === null || _58 === void 0 ? void 0 : _58.addEventListener('click', () => {
         handleCustomerCardSearch();
     });
-    (_42 = document.getElementById('cm-page-size')) === null || _42 === void 0 ? void 0 : _42.addEventListener('change', (e) => {
+    (_59 = document.getElementById('cm-page-size')) === null || _59 === void 0 ? void 0 : _59.addEventListener('change', (e) => {
         customerState.pageSize = Number(e.target.value) || 10;
         loadCustomers(1);
     });
-    (_43 = document.getElementById('cm-btn-first')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', () => {
+    (_60 = document.getElementById('cm-btn-first')) === null || _60 === void 0 ? void 0 : _60.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(1);
     });
-    (_44 = document.getElementById('cm-btn-prev')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', () => {
+    (_61 = document.getElementById('cm-btn-prev')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(customerState.page - 1);
     });
-    (_45 = document.getElementById('cm-btn-next')) === null || _45 === void 0 ? void 0 : _45.addEventListener('click', () => {
+    (_62 = document.getElementById('cm-btn-next')) === null || _62 === void 0 ? void 0 : _62.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(customerState.page + 1);
     });
-    (_46 = document.getElementById('cm-btn-last')) === null || _46 === void 0 ? void 0 : _46.addEventListener('click', () => {
+    (_63 = document.getElementById('cm-btn-last')) === null || _63 === void 0 ? void 0 : _63.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(totalPages);
@@ -18141,10 +18933,10 @@ const setupEventListeners = () => {
             }
         }
     });
-    (_47 = document.getElementById('save-details-btn')) === null || _47 === void 0 ? void 0 : _47.addEventListener('click', handleSaveDetails);
-    (_48 = document.getElementById('delete-subscriber-btn')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', handleDeleteSubscriber);
-    (_49 = document.getElementById('details-meterType')) === null || _49 === void 0 ? void 0 : _49.addEventListener('change', () => updateMeterFormVisibility('details-'));
-    (_50 = document.getElementById('details-subscriberType')) === null || _50 === void 0 ? void 0 : _50.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_64 = document.getElementById('save-details-btn')) === null || _64 === void 0 ? void 0 : _64.addEventListener('click', handleSaveDetails);
+    (_65 = document.getElementById('delete-subscriber-btn')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', handleDeleteSubscriber);
+    (_66 = document.getElementById('details-meterType')) === null || _66 === void 0 ? void 0 : _66.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_67 = document.getElementById('details-subscriberType')) === null || _67 === void 0 ? void 0 : _67.addEventListener('change', () => updateMeterFormVisibility('details-'));
     document.body.addEventListener('click', (event) => {
         const target = event.target;
         if (target.id === 'delete-selected-meters') {
@@ -18157,13 +18949,13 @@ const setupEventListeners = () => {
             checkboxes.forEach(checkbox => checkbox.checked = selectAllCheckbox.checked);
         }
     });
-    (_51 = document.getElementById('select-all-meters')) === null || _51 === void 0 ? void 0 : _51.addEventListener('click', (event) => {
+    (_68 = document.getElementById('select-all-meters')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', (event) => {
         const isChecked = event.target.checked;
         document.querySelectorAll('#meters-table tbody input[type="checkbox"].select-row').forEach((checkbox) => {
             checkbox.checked = isChecked;
         });
     });
-    (_52 = document.getElementById('btn-delete-by-status')) === null || _52 === void 0 ? void 0 : _52.addEventListener('click', () => {
+    (_69 = document.getElementById('btn-delete-by-status')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         const select = document.getElementById('delete-status-select');
         if (dialog && select) {
@@ -18172,12 +18964,12 @@ const setupEventListeners = () => {
             dialog.hidden = false;
         }
     });
-    (_53 = document.getElementById('delete-by-status-cancel')) === null || _53 === void 0 ? void 0 : _53.addEventListener('click', () => {
+    (_70 = document.getElementById('delete-by-status-cancel')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         if (dialog)
             dialog.hidden = true;
     });
-    (_54 = document.getElementById('delete-by-status-confirm')) === null || _54 === void 0 ? void 0 : _54.addEventListener('click', () => {
+    (_71 = document.getElementById('delete-by-status-confirm')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', () => {
         const select = document.getElementById('delete-status-select');
         const status = select.value;
         if (!status) {
@@ -18210,13 +19002,13 @@ const setupEventListeners = () => {
         showConfirmationDialog('تأكيد الحذف الجماعي', `هل أنت متأكد من حذف جميع المشتركين (${count}) الذين حالتهم "${status}"؟ لا يمكن التراجع عن هذا الإجراء.`, onConfirm);
     });
     // Repaired Meters Listeners
-    (_55 = document.getElementById('repair-search-form')) === null || _55 === void 0 ? void 0 : _55.addEventListener('submit', handleFaultyMeterSearch);
-    (_56 = document.getElementById('repair-form')) === null || _56 === void 0 ? void 0 : _56.addEventListener('submit', handleRepairFormSubmit);
-    (_57 = document.getElementById('repairStatus')) === null || _57 === void 0 ? void 0 : _57.addEventListener('change', updateRepairFormVisibility);
+    (_72 = document.getElementById('repair-search-form')) === null || _72 === void 0 ? void 0 : _72.addEventListener('submit', handleFaultyMeterSearch);
+    (_73 = document.getElementById('repair-form')) === null || _73 === void 0 ? void 0 : _73.addEventListener('submit', handleRepairFormSubmit);
+    (_74 = document.getElementById('repairStatus')) === null || _74 === void 0 ? void 0 : _74.addEventListener('change', updateRepairFormVisibility);
     // Reports Listeners
-    (_58 = document.getElementById('report-type')) === null || _58 === void 0 ? void 0 : _58.addEventListener('change', updateReportFilters);
-    (_59 = document.getElementById('report-generation-form')) === null || _59 === void 0 ? void 0 : _59.addEventListener('submit', handleGenerateReport);
-    (_60 = document.getElementById('print-report-btn')) === null || _60 === void 0 ? void 0 : _60.addEventListener('click', handlePrintReport);
+    (_75 = document.getElementById('report-type')) === null || _75 === void 0 ? void 0 : _75.addEventListener('change', updateReportFilters);
+    (_76 = document.getElementById('report-generation-form')) === null || _76 === void 0 ? void 0 : _76.addEventListener('submit', handleGenerateReport);
+    (_77 = document.getElementById('print-report-btn')) === null || _77 === void 0 ? void 0 : _77.addEventListener('click', handlePrintReport);
     // Custom multiselect listener
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.multiselect-btn');
@@ -18267,11 +19059,11 @@ const setupEventListeners = () => {
         }
     });
     // Activity Log Listener
-    (_61 = document.getElementById('print-activity-log-btn')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', handlePrintActivityLog);
+    (_78 = document.getElementById('print-activity-log-btn')) === null || _78 === void 0 ? void 0 : _78.addEventListener('click', handlePrintActivityLog);
     // User Management Listeners
-    (_62 = document.getElementById('user-form')) === null || _62 === void 0 ? void 0 : _62.addEventListener('submit', handleUserFormSubmit);
+    (_79 = document.getElementById('user-form')) === null || _79 === void 0 ? void 0 : _79.addEventListener('submit', handleUserFormSubmit);
     // Permissions Listeners (delegated inside render function)
-    (_63 = document.getElementById('permissions')) === null || _63 === void 0 ? void 0 : _63.addEventListener('change', (event) => {
+    (_80 = document.getElementById('permissions')) === null || _80 === void 0 ? void 0 : _80.addEventListener('change', (event) => {
         const target = event.target;
         if (!target.matches('input[type="checkbox"]'))
             return;
@@ -18285,30 +19077,30 @@ const setupEventListeners = () => {
             handlePermissionChange(event);
     });
     // Settings Listeners
-    (_64 = document.getElementById('export-backup-btn')) === null || _64 === void 0 ? void 0 : _64.addEventListener('click', handleExportBackup);
-    (_65 = document.getElementById('import-backup-btn')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', () => handleImportBackup());
-    (_66 = document.getElementById('export-csv-btn')) === null || _66 === void 0 ? void 0 : _66.addEventListener('click', handleExportCSV);
-    (_67 = document.getElementById('save-report-settings-btn')) === null || _67 === void 0 ? void 0 : _67.addEventListener('click', handleSaveReportSettings);
-    (_68 = document.getElementById('save-company-report-settings-btn')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', handleSaveCompanyReportSettings);
+    (_81 = document.getElementById('export-backup-btn')) === null || _81 === void 0 ? void 0 : _81.addEventListener('click', handleExportBackup);
+    (_82 = document.getElementById('import-backup-btn')) === null || _82 === void 0 ? void 0 : _82.addEventListener('click', () => handleImportBackup());
+    (_83 = document.getElementById('export-csv-btn')) === null || _83 === void 0 ? void 0 : _83.addEventListener('click', handleExportCSV);
+    (_84 = document.getElementById('save-report-settings-btn')) === null || _84 === void 0 ? void 0 : _84.addEventListener('click', handleSaveReportSettings);
+    (_85 = document.getElementById('save-company-report-settings-btn')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', handleSaveCompanyReportSettings);
     // مستمعات أحداث الطلبات قيد الانتظار
-    (_69 = document.getElementById('add-area-dialog-confirm-btn')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', confirmAddPendingArea);
-    (_70 = document.getElementById('add-area-dialog-cancel-btn')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', hideAddPendingAreaDialog);
-    (_71 = document.getElementById('add-pending-area-dialog')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', (event) => {
+    (_86 = document.getElementById('add-area-dialog-confirm-btn')) === null || _86 === void 0 ? void 0 : _86.addEventListener('click', confirmAddPendingArea);
+    (_87 = document.getElementById('add-area-dialog-cancel-btn')) === null || _87 === void 0 ? void 0 : _87.addEventListener('click', hideAddPendingAreaDialog);
+    (_88 = document.getElementById('add-pending-area-dialog')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', (event) => {
         if (event.target === document.getElementById('add-pending-area-dialog')) {
             hideAddPendingAreaDialog();
         }
     });
-    (_72 = document.getElementById('import-pending-excel-trigger-btn')) === null || _72 === void 0 ? void 0 : _72.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_73 = document.getElementById('pending-excel-upload')) === null || _73 === void 0 ? void 0 : _73.addEventListener('change', handleImportPendingExcel);
-    (_74 = document.getElementById('print-pending-requests-btn')) === null || _74 === void 0 ? void 0 : _74.addEventListener('click', handlePrintPendingRequests);
-    (_75 = document.getElementById('export-pending-excel-btn')) === null || _75 === void 0 ? void 0 : _75.addEventListener('click', handleExportPendingRequestsToExcel);
+    (_89 = document.getElementById('import-pending-excel-trigger-btn')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_90 = document.getElementById('pending-excel-upload')) === null || _90 === void 0 ? void 0 : _90.addEventListener('change', handleImportPendingExcel);
+    (_91 = document.getElementById('print-pending-requests-btn')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', handlePrintPendingRequests);
+    (_92 = document.getElementById('export-pending-excel-btn')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', handleExportPendingRequestsToExcel);
     // ربط أزرار العمليات الجماعية في صفحة الانتظار
-    (_76 = document.getElementById('assign-pending-requests-btn')) === null || _76 === void 0 ? void 0 : _76.addEventListener('click', handleAssignSelectedPendingRequests);
-    (_77 = document.getElementById('move-to-mukayasat-btn')) === null || _77 === void 0 ? void 0 : _77.addEventListener('click', handleMovePendingToMukayasat);
-    (_78 = document.getElementById('mark-pending-inspected-btn')) === null || _78 === void 0 ? void 0 : _78.addEventListener('click', handleMarkSelectedPendingInspected);
-    (_79 = document.getElementById('print-pending-inspection-btn')) === null || _79 === void 0 ? void 0 : _79.addEventListener('click', handlePrintSelectedPendingInspections);
-    (_80 = document.getElementById('delete-selected-pending-btn')) === null || _80 === void 0 ? void 0 : _80.addEventListener('click', handleDeleteSelectedPendingRequests);
-    (_81 = document.getElementById('add-pending-address-tab-btn')) === null || _81 === void 0 ? void 0 : _81.addEventListener('click', handleAddNewPendingAddressTab);
+    (_93 = document.getElementById('assign-pending-requests-btn')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', handleAssignSelectedPendingRequests);
+    (_94 = document.getElementById('move-to-mukayasat-btn')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', handleMovePendingToMukayasat);
+    (_95 = document.getElementById('mark-pending-inspected-btn')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', handleMarkSelectedPendingInspected);
+    (_96 = document.getElementById('print-pending-inspection-btn')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', handlePrintSelectedPendingInspections);
+    (_97 = document.getElementById('delete-selected-pending-btn')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', handleDeleteSelectedPendingRequests);
+    (_98 = document.getElementById('add-pending-address-tab-btn')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', handleAddNewPendingAddressTab);
     const pendingFilters = document.getElementById('pending-filters');
     if (pendingFilters) {
         const resetPending = () => { currentPendingPage = 1; pendingSelectedRequests = []; renderPendingRequestsSection(); };
@@ -18548,7 +19340,7 @@ const setupEventListeners = () => {
         });
     }
     // Company Logo Settings Listeners
-    (_82 = document.getElementById('developer-image-password-cancel')) === null || _82 === void 0 ? void 0 : _82.addEventListener('click', () => {
+    (_99 = document.getElementById('developer-image-password-cancel')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', () => {
         const dialog = document.getElementById('developer-image-password-dialog');
         const input = document.getElementById('developer-image-password');
         dialog === null || dialog === void 0 ? void 0 : dialog.setAttribute('hidden', '');
@@ -18556,7 +19348,7 @@ const setupEventListeners = () => {
             input.value = '';
         developerImagePasswordCallback = null;
     });
-    (_83 = document.getElementById('developer-image-password-confirm')) === null || _83 === void 0 ? void 0 : _83.addEventListener('click', () => {
+    (_100 = document.getElementById('developer-image-password-confirm')) === null || _100 === void 0 ? void 0 : _100.addEventListener('click', () => {
         const input = document.getElementById('developer-image-password');
         const error = document.getElementById('developer-image-password-error');
         const dialog = document.getElementById('developer-image-password-dialog');
@@ -18572,18 +19364,18 @@ const setupEventListeners = () => {
         input.value = '';
         callback === null || callback === void 0 ? void 0 : callback();
     });
-    (_84 = document.getElementById('upload-logo-btn')) === null || _84 === void 0 ? void 0 : _84.addEventListener('click', () => {
+    (_101 = document.getElementById('upload-logo-btn')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', () => {
         var _a;
         (_a = document.getElementById('logo-upload-input')) === null || _a === void 0 ? void 0 : _a.click();
     });
-    (_85 = document.getElementById('remove-logo-btn')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', () => {
+    (_102 = document.getElementById('remove-logo-btn')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', () => {
         state.settings.companyLogo = null;
         saveState();
         updateUI();
         renderSettingsSection(); // To update the preview
         showToast('تمت إزالة الشعار بنجاح.');
     });
-    (_86 = document.getElementById('logo-upload-input')) === null || _86 === void 0 ? void 0 : _86.addEventListener('change', (event) => {
+    (_103 = document.getElementById('logo-upload-input')) === null || _103 === void 0 ? void 0 : _103.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -18607,10 +19399,10 @@ const setupEventListeners = () => {
         };
         reader.readAsDataURL(file);
     });
-    (_87 = document.getElementById('upload-developer-image-btn')) === null || _87 === void 0 ? void 0 : _87.addEventListener('click', () => {
+    (_104 = document.getElementById('upload-developer-image-btn')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', () => {
         requestDeveloperImagePassword(() => { var _a; return (_a = document.getElementById('developer-image-upload-input')) === null || _a === void 0 ? void 0 : _a.click(); });
     });
-    (_88 = document.getElementById('remove-developer-image-btn')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', () => {
+    (_105 = document.getElementById('remove-developer-image-btn')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', () => {
         requestDeveloperImagePassword(() => {
             state.settings.developerImage = null;
             saveState();
@@ -18619,7 +19411,7 @@ const setupEventListeners = () => {
             showToast('تمت إزالة صورة المطور بنجاح.');
         });
     });
-    (_89 = document.getElementById('developer-image-upload-input')) === null || _89 === void 0 ? void 0 : _89.addEventListener('change', (event) => {
+    (_106 = document.getElementById('developer-image-upload-input')) === null || _106 === void 0 ? void 0 : _106.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -18640,7 +19432,7 @@ const setupEventListeners = () => {
         reader.onerror = () => showToast('حدث خطأ أثناء قراءة صورة المطور.', 'error');
         reader.readAsDataURL(file);
     });
-    (_90 = document.getElementById('logo-size-slider')) === null || _90 === void 0 ? void 0 : _90.addEventListener('input', (event) => {
+    (_107 = document.getElementById('logo-size-slider')) === null || _107 === void 0 ? void 0 : _107.addEventListener('input', (event) => {
         const slider = event.target;
         const newSize = parseInt(slider.value, 10);
         const valueDisplay = document.getElementById('logo-size-value');
@@ -18662,12 +19454,12 @@ const setupEventListeners = () => {
             <button class="btn btn-delete" id="btn-delete-selected-addresses" style="padding: 4px 8px; font-size: 0.8rem;">حذف المحدد</button>
         `;
         addressContainer.insertBefore(bulkActions, addressContainer.querySelector('ul'));
-        (_91 = document.getElementById('btn-select-all-addresses')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', () => {
+        (_108 = document.getElementById('btn-select-all-addresses')) === null || _108 === void 0 ? void 0 : _108.addEventListener('click', () => {
             const cbs = document.querySelectorAll('.address-bulk-checkbox');
             const allSelected = Array.from(cbs).every(cb => cb.checked);
             cbs.forEach(cb => cb.checked = !allSelected);
         });
-        (_92 = document.getElementById('btn-delete-selected-addresses')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', () => {
+        (_109 = document.getElementById('btn-delete-selected-addresses')) === null || _109 === void 0 ? void 0 : _109.addEventListener('click', () => {
             const selected = Array.from(document.querySelectorAll('.address-bulk-checkbox:checked'));
             if (selected.length === 0)
                 return showToast('يرجى تحديد عناوين أولاً', 'error');
@@ -18737,7 +19529,7 @@ const setupEventListeners = () => {
         }, { passive: true });
     };
     initMobileAdaptation();
-    (_93 = document.getElementById('sidebar-toggle')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', () => {
+    (_110 = document.getElementById('sidebar-toggle')) === null || _110 === void 0 ? void 0 : _110.addEventListener('click', () => {
         document.body.classList.toggle('sidebar-collapsed');
     });
     // Accordion behavior for sidebar categories: when one <details> opens, close the others
