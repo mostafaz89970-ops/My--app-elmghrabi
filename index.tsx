@@ -18580,6 +18580,24 @@ const renderJudicialCollectionSection = () => {
         passwordConfirmBtn?.addEventListener('click', handlePasswordChange);
 
         // Login Screen Listeners
+        
+        // Toggle password visibility button
+        document.getElementById('toggle-password-visibility')?.addEventListener('click', () => {
+            const passwordInput = document.getElementById('password') as HTMLInputElement;
+            const eyeOpen = document.getElementById('eye-icon-open');
+            const eyeClosed = document.getElementById('eye-icon-closed');
+            if (!passwordInput) return;
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                if (eyeOpen) eyeOpen.style.display = 'none';
+                if (eyeClosed) eyeClosed.style.display = 'block';
+            } else {
+                passwordInput.type = 'password';
+                if (eyeOpen) eyeOpen.style.display = 'block';
+                if (eyeClosed) eyeClosed.style.display = 'none';
+            }
+        });
+
         document.getElementById('login-form')?.addEventListener('submit', handleLogin);
         document.getElementById('header-logout-btn')?.addEventListener('click', handleLogout);
 
