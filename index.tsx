@@ -1274,6 +1274,24 @@ async function withAppLoading<T>(
 (window as any).hideAppLoading = hideAppLoading;
 (window as any).withAppLoading = withAppLoading;
 
+function getSectionIcon(targetId: string): string {
+    if (!targetId) return '⚡';
+    if (targetId === 'dashboard') return '📊';
+    if (targetId.includes('meter')) return '⚡';
+    if (targetId.includes('debt') || targetId.includes('fee')) return '💳';
+    if (targetId.includes('subscriber')) return '👥';
+    if (targetId.includes('transformer')) return '🔌';
+    if (targetId.includes('judicial') || targetId.includes('zinat')) return '⚖️';
+    if (targetId.includes('mukayasat')) return '📝';
+    if (targetId.includes('card')) return '💳';
+    if (targetId.includes('report')) return '📈';
+    if (targetId.includes('user') || targetId.includes('permission')) return '🛡️';
+    if (targetId.includes('setting')) return '⚙️';
+    if (targetId.includes('help')) return '❓';
+    return '⚡';
+}
+
+
 const handleLogin = async (event: Event) => {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
@@ -6011,6 +6029,7 @@ const renderJudicialCollectionSection = () => {
     };
 
     const handleGoBack = () => {
+        showAppLoading('جارٍ الرجوع...', 'المنظومة الموحدة للعدادات', '↩️');
         const currentSection = document.querySelector('.content-section.active') as HTMLElement | null;
         if (currentSection && currentSection.id === 'subscriber-statement') {
             renderSubscriberStatementSection();
@@ -18107,6 +18126,10 @@ const renderJudicialCollectionSection = () => {
         const targetId = (targetLink as HTMLElement).dataset.target;
         if (!targetId) return;
 
+        const pageLabel = targetLink.querySelector('span')?.textContent || targetLink.querySelector('h4')?.textContent || 'الصفحة';
+        const pageIcon = getSectionIcon(targetId);
+        showAppLoading(`جارٍ فتح ${pageLabel.trim()}...`, 'المنظومة الموحدة للعدادات', pageIcon);
+
         localStorage.setItem('lastActiveSection', targetId);
 
         if (targetId === 'meter-registration' && targetLink.id === 'sidebar-add-meter-btn') {
@@ -18323,6 +18346,9 @@ const renderJudicialCollectionSection = () => {
         } else if (targetId === 'pending-requests-section') {
             renderPendingRequestsSection();
         }
+        setTimeout(() => {
+            hideAppLoading(180);
+        }, 150);
     }
 
     /**
@@ -20168,6 +20194,7 @@ const renderJudicialCollectionSection = () => {
 
     // تهيئة التطبيق
     const initApp = async () => {
+        showAppLoading('جارٍ تشغيل المنظومة وتحميل البيانات...', 'المنظومة الموحدة للعدادات - مزامنة سحابية ⚡', '⚡');
         setupHelpSection();
         setupExcelImportSection();
         setupLiquidationSection();
@@ -20239,6 +20266,7 @@ const renderJudicialCollectionSection = () => {
                 showScreen('welcome-screen');
             }
         }
+        await hideAppLoading(300);
     };
 
 document.addEventListener('DOMContentLoaded', initApp);

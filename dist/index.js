@@ -1060,6 +1060,35 @@ async function withAppLoading(actionTitle, operation, subtext = 'تحديث فو
 window.showAppLoading = showAppLoading;
 window.hideAppLoading = hideAppLoading;
 window.withAppLoading = withAppLoading;
+function getSectionIcon(targetId) {
+    if (!targetId)
+        return '⚡';
+    if (targetId === 'dashboard')
+        return '📊';
+    if (targetId.includes('meter'))
+        return '⚡';
+    if (targetId.includes('debt') || targetId.includes('fee'))
+        return '💳';
+    if (targetId.includes('subscriber'))
+        return '👥';
+    if (targetId.includes('transformer'))
+        return '🔌';
+    if (targetId.includes('judicial') || targetId.includes('zinat'))
+        return '⚖️';
+    if (targetId.includes('mukayasat'))
+        return '📝';
+    if (targetId.includes('card'))
+        return '💳';
+    if (targetId.includes('report'))
+        return '📈';
+    if (targetId.includes('user') || targetId.includes('permission'))
+        return '🛡️';
+    if (targetId.includes('setting'))
+        return '⚙️';
+    if (targetId.includes('help'))
+        return '❓';
+    return '⚡';
+}
 const handleLogin = async (event) => {
     var _a;
     event.preventDefault();
@@ -5522,6 +5551,7 @@ const handleImportTransformersExcel = async (event) => {
 };
 const handleGoBack = () => {
     var _a;
+    showAppLoading('جارٍ الرجوع...', 'المنظومة الموحدة للعدادات', '↩️');
     const currentSection = document.querySelector('.content-section.active');
     if (currentSection && currentSection.id === 'subscriber-statement') {
         renderSubscriberStatementSection();
@@ -16999,7 +17029,7 @@ const handleDeleteSelectedMeters = async () => {
  * @param event The click event.
  */
 function handleNavigation(event) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     const currentActiveSection = document.querySelector('.content-section.active');
     if (!isNavigatingBack && currentActiveSection) {
         // Don't push if we are already on the target page to avoid duplicates on refresh-like actions
@@ -17018,6 +17048,9 @@ function handleNavigation(event) {
     const targetId = targetLink.dataset.target;
     if (!targetId)
         return;
+    const pageLabel = ((_a = targetLink.querySelector('span')) === null || _a === void 0 ? void 0 : _a.textContent) || ((_b = targetLink.querySelector('h4')) === null || _b === void 0 ? void 0 : _b.textContent) || 'الصفحة';
+    const pageIcon = getSectionIcon(targetId);
+    showAppLoading(`جارٍ فتح ${pageLabel.trim()}...`, 'المنظومة الموحدة للعدادات', pageIcon);
     localStorage.setItem('lastActiveSection', targetId);
     if (targetId === 'meter-registration' && targetLink.id === 'sidebar-add-meter-btn') {
         openMeterForm();
@@ -17051,10 +17084,10 @@ function handleNavigation(event) {
         // Keep company name for dashboard view
     }
     else if (sidebarLink) {
-        pageTitle = ((_a = sidebarLink.querySelector('span')) === null || _a === void 0 ? void 0 : _a.textContent) || pageTitle;
+        pageTitle = ((_c = sidebarLink.querySelector('span')) === null || _c === void 0 ? void 0 : _c.textContent) || pageTitle;
     }
     else {
-        const cardTitle = (_b = targetLink.querySelector('h4')) === null || _b === void 0 ? void 0 : _b.textContent;
+        const cardTitle = (_d = targetLink.querySelector('h4')) === null || _d === void 0 ? void 0 : _d.textContent;
         if (cardTitle) {
             pageTitle = cardTitle;
         }
@@ -17135,7 +17168,7 @@ function handleNavigation(event) {
     }
     else if (targetId === 'subscribers-all') {
         // تنظيف واجهة التعديل الجماعي السابقة لضمان عدم التكرار
-        (_c = document.getElementById('bulk-action-container-all')) === null || _c === void 0 ? void 0 : _c.remove();
+        (_e = document.getElementById('bulk-action-container-all')) === null || _e === void 0 ? void 0 : _e.remove();
         // نقل زر الرجوع من رأس الصفحة إلى حاوية البحث الأساسية لسهولة الوصول
         const backBtn = document.querySelector('#subscribers-all .btn-back-page');
         const searchBtn = document.getElementById('btn-search-subscribers-all');
@@ -17178,7 +17211,7 @@ function handleNavigation(event) {
     }
     else if (targetId === 'subscribers-new') {
         // Remove existing button to ensure correct state
-        (_d = document.getElementById('delete-selected-new-meters-btn')) === null || _d === void 0 ? void 0 : _d.remove();
+        (_f = document.getElementById('delete-selected-new-meters-btn')) === null || _f === void 0 ? void 0 : _f.remove();
         let columns = [...columnConfigs['subscribers-new']];
         if ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'admin') {
             columns.unshift({
@@ -17271,6 +17304,9 @@ function handleNavigation(event) {
     else if (targetId === 'pending-requests-section') {
         renderPendingRequestsSection();
     }
+    setTimeout(() => {
+        hideAppLoading(180);
+    }, 150);
 }
 /**
  * إعداد جميع مستمعي الأحداث للتطبيق
@@ -19086,6 +19122,7 @@ window.cloudSyncManager = cloudSyncManager;
 // تهيئة التطبيق
 const initApp = async () => {
     var _a, _b;
+    showAppLoading('جارٍ تشغيل المنظومة وتحميل البيانات...', 'المنظومة الموحدة للعدادات - مزامنة سحابية ⚡', '⚡');
     setupHelpSection();
     setupExcelImportSection();
     setupLiquidationSection();
@@ -19157,5 +19194,6 @@ const initApp = async () => {
             showScreen('welcome-screen');
         }
     }
+    await hideAppLoading(300);
 };
 document.addEventListener('DOMContentLoaded', initApp);
