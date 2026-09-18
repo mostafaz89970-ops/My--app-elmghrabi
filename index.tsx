@@ -8864,6 +8864,21 @@ const handlePrintJudicialControlDetails = () => {
             typeLabel.firstChild.textContent = isReplacement ? 'نوع العداد القديم ' : 'نوع العداد ';
         }
 
+        // إخفاء حقول العداد الجديد إذا لم يكن المشترك جديداً أو إحلالاً إلا إذا كانت مسجلة بالفعل
+        const newChassisInput = document.getElementById(`${formPrefix}newMeterChassisNumber`) as HTMLInputElement | null;
+        const newTypeInput = document.getElementById(`${formPrefix}newMeterType`) as HTMLSelectElement | null;
+        const newChassisGroup = newChassisInput?.closest('.input-group') as HTMLElement | null;
+        const newTypeGroup = newTypeInput?.closest('.input-group') as HTMLElement | null;
+
+        if (!isNewSubscriber && !isReplacement) {
+            const hasNewChassisVal = !!(newChassisInput && newChassisInput.value.trim() && newChassisInput.value.trim() !== 'غير محدد');
+            newChassisGroup?.classList.toggle('hidden', !hasNewChassisVal);
+            newTypeGroup?.classList.toggle('hidden', !hasNewChassisVal);
+        } else {
+            newChassisGroup?.classList.remove('hidden');
+            newTypeGroup?.classList.remove('hidden');
+        }
+
         // Check if actual data exists in each section (used for imported or untyped records)
         const hasRemovalData = !!(
             (document.getElementById(`${formPrefix}removalDate`) as HTMLInputElement)?.value ||
@@ -9172,12 +9187,6 @@ const handlePrintJudicialControlDetails = () => {
         const meter = state.meters.find(m => m.id === currentMeterIdForDetails);
         if (!meter) return;
 
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            showToast('فشل فتح نافذة الطباعة. يرجى السماح بالنوافذ المنبثقة.', 'error');
-            return;
-        }
-
         const companyName = (state.settings.replacementReportCompanyName || state.settings.companyName || 'ELMAGHRABI').replace(/\n/g, '<br>');
         const printDate = new Date().toLocaleString('ar-EG');
         const logoSrc = state.settings.companyLogo;
@@ -9214,7 +9223,7 @@ const handlePrintJudicialControlDetails = () => {
         const isReplacementRecord = ['مرفوع إحلال', 'استبدال', 'تم استبداله', 'تم تغير العداد'].includes(meter.subscriberType);
         const isRepairedRecord = ['تم الإصلاح', 'لا يمكن إصلاحه'].includes(meter.subscriberType);
 
-        const hasNewMeterData = (meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement) && !isNewRecord;
+        const hasNewMeterData = !!(meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement) && !isNewRecord;
 
         const meterItems = [
             createRow(hasNewMeterData ? 'شاسية العداد القديم' : 'شاسية العداد', meter.meterChassisNumber),
@@ -9226,8 +9235,8 @@ const handlePrintJudicialControlDetails = () => {
         // Install items: ONLY for new subscribers, replacement records, or records genuinely having install data (never for faulty or demolition)
         const shouldShowInstallInPrint = isNewRecord || isReplacementRecord || (!isFaultyRecord && !isDemolitionRecord && !isRepairedRecord && (meter.installationDate || meter.installedBy || hasNewMeterData));
         const installItems = shouldShowInstallInPrint ? [
-            createRow(isNewRecord ? 'شاسية العداد' : 'شاسية العداد الجديد', meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement || (isNewRecord ? meter.meterChassisNumber : '')),
-            createRow(isNewRecord ? 'نوع العداد' : 'نوع العداد الجديد', meter.newMeterType || (isNewRecord ? meter.meterType : '')),
+            (isNewRecord ? createRow('شاسية العداد', meter.meterChassisNumber || meter.newMeterChassisNumber) : (hasNewMeterData ? createRow('شاسية العداد الجديد', meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement) : '')),
+            (isNewRecord ? createRow('نوع العداد', meter.meterType || meter.newMeterType) : (hasNewMeterData ? createRow('نوع العداد الجديد', meter.newMeterType) : '')),
             createRow('تاريخ التركيب', meter.installationDate || meter.installationDateForReplacement),
             createRow('القائم بالتركيب', meter.installedBy),
             createRow('شركة توريد العداد', meter.meterSupplyCompany),
@@ -9290,7 +9299,7 @@ const handlePrintJudicialControlDetails = () => {
         </div>
       `;
 
-        printWindow.document.write(`
+        const printSubscriberDoc = `
         <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة تفاصيل المشترك</title>
         <style>
             @page { size: A4; margin: 10mm; } 
@@ -9356,13 +9365,8 @@ const handlePrintJudicialControlDetails = () => {
             </div>
         </div>
         ${content}<div class="print-footer"><p>تاريخ الطباعة: ${printDate}</p></div></body></html>
-    `);
-        printWindow.document.close();
-        setTimeout(() => {
-            printWindow.focus();
-            printWindow.print();
-            printWindow.close();
-        }, 500);
+        `;
+        executePrintHtmlContent(printSubscriberDoc);
     };
 
     // --- وحدة الرفع: تسليم العدادات المرفوعة أعطال ---
@@ -9637,6 +9641,45 @@ const handlePrintJudicialControlDetails = () => {
 
         // Trigger change events to show/hide conditional fields correctly
         updateMeterFormVisibility('details-');
+
+        // في وضع العرض فقط (mode === 'view')، يتم اختصار الشاشة وعرض الحقول المسجلة بالفعل فقط
+        if (mode === 'view') {
+            const inputGroups = form.querySelectorAll('.input-group');
+            inputGroups.forEach(group => {
+                if (group.classList.contains('compound')) {
+                    // فحص مرجع الحساب المركب (ف، ح، ي، م)
+                    const subInputs = group.querySelectorAll('input');
+                    const hasSubVal = Array.from(subInputs).some(i => i.value && i.value.trim() !== '' && i.value.trim() !== '-');
+                    (group as HTMLElement).style.display = hasSubVal ? '' : 'none';
+                    return;
+                }
+
+                const field = group.querySelector('input, select, textarea') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+                if (!field) return;
+
+                const val = (field.value || '').trim();
+                const isRegistered = val !== '' && val !== 'غير محدد' && val !== '-' && val !== 'null' && val !== 'undefined';
+
+                // حقول العداد الجديد تخفى نهائياً إذا كانت فارغة أو غير مسجلة
+                if ((field.id === 'details-newMeterChassisNumber' || field.id === 'details-newMeterType') && (!val || val === 'غير محدد')) {
+                    (group as HTMLElement).style.display = 'none';
+                    return;
+                }
+
+                (group as HTMLElement).style.display = isRegistered ? '' : 'none';
+            });
+
+            // فحص المجموعات (fieldsets): إخفاء أي مجموعة لا تحتوي على أي حقل مسجل وظاهر
+            form.querySelectorAll('fieldset').forEach(fs => {
+                const visibleChildGroups = Array.from(fs.querySelectorAll('.input-group')).filter(g => (g as HTMLElement).style.display !== 'none' && !g.classList.contains('hidden'));
+                (fs as HTMLElement).style.display = visibleChildGroups.length > 0 ? '' : 'none';
+            });
+        } else {
+            // في وضع التعديل (mode === 'edit') يتم إظهار الحقول المتاحة للإدخال
+            form.querySelectorAll('.input-group').forEach(g => (g as HTMLElement).style.display = '');
+            form.querySelectorAll('fieldset').forEach(fs => (fs as HTMLElement).style.display = '');
+            updateMeterFormVisibility('details-');
+        }
 
         // Navigate to the details section
         document.querySelectorAll('.content-section.active').forEach(s => s.classList.remove('active'));
