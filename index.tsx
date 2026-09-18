@@ -20405,7 +20405,7 @@ const handlePrintJudicialControlDetails = () => {
                     <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
                         <button type="button" class="btn btn-primary btn-print-accounting-record" data-id="${record.id}" title="طباعة بيانات طلب الخدمة" style="padding: 5px 12px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة 🖨️</button>
                         <button type="button" class="btn secondary btn-edit-accounting-record" data-id="${record.id}">تعديل</button>
-                        <button type="button" class="btn btn-delete btn-delete-accounting-record" data-id="${record.id}">حذف</button>
+                        ${hasButtonPermission('delete_button') ? `<button type="button" class="btn btn-delete btn-delete-accounting-record" data-id="${record.id}">حذف</button>` : ''}
                     </div>
                 </td>
             </tr>
@@ -20566,12 +20566,18 @@ const handlePrintJudicialControlDetails = () => {
             }
 
             if (deleteButton) {
+                if (!hasButtonPermission('delete_button')) {
+                    showToast('عفواً، ليس لديك صلاحية حذف السجلات. هذه الصلاحية مقصورة على مسؤول المنظومة فقط.', 'error');
+                    return;
+                }
                 const id = Number(deleteButton.getAttribute('data-id'));
-                const records = getAccountingRequests().filter(rec => Number(rec.id) !== id);
-                saveAccountingRequests(records);
-                showToast('تم حذف السجل بنجاح.', 'success');
-                refreshSavedRecords();
-                resetForm();
+                if (confirm('هل أنت متأكد من حذف هذا السجل؟')) {
+                    const records = getAccountingRequests().filter(rec => Number(rec.id) !== id);
+                    saveAccountingRequests(records);
+                    showToast('تم حذف السجل بنجاح.', 'success');
+                    refreshSavedRecords();
+                    resetForm();
+                }
             }
         });
 
@@ -20755,7 +20761,7 @@ const handlePrintJudicialControlDetails = () => {
                                             <button type="button" class="action-btn view btn-view-accounting-record" data-id="${record.id}" title="عرض"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
                                             <button type="button" class="action-btn print btn-print-accounting-record" data-id="${record.id}" title="طباعة"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></button>
                                             <button type="button" class="action-btn edit btn-edit-accounting-record" data-id="${record.id}" title="تعديل"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                                            <button type="button" class="action-btn delete btn-delete-accounting-record" data-id="${record.id}" title="حذف"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+                                            ${hasButtonPermission('delete_button') ? `<button type="button" class="action-btn delete btn-delete-accounting-record" data-id="${record.id}" title="حذف"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>` : ''}
                                         </div>
                                     </td>
                                 </tr>
@@ -20976,11 +20982,17 @@ const handlePrintJudicialControlDetails = () => {
                 }
 
                 if (deleteButton) {
+                    if (!hasButtonPermission('delete_button')) {
+                        showToast('عفواً، ليس لديك صلاحية حذف السجلات. هذه الصلاحية مقصورة على مسؤول المنظومة فقط.', 'error');
+                        return;
+                    }
                     const id = Number(deleteButton.getAttribute('data-id'));
-                    const updatedRecords = getAccountingRequests().filter(item => Number(item.id) !== id);
-                    saveAccountingRequests(updatedRecords);
-                    showToast('تم حذف السجل بنجاح.', 'success');
-                    renderTable(updatedRecords);
+                    if (confirm('هل أنت متأكد من حذف هذا السجل؟')) {
+                        const updatedRecords = getAccountingRequests().filter(item => Number(item.id) !== id);
+                        saveAccountingRequests(updatedRecords);
+                        showToast('تم حذف السجل بنجاح.', 'success');
+                        renderTable(updatedRecords);
+                    }
                 }
             });
         };
@@ -21504,21 +21516,6 @@ const handlePrintJudicialControlDetails = () => {
 
         <div class="footer-divider"></div>
         <div class="footer-note">* بيانات البطاقة هى بيانات بطاقة مقدم الطلب</div>
-
-        <div style="margin-top: 35px; display: flex; justify-content: space-between; text-align: center; font-size: 15px; font-weight: bold;">
-            <div style="min-width: 170px;">
-                <div>الفني القائم بالمعاينة</div>
-                <div style="margin-top: 25px;">..............................</div>
-            </div>
-            <div style="min-width: 170px;">
-                <div>الموظف المختص</div>
-                <div style="margin-top: 25px;">..............................</div>
-            </div>
-            <div style="min-width: 170px;">
-                <div>اعتماد رئيس الإيرادات</div>
-                <div style="margin-top: 25px;">..............................</div>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -21731,22 +21728,6 @@ const handlePrintJudicialControlDetails = () => {
                     <!-- الفاصل السفلي -->
                     <div style="border-bottom: 2px solid #000; margin: 25px 0 10px 0;"></div>
                     <div style="font-size: 14.5px; font-weight: bold; color: #000;">* بيانات البطاقة هى بيانات بطاقة مقدم الطلب</div>
-
-                    <!-- التوقيعات الرسمية -->
-                    <div style="margin-top: 30px; display: flex; justify-content: space-between; text-align: center; font-size: 15px; font-weight: bold;">
-                        <div style="min-width: 170px;">
-                            <div>الفني القائم بالمعاينة</div>
-                            <div style="margin-top: 25px;">..............................</div>
-                        </div>
-                        <div style="min-width: 170px;">
-                            <div>الموظف المختص</div>
-                            <div style="margin-top: 25px;">..............................</div>
-                        </div>
-                        <div style="min-width: 170px;">
-                            <div>اعتماد رئيس الإيرادات</div>
-                            <div style="margin-top: 25px;">..............................</div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -21870,6 +21851,9 @@ const handlePrintJudicialControlDetails = () => {
                 return;
             }
 
+            const canDelete = hasButtonPermission('delete_button');
+            const canPrint = hasButtonPermission('print_button');
+
             tableBody.innerHTML = records.map(rec => `
                 <tr>
                     <td style="font-weight: bold;">${rec['order-number'] || '-'}</td>
@@ -21880,8 +21864,8 @@ const handlePrintJudicialControlDetails = () => {
                     <td>
                         <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
                             <button type="button" class="btn secondary btn-sub-load" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px;">عرض في المستند 📄</button>
-                            <button type="button" class="btn btn-sub-print" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة 🖨️</button>
-                            <button type="button" class="btn btn-delete btn-sub-delete" data-id="${rec.id}" style="padding: 4px 8px; font-size: 12px;">حذف</button>
+                            ${canPrint ? `<button type="button" class="btn btn-sub-print" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة 🖨️</button>` : ''}
+                            ${canDelete ? `<button type="button" class="btn btn-delete btn-sub-delete" data-id="${rec.id}" style="padding: 4px 8px; font-size: 12px;">حذف</button>` : ''}
                         </div>
                     </td>
                 </tr>
@@ -21892,6 +21876,10 @@ const handlePrintJudicialControlDetails = () => {
 
         // زر الطباعة المطابقة للأصل
         document.getElementById('sub-doc-print-btn')?.addEventListener('click', () => {
+            if (!hasButtonPermission('print_button')) {
+                showToast('عفواً، ليس لديك صلاحية الطباعة.', 'error');
+                return;
+            }
             const currentData = getDocFormData();
             printServiceRequestExactDocument(currentData);
         });
@@ -21899,13 +21887,21 @@ const handlePrintJudicialControlDetails = () => {
         // زر حفظ أو تحديث الاشتراك
         document.getElementById('sub-doc-save-btn')?.addEventListener('click', () => {
             const currentData = getDocFormData();
+            const existingId = currentData.id ? Number(currentData.id) : null;
+            if (existingId && !hasButtonPermission('edit_button')) {
+                showToast('عفواً، ليس لديك صلاحية تعديل بيانات الاشتراك.', 'error');
+                return;
+            }
+            if (!existingId && !hasButtonPermission('add_button')) {
+                showToast('عفواً، ليس لديك صلاحية إضافة اشتراك جديد.', 'error');
+                return;
+            }
             if (!currentData['client-name'] && !currentData['order-number']) {
                 showToast('يرجى إدخال اسم العميل أو رقم الطلب على الأقل لحفظ الاشتراك.', 'error');
                 return;
             }
 
             const records = getAccountingRequests();
-            const existingId = currentData.id ? Number(currentData.id) : null;
             if (existingId) {
                 const idx = records.findIndex(r => Number(r.id) === existingId);
                 if (idx !== -1) {
@@ -22056,6 +22052,10 @@ const handlePrintJudicialControlDetails = () => {
             }
 
             if (printBtn) {
+                if (!hasButtonPermission('print_button')) {
+                    showToast('عفواً، ليس لديك صلاحية الطباعة.', 'error');
+                    return;
+                }
                 const id = Number(printBtn.getAttribute('data-id'));
                 const rec = getAccountingRequests().find(r => Number(r.id) === id);
                 if (rec) {
@@ -22065,6 +22065,10 @@ const handlePrintJudicialControlDetails = () => {
             }
 
             if (deleteBtn) {
+                if (!hasButtonPermission('delete_button')) {
+                    showToast('عفواً، ليس لديك صلاحية حذف سجلات الاشتراكات. هذه الصلاحية مقصورة على مسؤول المنظومة فقط.', 'error');
+                    return;
+                }
                 const id = Number(deleteBtn.getAttribute('data-id'));
                 if (confirm('هل أنت متأكد من حذف هذا الاشتراك؟')) {
                     const filtered = getAccountingRequests().filter(r => Number(r.id) !== id);
