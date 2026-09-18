@@ -18333,6 +18333,559 @@ const renderAccountingSystemSection = () => {
         });
     }
 };
+// دالة طباعة تفاصيل سجل تغيير المحاسبة (بيانات طلب الخدمة) بشكل رسمي وشامل
+const printAccountingRecordDetails = (record) => {
+    if (!record)
+        return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        showToast('فشل فتح نافذة الطباعة. يرجى السماح بالنوافذ المنبثقة في المتصفح.', 'error');
+        return;
+    }
+    const headerInfo = getDynamicReceiptHeader();
+    const logoSrc = state.settings.companyLogo;
+    const printDate = new Date().toLocaleDateString('ar-EG');
+    const printTime = new Date().toLocaleTimeString('ar-EG');
+    const meterDetails = Array.isArray(record['meter-details']) && record['meter-details'].length
+        ? record['meter-details']
+        : Array.isArray(record['meter-numbers']) && record['meter-numbers'].length
+            ? record['meter-numbers'].map((number, index) => { var _a; return ({ number, locationType: ((_a = record['meter-location-types']) === null || _a === void 0 ? void 0 : _a[index]) || record['location-description'] || '' }); })
+            : (record['meter-number'] ? [{ number: record['meter-number'], locationType: record['location-description'] || '' }] : []);
+    const meterCount = Number(record['meter-count']) || meterDetails.length || 1;
+    const savedDateFormatted = record.savedAt ? new Date(record.savedAt).toLocaleString('ar-EG') : '-';
+    const orderNo = record['order-number'] || '-';
+    const clientName = record['client-name'] || '-';
+    const address = record.address || '-';
+    const cardNumber = record['card-number'] || '-';
+    const mobile = record.mobile || '-';
+    const clientDescription = record['client-description'] || '-';
+    const ownerName = record['owner-name'] || '-';
+    const locationDescription = record['location-description'] || '-';
+    const eastBoundary = record['east-boundary'] || '-';
+    const westBoundary = record['west-boundary'] || '-';
+    const northBoundary = record['north-boundary'] || '-';
+    const southBoundary = record['south-boundary'] || '-';
+    const modelNumber = record['model-number'] || '-';
+    const registrationNumber = record['registration-number'] || '-';
+    const issueDate = record['issue-date'] || '-';
+    const inspectionReceipt = record['inspection-receipt'] || '-';
+    const inspectionCompletionDate = record['inspection-completion-date'] || '-';
+    const hasImages = Boolean(record.modelImage || record.certificateImage || record.inspectionImage);
+    const html = `
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>بيانات طلب الخدمة - ${clientName} - طلب رقم ${orderNo}</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+            <style>
+                @page {
+                    size: A4 portrait;
+                    margin: 8mm 10mm;
+                }
+                * {
+                    box-sizing: border-box;
+                }
+                body {
+                    font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: #f1f5f9;
+                    color: #0f172a;
+                    margin: 0;
+                    padding: 16px;
+                    direction: rtl;
+                    line-height: 1.45;
+                }
+                .page-container {
+                    max-width: 860px;
+                    margin: 0 auto;
+                    background: #ffffff;
+                    border: 2px solid #0f172a;
+                    border-radius: 10px;
+                    padding: 16px 20px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+                }
+                .action-bar {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 14px;
+                    padding: 8px 14px;
+                    background: #0f172a;
+                    color: #fff;
+                    border-radius: 8px;
+                }
+                .action-bar button {
+                    background: #0284c7;
+                    color: #fff;
+                    border: none;
+                    padding: 7px 16px;
+                    border-radius: 6px;
+                    font-family: inherit;
+                    font-weight: 800;
+                    font-size: 13.5px;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                .action-bar button:hover {
+                    background: #0369a1;
+                }
+
+                /* Top Headers */
+                .header-container {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    border-bottom: 2.5px solid #0f172a;
+                    padding-bottom: 10px;
+                    margin-bottom: 12px;
+                }
+                .header-right {
+                    text-align: right;
+                    line-height: 1.35;
+                }
+                .header-right .ministry { font-size: 12.5px; font-weight: 800; color: #1e293b; }
+                .header-right .holding { font-size: 12px; font-weight: 800; color: #334155; }
+                .header-right .company { font-size: 13.5px; font-weight: 900; color: #0f172a; }
+                .header-right .sector { font-size: 12.5px; font-weight: 800; color: #1e40af; }
+                .header-right .branch { font-size: 12.5px; font-weight: 800; color: #065f46; }
+                .header-right .rev-branch { font-size: 12px; font-weight: 800; color: #047857; }
+
+                .header-center {
+                    text-align: center;
+                    flex: 1;
+                    padding: 0 10px;
+                }
+                .main-title-badge {
+                    display: inline-block;
+                    background: #0f172a;
+                    color: #ffffff;
+                    font-size: 20px;
+                    font-weight: 900;
+                    padding: 6px 26px;
+                    border-radius: 8px;
+                    letter-spacing: 0.5px;
+                    border: 2px solid #0f172a;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+                }
+                .header-center .sub-title {
+                    font-size: 11.5px;
+                    font-weight: 800;
+                    color: #475569;
+                    margin-top: 4px;
+                }
+                .header-center .order-chip {
+                    display: inline-block;
+                    background: #f1f5f9;
+                    border: 1.5px solid #cbd5e1;
+                    border-radius: 6px;
+                    padding: 2px 10px;
+                    font-size: 12px;
+                    font-weight: 800;
+                    color: #0f172a;
+                    margin-top: 4px;
+                }
+
+                .header-left {
+                    text-align: left;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 4px;
+                }
+                .logo-img {
+                    max-height: 70px;
+                    max-width: 105px;
+                    object-fit: contain;
+                }
+                .meta-tags {
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    color: #475569;
+                    text-align: left;
+                    line-height: 1.4;
+                }
+
+                /* Section Styling */
+                .section-card {
+                    border: 1.5px solid #0f172a;
+                    border-radius: 8px;
+                    margin-bottom: 10px;
+                    overflow: hidden;
+                    background: #ffffff;
+                    page-break-inside: avoid;
+                }
+                .section-header {
+                    background: #f1f5f9;
+                    color: #0f172a;
+                    font-weight: 900;
+                    font-size: 12.5px;
+                    padding: 4px 10px;
+                    border-bottom: 1.5px solid #0f172a;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                }
+                .data-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 11.5px;
+                }
+                .data-table td {
+                    padding: 4.5px 8px;
+                    border: 1px solid #cbd5e1;
+                    vertical-align: middle;
+                }
+                .data-table td.lbl {
+                    font-weight: 800;
+                    background: #f8fafc;
+                    color: #1e293b;
+                    width: 18%;
+                    white-space: nowrap;
+                }
+                .data-table td.val {
+                    font-weight: 700;
+                    color: #0f172a;
+                    width: 32%;
+                    word-break: break-word;
+                }
+
+                /* Meters Table */
+                .meters-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 11.5px;
+                    text-align: center;
+                }
+                .meters-table th {
+                    background: #e2e8f0;
+                    color: #0f172a;
+                    font-weight: 900;
+                    padding: 5px;
+                    border: 1px solid #94a3b8;
+                }
+                .meters-table td {
+                    padding: 4.5px;
+                    border: 1px solid #cbd5e1;
+                    font-weight: 700;
+                }
+
+                /* Attachments */
+                .attachments-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 10px;
+                    padding: 8px;
+                }
+                .attachment-item {
+                    border: 1px solid #cbd5e1;
+                    border-radius: 6px;
+                    padding: 6px;
+                    text-align: center;
+                    background: #f8fafc;
+                    page-break-inside: avoid;
+                }
+                .attachment-item h5 {
+                    margin: 0 0 4px 0;
+                    font-size: 11.5px;
+                    font-weight: 800;
+                    color: #1e293b;
+                }
+                .attachment-item img {
+                    max-width: 100%;
+                    max-height: 200px;
+                    object-fit: contain;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 4px;
+                    background: #fff;
+                }
+
+                /* Signatures */
+                .signatures-container {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 12px;
+                    padding-top: 8px;
+                    border-top: 1.5px dashed #0f172a;
+                    page-break-inside: avoid;
+                }
+                .sign-box {
+                    width: 31%;
+                    text-align: center;
+                    font-size: 11.5px;
+                    font-weight: 800;
+                    color: #0f172a;
+                    line-height: 1.5;
+                }
+                .sign-line {
+                    margin-top: 28px;
+                    border-bottom: 1.5px dotted #64748b;
+                    width: 80%;
+                    margin-left: auto;
+                    margin-right: auto;
+                }
+
+                .print-footer {
+                    margin-top: 10px;
+                    border-top: 1px solid #cbd5e1;
+                    padding-top: 5px;
+                    font-size: 10px;
+                    color: #64748b;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+
+                @media print {
+                    body {
+                        background: #ffffff;
+                        padding: 0;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .page-container {
+                        border: 2px solid #000;
+                        box-shadow: none;
+                        padding: 8px;
+                        max-width: 100%;
+                    }
+                    .action-bar {
+                        display: none !important;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="page-container">
+                <div class="action-bar">
+                    <div style="font-weight: 800;">معاينة طباعة: بيانات طلب الخدمة (سجل تغيير نظام المحاسبة)</div>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="window.print()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            طباعة المستند 🖨️
+                        </button>
+                        <button onclick="window.close()" style="background: #475569;">إغلاق ✕</button>
+                    </div>
+                </div>
+
+                <!-- Header -->
+                <div class="header-container">
+                    <div class="header-right">
+                        <div class="ministry">وزارة الكهرباء والطاقة المتجددة</div>
+                        <div class="holding">الشركة القابضة لكهرباء مصر</div>
+                        <div class="company">${headerInfo.company}</div>
+                        <div class="sector">${headerInfo.sector}</div>
+                        <div class="branch">${headerInfo.branchName}</div>
+                        <div class="rev-branch">${headerInfo.revenueBranch}</div>
+                    </div>
+
+                    <div class="header-center">
+                        <div class="main-title-badge">بيانات طلب الخدمة</div>
+                        <div class="sub-title">نموذج تسجيل وتغيير نظام المحاسبة للعملاء والعدادات</div>
+                        <div class="order-chip">
+                            رقم الطلب: <strong>${orderNo}</strong>
+                            ${registrationNumber !== '-' ? ` • رقم القيد: <strong>${registrationNumber}</strong>` : ''}
+                        </div>
+                    </div>
+
+                    <div class="header-left">
+                        ${logoSrc ? `<img src="${logoSrc}" alt="شعار الشركة" class="logo-img">` : ''}
+                        <div class="meta-tags">
+                            <div>التاريخ: ${printDate}</div>
+                            <div>الوقت: ${printTime}</div>
+                            <div>كود السجل: #${record.id || '-'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1. Customer & Request Data -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <span>👤 أولاً: بيانات العميل وموقع العقار</span>
+                        <span>رقم الطلب: <strong>${orderNo}</strong></span>
+                    </div>
+                    <table class="data-table">
+                        <tr>
+                            <td class="lbl">اسم العميل:</td>
+                            <td class="val" style="font-size: 13px; font-weight: 900; color: #0f172a;">${clientName}</td>
+                            <td class="lbl">الرقم القومي (البطاقة):</td>
+                            <td class="val" style="font-family: monospace; font-size: 12.5px;">${cardNumber}</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">رقم الموبايل:</td>
+                            <td class="val" style="font-family: monospace;">${mobile}</td>
+                            <td class="lbl">صفة العميل:</td>
+                            <td class="val"><strong>${clientDescription}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">اسم المالك:</td>
+                            <td class="val">${ownerName}</td>
+                            <td class="lbl">وصف المكان / النشاط:</td>
+                            <td class="val"><strong>${locationDescription}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">العنوان تفصيلياً:</td>
+                            <td class="val" colspan="3" style="font-size: 12px; line-height: 1.5;">${address}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- 2. Boundaries -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <span>🧭 ثانياً: حدود العقار الجغرافية</span>
+                    </div>
+                    <table class="data-table">
+                        <tr>
+                            <td class="lbl">الحد الشرقي:</td>
+                            <td class="val">${eastBoundary}</td>
+                            <td class="lbl">الحد الغربي:</td>
+                            <td class="val">${westBoundary}</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">الحد البحري (الشمالي):</td>
+                            <td class="val">${northBoundary}</td>
+                            <td class="lbl">الحد القبلي (الجنوبي):</td>
+                            <td class="val">${southBoundary}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- 3. Inspection & Model Details -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <span>📋 ثالثاً: بيانات المعاينة والنموذج وشهادة التركيب</span>
+                    </div>
+                    <table class="data-table">
+                        <tr>
+                            <td class="lbl">رقم النموذج:</td>
+                            <td class="val"><strong>${modelNumber}</strong></td>
+                            <td class="lbl">عدد العدادات:</td>
+                            <td class="val"><strong>${meterCount} عداد</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">رقم إيصال المعاينة:</td>
+                            <td class="val"><strong>${inspectionReceipt}</strong></td>
+                            <td class="lbl">تاريخ إتمام المعاينة:</td>
+                            <td class="val">${inspectionCompletionDate}</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">رقم القيد بشهادة التركيب:</td>
+                            <td class="val"><strong>${registrationNumber}</strong></td>
+                            <td class="lbl">تاريخ صدور الشهادة:</td>
+                            <td class="val">${issueDate}</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">تاريخ ووقت الحفظ بالنظام:</td>
+                            <td class="val">${savedDateFormatted}</td>
+                            <td class="lbl">حالة الطلب بالنظام:</td>
+                            <td class="val"><strong style="color: #15803d;">✔️ مسجل ومعتمد</strong></td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- 4. Meters Table -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <span>⚡ رابعاً: بيان العدادات ومواقع تركيبها (${meterDetails.length > 0 ? meterDetails.length : meterCount} عداد)</span>
+                    </div>
+                    <table class="meters-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 10%;">م</th>
+                                <th style="width: 45%;">رقم العداد</th>
+                                <th style="width: 45%;">وصف المكان / موقع التركيب</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${meterDetails.length > 0 ? meterDetails.map((m, idx) => `
+                                <tr>
+                                    <td>${idx + 1}</td>
+                                    <td style="font-family: monospace; font-size: 12.5px; font-weight: 800;">${m.number || 'بدون رقم'}</td>
+                                    <td>${m.locationType || locationDescription || '-'}</td>
+                                </tr>
+                            `).join('') : `
+                                <tr>
+                                    <td>1</td>
+                                    <td style="font-family: monospace; font-size: 12.5px; font-weight: 800;">${record['meter-number'] || 'غير محدد'}</td>
+                                    <td>${locationDescription || '-'}</td>
+                                </tr>
+                            `}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 5. Attachments if available -->
+                ${hasImages ? `
+                <div class="section-card">
+                    <div class="section-header">
+                        <span>📎 خامساً: المستندات والوثائق المرفقة بالطلب</span>
+                    </div>
+                    <div class="attachments-grid">
+                        ${record.modelImage ? `
+                            <div class="attachment-item">
+                                <h5>📄 صورة النموذج</h5>
+                                <img src="${record.modelImage}" alt="صورة النموذج" />
+                            </div>
+                        ` : ''}
+                        ${record.certificateImage ? `
+                            <div class="attachment-item">
+                                <h5>📜 صورة شهادة التركيب</h5>
+                                <img src="${record.certificateImage}" alt="صورة شهادة التركيب" />
+                            </div>
+                        ` : ''}
+                        ${record.inspectionImage ? `
+                            <div class="attachment-item">
+                                <h5>🔍 صورة المعاينة</h5>
+                                <img src="${record.inspectionImage}" alt="صورة المعاينة" />
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- 6. Official Signatures -->
+                <div class="signatures-container">
+                    <div class="sign-box">
+                        <div>توقيع مقدم الطلب / العميل</div>
+                        <div style="font-size: 10px; color: #64748b;">(إقرار بصحة كافة البيانات)</div>
+                        <div class="sign-line"></div>
+                        <div style="margin-top: 4px; font-size: 11px;">الاسم: ${clientName}</div>
+                    </div>
+                    <div class="sign-box">
+                        <div>الموظف المختص / مدخل البيانات</div>
+                        <div style="font-size: 10px; color: #64748b;">(مراجعة واستيفاء المستندات)</div>
+                        <div class="sign-line"></div>
+                        <div style="margin-top: 4px; font-size: 11px;">الاسم: ${record.createdBy || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || '....................'}</div>
+                    </div>
+                    <div class="sign-box">
+                        <div>اعتماد رئيس القسم / مدير الهندسة</div>
+                        <div style="font-size: 10px; color: #64748b;">(خاتم الشعار الرسمي)</div>
+                        <div class="sign-line"></div>
+                        <div style="margin-top: 4px; font-size: 11px;">التوقيع: ....................</div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="print-footer">
+                    <div>نظام إدارة ومتابعة العدادات والتحصيل الموحد • طُبع بواسطة: ${(loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'النظام'}</div>
+                    <div>تاريخ وتوقيت الطباعة: ${printDate} ${printTime}</div>
+                </div>
+            </div>
+        </body>
+        </html>
+        `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+    }, 350);
+};
 const renderAccountingRegistrationSection = () => {
     const activeSection = document.querySelector('.content-section.active');
     if (activeSection && activeSection.id !== 'accounting-save-registration')
@@ -18758,7 +19311,8 @@ const renderAccountingRegistrationSection = () => {
                 <td>${record['meter-number'] || '-'}</td>
                 <td>${record['registration-number'] || '-'}</td>
                 <td>
-                    <div style="display: flex; gap: 8px; justify-content: center;">
+                    <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-primary btn-print-accounting-record" data-id="${record.id}" title="طباعة بيانات طلب الخدمة" style="padding: 5px 12px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة 🖨️</button>
                         <button type="button" class="btn secondary btn-edit-accounting-record" data-id="${record.id}">تعديل</button>
                         <button type="button" class="btn btn-delete btn-delete-accounting-record" data-id="${record.id}">حذف</button>
                     </div>
@@ -18779,9 +19333,19 @@ const renderAccountingRegistrationSection = () => {
     registerPreview('accounting-inspection-image', 'accounting-inspection-preview');
     body.addEventListener('click', (event) => {
         const target = event.target;
+        const printButton = target.closest('.btn-print-accounting-record');
         const editButton = target.closest('.btn-edit-accounting-record');
         const deleteButton = target.closest('.btn-delete-accounting-record');
         const cancelButton = target.closest('#accounting-cancel-edit');
+        if (printButton) {
+            const id = Number(printButton.getAttribute('data-id'));
+            const records = getAccountingRequests();
+            const targetRecord = records.find(rec => Number(rec.id) === id);
+            if (targetRecord) {
+                printAccountingRecordDetails(targetRecord);
+            }
+            return;
+        }
         if (cancelButton) {
             resetForm();
             return;
@@ -19024,67 +19588,9 @@ const renderAccountingSavedRecordsSection = () => {
             if (printButton) {
                 const id = Number(printButton.getAttribute('data-id'));
                 const record = getAccountingRequests().find(item => Number(item.id) === id);
-                if (!record)
-                    return;
-                const printWindow = window.open('', '_blank');
-                if (!printWindow) {
-                    showToast('فشل فتح نافذة الطباعة. يرجى السماح بالنوافذ المنبثقة.', 'error');
-                    return;
+                if (record) {
+                    printAccountingRecordDetails(record);
                 }
-                const meterDetails = Array.isArray(record['meter-details']) && record['meter-details'].length
-                    ? record['meter-details']
-                    : Array.isArray(record['meter-numbers']) && record['meter-numbers'].length
-                        ? record['meter-numbers'].map((number, index) => { var _a; return ({ number, locationType: ((_a = record['meter-location-types']) === null || _a === void 0 ? void 0 : _a[index]) || record['location-description'] || '' }); })
-                        : (record['meter-number'] ? [{ number: record['meter-number'], locationType: record['location-description'] || '' }] : []);
-                const meterLocationSummary = meterDetails.length
-                    ? meterDetails.map((item) => `${item.number || 'بدون رقم'}: ${item.locationType || 'غير محدد'}`).join(' • ')
-                    : '-';
-                const content = `
-                    <div style="font-family: 'Segoe UI', Tahoma, sans-serif; direction: rtl; color: #111827; line-height: 1.8; padding: 24px;">
-                        <h2 style="text-align:center; margin-bottom: 20px;">تفاصيل سجل نظام المحاسبة</h2>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
-                            <div><strong>اسم العميل:</strong> ${record['client-name'] || '-'}</div>
-                            <div><strong>العنوان:</strong> ${record.address || '-'}</div>
-                            <div><strong>رقم البطاقة:</strong> ${record['card-number'] || '-'}</div>
-                            <div><strong>رقم الطلب:</strong> ${record['order-number'] || '-'}</div>
-                            <div><strong>الموبايل:</strong> ${record.mobile || '-'}</div>
-                            <div><strong>صفة العميل:</strong> ${record['client-description'] || '-'}</div>
-                            <div><strong>اسم المالك:</strong> ${record['owner-name'] || '-'}</div>
-                            <div><strong>وصف المكان:</strong> ${record['location-description'] || '-'}</div>
-                            <div><strong>رقم النموذج:</strong> ${record['model-number'] || '-'}</div>
-                            <div><strong>عدد العدادات:</strong> ${record['meter-count'] || meterDetails.length || 1}</div>
-                            <div><strong>أرقام العدادات:</strong> ${meterLocationSummary}</div>
-                            <div><strong>رقم القيد:</strong> ${record['registration-number'] || '-'}</div>
-                            <div><strong>رقم إيصال المعاينة:</strong> ${record['inspection-receipt'] || '-'}</div>
-                            <div><strong>تاريخ المعاينة:</strong> ${record['inspection-completion-date'] || '-'}</div>
-                            <div><strong>تاريخ الصدور:</strong> ${record['issue-date'] || '-'}</div>
-                            <div><strong>تاريخ الحفظ:</strong> ${record.savedAt ? new Date(record.savedAt).toLocaleString('ar-EG') : '-'}</div>
-                        </div>
-                    </div>
-                `;
-                printWindow.document.write(`
-                    <!DOCTYPE html>
-                    <html lang="ar" dir="rtl">
-                        <head>
-                            <meta charset="UTF-8" />
-                            <title>طباعة سجل محاسبة</title>
-                            <style>
-                                body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; color: #111827; }
-                                h2 { text-align: center; margin-bottom: 20px; }
-                                strong { display: inline-block; min-width: 110px; }
-                                div { margin-bottom: 8px; }
-                                @media print { body { padding: 0; } }
-                            </style>
-                        </head>
-                        <body>${content}</body>
-                    </html>
-                `);
-                printWindow.document.close();
-                setTimeout(() => {
-                    printWindow.focus();
-                    printWindow.print();
-                    printWindow.close();
-                }, 300);
                 return;
             }
             if (viewButton) {
@@ -19105,7 +19611,13 @@ const renderAccountingSavedRecordsSection = () => {
                     : '-';
                 const detailHtml = `
                     <div class="info-card" style="margin-top: 18px;">
-                        <h4>تفاصيل السجل</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                            <h4 style="margin: 0;">تفاصيل سجل تغيير نظام المحاسبة</h4>
+                            <button type="button" class="btn btn-primary btn-print-accounting-record" data-id="${record.id}" style="display: flex; align-items: center; gap: 8px; font-weight: 800; background: #0284c7; border-color: #0369a1; padding: 7px 16px; color: #fff; border-radius: 6px; cursor: pointer;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                                <span>طباعة بيانات طلب الخدمة 🖨️</span>
+                            </button>
+                        </div>
                         <div class="details-grid">
                             <div class="detail-item"><label>اسم العميل</label><span class="value">${record['client-name'] || '-'}</span></div>
                             <div class="detail-item"><label>العنوان</label><span class="value">${record.address || '-'}</span></div>
