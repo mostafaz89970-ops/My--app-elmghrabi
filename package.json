@@ -1,6 +1,6 @@
 {
   "name": "unified-counter-system",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "المنظومة الموحدة لادارة العدادات",
   "main": "main.js",
   "scripts": {
@@ -63,8 +63,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "your-github-username",
-      "repo": "your-repo-name"
+      "owner": "mostafaz89970-ops",
+      "repo": "My--app-elmghrabi"
     }
   }
 }

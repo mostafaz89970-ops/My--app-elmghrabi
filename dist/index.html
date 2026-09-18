@@ -8,9 +8,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#1f2937">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>المنظومة الموحدة للعدادات</title>
-  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="index.css?v=20260918_2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -5806,8 +5808,10 @@
   <!-- Firebase Realtime Database SDK (للمزامنة السحابية الفورية المباشرة) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript -->
-  <script src="./dist/index.js?v=1789685546365"></script>
+  <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript مع كسر الكاش لضمان ظهور التحديثات فورياً -->
+  <script>
+    document.write('<script src="./dist/index.js?t=' + Date.now() + '"><\/script>');
+  </script>
 
   <!-- HOTFIX: Ensure app container is hidden on logout -->
   <script>

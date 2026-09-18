@@ -38,6 +38,9 @@ function createWindow() {
     icon: path.join(__dirname, 'icon.png') // يمكنك إضافة أيقونة للتطبيق هنا
   });
 
+  // تفريغ الكاش بالكامل عند الإقلاع لضمان تحميل أحدث الأكواد والتعديلات فوراً
+  mainWindow.webContents.session.clearCache();
+
   // تحميل ملف index.html الخاص بالتطبيق.
   mainWindow.loadFile(path.join(__dirname, 'المنظومة الموحدة للعدادات.html'));
 
