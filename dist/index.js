@@ -468,8 +468,11 @@ const getSubAdmins = (selectedSector, selectedGeneralAdmin) => {
 const getDynamicReceiptHeader = (userOrCollector) => {
     let sec = loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector;
     let br = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch);
-    // For admin with active scope filter
-    if (loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.role === 'supervisor')) {
+    // For global admin with active scope filter
+    const isGlobalAdmin = loggedInUser &&
+        ((loggedInUser.username === 'admin' || loggedInUser.username === 'المدير') ||
+            (loggedInUser.role === 'admin' && (loggedInUser.branch === 'all' || !loggedInUser.branch)));
+    if (isGlobalAdmin) {
         if (currentAdminScopeSector && currentAdminScopeSector !== 'all')
             sec = currentAdminScopeSector;
         if (currentAdminScopeBranch && currentAdminScopeBranch !== 'all')
@@ -950,8 +953,10 @@ const ensureDefaultScope = (stateObj) => {
 const getCurrentDataScope = () => {
     if (!loggedInUser)
         return { sector: 'all', generalAdmin: 'all', branch: 'all', isGlobal: true };
-    const isAdmin = loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'supervisor';
-    if (isAdmin) {
+    // Only the global system administrator who is not assigned to a specific department has a global scope
+    const isGlobalAdmin = (loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'admin') &&
+        (loggedInUser.sector === 'all' || !loggedInUser.branch || loggedInUser.branch === 'all');
+    if (isGlobalAdmin) {
         return {
             sector: currentAdminScopeSector,
             generalAdmin: currentAdminScopeGeneralAdmin,
@@ -959,14 +964,14 @@ const getCurrentDataScope = () => {
             isGlobal: currentAdminScopeSector === 'all' && currentAdminScopeGeneralAdmin === 'all' && currentAdminScopeBranch === 'all'
         };
     }
-    const userSector = loggedInUser.sector || 'قطاع شمال المنيا';
-    const userGenAdmin = loggedInUser.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+    const userSector = loggedInUser.sector && loggedInUser.sector !== 'all' ? loggedInUser.sector : 'قطاع شمال المنيا';
+    const userGenAdmin = loggedInUser.generalAdmin && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : 'الإدارة العامة لهندسات شمال المنيا';
     const userBranch = loggedInUser.subAdmin || loggedInUser.branch || 'هندسة كهرباء بني مزار';
     return {
         sector: userSector,
         generalAdmin: userGenAdmin,
         branch: userBranch,
-        isGlobal: userSector === 'all' && userGenAdmin === 'all' && userBranch === 'all'
+        isGlobal: false
     };
 };
 const matchesCurrentScope = (item) => {
@@ -975,17 +980,26 @@ const matchesCurrentScope = (item) => {
     const scope = getCurrentDataScope();
     if (scope.isGlobal)
         return true;
-    const itemSector = item.sector || 'قطاع شمال المنيا';
-    const itemGenAdmin = item.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
-    const itemBranch = item.subAdmin || item.branch || 'هندسة كهرباء بني مزار';
-    if (scope.sector !== 'all' && itemSector !== scope.sector) {
+    const itemSector = (item.sector || '').trim();
+    const itemGenAdmin = (item.generalAdmin || '').trim();
+    const itemBranch = (item.subAdmin || item.branch || item.branchName || item.department || '').trim();
+    if (scope.sector !== 'all' && itemSector && itemSector !== scope.sector) {
         return false;
     }
-    if (scope.generalAdmin !== 'all' && itemGenAdmin !== scope.generalAdmin) {
+    if (scope.generalAdmin !== 'all' && itemGenAdmin && itemGenAdmin !== scope.generalAdmin) {
         return false;
     }
-    if (scope.branch !== 'all' && itemBranch !== scope.branch) {
-        return false;
+    if (scope.branch !== 'all') {
+        const cleanScopeBranch = (scope.branch || '').trim();
+        if (itemBranch) {
+            if (itemBranch !== cleanScopeBranch)
+                return false;
+        }
+        else {
+            // Legacy items without branch belong to default بني مزار
+            if (cleanScopeBranch !== 'هندسة كهرباء بني مزار')
+                return false;
+        }
     }
     return true;
 };
@@ -1020,32 +1034,35 @@ const stampItemWithScope = (item) => {
     if (!item)
         return item;
     const scope = getCurrentDataScope();
-    if (!item.sector) {
-        item.sector = (!scope.isGlobal && scope.sector !== 'all')
-            ? scope.sector
-            : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector) && loggedInUser.sector !== 'all' ? loggedInUser.sector : (currentAdminScopeSector !== 'all' ? currentAdminScopeSector : 'قطاع شمال المنيا'));
-    }
-    if (!item.generalAdmin) {
-        item.generalAdmin = (!scope.isGlobal && scope.generalAdmin !== 'all')
-            ? scope.generalAdmin
-            : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.generalAdmin) && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : (currentAdminScopeGeneralAdmin !== 'all' ? currentAdminScopeGeneralAdmin : 'الإدارة العامة لهندسات شمال المنيا'));
-    }
-    if (!item.branch) {
-        item.branch = (!scope.isGlobal && scope.branch !== 'all')
-            ? scope.branch
-            : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) && loggedInUser.branch !== 'all' ? loggedInUser.branch : (currentAdminScopeBranch !== 'all' ? currentAdminScopeBranch : 'هندسة كهرباء بني مزار'));
-    }
-    if (!item.subAdmin) {
-        item.subAdmin = item.branch;
-    }
+    const effectiveSector = (!scope.isGlobal && scope.sector !== 'all')
+        ? scope.sector
+        : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector) && loggedInUser.sector !== 'all' ? loggedInUser.sector : (currentAdminScopeSector !== 'all' ? currentAdminScopeSector : 'قطاع شمال المنيا'));
+    const effectiveGenAdmin = (!scope.isGlobal && scope.generalAdmin !== 'all')
+        ? scope.generalAdmin
+        : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.generalAdmin) && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : (currentAdminScopeGeneralAdmin !== 'all' ? currentAdminScopeGeneralAdmin : 'الإدارة العامة لهندسات شمال المنيا'));
+    const effectiveBranch = (!scope.isGlobal && scope.branch !== 'all')
+        ? scope.branch
+        : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) && loggedInUser.branch !== 'all' ? loggedInUser.branch : (currentAdminScopeBranch !== 'all' ? currentAdminScopeBranch : 'هندسة كهرباء بني مزار'));
+    if (!item.sector)
+        item.sector = effectiveSector;
+    if (!item.generalAdmin)
+        item.generalAdmin = effectiveGenAdmin;
+    if (!item.branch)
+        item.branch = effectiveBranch;
+    if (!item.subAdmin)
+        item.subAdmin = effectiveBranch;
+    if (!item.branchName)
+        item.branchName = effectiveBranch;
     return item;
 };
 const updateAdminScopeUI = () => {
-    const isAdmin = loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'supervisor');
+    const isGlobalAdmin = loggedInUser &&
+        ((loggedInUser.username === 'admin' || loggedInUser.username === 'المدير') ||
+            (loggedInUser.role === 'admin' && (loggedInUser.branch === 'all' || !loggedInUser.branch)));
     const container = document.getElementById('admin-scope-container');
     const badge = document.getElementById('user-branch-badge');
     const badgeText = document.getElementById('user-branch-text');
-    if (isAdmin) {
+    if (isGlobalAdmin) {
         if (container)
             container.style.display = 'flex';
         if (badge)
@@ -10594,9 +10611,9 @@ const handleSubscriberStatementSearch = (event) => {
         const refMMatch = !refM || String((_d = m.accountRefM) !== null && _d !== void 0 ? _d : '').trim() === refM;
         return nameMatch && codeMatch && chassisMatch && refFMatch && refHMatch && refYMatch && refMMatch;
     };
-    const metersList = Array.isArray(state.meters) ? state.meters : [];
-    const subscribersList = Array.isArray(state.subscribers) ? state.subscribers : [];
-    const mukayasatList = Array.isArray(state.mukayasat) ? state.mukayasat : [];
+    const metersList = (Array.isArray(state.meters) ? state.meters : []).filter(matchesCurrentScope);
+    const subscribersList = (Array.isArray(state.subscribers) ? state.subscribers : []).filter(matchesCurrentScope);
+    const mukayasatList = (Array.isArray(state.mukayasat) ? state.mukayasat : []).filter(matchesCurrentScope);
     const meterResults = metersList.filter(searchFilter);
     const subscriberResults = subscribersList.filter(searchFilter);
     const mukayasatResults = mukayasatList.filter(searchFilter);
@@ -18157,7 +18174,7 @@ const handleEditItemFromList = (listKey, key) => {
     renderDashboardPermissionsSection();
     renderUserManagementSection();
 };
-const getAccountingRequests = () => {
+const getAllAccountingRequests = () => {
     const accountingRecords = (state.mukayasatAccountSystemSaved || []);
     if (accountingRecords.length > 0)
         return accountingRecords;
@@ -18177,6 +18194,12 @@ const getAccountingRequests = () => {
         console.warn('تعذر ترحيل سجلات المحاسبة القديمة:', error);
     }
     return [];
+};
+const getAccountingRequests = (ignoreScope = false) => {
+    const all = getAllAccountingRequests();
+    if (ignoreScope)
+        return all;
+    return all.filter(matchesCurrentScope);
 };
 const saveAccountingRequests = (records) => {
     try {
@@ -19544,7 +19567,7 @@ const renderAccountingRegistrationSection = () => {
             }
             const id = Number(deleteButton.getAttribute('data-id'));
             if (confirm('هل أنت متأكد من حذف هذا السجل؟')) {
-                const records = getAccountingRequests().filter(rec => Number(rec.id) !== id);
+                const records = getAllAccountingRequests().filter(rec => Number(rec.id) !== id);
                 saveAccountingRequests(records);
                 showToast('تم حذف السجل بنجاح.', 'success');
                 refreshSavedRecords();
@@ -19633,7 +19656,7 @@ const renderAccountingRegistrationSection = () => {
         if ((_d = inspectionInput === null || inspectionInput === void 0 ? void 0 : inspectionInput.files) === null || _d === void 0 ? void 0 : _d[0]) {
             formData.inspectionImage = await readFileAsDataURL(inspectionInput.files[0]);
         }
-        const records = getAccountingRequests();
+        const records = getAllAccountingRequests();
         if (recordIdValue) {
             const index = records.findIndex(rec => String(rec.id) === recordIdValue);
             if (index >= 0) {
@@ -19641,7 +19664,7 @@ const renderAccountingRegistrationSection = () => {
                 formData.modelImage = formData.modelImage || existing.modelImage;
                 formData.certificateImage = formData.certificateImage || existing.certificateImage;
                 formData.inspectionImage = formData.inspectionImage || existing.inspectionImage;
-                records[index] = Object.assign(Object.assign(Object.assign({}, existing), formData), { id: Number(recordIdValue) });
+                records[index] = stampItemWithScope(Object.assign(Object.assign(Object.assign({}, existing), formData), { id: Number(recordIdValue) }));
             }
         }
         else {
@@ -19649,7 +19672,7 @@ const renderAccountingRegistrationSection = () => {
             let newRecordId = Date.now();
             while (usedIds.has(newRecordId))
                 newRecordId += 1;
-            records.push(Object.assign(Object.assign({ id: newRecordId }, formData), { savedAt: new Date().toISOString() }));
+            records.push(stampItemWithScope(Object.assign(Object.assign({ id: newRecordId }, formData), { savedAt: new Date().toISOString() })));
         }
         if (!saveAccountingRequests(records))
             return;
@@ -20511,7 +20534,7 @@ const printServiceRequestExactDocument = (record) => {
 };
 // قسم الاشتراكات (بيانات طلب الخدمة)
 const renderAccountingSubscriptionsSection = () => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const activeSection = document.querySelector('.content-section.active');
     if (activeSection && activeSection.id !== 'accounting-subscriptions')
         previousPageId = activeSection.id;
@@ -20539,6 +20562,9 @@ const renderAccountingSubscriptionsSection = () => {
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         <button type="button" id="sub-doc-print-btn" class="btn" style="background: #0284c7; border-color: #0369a1; color: #fff; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
                             <span>🖨️ طباعة بيانات طلب الخدمة (مطابق للأصل)</span>
+                        </button>
+                        <button type="button" id="sub-doc-print-new-btn" class="btn" style="background: #0d9488; border-color: #0f766e; color: #fff; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>🖨️ طباعة النموذج الجديد</span>
                         </button>
                         <button type="button" id="sub-doc-save-btn" class="btn" style="background: #16a34a; border-color: #15803d; color: #fff; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
                             <span>💾 حفظ / تحديث الاشتراك</span>
@@ -20838,7 +20864,7 @@ const renderAccountingSubscriptionsSection = () => {
                     <td>
                         <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
                             <button type="button" class="btn secondary btn-sub-load" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px;">عرض في المستند 📄</button>
-                            ${canPrint ? `<button type="button" class="btn btn-sub-print" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة 🖨️</button>` : ''}
+                            ${canPrint ? `<button type="button" class="btn btn-sub-print" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة النموذج الجديد 🖨️</button>` : ''}
                             ${canDelete ? `<button type="button" class="btn btn-delete btn-sub-delete" data-id="${rec.id}" style="padding: 4px 8px; font-size: 12px;">حذف</button>` : ''}
                         </div>
                     </td>
@@ -20855,8 +20881,17 @@ const renderAccountingSubscriptionsSection = () => {
         const currentData = getDocFormData();
         printServiceRequestExactDocument(currentData);
     });
+    // زر طباعة النموذج الجديد
+    (_b = document.getElementById('sub-doc-print-new-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
+        if (!hasButtonPermission('print_button')) {
+            showToast('عفواً، ليس لديك صلاحية الطباعة.', 'error');
+            return;
+        }
+        const currentData = getDocFormData();
+        printAccountingRecordDetails(currentData);
+    });
     // زر حفظ أو تحديث الاشتراك
-    (_b = document.getElementById('sub-doc-save-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
+    (_c = document.getElementById('sub-doc-save-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => {
         const currentData = getDocFormData();
         const existingId = currentData.id ? Number(currentData.id) : null;
         if (existingId && !hasButtonPermission('edit_button')) {
@@ -20871,18 +20906,18 @@ const renderAccountingSubscriptionsSection = () => {
             showToast('يرجى إدخال اسم العميل أو رقم الطلب على الأقل لحفظ الاشتراك.', 'error');
             return;
         }
-        const records = getAccountingRequests();
+        const records = getAllAccountingRequests();
         if (existingId) {
             const idx = records.findIndex(r => Number(r.id) === existingId);
             if (idx !== -1) {
-                records[idx] = Object.assign(Object.assign(Object.assign({}, records[idx]), currentData), { id: existingId, updatedAt: new Date().toISOString() });
+                records[idx] = stampItemWithScope(Object.assign(Object.assign(Object.assign({}, records[idx]), currentData), { id: existingId, updatedAt: new Date().toISOString() }));
                 saveAccountingRequests(records);
                 showToast('تم تحديث بيانات الاشتراك بنجاح.', 'success');
             }
             else {
                 currentData.id = Date.now();
                 currentData.savedAt = new Date().toISOString();
-                records.unshift(currentData);
+                records.unshift(stampItemWithScope(currentData));
                 saveAccountingRequests(records);
                 showToast('تم حفظ الاشتراك الجديد بنجاح.', 'success');
             }
@@ -20890,7 +20925,7 @@ const renderAccountingSubscriptionsSection = () => {
         else {
             currentData.id = Date.now();
             currentData.savedAt = new Date().toISOString();
-            records.unshift(currentData);
+            records.unshift(stampItemWithScope(currentData));
             saveAccountingRequests(records);
             const idEl = document.getElementById('sub-input-record-id');
             if (idEl)
@@ -20900,7 +20935,7 @@ const renderAccountingSubscriptionsSection = () => {
         renderSavedSubList();
     });
     // زر اشتراك جديد
-    (_c = document.getElementById('sub-doc-reset-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => {
+    (_d = document.getElementById('sub-doc-reset-btn')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
         resetDocForm();
         showToast('تم تفريغ حقول المستند لكتابة اشتراك جديد.', 'info');
     });
@@ -21023,9 +21058,9 @@ const renderAccountingSubscriptionsSection = () => {
                 return;
             }
             const id = Number(printBtn.getAttribute('data-id'));
-            const rec = getAccountingRequests().find(r => Number(r.id) === id);
+            const rec = getAllAccountingRequests().find(r => Number(r.id) === id);
             if (rec) {
-                printServiceRequestExactDocument(rec);
+                printAccountingRecordDetails(rec);
             }
             return;
         }
@@ -21036,7 +21071,7 @@ const renderAccountingSubscriptionsSection = () => {
             }
             const id = Number(deleteBtn.getAttribute('data-id'));
             if (confirm('هل أنت متأكد من حذف هذا الاشتراك؟')) {
-                const filtered = getAccountingRequests().filter(r => Number(r.id) !== id);
+                const filtered = getAllAccountingRequests().filter(r => Number(r.id) !== id);
                 saveAccountingRequests(filtered);
                 showToast('تم حذف الاشتراك بنجاح.', 'success');
                 renderSavedSubList();

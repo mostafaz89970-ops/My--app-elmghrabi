@@ -653,8 +653,11 @@ const getDynamicReceiptHeader = (userOrCollector?: string) => {
     let sec = loggedInUser?.sector;
     let br = loggedInUser?.subAdmin || loggedInUser?.branch;
 
-    // For admin with active scope filter
-    if (loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.role === 'supervisor')) {
+    // For global admin with active scope filter
+    const isGlobalAdmin = loggedInUser && 
+        ((loggedInUser.username === 'admin' || loggedInUser.username === 'المدير') ||
+        (loggedInUser.role === 'admin' && (loggedInUser.branch === 'all' || !loggedInUser.branch)));
+    if (isGlobalAdmin) {
         if (currentAdminScopeSector && currentAdminScopeSector !== 'all') sec = currentAdminScopeSector;
         if (currentAdminScopeBranch && currentAdminScopeBranch !== 'all') br = currentAdminScopeBranch;
     }
@@ -1116,8 +1119,10 @@ const ensureDefaultScope = (stateObj: any) => {
 
 const getCurrentDataScope = () => {
     if (!loggedInUser) return { sector: 'all', generalAdmin: 'all', branch: 'all', isGlobal: true };
-    const isAdmin = loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'supervisor';
-    if (isAdmin) {
+    // Only the global system administrator who is not assigned to a specific department has a global scope
+    const isGlobalAdmin = (loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'admin') &&
+                          (loggedInUser.sector === 'all' || !loggedInUser.branch || loggedInUser.branch === 'all');
+    if (isGlobalAdmin) {
         return {
             sector: currentAdminScopeSector,
             generalAdmin: currentAdminScopeGeneralAdmin,
@@ -1125,14 +1130,14 @@ const getCurrentDataScope = () => {
             isGlobal: currentAdminScopeSector === 'all' && currentAdminScopeGeneralAdmin === 'all' && currentAdminScopeBranch === 'all'
         };
     }
-    const userSector = loggedInUser.sector || 'قطاع شمال المنيا';
-    const userGenAdmin = loggedInUser.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+    const userSector = loggedInUser.sector && loggedInUser.sector !== 'all' ? loggedInUser.sector : 'قطاع شمال المنيا';
+    const userGenAdmin = loggedInUser.generalAdmin && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : 'الإدارة العامة لهندسات شمال المنيا';
     const userBranch = loggedInUser.subAdmin || loggedInUser.branch || 'هندسة كهرباء بني مزار';
     return {
         sector: userSector,
         generalAdmin: userGenAdmin,
         branch: userBranch,
-        isGlobal: userSector === 'all' && userGenAdmin === 'all' && userBranch === 'all'
+        isGlobal: false
     };
 };
 
@@ -1141,18 +1146,24 @@ const matchesCurrentScope = (item: any): boolean => {
     const scope = getCurrentDataScope();
     if (scope.isGlobal) return true;
 
-    const itemSector = item.sector || 'قطاع شمال المنيا';
-    const itemGenAdmin = item.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
-    const itemBranch = item.subAdmin || item.branch || 'هندسة كهرباء بني مزار';
+    const itemSector = (item.sector || '').trim();
+    const itemGenAdmin = (item.generalAdmin || '').trim();
+    const itemBranch = (item.subAdmin || item.branch || item.branchName || item.department || '').trim();
 
-    if (scope.sector !== 'all' && itemSector !== scope.sector) {
+    if (scope.sector !== 'all' && itemSector && itemSector !== scope.sector) {
         return false;
     }
-    if (scope.generalAdmin !== 'all' && itemGenAdmin !== scope.generalAdmin) {
+    if (scope.generalAdmin !== 'all' && itemGenAdmin && itemGenAdmin !== scope.generalAdmin) {
         return false;
     }
-    if (scope.branch !== 'all' && itemBranch !== scope.branch) {
-        return false;
+    if (scope.branch !== 'all') {
+        const cleanScopeBranch = (scope.branch || '').trim();
+        if (itemBranch) {
+            if (itemBranch !== cleanScopeBranch) return false;
+        } else {
+            // Legacy items without branch belong to default بني مزار
+            if (cleanScopeBranch !== 'هندسة كهرباء بني مزار') return false;
+        }
     }
     return true;
 };
@@ -1190,34 +1201,33 @@ const generateNextTreasuryReceiptNumber = (prefix: string = 'خز'): string => {
 const stampItemWithScope = (item: any): any => {
     if (!item) return item;
     const scope = getCurrentDataScope();
-    if (!item.sector) {
-        item.sector = (!scope.isGlobal && scope.sector !== 'all') 
-            ? scope.sector 
-            : (loggedInUser?.sector && loggedInUser.sector !== 'all' ? loggedInUser.sector : (currentAdminScopeSector !== 'all' ? currentAdminScopeSector : 'قطاع شمال المنيا'));
-    }
-    if (!item.generalAdmin) {
-        item.generalAdmin = (!scope.isGlobal && scope.generalAdmin !== 'all')
-            ? scope.generalAdmin
-            : (loggedInUser?.generalAdmin && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : (currentAdminScopeGeneralAdmin !== 'all' ? currentAdminScopeGeneralAdmin : 'الإدارة العامة لهندسات شمال المنيا'));
-    }
-    if (!item.branch) {
-        item.branch = (!scope.isGlobal && scope.branch !== 'all') 
-            ? scope.branch 
-            : (loggedInUser?.branch && loggedInUser.branch !== 'all' ? loggedInUser.branch : (currentAdminScopeBranch !== 'all' ? currentAdminScopeBranch : 'هندسة كهرباء بني مزار'));
-    }
-    if (!item.subAdmin) {
-        item.subAdmin = item.branch;
-    }
+    const effectiveSector = (!scope.isGlobal && scope.sector !== 'all') 
+        ? scope.sector 
+        : (loggedInUser?.sector && loggedInUser.sector !== 'all' ? loggedInUser.sector : (currentAdminScopeSector !== 'all' ? currentAdminScopeSector : 'قطاع شمال المنيا'));
+    const effectiveGenAdmin = (!scope.isGlobal && scope.generalAdmin !== 'all')
+        ? scope.generalAdmin
+        : (loggedInUser?.generalAdmin && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : (currentAdminScopeGeneralAdmin !== 'all' ? currentAdminScopeGeneralAdmin : 'الإدارة العامة لهندسات شمال المنيا'));
+    const effectiveBranch = (!scope.isGlobal && scope.branch !== 'all') 
+        ? scope.branch 
+        : (loggedInUser?.branch && loggedInUser.branch !== 'all' ? loggedInUser.branch : (currentAdminScopeBranch !== 'all' ? currentAdminScopeBranch : 'هندسة كهرباء بني مزار'));
+
+    if (!item.sector) item.sector = effectiveSector;
+    if (!item.generalAdmin) item.generalAdmin = effectiveGenAdmin;
+    if (!item.branch) item.branch = effectiveBranch;
+    if (!item.subAdmin) item.subAdmin = effectiveBranch;
+    if (!item.branchName) item.branchName = effectiveBranch;
     return item;
 };
 
 const updateAdminScopeUI = () => {
-    const isAdmin = loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'supervisor');
+    const isGlobalAdmin = loggedInUser && 
+        ((loggedInUser.username === 'admin' || loggedInUser.username === 'المدير') ||
+        (loggedInUser.role === 'admin' && (loggedInUser.branch === 'all' || !loggedInUser.branch)));
     const container = document.getElementById('admin-scope-container');
     const badge = document.getElementById('user-branch-badge');
     const badgeText = document.getElementById('user-branch-text');
 
-    if (isAdmin) {
+    if (isGlobalAdmin) {
         if (container) container.style.display = 'flex';
         if (badge) badge.style.display = 'none';
 
@@ -11341,9 +11351,9 @@ const handlePrintJudicialControlDetails = () => {
             return nameMatch && codeMatch && chassisMatch && refFMatch && refHMatch && refYMatch && refMMatch;
         };
 
-        const metersList = Array.isArray(state.meters) ? state.meters : [];
-        const subscribersList = Array.isArray(state.subscribers) ? state.subscribers : [];
-        const mukayasatList = Array.isArray(state.mukayasat) ? state.mukayasat : [];
+        const metersList = (Array.isArray(state.meters) ? state.meters : []).filter(matchesCurrentScope);
+        const subscribersList = (Array.isArray(state.subscribers) ? state.subscribers : []).filter(matchesCurrentScope);
+        const mukayasatList = (Array.isArray(state.mukayasat) ? state.mukayasat : []).filter(matchesCurrentScope);
 
         const meterResults = metersList.filter(searchFilter);
         const subscriberResults = subscribersList.filter(searchFilter);
@@ -19230,7 +19240,7 @@ const handlePrintJudicialControlDetails = () => {
         renderUserManagementSection();
     };
 
-    const getAccountingRequests = (): Record<string, any>[] => {
+    const getAllAccountingRequests = (): Record<string, any>[] => {
         const accountingRecords = (state.mukayasatAccountSystemSaved || []) as Record<string, any>[];
         if (accountingRecords.length > 0) return accountingRecords;
 
@@ -19248,6 +19258,12 @@ const handlePrintJudicialControlDetails = () => {
             console.warn('تعذر ترحيل سجلات المحاسبة القديمة:', error);
         }
         return [];
+    };
+
+    const getAccountingRequests = (ignoreScope: boolean = false): Record<string, any>[] => {
+        const all = getAllAccountingRequests();
+        if (ignoreScope) return all;
+        return all.filter(matchesCurrentScope);
     };
 
     const saveAccountingRequests = (records: Record<string, any>[]): boolean => {
@@ -20622,7 +20638,7 @@ const handlePrintJudicialControlDetails = () => {
                 }
                 const id = Number(deleteButton.getAttribute('data-id'));
                 if (confirm('هل أنت متأكد من حذف هذا السجل؟')) {
-                    const records = getAccountingRequests().filter(rec => Number(rec.id) !== id);
+                    const records = getAllAccountingRequests().filter(rec => Number(rec.id) !== id);
                     saveAccountingRequests(records);
                     showToast('تم حذف السجل بنجاح.', 'success');
                     refreshSavedRecords();
@@ -20719,7 +20735,7 @@ const handlePrintJudicialControlDetails = () => {
                 formData.inspectionImage = await readFileAsDataURL(inspectionInput.files[0]);
             }
 
-            const records = getAccountingRequests();
+            const records = getAllAccountingRequests();
             if (recordIdValue) {
                 const index = records.findIndex(rec => String(rec.id) === recordIdValue);
                 if (index >= 0) {
@@ -20727,13 +20743,13 @@ const handlePrintJudicialControlDetails = () => {
                     formData.modelImage = formData.modelImage || existing.modelImage;
                     formData.certificateImage = formData.certificateImage || existing.certificateImage;
                     formData.inspectionImage = formData.inspectionImage || existing.inspectionImage;
-                    records[index] = { ...existing, ...formData, id: Number(recordIdValue) };
+                    records[index] = stampItemWithScope({ ...existing, ...formData, id: Number(recordIdValue) });
                 }
             } else {
                 const usedIds = new Set(records.map(record => Number(record.id)).filter(Number.isFinite));
                 let newRecordId = Date.now();
                 while (usedIds.has(newRecordId)) newRecordId += 1;
-                records.push({ id: newRecordId, ...formData, savedAt: new Date().toISOString() });
+                records.push(stampItemWithScope({ id: newRecordId, ...formData, savedAt: new Date().toISOString() }));
             }
 
             if (!saveAccountingRequests(records)) return;
@@ -21651,6 +21667,9 @@ const handlePrintJudicialControlDetails = () => {
                         <button type="button" id="sub-doc-print-btn" class="btn" style="background: #0284c7; border-color: #0369a1; color: #fff; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
                             <span>🖨️ طباعة بيانات طلب الخدمة (مطابق للأصل)</span>
                         </button>
+                        <button type="button" id="sub-doc-print-new-btn" class="btn" style="background: #0d9488; border-color: #0f766e; color: #fff; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>🖨️ طباعة النموذج الجديد</span>
+                        </button>
                         <button type="button" id="sub-doc-save-btn" class="btn" style="background: #16a34a; border-color: #15803d; color: #fff; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
                             <span>💾 حفظ / تحديث الاشتراك</span>
                         </button>
@@ -21952,7 +21971,7 @@ const handlePrintJudicialControlDetails = () => {
                     <td>
                         <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
                             <button type="button" class="btn secondary btn-sub-load" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px;">عرض في المستند 📄</button>
-                            ${canPrint ? `<button type="button" class="btn btn-sub-print" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة 🖨️</button>` : ''}
+                            ${canPrint ? `<button type="button" class="btn btn-sub-print" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة النموذج الجديد 🖨️</button>` : ''}
                             ${canDelete ? `<button type="button" class="btn btn-delete btn-sub-delete" data-id="${rec.id}" style="padding: 4px 8px; font-size: 12px;">حذف</button>` : ''}
                         </div>
                     </td>
@@ -21972,6 +21991,16 @@ const handlePrintJudicialControlDetails = () => {
             printServiceRequestExactDocument(currentData);
         });
 
+        // زر طباعة النموذج الجديد
+        document.getElementById('sub-doc-print-new-btn')?.addEventListener('click', () => {
+            if (!hasButtonPermission('print_button')) {
+                showToast('عفواً، ليس لديك صلاحية الطباعة.', 'error');
+                return;
+            }
+            const currentData = getDocFormData();
+            printAccountingRecordDetails(currentData);
+        });
+
         // زر حفظ أو تحديث الاشتراك
         document.getElementById('sub-doc-save-btn')?.addEventListener('click', () => {
             const currentData = getDocFormData();
@@ -21989,24 +22018,24 @@ const handlePrintJudicialControlDetails = () => {
                 return;
             }
 
-            const records = getAccountingRequests();
+            const records = getAllAccountingRequests();
             if (existingId) {
                 const idx = records.findIndex(r => Number(r.id) === existingId);
                 if (idx !== -1) {
-                    records[idx] = { ...records[idx], ...currentData, id: existingId, updatedAt: new Date().toISOString() };
+                    records[idx] = stampItemWithScope({ ...records[idx], ...currentData, id: existingId, updatedAt: new Date().toISOString() });
                     saveAccountingRequests(records);
                     showToast('تم تحديث بيانات الاشتراك بنجاح.', 'success');
                 } else {
                     currentData.id = Date.now();
                     currentData.savedAt = new Date().toISOString();
-                    records.unshift(currentData);
+                    records.unshift(stampItemWithScope(currentData));
                     saveAccountingRequests(records);
                     showToast('تم حفظ الاشتراك الجديد بنجاح.', 'success');
                 }
             } else {
                 currentData.id = Date.now();
                 currentData.savedAt = new Date().toISOString();
-                records.unshift(currentData);
+                records.unshift(stampItemWithScope(currentData));
                 saveAccountingRequests(records);
                 const idEl = document.getElementById('sub-input-record-id') as HTMLInputElement | null;
                 if (idEl) idEl.value = String(currentData.id);
@@ -22145,9 +22174,9 @@ const handlePrintJudicialControlDetails = () => {
                     return;
                 }
                 const id = Number(printBtn.getAttribute('data-id'));
-                const rec = getAccountingRequests().find(r => Number(r.id) === id);
+                const rec = getAllAccountingRequests().find(r => Number(r.id) === id);
                 if (rec) {
-                    printServiceRequestExactDocument(rec);
+                    printAccountingRecordDetails(rec);
                 }
                 return;
             }
@@ -22159,7 +22188,7 @@ const handlePrintJudicialControlDetails = () => {
                 }
                 const id = Number(deleteBtn.getAttribute('data-id'));
                 if (confirm('هل أنت متأكد من حذف هذا الاشتراك؟')) {
-                    const filtered = getAccountingRequests().filter(r => Number(r.id) !== id);
+                    const filtered = getAllAccountingRequests().filter(r => Number(r.id) !== id);
                     saveAccountingRequests(filtered);
                     showToast('تم حذف الاشتراك بنجاح.', 'success');
                     renderSavedSubList();
