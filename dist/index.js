@@ -48,6 +48,21 @@ let state = {
             'قطاع بني سويف',
             'قطاع أسيوط'
         ],
+        generalAdministrations: [
+            'الإدارة العامة لهندسات شمال المنيا',
+            'الإدارة العامة لكبار المشتركين والعدادات',
+            'الإدارة العامة للضبطية القضائية والتفتيش',
+            'الإدارة العامة للتشغيل والتحكم',
+            'الإدارة العامة للشئون التجارية والتحصيل'
+        ],
+        subAdministrations: [
+            'هندسة كهرباء بني مزار',
+            'هندسة كهرباء مغاغة',
+            'هندسة كهرباء العدوة',
+            'هندسة كهرباء مطاي',
+            'هندسة كهرباء سمالوط شرق',
+            'هندسة كهرباء سمالوط غرب'
+        ],
         branches: [
             'هندسة كهرباء بني مزار',
             'فرع بني مزار شرق',
@@ -288,41 +303,214 @@ let state = {
 // منظومة الفروع والقطاعات وعزل البيانات (Multi-Tenant Branch Isolation)
 // =========================================================================
 let currentAdminScopeSector = 'all';
+let currentAdminScopeGeneralAdmin = 'all';
 let currentAdminScopeBranch = 'all';
+// الهيكل الإداري الافتراضي والديناميكي
+const defaultOrgStructure = {
+    'قطاع شمال المنيا': {
+        'الإدارة العامة لهندسات شمال المنيا': [
+            'هندسة كهرباء بني مزار',
+            'هندسة كهرباء مغاغة',
+            'هندسة كهرباء العدوة',
+            'هندسة كهرباء مطاي',
+            'هندسة كهرباء سمالوط شرق',
+            'هندسة كهرباء سمالوط غرب'
+        ],
+        'الإدارة العامة لكبار المشتركين والعدادات': [
+            'هندسة فحص واختبار العدادات',
+            'وحدة الرفع والفحص الفني',
+            'إدارة كبار المشتركين (شمال)'
+        ],
+        'الإدارة العامة للضبطية القضائية والتفتيش': [
+            'فرع الضبطية القضائية بني مزار ومغاغة',
+            'فرع الضبطية القضائية سمالوط ومطاي'
+        ],
+        'الإدارة العامة للشئون التجارية والتحصيل': [
+            'خزينة وتحصيل شمال المنيا',
+            'إدارة اشتراكات شمال المنيا'
+        ]
+    },
+    'قطاع جنوب المنيا': {
+        'الإدارة العامة لهندسات جنوب المنيا': [
+            'هندسة كهرباء المنيا شرق',
+            'هندسة كهرباء المنيا غرب',
+            'هندسة كهرباء أبو قرقاص',
+            'هندسة كهرباء ملوي',
+            'هندسة كهرباء ديرمواس'
+        ],
+        'الإدارة العامة لكبار المشتركين (جنوب)': [
+            'هندسة فحص العدادات (جنوب)',
+            'وحدة كبار المشتركين ملوي'
+        ]
+    },
+    'قطاع بني سويف': {
+        'الإدارة العامة لهندسات بني سويف': [
+            'هندسة كهرباء بني سويف',
+            'هندسة كهرباء الواسطى',
+            'هندسة كهرباء ناصر',
+            'هندسة كهرباء ببا',
+            'هندسة كهرباء الفشن',
+            'هندسة كهرباء إهناسيا',
+            'هندسة كهرباء سمسطا'
+        ]
+    },
+    'قطاع الفيوم': {
+        'الإدارة العامة لهندسات الفيوم': [
+            'هندسة كهرباء الفيوم شرق',
+            'هندسة كهرباء الفيوم غرب',
+            'هندسة كهرباء سنورس',
+            'هندسة كهرباء إطسا',
+            'هندسة كهرباء طامية',
+            'هندسة كهرباء أبشواي'
+        ]
+    },
+    'قطاع أسيوط شمال': {
+        'الإدارة العامة لهندسات أسيوط شمال': [
+            'هندسة كهرباء ديروط',
+            'هندسة كهرباء القوصية',
+            'هندسة كهرباء منفلوط'
+        ]
+    },
+    'قطاع أسيوط جنوب': {
+        'الإدارة العامة لهندسات أسيوط جنوب': [
+            'هندسة كهرباء أسيوط غرب',
+            'هندسة كهرباء أسيوط شرق',
+            'هندسة كهرباء الفتح',
+            'هندسة كهرباء أبوتيج',
+            'هندسة كهرباء صدفا',
+            'هندسة كهرباء الغنايم'
+        ]
+    },
+    'قطاع الوادي الجديد': {
+        'الإدارة العامة لهندسات الوادي الجديد': [
+            'هندسة كهرباء الخارجة',
+            'هندسة كهرباء الداخلة',
+            'هندسة كهرباء الفرافرة',
+            'هندسة كهرباء باريس'
+        ]
+    }
+};
+const getAvailableSectors = () => {
+    const list = new Set();
+    Object.keys(defaultOrgStructure).forEach(s => list.add(s));
+    (state.settings.sectors || []).forEach(s => { if (s && s !== 'all')
+        list.add(s); });
+    (state.users || []).forEach(u => { if (u.sector && u.sector !== 'all')
+        list.add(u.sector); });
+    (state.meters || []).forEach(m => { if (m.sector && m.sector !== 'all')
+        list.add(m.sector); });
+    return Array.from(list);
+};
+const getGeneralAdminsForSector = (selectedSector) => {
+    const list = new Set();
+    if (selectedSector && selectedSector !== 'all') {
+        const struct = defaultOrgStructure[selectedSector];
+        if (struct) {
+            Object.keys(struct).forEach(ga => list.add(ga));
+        }
+        (state.users || []).forEach(u => {
+            if (u.sector === selectedSector && u.generalAdmin && u.generalAdmin !== 'all') {
+                list.add(u.generalAdmin);
+            }
+        });
+        (state.meters || []).forEach(m => {
+            if (m.sector === selectedSector && m.generalAdmin && m.generalAdmin !== 'all') {
+                list.add(m.generalAdmin);
+            }
+        });
+    }
+    else {
+        Object.values(defaultOrgStructure).forEach(struct => {
+            Object.keys(struct).forEach(ga => list.add(ga));
+        });
+        (state.users || []).forEach(u => { if (u.generalAdmin && u.generalAdmin !== 'all')
+            list.add(u.generalAdmin); });
+        (state.settings.generalAdministrations || []).forEach(ga => { if (ga && ga !== 'all')
+            list.add(ga); });
+    }
+    return Array.from(list);
+};
+const getSubAdmins = (selectedSector, selectedGeneralAdmin) => {
+    const list = new Set();
+    if (selectedSector && selectedSector !== 'all') {
+        const struct = defaultOrgStructure[selectedSector];
+        if (struct) {
+            if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
+                (struct[selectedGeneralAdmin] || []).forEach(b => list.add(b));
+            }
+            else {
+                Object.values(struct).forEach(branches => branches.forEach(b => list.add(b)));
+            }
+        }
+        (state.users || []).forEach(u => {
+            const matchSec = u.sector === selectedSector;
+            const matchGen = selectedGeneralAdmin === 'all' || !selectedGeneralAdmin || u.generalAdmin === selectedGeneralAdmin;
+            const sub = u.subAdmin || u.branch;
+            if (matchSec && matchGen && sub && sub !== 'all')
+                list.add(sub);
+        });
+        (state.meters || []).forEach(m => {
+            const matchSec = m.sector === selectedSector;
+            const matchGen = selectedGeneralAdmin === 'all' || !selectedGeneralAdmin || m.generalAdmin === selectedGeneralAdmin;
+            const sub = m.subAdmin || m.branch;
+            if (matchSec && matchGen && sub && sub !== 'all')
+                list.add(sub);
+        });
+    }
+    else {
+        Object.values(defaultOrgStructure).forEach(struct => {
+            if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
+                if (struct[selectedGeneralAdmin]) {
+                    struct[selectedGeneralAdmin].forEach(b => list.add(b));
+                }
+            }
+            else {
+                Object.values(struct).forEach(branches => branches.forEach(b => list.add(b)));
+            }
+        });
+        (state.users || []).forEach(u => {
+            const sub = u.subAdmin || u.branch;
+            if (sub && sub !== 'all')
+                list.add(sub);
+        });
+        (state.settings.branches || []).forEach(b => { if (b && b !== 'all')
+            list.add(b); });
+        (state.settings.subAdministrations || []).forEach(b => { if (b && b !== 'all')
+            list.add(b); });
+    }
+    return Array.from(list);
+};
 const ensureDefaultScope = (stateObj) => {
     if (!stateObj)
         return;
     if (!stateObj.settings)
         stateObj.settings = {};
     if (!stateObj.settings.sectors || !Array.isArray(stateObj.settings.sectors) || stateObj.settings.sectors.length === 0) {
-        stateObj.settings.sectors = [
-            'قطاع شمال المنيا',
-            'قطاع جنوب المنيا',
-            'قطاع بني سويف',
-            'قطاع أسيوط'
-        ];
+        stateObj.settings.sectors = getAvailableSectors();
+    }
+    if (!stateObj.settings.generalAdministrations || !Array.isArray(stateObj.settings.generalAdministrations) || stateObj.settings.generalAdministrations.length === 0) {
+        stateObj.settings.generalAdministrations = getGeneralAdminsForSector('all');
     }
     if (!stateObj.settings.branches || !Array.isArray(stateObj.settings.branches) || stateObj.settings.branches.length === 0) {
-        stateObj.settings.branches = [
-            'هندسة كهرباء بني مزار',
-            'فرع بني مزار شرق',
-            'فرع بني مزار غرب',
-            'هندسة كهرباء مغاغة',
-            'هندسة كهرباء العدوة',
-            'هندسة كهرباء مطاي',
-            'هندسة كهرباء سمالوط',
-            'هندسة كهرباء المنيا',
-            'هندسة كهرباء ملوي',
-            'هندسة كهرباء أبو قرقاص'
-        ];
+        stateObj.settings.branches = getSubAdmins('all', 'all');
     }
     if (stateObj.users && Array.isArray(stateObj.users)) {
         stateObj.users.forEach((u) => {
-            if (!u.sector) {
-                u.sector = (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') ? 'all' : 'قطاع شمال المنيا';
+            if (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') {
+                u.sector = 'all';
+                u.generalAdmin = 'all';
+                u.subAdmin = 'all';
+                u.branch = 'all';
             }
-            if (!u.branch) {
-                u.branch = (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') ? 'all' : 'هندسة كهرباء بني مزار';
+            else {
+                if (!u.sector)
+                    u.sector = 'قطاع شمال المنيا';
+                if (!u.generalAdmin)
+                    u.generalAdmin = 'الإدارة العامة لهندسات شمال المنيا';
+                if (!u.subAdmin)
+                    u.subAdmin = u.branch || 'هندسة كهرباء بني مزار';
+                if (!u.branch)
+                    u.branch = u.subAdmin;
             }
         });
     }
@@ -330,8 +518,12 @@ const ensureDefaultScope = (stateObj) => {
         stateObj.meters.forEach((m) => {
             if (!m.sector)
                 m.sector = 'قطاع شمال المنيا';
+            if (!m.generalAdmin)
+                m.generalAdmin = 'الإدارة العامة لهندسات شمال المنيا';
+            if (!m.subAdmin)
+                m.subAdmin = m.branch || 'هندسة كهرباء بني مزار';
             if (!m.branch)
-                m.branch = 'هندسة كهرباء بني مزار';
+                m.branch = m.subAdmin;
         });
     }
     ['mukayasat', 'judicialControl', 'lostMeterMemos', 'transformers', 'treasuryTransactions', 'treasurySettlements'].forEach(coll => {
@@ -339,29 +531,36 @@ const ensureDefaultScope = (stateObj) => {
             stateObj[coll].forEach((item) => {
                 if (!item.sector)
                     item.sector = 'قطاع شمال المنيا';
+                if (!item.generalAdmin)
+                    item.generalAdmin = 'الإدارة العامة لهندسات شمال المنيا';
+                if (!item.subAdmin)
+                    item.subAdmin = item.branch || 'هندسة كهرباء بني مزار';
                 if (!item.branch)
-                    item.branch = 'هندسة كهرباء بني مزار';
+                    item.branch = item.subAdmin;
             });
         }
     });
 };
 const getCurrentDataScope = () => {
     if (!loggedInUser)
-        return { sector: 'all', branch: 'all', isGlobal: true };
+        return { sector: 'all', generalAdmin: 'all', branch: 'all', isGlobal: true };
     const isAdmin = loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'supervisor';
     if (isAdmin) {
         return {
             sector: currentAdminScopeSector,
+            generalAdmin: currentAdminScopeGeneralAdmin,
             branch: currentAdminScopeBranch,
-            isGlobal: currentAdminScopeSector === 'all' && currentAdminScopeBranch === 'all'
+            isGlobal: currentAdminScopeSector === 'all' && currentAdminScopeGeneralAdmin === 'all' && currentAdminScopeBranch === 'all'
         };
     }
     const userSector = loggedInUser.sector || 'قطاع شمال المنيا';
-    const userBranch = loggedInUser.branch || 'هندسة كهرباء بني مزار';
+    const userGenAdmin = loggedInUser.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+    const userBranch = loggedInUser.subAdmin || loggedInUser.branch || 'هندسة كهرباء بني مزار';
     return {
         sector: userSector,
+        generalAdmin: userGenAdmin,
         branch: userBranch,
-        isGlobal: userSector === 'all' && userBranch === 'all'
+        isGlobal: userSector === 'all' && userGenAdmin === 'all' && userBranch === 'all'
     };
 };
 const matchesCurrentScope = (item) => {
@@ -371,8 +570,12 @@ const matchesCurrentScope = (item) => {
     if (scope.isGlobal)
         return true;
     const itemSector = item.sector || 'قطاع شمال المنيا';
-    const itemBranch = item.branch || 'هندسة كهرباء بني مزار';
+    const itemGenAdmin = item.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+    const itemBranch = item.subAdmin || item.branch || 'هندسة كهرباء بني مزار';
     if (scope.sector !== 'all' && itemSector !== scope.sector) {
+        return false;
+    }
+    if (scope.generalAdmin !== 'all' && itemGenAdmin !== scope.generalAdmin) {
         return false;
     }
     if (scope.branch !== 'all' && itemBranch !== scope.branch) {
@@ -389,10 +592,18 @@ const stampItemWithScope = (item) => {
             ? scope.sector
             : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector) && loggedInUser.sector !== 'all' ? loggedInUser.sector : (currentAdminScopeSector !== 'all' ? currentAdminScopeSector : 'قطاع شمال المنيا'));
     }
+    if (!item.generalAdmin) {
+        item.generalAdmin = (!scope.isGlobal && scope.generalAdmin !== 'all')
+            ? scope.generalAdmin
+            : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.generalAdmin) && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : (currentAdminScopeGeneralAdmin !== 'all' ? currentAdminScopeGeneralAdmin : 'الإدارة العامة لهندسات شمال المنيا'));
+    }
     if (!item.branch) {
         item.branch = (!scope.isGlobal && scope.branch !== 'all')
             ? scope.branch
             : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) && loggedInUser.branch !== 'all' ? loggedInUser.branch : (currentAdminScopeBranch !== 'all' ? currentAdminScopeBranch : 'هندسة كهرباء بني مزار'));
+    }
+    if (!item.subAdmin) {
+        item.subAdmin = item.branch;
     }
     return item;
 };
@@ -407,15 +618,21 @@ const updateAdminScopeUI = () => {
         if (badge)
             badge.style.display = 'none';
         const secSelect = document.getElementById('scope-sector-select');
+        const genSelect = document.getElementById('scope-general-admin-select');
         const brSelect = document.getElementById('scope-branch-select');
         if (secSelect) {
             secSelect.innerHTML = '<option value="all">🌐 جميع القطاعات</option>' +
-                (state.settings.sectors || []).map((s) => `<option value="${s}" ${currentAdminScopeSector === s ? 'selected' : ''}>${s}</option>`).join('');
+                getAvailableSectors().map((s) => `<option value="${s}" ${currentAdminScopeSector === s ? 'selected' : ''}>${s}</option>`).join('');
             secSelect.value = currentAdminScopeSector;
         }
+        if (genSelect) {
+            genSelect.innerHTML = '<option value="all">🏢 جميع الإدارات العامة</option>' +
+                getGeneralAdminsForSector(currentAdminScopeSector).map((g) => `<option value="${g}" ${currentAdminScopeGeneralAdmin === g ? 'selected' : ''}>${g}</option>`).join('');
+            genSelect.value = currentAdminScopeGeneralAdmin;
+        }
         if (brSelect) {
-            brSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات</option>' +
-                (state.settings.branches || []).map((b) => `<option value="${b}" ${currentAdminScopeBranch === b ? 'selected' : ''}>${b}</option>`).join('');
+            brSelect.innerHTML = '<option value="all">🏛️ جميع الإدارات الفرعية / الهندسات</option>' +
+                getSubAdmins(currentAdminScopeSector, currentAdminScopeGeneralAdmin).map((b) => `<option value="${b}" ${currentAdminScopeBranch === b ? 'selected' : ''}>${b}</option>`).join('');
             brSelect.value = currentAdminScopeBranch;
         }
     }
@@ -426,8 +643,9 @@ const updateAdminScopeUI = () => {
             badge.style.display = 'flex';
             if (badgeText) {
                 const sec = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector) || 'قطاع شمال المنيا';
-                const br = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) || 'هندسة كهرباء بني مزار';
-                badgeText.textContent = `${sec} - ${br}`;
+                const gen = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.generalAdmin) || 'الإدارة العامة لهندسات شمال المنيا';
+                const br = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) || 'هندسة كهرباء بني مزار';
+                badgeText.textContent = `${sec} - ${gen} - ${br}`;
             }
         }
     }
@@ -970,38 +1188,149 @@ const populateSelect = (selectElement, options, includeEmpty = false) => {
  * Populates the username dropdown on the login screen.
  */
 const populateUserDropdown = () => {
+    const sectorSelect = document.getElementById('login-sector');
+    const genAdminSelect = document.getElementById('login-general-admin');
+    const subAdminSelect = document.getElementById('login-sub-admin');
     const usernameSelect = document.getElementById('username');
     if (!usernameSelect)
         return;
-    usernameSelect.innerHTML = '<option value="" disabled selected>اختر اسم المستخدم...</option>';
-    state.users.forEach(user => {
-        const option = document.createElement('option');
-        option.value = user.username;
-        option.textContent = user.fullName + (user.isSuspended ? ' ⛔ (موقوف من الخزينة)' : '');
-        usernameSelect.appendChild(option);
-    });
-    usernameSelect.value = '';
-    const passwordInput = document.getElementById('password');
-    if (passwordInput)
-        passwordInput.value = '';
-    const affBox = document.getElementById('login-user-affiliation');
-    if (affBox)
-        affBox.style.display = 'none';
+    // Helper to refresh users dropdown based on current login filters
+    const updateFilteredUsersList = (preserveSelection = false) => {
+        const selSector = sectorSelect ? sectorSelect.value : 'all';
+        const selGen = genAdminSelect ? genAdminSelect.value : 'all';
+        const selSub = subAdminSelect ? subAdminSelect.value : 'all';
+        const previousUsername = usernameSelect.value;
+        usernameSelect.innerHTML = '<option value="" disabled selected>اختر اسم المستخدم...</option>';
+        const filteredUsers = state.users.filter(user => {
+            const isGlobalAdmin = user.username === 'admin' || user.username === 'المدير' || user.role === 'admin' || user.role === 'supervisor' || user.sector === 'all';
+            if (isGlobalAdmin)
+                return true; // Global admins can log in from any branch
+            const uSector = user.sector || 'قطاع شمال المنيا';
+            const uGen = user.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+            const uSub = user.subAdmin || user.branch || 'هندسة كهرباء بني مزار';
+            if (selSector !== 'all' && uSector !== selSector)
+                return false;
+            if (selGen !== 'all' && uGen !== selGen)
+                return false;
+            if (selSub !== 'all' && uSub !== selSub)
+                return false;
+            return true;
+        });
+        filteredUsers.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.username;
+            const isGlobalAdmin = user.username === 'admin' || user.username === 'المدير' || user.role === 'admin' || user.role === 'supervisor';
+            const badge = isGlobalAdmin ? ' ⭐ (إدارة عامة)' : '';
+            option.textContent = user.fullName + badge + (user.isSuspended ? ' ⛔ (موقوف)' : '');
+            usernameSelect.appendChild(option);
+        });
+        if (preserveSelection && previousUsername && filteredUsers.some(u => u.username === previousUsername)) {
+            usernameSelect.value = previousUsername;
+        }
+        else {
+            usernameSelect.value = '';
+            const passwordInput = document.getElementById('password');
+            if (passwordInput)
+                passwordInput.value = '';
+            const affBox = document.getElementById('login-user-affiliation');
+            if (affBox)
+                affBox.style.display = 'none';
+        }
+    };
+    // Helper to update subAdmin dropdown based on sector and genAdmin
+    const updateSubAdminDropdown = () => {
+        if (!subAdminSelect)
+            return;
+        const currentSector = sectorSelect ? sectorSelect.value : 'all';
+        const currentGen = genAdminSelect ? genAdminSelect.value : 'all';
+        const currentVal = subAdminSelect.value;
+        const subList = getSubAdmins(currentSector, currentGen);
+        subAdminSelect.innerHTML = '<option value="all">🏛️ جميع الإدارات الفرعية / الهندسات</option>' +
+            subList.map(b => `<option value="${b}">${b}</option>`).join('');
+        if (currentVal && (currentVal === 'all' || subList.includes(currentVal))) {
+            subAdminSelect.value = currentVal;
+        }
+        else {
+            subAdminSelect.value = 'all';
+        }
+    };
+    // Helper to update generalAdmin dropdown based on sector
+    const updateGeneralAdminDropdown = () => {
+        if (!genAdminSelect)
+            return;
+        const currentSector = sectorSelect ? sectorSelect.value : 'all';
+        const currentVal = genAdminSelect.value;
+        const genList = getGeneralAdminsForSector(currentSector);
+        genAdminSelect.innerHTML = '<option value="all">🏢 جميع الإدارات العامة</option>' +
+            genList.map(g => `<option value="${g}">${g}</option>`).join('');
+        if (currentVal && (currentVal === 'all' || genList.includes(currentVal))) {
+            genAdminSelect.value = currentVal;
+        }
+        else {
+            genAdminSelect.value = 'all';
+        }
+        updateSubAdminDropdown();
+    };
+    // Initialize login dropdowns
+    if (sectorSelect) {
+        const sectorsList = getAvailableSectors();
+        const curSec = sectorSelect.value || 'all';
+        sectorSelect.innerHTML = '<option value="all">🌐 جميع القطاعات</option>' +
+            sectorsList.map(s => `<option value="${s}">${s}</option>`).join('');
+        if (sectorsList.includes(curSec))
+            sectorSelect.value = curSec;
+        else
+            sectorSelect.value = 'all';
+        sectorSelect.onchange = () => {
+            updateGeneralAdminDropdown();
+            updateFilteredUsersList();
+        };
+    }
+    if (genAdminSelect) {
+        updateGeneralAdminDropdown();
+        genAdminSelect.onchange = () => {
+            updateSubAdminDropdown();
+            updateFilteredUsersList();
+        };
+    }
+    if (subAdminSelect) {
+        updateSubAdminDropdown();
+        subAdminSelect.onchange = () => {
+            updateFilteredUsersList();
+        };
+    }
+    // Populate initial users list
+    updateFilteredUsersList();
+    // Username selection listener
     usernameSelect.onchange = () => {
         const val = usernameSelect.value;
         const u = state.users.find(usr => usr.username === val);
         const affBoxEl = document.getElementById('login-user-affiliation');
         const affTextEl = document.getElementById('login-user-affiliation-text');
         if (u && affBoxEl && affTextEl) {
-            if (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor' || u.sector === 'all') {
+            const isGlobalAdmin = u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor' || u.sector === 'all';
+            if (isGlobalAdmin) {
                 affTextEl.textContent = 'إدارة عامة وشاملة (جميع القطاعات والفروع)';
                 affBoxEl.style.display = 'block';
             }
             else {
                 const sec = u.sector || 'قطاع شمال المنيا';
-                const br = u.branch || 'هندسة كهرباء بني مزار';
-                affTextEl.textContent = `${sec} - ${br}`;
+                const gen = u.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+                const br = u.subAdmin || u.branch || 'هندسة كهرباء بني مزار';
+                affTextEl.textContent = `${sec} | ${gen} | ${br}`;
                 affBoxEl.style.display = 'block';
+                // Automatically reflect user's sector, genAdmin, and subAdmin if currently set to 'all'
+                if (sectorSelect && sectorSelect.value === 'all' && sec) {
+                    sectorSelect.value = sec;
+                    updateGeneralAdminDropdown();
+                }
+                if (genAdminSelect && genAdminSelect.value === 'all' && gen) {
+                    genAdminSelect.value = gen;
+                    updateSubAdminDropdown();
+                }
+                if (subAdminSelect && subAdminSelect.value === 'all' && br) {
+                    subAdminSelect.value = br;
+                }
             }
         }
         else if (affBoxEl) {
@@ -1454,10 +1783,13 @@ const handleLogin = async (event) => {
             role: user.role,
             username: user.username,
             sector: user.sector || 'all',
-            branch: user.branch || 'all'
+            generalAdmin: user.generalAdmin || (user.sector === 'all' ? 'all' : 'الإدارة العامة لهندسات شمال المنيا'),
+            subAdmin: user.subAdmin || user.branch || (user.sector === 'all' ? 'all' : 'هندسة كهرباء بني مزار'),
+            branch: user.subAdmin || user.branch || (user.sector === 'all' ? 'all' : 'هندسة كهرباء بني مزار')
         };
         localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
         currentAdminScopeSector = 'all';
+        currentAdminScopeGeneralAdmin = 'all';
         currentAdminScopeBranch = 'all';
         updateAdminScopeUI();
         errorElement === null || errorElement === void 0 ? void 0 : errorElement.classList.add('hidden');
@@ -17472,7 +17804,8 @@ const renderUserManagementSection = () => {
             <th>اسم المستخدم</th>
             <th>الدور الوظيفي</th>
             <th>القطاع</th>
-            <th>الفرع / الهندسة</th>
+            <th>الإدارة العامة</th>
+            <th>الإدارة الفرعية / الهندسة</th>
             <th>حالة الحساب / الإيقاف</th>
             <th>إجراءات</th>
         </tr>
@@ -17496,14 +17829,18 @@ const renderUserManagementSection = () => {
         const secBadge = user.sector === 'all'
             ? '<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">🌐 شامل (الكل)</span>'
             : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.sector || 'قطاع شمال المنيا'}</span>`;
-        const brBadge = user.branch === 'all'
+        const genBadge = (user.generalAdmin === 'all' || user.sector === 'all')
+            ? '<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">🏢 شامل (الكل)</span>'
+            : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا'}</span>`;
+        const brBadge = (user.branch === 'all' || user.subAdmin === 'all' || user.sector === 'all')
             ? '<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">🏛️ شامل (الكل)</span>'
-            : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.branch || 'هندسة كهرباء بني مزار'}</span>`;
+            : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.subAdmin || user.branch || 'هندسة كهرباء بني مزار'}</span>`;
         row.innerHTML = ` 
             <td><b>${user.fullName}</b></td>
             <td><code>@${user.username}</code></td>
             <td><span class="badge" style="background:#f1f5f9; color:#334155;">${roleName}</span></td>
             <td>${secBadge}</td>
+            <td>${genBadge}</td>
             <td>${brBadge}</td>
             <td>
                 ${statusHtml}
@@ -17531,17 +17868,46 @@ const renderUserManagementSection = () => {
         roleSelect.appendChild(option);
     });
     const sectorSelect = form.querySelector('#user-sector');
+    const genAdminSelect = form.querySelector('#user-general-admin');
+    const branchSelect = form.querySelector('#user-branch');
+    const updateUserFormDynamicSelects = () => {
+        const curSec = (sectorSelect === null || sectorSelect === void 0 ? void 0 : sectorSelect.value) || 'all';
+        const curGen = (genAdminSelect === null || genAdminSelect === void 0 ? void 0 : genAdminSelect.value) || 'all';
+        if (genAdminSelect) {
+            const genList = getGeneralAdminsForSector(curSec);
+            const prevGen = genAdminSelect.value;
+            genAdminSelect.innerHTML = '<option value="all">🏢 جميع الإدارات العامة (شامل)</option>' +
+                genList.map((g) => `<option value="${g}">${g}</option>`).join('');
+            if (prevGen && (prevGen === 'all' || genList.includes(prevGen))) {
+                genAdminSelect.value = prevGen;
+            }
+            else {
+                genAdminSelect.value = 'all';
+            }
+        }
+        if (branchSelect) {
+            const subList = getSubAdmins(curSec, (genAdminSelect === null || genAdminSelect === void 0 ? void 0 : genAdminSelect.value) || 'all');
+            const prevSub = branchSelect.value;
+            branchSelect.innerHTML = '<option value="all">🏛️ جميع الإدارات الفرعية / الهندسات (شامل)</option>' +
+                subList.map((b) => `<option value="${b}">${b}</option>`).join('');
+            if (prevSub && (prevSub === 'all' || subList.includes(prevSub))) {
+                branchSelect.value = prevSub;
+            }
+            else {
+                branchSelect.value = 'all';
+            }
+        }
+    };
     if (sectorSelect) {
         sectorSelect.innerHTML = '<option value="all">🌐 جميع القطاعات (شامل)</option>' +
-            (state.settings.sectors || []).map((s) => `<option value="${s}">${s}</option>`).join('');
+            getAvailableSectors().map((s) => `<option value="${s}">${s}</option>`).join('');
         sectorSelect.value = 'all';
+        sectorSelect.onchange = () => updateUserFormDynamicSelects();
     }
-    const branchSelect = form.querySelector('#user-branch');
-    if (branchSelect) {
-        branchSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات (شامل)</option>' +
-            (state.settings.branches || []).map((b) => `<option value="${b}">${b}</option>`).join('');
-        branchSelect.value = 'all';
+    if (genAdminSelect) {
+        genAdminSelect.onchange = () => updateUserFormDynamicSelects();
     }
+    updateUserFormDynamicSelects();
     // Hide form for non-admins
     const userFormContainer = document.querySelector('#user-management .form-container');
     if (userFormContainer) {
@@ -17549,7 +17915,7 @@ const renderUserManagementSection = () => {
     }
 };
 const handleUserFormSubmit = (event) => {
-    var _a, _b;
+    var _a, _b, _c;
     event.preventDefault();
     const form = event.target;
     if (!validateForm(form)) {
@@ -17563,7 +17929,9 @@ const handleUserFormSubmit = (event) => {
     const role = form.querySelector('#user-role').value;
     const password = form.querySelector('#user-password').value;
     const sector = ((_a = form.querySelector('#user-sector')) === null || _a === void 0 ? void 0 : _a.value) || 'all';
-    const branch = ((_b = form.querySelector('#user-branch')) === null || _b === void 0 ? void 0 : _b.value) || 'all';
+    const generalAdmin = ((_b = form.querySelector('#user-general-admin')) === null || _b === void 0 ? void 0 : _b.value) || 'all';
+    const branch = ((_c = form.querySelector('#user-branch')) === null || _c === void 0 ? void 0 : _c.value) || 'all';
+    const subAdmin = branch;
     const existingUser = state.users.find(u => u.username === username && u.id !== id);
     if (existingUser) {
         showFieldError(form.querySelector('#user-username'), 'اسم المستخدم هذا موجود بالفعل.');
@@ -17575,6 +17943,10 @@ const handleUserFormSubmit = (event) => {
         const user = state.users[userIndex];
         user.fullName = fullName;
         user.username = username;
+        user.sector = sector;
+        user.generalAdmin = generalAdmin;
+        user.subAdmin = subAdmin;
+        user.branch = branch;
         // The main admin's role cannot be changed
         if (user.username !== 'admin') {
             user.role = role;
@@ -17603,7 +17975,7 @@ const handleUserFormSubmit = (event) => {
             showToast('كلمة المرور مطلوبة للمستخدم الجديد.', 'error');
             return;
         }
-        state.users.push({ id, fullName, username, password, role, sector, branch });
+        state.users.push({ id, fullName, username, password, role, sector, generalAdmin, subAdmin, branch });
         logActivity('إضافة مستخدم', `إضافة مستخدم جديد: "${fullName}".`, `اسم المستخدم: ${username}, الدور الوظيفي: ${role}`);
         showToast('تمت إضافة المستخدم بنجاح.');
     }
@@ -17623,16 +17995,25 @@ const openUserFormForEdit = (userId) => {
     form.querySelector('#user-role').value = user.role;
     form.querySelector('#user-password').value = '';
     const editSecSelect = form.querySelector('#user-sector');
+    const editGenSelect = form.querySelector('#user-general-admin');
+    const editBrSelect = form.querySelector('#user-branch');
     if (editSecSelect) {
         editSecSelect.innerHTML = '<option value="all">🌐 جميع القطاعات (شامل)</option>' +
-            (state.settings.sectors || []).map((s) => `<option value="${s}" ${user.sector === s ? 'selected' : ''}>${s}</option>`).join('');
+            getAvailableSectors().map((s) => `<option value="${s}" ${user.sector === s ? 'selected' : ''}>${s}</option>`).join('');
         editSecSelect.value = user.sector || 'all';
     }
-    const editBrSelect = form.querySelector('#user-branch');
+    if (editGenSelect) {
+        const genList = getGeneralAdminsForSector(user.sector || 'all');
+        editGenSelect.innerHTML = '<option value="all">🏢 جميع الإدارات العامة (شامل)</option>' +
+            genList.map((g) => `<option value="${g}" ${user.generalAdmin === g ? 'selected' : ''}>${g}</option>`).join('');
+        editGenSelect.value = user.generalAdmin || 'all';
+    }
     if (editBrSelect) {
-        editBrSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات (شامل)</option>' +
-            (state.settings.branches || []).map((b) => `<option value="${b}" ${user.branch === b ? 'selected' : ''}>${b}</option>`).join('');
-        editBrSelect.value = user.branch || 'all';
+        const userSub = user.subAdmin || user.branch || 'all';
+        const subList = getSubAdmins(user.sector || 'all', user.generalAdmin || 'all');
+        editBrSelect.innerHTML = '<option value="all">🏛️ جميع الإدارات الفرعية / الهندسات (شامل)</option>' +
+            subList.map((b) => `<option value="${b}" ${userSub === b ? 'selected' : ''}>${b}</option>`).join('');
+        editBrSelect.value = userSub;
     }
     form.querySelector('#user-confirmPassword').value = '';
     // Admin user cannot have role changed
@@ -19487,7 +19868,7 @@ function handleNavigation(event) {
  * Sets up all the event listeners for the application.
  */
 const setupEventListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119, _120;
     // Welcome Screen Listeners
     (_a = document.getElementById('start-new-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', handleStartNew);
     (_b = document.getElementById('import-from-welcome-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleImportFromWelcome);
@@ -19670,59 +20051,69 @@ const setupEventListeners = () => {
     });
     (_2 = document.getElementById('login-form')) === null || _2 === void 0 ? void 0 : _2.addEventListener('submit', handleLogin);
     (_3 = document.getElementById('header-logout-btn')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', handleLogout);
-    // مستمعات شريط تبديل النطاق (القطاع والفرع) للأدمن
+    // مستمعات شريط تبديل النطاق (القطاع، الإدارة العامة، والفرع) للأدمن
     (_4 = document.getElementById('scope-sector-select')) === null || _4 === void 0 ? void 0 : _4.addEventListener('change', (e) => {
         currentAdminScopeSector = e.target.value;
+        currentAdminScopeGeneralAdmin = 'all';
+        currentAdminScopeBranch = 'all';
+        updateAdminScopeUI();
         refreshCurrentActiveSection();
         showToast(`تم تبديل عرض القطاع: ${currentAdminScopeSector === 'all' ? 'جميع القطاعات' : currentAdminScopeSector}`, 'info');
     });
-    (_5 = document.getElementById('scope-branch-select')) === null || _5 === void 0 ? void 0 : _5.addEventListener('change', (e) => {
+    (_5 = document.getElementById('scope-general-admin-select')) === null || _5 === void 0 ? void 0 : _5.addEventListener('change', (e) => {
+        currentAdminScopeGeneralAdmin = e.target.value;
+        currentAdminScopeBranch = 'all';
+        updateAdminScopeUI();
+        refreshCurrentActiveSection();
+        showToast(`تم تبديل عرض الإدارة العامة: ${currentAdminScopeGeneralAdmin === 'all' ? 'جميع الإدارات العامة' : currentAdminScopeGeneralAdmin}`, 'info');
+    });
+    (_6 = document.getElementById('scope-branch-select')) === null || _6 === void 0 ? void 0 : _6.addEventListener('change', (e) => {
         currentAdminScopeBranch = e.target.value;
         refreshCurrentActiveSection();
-        showToast(`تم تبديل عرض الفرع: ${currentAdminScopeBranch === 'all' ? 'جميع الفروع' : currentAdminScopeBranch}`, 'info');
+        showToast(`تم تبديل عرض الإدارة الفرعية: ${currentAdminScopeBranch === 'all' ? 'جميع الإدارات الفرعية' : currentAdminScopeBranch}`, 'info');
     });
     // Main App Listeners
     document.querySelectorAll('.sidebar-nav .nav-link, .btn-back, .card.nav-link').forEach(link => {
         link.addEventListener('click', handleNavigation);
     });
     // Meter Management Listeners
-    (_6 = document.getElementById('add-meter-record-btn')) === null || _6 === void 0 ? void 0 : _6.addEventListener('click', () => openMeterForm());
-    (_7 = document.getElementById('meter-form')) === null || _7 === void 0 ? void 0 : _7.addEventListener('submit', handleMeterFormSubmit);
-    (_8 = document.getElementById('meterType')) === null || _8 === void 0 ? void 0 : _8.addEventListener('change', () => updateMeterFormVisibility());
-    (_9 = document.getElementById('sidebar-add-mukaysa-btn')) === null || _9 === void 0 ? void 0 : _9.addEventListener('click', (e) => { e.preventDefault(); openMukayasatForm(); });
-    (_10 = document.getElementById('mukayasat-form')) === null || _10 === void 0 ? void 0 : _10.addEventListener('submit', handleMukayasatFormSubmit);
-    (_11 = document.getElementById('print-mukayasa-btn')) === null || _11 === void 0 ? void 0 : _11.addEventListener('click', handlePrintMukayasaDetails);
+    (_7 = document.getElementById('add-meter-record-btn')) === null || _7 === void 0 ? void 0 : _7.addEventListener('click', () => openMeterForm());
+    (_8 = document.getElementById('meter-form')) === null || _8 === void 0 ? void 0 : _8.addEventListener('submit', handleMeterFormSubmit);
+    (_9 = document.getElementById('meterType')) === null || _9 === void 0 ? void 0 : _9.addEventListener('change', () => updateMeterFormVisibility());
+    (_10 = document.getElementById('sidebar-add-mukaysa-btn')) === null || _10 === void 0 ? void 0 : _10.addEventListener('click', (e) => { e.preventDefault(); openMukayasatForm(); });
+    (_11 = document.getElementById('mukayasat-form')) === null || _11 === void 0 ? void 0 : _11.addEventListener('submit', handleMukayasatFormSubmit);
+    (_12 = document.getElementById('print-mukayasa-btn')) === null || _12 === void 0 ? void 0 : _12.addEventListener('click', handlePrintMukayasaDetails);
     // Transformer Management Listeners
-    (_12 = document.getElementById('transformer-form')) === null || _12 === void 0 ? void 0 : _12.addEventListener('submit', handleTransformerRegistrationSubmit);
-    (_13 = document.getElementById('transformer-query-form')) === null || _13 === void 0 ? void 0 : _13.addEventListener('submit', handleTransformerQuerySearch);
-    (_14 = document.getElementById('transformer-load-form')) === null || _14 === void 0 ? void 0 : _14.addEventListener('submit', handleTransformerLoadSubmit);
-    (_15 = document.getElementById('transformer-load-name')) === null || _15 === void 0 ? void 0 : _15.addEventListener('change', handleTransformerLoadNameChange);
+    (_13 = document.getElementById('transformer-form')) === null || _13 === void 0 ? void 0 : _13.addEventListener('submit', handleTransformerRegistrationSubmit);
+    (_14 = document.getElementById('transformer-query-form')) === null || _14 === void 0 ? void 0 : _14.addEventListener('submit', handleTransformerQuerySearch);
+    (_15 = document.getElementById('transformer-load-form')) === null || _15 === void 0 ? void 0 : _15.addEventListener('submit', handleTransformerLoadSubmit);
+    (_16 = document.getElementById('transformer-load-name')) === null || _16 === void 0 ? void 0 : _16.addEventListener('change', handleTransformerLoadNameChange);
     initializeTransformerLoadRecordFilters();
     ['transformer-load-capacity', 'transformer-load-s1-r', 'transformer-load-s1-s', 'transformer-load-s1-t', 'transformer-load-s2-r', 'transformer-load-s2-s', 'transformer-load-s2-t', 'transformer-load-s3-r', 'transformer-load-s3-s', 'transformer-load-s3-t', 'transformer-load-s4-r', 'transformer-load-s4-s', 'transformer-load-s4-t', 'transformer-load-streets-r', 'transformer-load-streets-s', 'transformer-load-streets-t'].forEach((id) => {
         const element = document.getElementById(id);
         element === null || element === void 0 ? void 0 : element.addEventListener('input', calculateTransformerLoadAutoValues);
     });
-    (_16 = document.getElementById('print-transformers-list-btn')) === null || _16 === void 0 ? void 0 : _16.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
-    (_17 = document.getElementById('import-transformers-excel-trigger')) === null || _17 === void 0 ? void 0 : _17.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_18 = document.getElementById('transformers-excel-upload')) === null || _18 === void 0 ? void 0 : _18.addEventListener('change', handleImportTransformersExcel);
-    (_19 = document.getElementById('delete-selected-transformers-btn')) === null || _19 === void 0 ? void 0 : _19.addEventListener('click', handleDeleteSelectedTransformers);
+    (_17 = document.getElementById('print-transformers-list-btn')) === null || _17 === void 0 ? void 0 : _17.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
+    (_18 = document.getElementById('import-transformers-excel-trigger')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_19 = document.getElementById('transformers-excel-upload')) === null || _19 === void 0 ? void 0 : _19.addEventListener('change', handleImportTransformersExcel);
+    (_20 = document.getElementById('delete-selected-transformers-btn')) === null || _20 === void 0 ? void 0 : _20.addEventListener('click', handleDeleteSelectedTransformers);
     // Transformer List Filters
     ['filter-transformer-name', 'filter-transformer-chassis'].forEach(id => {
         var _a;
         (_a = document.getElementById(id)) === null || _a === void 0 ? void 0 : _a.addEventListener('input', () => renderTransformerListSection());
     });
-    (_20 = document.getElementById('select-all-transformers')) === null || _20 === void 0 ? void 0 : _20.addEventListener('change', (e) => {
+    (_21 = document.getElementById('select-all-transformers')) === null || _21 === void 0 ? void 0 : _21.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
         document.querySelectorAll('.transformer-row-checkbox').forEach(cb => cb.checked = isChecked);
     });
-    (_21 = document.getElementById('print-installation-details-btn')) === null || _21 === void 0 ? void 0 : _21.addEventListener('click', handlePrintInstallationDetails);
-    (_22 = document.getElementById('clear-mukayasa-form-btn')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', handleClearMukayasaForm);
+    (_22 = document.getElementById('print-installation-details-btn')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', handlePrintInstallationDetails);
+    (_23 = document.getElementById('clear-mukayasa-form-btn')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', handleClearMukayasaForm);
     // Judicial Control Listeners
-    (_23 = document.getElementById('print-judicial-control-btn')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', handlePrintJudicialControlDetails);
-    (_24 = document.getElementById('judicial-control-form')) === null || _24 === void 0 ? void 0 : _24.addEventListener('submit', handleJudicialControlFormSubmit);
+    (_24 = document.getElementById('print-judicial-control-btn')) === null || _24 === void 0 ? void 0 : _24.addEventListener('click', handlePrintJudicialControlDetails);
+    (_25 = document.getElementById('judicial-control-form')) === null || _25 === void 0 ? void 0 : _25.addEventListener('submit', handleJudicialControlFormSubmit);
     // Judicial Control Filter Listeners
-    (_25 = document.getElementById('add-zinat-btn')) === null || _25 === void 0 ? void 0 : _25.addEventListener('click', openZinatForm);
-    (_26 = document.getElementById('zinat-form')) === null || _26 === void 0 ? void 0 : _26.addEventListener('submit', handleZinatFormSubmit);
+    (_26 = document.getElementById('add-zinat-btn')) === null || _26 === void 0 ? void 0 : _26.addEventListener('click', openZinatForm);
+    (_27 = document.getElementById('zinat-form')) === null || _27 === void 0 ? void 0 : _27.addEventListener('submit', handleZinatFormSubmit);
     const zinatFilterForm = document.getElementById('zinat-collection-filter-form');
     zinatFilterForm === null || zinatFilterForm === void 0 ? void 0 : zinatFilterForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -19732,12 +20123,12 @@ const setupEventListeners = () => {
         setTimeout(() => renderZinatCollectionSection(), 0);
     });
     // Print List Buttons
-    (_27 = document.getElementById('print-lost-memos-list-btn')) === null || _27 === void 0 ? void 0 : _27.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
-    (_28 = document.getElementById('print-judicial-control-list-btn')) === null || _28 === void 0 ? void 0 : _28.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
-    (_29 = document.getElementById('print-collection-judicial-btn')) === null || _29 === void 0 ? void 0 : _29.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
-    (_30 = document.getElementById('print-collection-zinat-btn')) === null || _30 === void 0 ? void 0 : _30.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
+    (_28 = document.getElementById('print-lost-memos-list-btn')) === null || _28 === void 0 ? void 0 : _28.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
+    (_29 = document.getElementById('print-judicial-control-list-btn')) === null || _29 === void 0 ? void 0 : _29.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
+    (_30 = document.getElementById('print-collection-judicial-btn')) === null || _30 === void 0 ? void 0 : _30.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
+    (_31 = document.getElementById('print-collection-zinat-btn')) === null || _31 === void 0 ? void 0 : _31.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
     // Judicial Collection Filter Listener
-    (_31 = document.getElementById('judicial-collection-filter-form')) === null || _31 === void 0 ? void 0 : _31.addEventListener('input', () => {
+    (_32 = document.getElementById('judicial-collection-filter-form')) === null || _32 === void 0 ? void 0 : _32.addEventListener('input', () => {
         renderJudicialCollectionSection();
     });
     // Judicial Control Filter Listeners
@@ -19754,9 +20145,9 @@ const setupEventListeners = () => {
         setTimeout(() => applyAndRenderJudicialControlList(), 0); // Use timeout to allow form to reset first
     });
     // Lost Memo Listeners
-    (_32 = document.getElementById('add-lost-memo-btn')) === null || _32 === void 0 ? void 0 : _32.addEventListener('click', () => openLostMemoForm());
-    (_33 = document.getElementById('lost-memo-form')) === null || _33 === void 0 ? void 0 : _33.addEventListener('submit', handleLostMemoFormSubmit);
-    (_34 = document.getElementById('print-lost-memo-btn')) === null || _34 === void 0 ? void 0 : _34.addEventListener('click', handlePrintLostMemo);
+    (_33 = document.getElementById('add-lost-memo-btn')) === null || _33 === void 0 ? void 0 : _33.addEventListener('click', () => openLostMemoForm());
+    (_34 = document.getElementById('lost-memo-form')) === null || _34 === void 0 ? void 0 : _34.addEventListener('submit', handleLostMemoFormSubmit);
+    (_35 = document.getElementById('print-lost-memo-btn')) === null || _35 === void 0 ? void 0 : _35.addEventListener('click', handlePrintLostMemo);
     const mukSearchForm = document.getElementById('mukayasat-search-form');
     mukSearchForm === null || mukSearchForm === void 0 ? void 0 : mukSearchForm.addEventListener('submit', handleMukayasatSearch);
     if (mukSearchForm) {
@@ -19768,7 +20159,7 @@ const setupEventListeners = () => {
             handleGoBack();
         }
     });
-    (_35 = document.getElementById('meters-table-filter')) === null || _35 === void 0 ? void 0 : _35.addEventListener('input', (e) => {
+    (_36 = document.getElementById('meters-table-filter')) === null || _36 === void 0 ? void 0 : _36.addEventListener('input', (e) => {
         const filterValue = e.target.value.toLowerCase();
         const table = document.getElementById('meters-table');
         filterTable(table, filterValue);
@@ -19796,10 +20187,10 @@ const setupEventListeners = () => {
             });
         }
     });
-    (_36 = document.getElementById('btn-search-subscribers-all')) === null || _36 === void 0 ? void 0 : _36.addEventListener('click', handleAllSubscribersSearch);
-    (_37 = document.getElementById('btn-reset-subscribers-all')) === null || _37 === void 0 ? void 0 : _37.addEventListener('click', handleResetAllSubscribersSearch);
-    (_38 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _38 === void 0 ? void 0 : _38.addEventListener('click', handleDeleteSelectedSubscribersAll);
-    (_39 = document.getElementById('subscriberType')) === null || _39 === void 0 ? void 0 : _39.addEventListener('change', (e) => {
+    (_37 = document.getElementById('btn-search-subscribers-all')) === null || _37 === void 0 ? void 0 : _37.addEventListener('click', handleAllSubscribersSearch);
+    (_38 = document.getElementById('btn-reset-subscribers-all')) === null || _38 === void 0 ? void 0 : _38.addEventListener('click', handleResetAllSubscribersSearch);
+    (_39 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _39 === void 0 ? void 0 : _39.addEventListener('click', handleDeleteSelectedSubscribersAll);
+    (_40 = document.getElementById('subscriberType')) === null || _40 === void 0 ? void 0 : _40.addEventListener('change', (e) => {
         var _a;
         const select = e.target;
         const isSearchMode = !((_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.contains('hidden'));
@@ -19818,59 +20209,59 @@ const setupEventListeners = () => {
         updateMeterFormVisibility();
     });
     // Subscriber Statement Listener (الاستعلام عن مشترك)
-    (_40 = document.getElementById('subscriber-statement-form')) === null || _40 === void 0 ? void 0 : _40.addEventListener('submit', (e) => {
+    (_41 = document.getElementById('subscriber-statement-form')) === null || _41 === void 0 ? void 0 : _41.addEventListener('submit', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
-    (_41 = document.getElementById('statement-search-btn')) === null || _41 === void 0 ? void 0 : _41.addEventListener('click', (e) => {
+    (_42 = document.getElementById('statement-search-btn')) === null || _42 === void 0 ? void 0 : _42.addEventListener('click', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
     // قراءة الكارت الذكي
-    (_42 = document.getElementById('statement-read-card-btn')) === null || _42 === void 0 ? void 0 : _42.addEventListener('click', (e) => {
+    (_43 = document.getElementById('statement-read-card-btn')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadSmartCard();
     });
-    (_43 = document.getElementById('smart-card-close-btn')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', () => {
+    (_44 = document.getElementById('smart-card-close-btn')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_44 = document.getElementById('smart-card-close-x-btn')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', () => {
+    (_45 = document.getElementById('smart-card-close-x-btn')) === null || _45 === void 0 ? void 0 : _45.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_45 = document.getElementById('smart-card-search-now-btn')) === null || _45 === void 0 ? void 0 : _45.addEventListener('click', () => {
+    (_46 = document.getElementById('smart-card-search-now-btn')) === null || _46 === void 0 ? void 0 : _46.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
         handleSubscriberStatementSearch();
     });
     // كروت التحكم (Control Cards Event Listeners)
-    (_46 = document.getElementById('btn-read-control-card')) === null || _46 === void 0 ? void 0 : _46.addEventListener('click', (e) => {
+    (_47 = document.getElementById('btn-read-control-card')) === null || _47 === void 0 ? void 0 : _47.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadControlCard();
     });
-    (_47 = document.getElementById('btn-renew-control-card')) === null || _47 === void 0 ? void 0 : _47.addEventListener('click', (e) => {
+    (_48 = document.getElementById('btn-renew-control-card')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', (e) => {
         e.preventDefault();
         handleRenewControlCard();
     });
-    (_48 = document.getElementById('btn-print-control-card')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', (e) => {
+    (_49 = document.getElementById('btn-print-control-card')) === null || _49 === void 0 ? void 0 : _49.addEventListener('click', (e) => {
         e.preventDefault();
         handlePrintControlCardReport();
     });
-    (_49 = document.getElementById('control-card-meter-details-close')) === null || _49 === void 0 ? void 0 : _49.addEventListener('click', () => {
+    (_50 = document.getElementById('control-card-meter-details-close')) === null || _50 === void 0 ? void 0 : _50.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_50 = document.getElementById('control-card-meter-details-close-x')) === null || _50 === void 0 ? void 0 : _50.addEventListener('click', () => {
+    (_51 = document.getElementById('control-card-meter-details-close-x')) === null || _51 === void 0 ? void 0 : _51.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_51 = document.getElementById('ctrl-meters-filter')) === null || _51 === void 0 ? void 0 : _51.addEventListener('input', (e) => {
+    (_52 = document.getElementById('ctrl-meters-filter')) === null || _52 === void 0 ? void 0 : _52.addEventListener('input', (e) => {
         const term = e.target.value.trim().toLowerCase();
         const rows = document.querySelectorAll('#control-card-meters-tbody tr');
         rows.forEach(r => {
@@ -19879,15 +20270,15 @@ const setupEventListeners = () => {
             r.style.display = text.includes(term) ? '' : 'none';
         });
     });
-    (_52 = document.getElementById('issue-control-card-form')) === null || _52 === void 0 ? void 0 : _52.addEventListener('submit', (e) => {
+    (_53 = document.getElementById('issue-control-card-form')) === null || _53 === void 0 ? void 0 : _53.addEventListener('submit', (e) => {
         e.preventDefault();
         handleIssueControlCard(e);
     });
-    (_53 = document.getElementById('issue-meter-company')) === null || _53 === void 0 ? void 0 : _53.addEventListener('change', (e) => {
+    (_54 = document.getElementById('issue-meter-company')) === null || _54 === void 0 ? void 0 : _54.addEventListener('change', (e) => {
         const val = e.target.value;
         handleCompanyChange(val);
     });
-    (_54 = document.getElementById('issue-technician')) === null || _54 === void 0 ? void 0 : _54.addEventListener('change', (e) => {
+    (_55 = document.getElementById('issue-technician')) === null || _55 === void 0 ? void 0 : _55.addEventListener('change', (e) => {
         const sel = e.target;
         const opt = sel.options[sel.selectedIndex];
         const codeInput = document.getElementById('issue-tech-code');
@@ -19895,7 +20286,7 @@ const setupEventListeners = () => {
             codeInput.value = (opt === null || opt === void 0 ? void 0 : opt.getAttribute('data-code')) || '';
         }
     });
-    (_55 = document.getElementById('issue-control-op-type')) === null || _55 === void 0 ? void 0 : _55.addEventListener('change', (e) => {
+    (_56 = document.getElementById('issue-control-op-type')) === null || _56 === void 0 ? void 0 : _56.addEventListener('change', (e) => {
         const val = e.target.value;
         const tampersWrap = document.getElementById('container-tampers');
         const manualDateWrap = document.getElementById('container-manual-date');
@@ -19904,7 +20295,7 @@ const setupEventListeners = () => {
         if (manualDateWrap)
             manualDateWrap.style.display = val === '0' ? 'block' : 'none';
     });
-    (_56 = document.getElementById('issue-control-type-meter')) === null || _56 === void 0 ? void 0 : _56.addEventListener('change', (e) => {
+    (_57 = document.getElementById('issue-control-type-meter')) === null || _57 === void 0 ? void 0 : _57.addEventListener('change', (e) => {
         const val = e.target.value;
         const singleWrap = document.getElementById('container-single-meter');
         const multiWrap = document.getElementById('container-multi-meters');
@@ -19916,7 +20307,7 @@ const setupEventListeners = () => {
         if (countWrap)
             countWrap.style.display = val === '2' ? 'block' : 'none';
     });
-    (_57 = document.getElementById('btn-add-meter-to-list')) === null || _57 === void 0 ? void 0 : _57.addEventListener('click', () => {
+    (_58 = document.getElementById('btn-add-meter-to-list')) === null || _58 === void 0 ? void 0 : _58.addEventListener('click', () => {
         const inp = document.getElementById('issue-multi-meter-input');
         const val = (inp === null || inp === void 0 ? void 0 : inp.value.trim()) || '';
         if (!val)
@@ -19930,16 +20321,16 @@ const setupEventListeners = () => {
             inp.value = '';
         renderIssuedMetersTags();
     });
-    (_58 = document.getElementById('issue-is-manual-date')) === null || _58 === void 0 ? void 0 : _58.addEventListener('change', (e) => {
+    (_59 = document.getElementById('issue-is-manual-date')) === null || _59 === void 0 ? void 0 : _59.addEventListener('change', (e) => {
         const wrap = document.getElementById('manual-date-picker-wrap');
         if (wrap)
             wrap.style.display = e.target.checked ? 'block' : 'none';
     });
-    (_59 = document.getElementById('btn-issue-card-reset')) === null || _59 === void 0 ? void 0 : _59.addEventListener('click', () => {
+    (_60 = document.getElementById('btn-issue-card-reset')) === null || _60 === void 0 ? void 0 : _60.addEventListener('click', () => {
         issuedMetersList = [];
         renderIssuedMetersTags();
     });
-    (_60 = document.getElementById('btn-close-issued-dialog')) === null || _60 === void 0 ? void 0 : _60.addEventListener('click', () => {
+    (_61 = document.getElementById('btn-close-issued-dialog')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -19948,7 +20339,7 @@ const setupEventListeners = () => {
                 dlg.style.display = 'none';
         }
     });
-    (_61 = document.getElementById('btn-read-issued-card-now')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', () => {
+    (_62 = document.getElementById('btn-read-issued-card-now')) === null || _62 === void 0 ? void 0 : _62.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -19983,40 +20374,40 @@ const setupEventListeners = () => {
         });
     });
     // Customer Management Listeners
-    (_62 = document.getElementById('cm-filters-form')) === null || _62 === void 0 ? void 0 : _62.addEventListener('submit', (e) => {
+    (_63 = document.getElementById('cm-filters-form')) === null || _63 === void 0 ? void 0 : _63.addEventListener('submit', (e) => {
         e.preventDefault();
         loadCustomers(1);
     });
-    (_63 = document.getElementById('btn-cm-reset')) === null || _63 === void 0 ? void 0 : _63.addEventListener('click', () => {
+    (_64 = document.getElementById('btn-cm-reset')) === null || _64 === void 0 ? void 0 : _64.addEventListener('click', () => {
         const form = document.getElementById('cm-filters-form');
         if (form)
             form.reset();
         loadCustomers(1);
     });
-    (_64 = document.getElementById('btn-cm-refresh')) === null || _64 === void 0 ? void 0 : _64.addEventListener('click', () => {
+    (_65 = document.getElementById('btn-cm-refresh')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', () => {
         loadCustomers(customerState.page);
     });
-    (_65 = document.getElementById('btn-cm-card-search')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', () => {
+    (_66 = document.getElementById('btn-cm-card-search')) === null || _66 === void 0 ? void 0 : _66.addEventListener('click', () => {
         handleCustomerCardSearch();
     });
-    (_66 = document.getElementById('cm-page-size')) === null || _66 === void 0 ? void 0 : _66.addEventListener('change', (e) => {
+    (_67 = document.getElementById('cm-page-size')) === null || _67 === void 0 ? void 0 : _67.addEventListener('change', (e) => {
         customerState.pageSize = Number(e.target.value) || 10;
         loadCustomers(1);
     });
-    (_67 = document.getElementById('cm-btn-first')) === null || _67 === void 0 ? void 0 : _67.addEventListener('click', () => {
+    (_68 = document.getElementById('cm-btn-first')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(1);
     });
-    (_68 = document.getElementById('cm-btn-prev')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', () => {
+    (_69 = document.getElementById('cm-btn-prev')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(customerState.page - 1);
     });
-    (_69 = document.getElementById('cm-btn-next')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', () => {
+    (_70 = document.getElementById('cm-btn-next')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(customerState.page + 1);
     });
-    (_70 = document.getElementById('cm-btn-last')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', () => {
+    (_71 = document.getElementById('cm-btn-last')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(totalPages);
@@ -20137,10 +20528,10 @@ const setupEventListeners = () => {
             }
         }
     });
-    (_71 = document.getElementById('save-details-btn')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', handleSaveDetails);
-    (_72 = document.getElementById('delete-subscriber-btn')) === null || _72 === void 0 ? void 0 : _72.addEventListener('click', handleDeleteSubscriber);
-    (_73 = document.getElementById('details-meterType')) === null || _73 === void 0 ? void 0 : _73.addEventListener('change', () => updateMeterFormVisibility('details-'));
-    (_74 = document.getElementById('details-subscriberType')) === null || _74 === void 0 ? void 0 : _74.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_72 = document.getElementById('save-details-btn')) === null || _72 === void 0 ? void 0 : _72.addEventListener('click', handleSaveDetails);
+    (_73 = document.getElementById('delete-subscriber-btn')) === null || _73 === void 0 ? void 0 : _73.addEventListener('click', handleDeleteSubscriber);
+    (_74 = document.getElementById('details-meterType')) === null || _74 === void 0 ? void 0 : _74.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_75 = document.getElementById('details-subscriberType')) === null || _75 === void 0 ? void 0 : _75.addEventListener('change', () => updateMeterFormVisibility('details-'));
     document.body.addEventListener('click', (event) => {
         const target = event.target;
         if (target.id === 'delete-selected-meters') {
@@ -20153,13 +20544,13 @@ const setupEventListeners = () => {
             checkboxes.forEach(checkbox => checkbox.checked = selectAllCheckbox.checked);
         }
     });
-    (_75 = document.getElementById('select-all-meters')) === null || _75 === void 0 ? void 0 : _75.addEventListener('click', (event) => {
+    (_76 = document.getElementById('select-all-meters')) === null || _76 === void 0 ? void 0 : _76.addEventListener('click', (event) => {
         const isChecked = event.target.checked;
         document.querySelectorAll('#meters-table tbody input[type="checkbox"].select-row').forEach((checkbox) => {
             checkbox.checked = isChecked;
         });
     });
-    (_76 = document.getElementById('btn-delete-by-status')) === null || _76 === void 0 ? void 0 : _76.addEventListener('click', () => {
+    (_77 = document.getElementById('btn-delete-by-status')) === null || _77 === void 0 ? void 0 : _77.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         const select = document.getElementById('delete-status-select');
         if (dialog && select) {
@@ -20168,12 +20559,12 @@ const setupEventListeners = () => {
             dialog.hidden = false;
         }
     });
-    (_77 = document.getElementById('delete-by-status-cancel')) === null || _77 === void 0 ? void 0 : _77.addEventListener('click', () => {
+    (_78 = document.getElementById('delete-by-status-cancel')) === null || _78 === void 0 ? void 0 : _78.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         if (dialog)
             dialog.hidden = true;
     });
-    (_78 = document.getElementById('delete-by-status-confirm')) === null || _78 === void 0 ? void 0 : _78.addEventListener('click', () => {
+    (_79 = document.getElementById('delete-by-status-confirm')) === null || _79 === void 0 ? void 0 : _79.addEventListener('click', () => {
         const select = document.getElementById('delete-status-select');
         const status = select.value;
         if (!status) {
@@ -20206,13 +20597,13 @@ const setupEventListeners = () => {
         showConfirmationDialog('تأكيد الحذف الجماعي', `هل أنت متأكد من حذف جميع المشتركين (${count}) الذين حالتهم "${status}"؟ لا يمكن التراجع عن هذا الإجراء.`, onConfirm);
     });
     // Repaired Meters Listeners
-    (_79 = document.getElementById('repair-search-form')) === null || _79 === void 0 ? void 0 : _79.addEventListener('submit', handleFaultyMeterSearch);
-    (_80 = document.getElementById('repair-form')) === null || _80 === void 0 ? void 0 : _80.addEventListener('submit', handleRepairFormSubmit);
-    (_81 = document.getElementById('repairStatus')) === null || _81 === void 0 ? void 0 : _81.addEventListener('change', updateRepairFormVisibility);
+    (_80 = document.getElementById('repair-search-form')) === null || _80 === void 0 ? void 0 : _80.addEventListener('submit', handleFaultyMeterSearch);
+    (_81 = document.getElementById('repair-form')) === null || _81 === void 0 ? void 0 : _81.addEventListener('submit', handleRepairFormSubmit);
+    (_82 = document.getElementById('repairStatus')) === null || _82 === void 0 ? void 0 : _82.addEventListener('change', updateRepairFormVisibility);
     // Reports Listeners
-    (_82 = document.getElementById('report-type')) === null || _82 === void 0 ? void 0 : _82.addEventListener('change', updateReportFilters);
-    (_83 = document.getElementById('report-generation-form')) === null || _83 === void 0 ? void 0 : _83.addEventListener('submit', handleGenerateReport);
-    (_84 = document.getElementById('print-report-btn')) === null || _84 === void 0 ? void 0 : _84.addEventListener('click', handlePrintReport);
+    (_83 = document.getElementById('report-type')) === null || _83 === void 0 ? void 0 : _83.addEventListener('change', updateReportFilters);
+    (_84 = document.getElementById('report-generation-form')) === null || _84 === void 0 ? void 0 : _84.addEventListener('submit', handleGenerateReport);
+    (_85 = document.getElementById('print-report-btn')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', handlePrintReport);
     // Custom multiselect listener
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.multiselect-btn');
@@ -20263,11 +20654,11 @@ const setupEventListeners = () => {
         }
     });
     // Activity Log Listener
-    (_85 = document.getElementById('print-activity-log-btn')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', handlePrintActivityLog);
+    (_86 = document.getElementById('print-activity-log-btn')) === null || _86 === void 0 ? void 0 : _86.addEventListener('click', handlePrintActivityLog);
     // User Management Listeners
-    (_86 = document.getElementById('user-form')) === null || _86 === void 0 ? void 0 : _86.addEventListener('submit', handleUserFormSubmit);
+    (_87 = document.getElementById('user-form')) === null || _87 === void 0 ? void 0 : _87.addEventListener('submit', handleUserFormSubmit);
     // Permissions Listeners (delegated inside render function)
-    (_87 = document.getElementById('permissions')) === null || _87 === void 0 ? void 0 : _87.addEventListener('change', (event) => {
+    (_88 = document.getElementById('permissions')) === null || _88 === void 0 ? void 0 : _88.addEventListener('change', (event) => {
         const target = event.target;
         if (!target.matches('input[type="checkbox"]'))
             return;
@@ -20281,32 +20672,32 @@ const setupEventListeners = () => {
             handlePermissionChange(event);
     });
     // Settings Listeners
-    (_88 = document.getElementById('export-backup-btn')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', handleExportBackup);
-    (_89 = document.getElementById('import-backup-btn')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', () => handleImportBackup());
-    (_90 = document.getElementById('export-csv-btn')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', handleExportCSV);
-    (_91 = document.getElementById('save-report-settings-btn')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', handleSaveReportSettings);
-    (_92 = document.getElementById('form-lifting-unit-delivery')) === null || _92 === void 0 ? void 0 : _92.addEventListener('submit', handleLiftingDeliverySubmit);
-    (_93 = document.getElementById('btn-cancel-lifting-delivery')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', handleCancelLiftingDelivery);
-    (_94 = document.getElementById('save-company-report-settings-btn')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', handleSaveCompanyReportSettings);
+    (_89 = document.getElementById('export-backup-btn')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', handleExportBackup);
+    (_90 = document.getElementById('import-backup-btn')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', () => handleImportBackup());
+    (_91 = document.getElementById('export-csv-btn')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', handleExportCSV);
+    (_92 = document.getElementById('save-report-settings-btn')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', handleSaveReportSettings);
+    (_93 = document.getElementById('form-lifting-unit-delivery')) === null || _93 === void 0 ? void 0 : _93.addEventListener('submit', handleLiftingDeliverySubmit);
+    (_94 = document.getElementById('btn-cancel-lifting-delivery')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', handleCancelLiftingDelivery);
+    (_95 = document.getElementById('save-company-report-settings-btn')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', handleSaveCompanyReportSettings);
     // مستمعات أحداث الطلبات قيد الانتظار
-    (_95 = document.getElementById('add-area-dialog-confirm-btn')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', confirmAddPendingArea);
-    (_96 = document.getElementById('add-area-dialog-cancel-btn')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', hideAddPendingAreaDialog);
-    (_97 = document.getElementById('add-pending-area-dialog')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', (event) => {
+    (_96 = document.getElementById('add-area-dialog-confirm-btn')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', confirmAddPendingArea);
+    (_97 = document.getElementById('add-area-dialog-cancel-btn')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', hideAddPendingAreaDialog);
+    (_98 = document.getElementById('add-pending-area-dialog')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', (event) => {
         if (event.target === document.getElementById('add-pending-area-dialog')) {
             hideAddPendingAreaDialog();
         }
     });
-    (_98 = document.getElementById('import-pending-excel-trigger-btn')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_99 = document.getElementById('pending-excel-upload')) === null || _99 === void 0 ? void 0 : _99.addEventListener('change', handleImportPendingExcel);
-    (_100 = document.getElementById('print-pending-requests-btn')) === null || _100 === void 0 ? void 0 : _100.addEventListener('click', handlePrintPendingRequests);
-    (_101 = document.getElementById('export-pending-excel-btn')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', handleExportPendingRequestsToExcel);
+    (_99 = document.getElementById('import-pending-excel-trigger-btn')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_100 = document.getElementById('pending-excel-upload')) === null || _100 === void 0 ? void 0 : _100.addEventListener('change', handleImportPendingExcel);
+    (_101 = document.getElementById('print-pending-requests-btn')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', handlePrintPendingRequests);
+    (_102 = document.getElementById('export-pending-excel-btn')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', handleExportPendingRequestsToExcel);
     // ربط أزرار العمليات الجماعية في صفحة الانتظار
-    (_102 = document.getElementById('assign-pending-requests-btn')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', handleAssignSelectedPendingRequests);
-    (_103 = document.getElementById('move-to-mukayasat-btn')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', handleMovePendingToMukayasat);
-    (_104 = document.getElementById('mark-pending-inspected-btn')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', handleMarkSelectedPendingInspected);
-    (_105 = document.getElementById('print-pending-inspection-btn')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', handlePrintSelectedPendingInspections);
-    (_106 = document.getElementById('delete-selected-pending-btn')) === null || _106 === void 0 ? void 0 : _106.addEventListener('click', handleDeleteSelectedPendingRequests);
-    (_107 = document.getElementById('add-pending-address-tab-btn')) === null || _107 === void 0 ? void 0 : _107.addEventListener('click', handleAddNewPendingAddressTab);
+    (_103 = document.getElementById('assign-pending-requests-btn')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', handleAssignSelectedPendingRequests);
+    (_104 = document.getElementById('move-to-mukayasat-btn')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', handleMovePendingToMukayasat);
+    (_105 = document.getElementById('mark-pending-inspected-btn')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', handleMarkSelectedPendingInspected);
+    (_106 = document.getElementById('print-pending-inspection-btn')) === null || _106 === void 0 ? void 0 : _106.addEventListener('click', handlePrintSelectedPendingInspections);
+    (_107 = document.getElementById('delete-selected-pending-btn')) === null || _107 === void 0 ? void 0 : _107.addEventListener('click', handleDeleteSelectedPendingRequests);
+    (_108 = document.getElementById('add-pending-address-tab-btn')) === null || _108 === void 0 ? void 0 : _108.addEventListener('click', handleAddNewPendingAddressTab);
     const pendingFilters = document.getElementById('pending-filters');
     if (pendingFilters) {
         const resetPending = () => { currentPendingPage = 1; pendingSelectedRequests = []; renderPendingRequestsSection(); };
@@ -20546,7 +20937,7 @@ const setupEventListeners = () => {
         });
     }
     // Company Logo Settings Listeners
-    (_108 = document.getElementById('developer-image-password-cancel')) === null || _108 === void 0 ? void 0 : _108.addEventListener('click', () => {
+    (_109 = document.getElementById('developer-image-password-cancel')) === null || _109 === void 0 ? void 0 : _109.addEventListener('click', () => {
         const dialog = document.getElementById('developer-image-password-dialog');
         const input = document.getElementById('developer-image-password');
         dialog === null || dialog === void 0 ? void 0 : dialog.setAttribute('hidden', '');
@@ -20554,7 +20945,7 @@ const setupEventListeners = () => {
             input.value = '';
         developerImagePasswordCallback = null;
     });
-    (_109 = document.getElementById('developer-image-password-confirm')) === null || _109 === void 0 ? void 0 : _109.addEventListener('click', () => {
+    (_110 = document.getElementById('developer-image-password-confirm')) === null || _110 === void 0 ? void 0 : _110.addEventListener('click', () => {
         const input = document.getElementById('developer-image-password');
         const error = document.getElementById('developer-image-password-error');
         const dialog = document.getElementById('developer-image-password-dialog');
@@ -20570,18 +20961,18 @@ const setupEventListeners = () => {
         input.value = '';
         callback === null || callback === void 0 ? void 0 : callback();
     });
-    (_110 = document.getElementById('upload-logo-btn')) === null || _110 === void 0 ? void 0 : _110.addEventListener('click', () => {
+    (_111 = document.getElementById('upload-logo-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', () => {
         var _a;
         (_a = document.getElementById('logo-upload-input')) === null || _a === void 0 ? void 0 : _a.click();
     });
-    (_111 = document.getElementById('remove-logo-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', () => {
+    (_112 = document.getElementById('remove-logo-btn')) === null || _112 === void 0 ? void 0 : _112.addEventListener('click', () => {
         state.settings.companyLogo = null;
         saveState();
         updateUI();
         renderSettingsSection(); // To update the preview
         showToast('تمت إزالة الشعار بنجاح.');
     });
-    (_112 = document.getElementById('logo-upload-input')) === null || _112 === void 0 ? void 0 : _112.addEventListener('change', (event) => {
+    (_113 = document.getElementById('logo-upload-input')) === null || _113 === void 0 ? void 0 : _113.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -20605,10 +20996,10 @@ const setupEventListeners = () => {
         };
         reader.readAsDataURL(file);
     });
-    (_113 = document.getElementById('upload-developer-image-btn')) === null || _113 === void 0 ? void 0 : _113.addEventListener('click', () => {
+    (_114 = document.getElementById('upload-developer-image-btn')) === null || _114 === void 0 ? void 0 : _114.addEventListener('click', () => {
         requestDeveloperImagePassword(() => { var _a; return (_a = document.getElementById('developer-image-upload-input')) === null || _a === void 0 ? void 0 : _a.click(); });
     });
-    (_114 = document.getElementById('remove-developer-image-btn')) === null || _114 === void 0 ? void 0 : _114.addEventListener('click', () => {
+    (_115 = document.getElementById('remove-developer-image-btn')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', () => {
         requestDeveloperImagePassword(() => {
             state.settings.developerImage = null;
             saveState();
@@ -20617,7 +21008,7 @@ const setupEventListeners = () => {
             showToast('تمت إزالة صورة المطور بنجاح.');
         });
     });
-    (_115 = document.getElementById('developer-image-upload-input')) === null || _115 === void 0 ? void 0 : _115.addEventListener('change', (event) => {
+    (_116 = document.getElementById('developer-image-upload-input')) === null || _116 === void 0 ? void 0 : _116.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -20638,7 +21029,7 @@ const setupEventListeners = () => {
         reader.onerror = () => showToast('حدث خطأ أثناء قراءة صورة المطور.', 'error');
         reader.readAsDataURL(file);
     });
-    (_116 = document.getElementById('logo-size-slider')) === null || _116 === void 0 ? void 0 : _116.addEventListener('input', (event) => {
+    (_117 = document.getElementById('logo-size-slider')) === null || _117 === void 0 ? void 0 : _117.addEventListener('input', (event) => {
         const slider = event.target;
         const newSize = parseInt(slider.value, 10);
         const valueDisplay = document.getElementById('logo-size-value');
@@ -20660,12 +21051,12 @@ const setupEventListeners = () => {
             <button class="btn btn-delete" id="btn-delete-selected-addresses" style="padding: 4px 8px; font-size: 0.8rem;">حذف المحدد</button>
         `;
         addressContainer.insertBefore(bulkActions, addressContainer.querySelector('ul'));
-        (_117 = document.getElementById('btn-select-all-addresses')) === null || _117 === void 0 ? void 0 : _117.addEventListener('click', () => {
+        (_118 = document.getElementById('btn-select-all-addresses')) === null || _118 === void 0 ? void 0 : _118.addEventListener('click', () => {
             const cbs = document.querySelectorAll('.address-bulk-checkbox');
             const allSelected = Array.from(cbs).every(cb => cb.checked);
             cbs.forEach(cb => cb.checked = !allSelected);
         });
-        (_118 = document.getElementById('btn-delete-selected-addresses')) === null || _118 === void 0 ? void 0 : _118.addEventListener('click', () => {
+        (_119 = document.getElementById('btn-delete-selected-addresses')) === null || _119 === void 0 ? void 0 : _119.addEventListener('click', () => {
             const selected = Array.from(document.querySelectorAll('.address-bulk-checkbox:checked'));
             if (selected.length === 0)
                 return showToast('يرجى تحديد عناوين أولاً', 'error');
@@ -20735,7 +21126,7 @@ const setupEventListeners = () => {
         }, { passive: true });
     };
     initMobileAdaptation();
-    (_119 = document.getElementById('sidebar-toggle')) === null || _119 === void 0 ? void 0 : _119.addEventListener('click', () => {
+    (_120 = document.getElementById('sidebar-toggle')) === null || _120 === void 0 ? void 0 : _120.addEventListener('click', () => {
         document.body.classList.toggle('sidebar-collapsed');
     });
     // Accordion behavior for sidebar categories: when one <details> opens, close the others

@@ -81,6 +81,8 @@ interface AppUser {
     password: string;
     role: string;
     sector?: string;
+    generalAdmin?: string;
+    subAdmin?: string;
     branch?: string;
     isSuspended?: boolean;
     suspendReason?: string;
@@ -95,6 +97,8 @@ interface AppSettings {
     companyName: string;
     companyAddress?: string;
     sectors?: string[];
+    generalAdministrations?: string[];
+    subAdministrations?: string[];
     branches?: string[];
     footerText: string;
     technicians: string[];
@@ -214,6 +218,21 @@ let state = {
             'قطاع جنوب المنيا',
             'قطاع بني سويف',
             'قطاع أسيوط'
+        ],
+        generalAdministrations: [
+            'الإدارة العامة لهندسات شمال المنيا',
+            'الإدارة العامة لكبار المشتركين والعدادات',
+            'الإدارة العامة للضبطية القضائية والتفتيش',
+            'الإدارة العامة للتشغيل والتحكم',
+            'الإدارة العامة للشئون التجارية والتحصيل'
+        ],
+        subAdministrations: [
+            'هندسة كهرباء بني مزار',
+            'هندسة كهرباء مغاغة',
+            'هندسة كهرباء العدوة',
+            'هندسة كهرباء مطاي',
+            'هندسة كهرباء سمالوط شرق',
+            'هندسة كهرباء سمالوط غرب'
         ],
         branches: [
             'هندسة كهرباء بني مزار',
@@ -460,75 +479,240 @@ type StateKey = keyof Omit<State, 'users' | 'settings' | 'subscribers'>;
 // منظومة الفروع والقطاعات وعزل البيانات (Multi-Tenant Branch Isolation)
 // =========================================================================
 let currentAdminScopeSector: string = 'all';
+let currentAdminScopeGeneralAdmin: string = 'all';
 let currentAdminScopeBranch: string = 'all';
+
+// الهيكل الإداري الافتراضي والديناميكي
+const defaultOrgStructure: Record<string, Record<string, string[]>> = {
+    'قطاع شمال المنيا': {
+        'الإدارة العامة لهندسات شمال المنيا': [
+            'هندسة كهرباء بني مزار',
+            'هندسة كهرباء مغاغة',
+            'هندسة كهرباء العدوة',
+            'هندسة كهرباء مطاي',
+            'هندسة كهرباء سمالوط شرق',
+            'هندسة كهرباء سمالوط غرب'
+        ],
+        'الإدارة العامة لكبار المشتركين والعدادات': [
+            'هندسة فحص واختبار العدادات',
+            'وحدة الرفع والفحص الفني',
+            'إدارة كبار المشتركين (شمال)'
+        ],
+        'الإدارة العامة للضبطية القضائية والتفتيش': [
+            'فرع الضبطية القضائية بني مزار ومغاغة',
+            'فرع الضبطية القضائية سمالوط ومطاي'
+        ],
+        'الإدارة العامة للشئون التجارية والتحصيل': [
+            'خزينة وتحصيل شمال المنيا',
+            'إدارة اشتراكات شمال المنيا'
+        ]
+    },
+    'قطاع جنوب المنيا': {
+        'الإدارة العامة لهندسات جنوب المنيا': [
+            'هندسة كهرباء المنيا شرق',
+            'هندسة كهرباء المنيا غرب',
+            'هندسة كهرباء أبو قرقاص',
+            'هندسة كهرباء ملوي',
+            'هندسة كهرباء ديرمواس'
+        ],
+        'الإدارة العامة لكبار المشتركين (جنوب)': [
+            'هندسة فحص العدادات (جنوب)',
+            'وحدة كبار المشتركين ملوي'
+        ]
+    },
+    'قطاع بني سويف': {
+        'الإدارة العامة لهندسات بني سويف': [
+            'هندسة كهرباء بني سويف',
+            'هندسة كهرباء الواسطى',
+            'هندسة كهرباء ناصر',
+            'هندسة كهرباء ببا',
+            'هندسة كهرباء الفشن',
+            'هندسة كهرباء إهناسيا',
+            'هندسة كهرباء سمسطا'
+        ]
+    },
+    'قطاع الفيوم': {
+        'الإدارة العامة لهندسات الفيوم': [
+            'هندسة كهرباء الفيوم شرق',
+            'هندسة كهرباء الفيوم غرب',
+            'هندسة كهرباء سنورس',
+            'هندسة كهرباء إطسا',
+            'هندسة كهرباء طامية',
+            'هندسة كهرباء أبشواي'
+        ]
+    },
+    'قطاع أسيوط شمال': {
+        'الإدارة العامة لهندسات أسيوط شمال': [
+            'هندسة كهرباء ديروط',
+            'هندسة كهرباء القوصية',
+            'هندسة كهرباء منفلوط'
+        ]
+    },
+    'قطاع أسيوط جنوب': {
+        'الإدارة العامة لهندسات أسيوط جنوب': [
+            'هندسة كهرباء أسيوط غرب',
+            'هندسة كهرباء أسيوط شرق',
+            'هندسة كهرباء الفتح',
+            'هندسة كهرباء أبوتيج',
+            'هندسة كهرباء صدفا',
+            'هندسة كهرباء الغنايم'
+        ]
+    },
+    'قطاع الوادي الجديد': {
+        'الإدارة العامة لهندسات الوادي الجديد': [
+            'هندسة كهرباء الخارجة',
+            'هندسة كهرباء الداخلة',
+            'هندسة كهرباء الفرافرة',
+            'هندسة كهرباء باريس'
+        ]
+    }
+};
+
+const getAvailableSectors = (): string[] => {
+    const list = new Set<string>();
+    Object.keys(defaultOrgStructure).forEach(s => list.add(s));
+    (state.settings.sectors || []).forEach(s => { if (s && s !== 'all') list.add(s); });
+    (state.users || []).forEach(u => { if (u.sector && u.sector !== 'all') list.add(u.sector); });
+    (state.meters || []).forEach(m => { if (m.sector && m.sector !== 'all') list.add(m.sector); });
+    return Array.from(list);
+};
+
+const getGeneralAdminsForSector = (selectedSector: string): string[] => {
+    const list = new Set<string>();
+    if (selectedSector && selectedSector !== 'all') {
+        const struct = defaultOrgStructure[selectedSector];
+        if (struct) {
+            Object.keys(struct).forEach(ga => list.add(ga));
+        }
+        (state.users || []).forEach(u => {
+            if (u.sector === selectedSector && u.generalAdmin && u.generalAdmin !== 'all') {
+                list.add(u.generalAdmin);
+            }
+        });
+        (state.meters || []).forEach(m => {
+            if (m.sector === selectedSector && m.generalAdmin && m.generalAdmin !== 'all') {
+                list.add(m.generalAdmin);
+            }
+        });
+    } else {
+        Object.values(defaultOrgStructure).forEach(struct => {
+            Object.keys(struct).forEach(ga => list.add(ga));
+        });
+        (state.users || []).forEach(u => { if (u.generalAdmin && u.generalAdmin !== 'all') list.add(u.generalAdmin); });
+        (state.settings.generalAdministrations || []).forEach(ga => { if (ga && ga !== 'all') list.add(ga); });
+    }
+    return Array.from(list);
+};
+
+const getSubAdmins = (selectedSector: string, selectedGeneralAdmin: string): string[] => {
+    const list = new Set<string>();
+    if (selectedSector && selectedSector !== 'all') {
+        const struct = defaultOrgStructure[selectedSector];
+        if (struct) {
+            if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
+                (struct[selectedGeneralAdmin] || []).forEach(b => list.add(b));
+            } else {
+                Object.values(struct).forEach(branches => branches.forEach(b => list.add(b)));
+            }
+        }
+        (state.users || []).forEach(u => {
+            const matchSec = u.sector === selectedSector;
+            const matchGen = selectedGeneralAdmin === 'all' || !selectedGeneralAdmin || u.generalAdmin === selectedGeneralAdmin;
+            const sub = u.subAdmin || u.branch;
+            if (matchSec && matchGen && sub && sub !== 'all') list.add(sub);
+        });
+        (state.meters || []).forEach(m => {
+            const matchSec = m.sector === selectedSector;
+            const matchGen = selectedGeneralAdmin === 'all' || !selectedGeneralAdmin || m.generalAdmin === selectedGeneralAdmin;
+            const sub = m.subAdmin || m.branch;
+            if (matchSec && matchGen && sub && sub !== 'all') list.add(sub);
+        });
+    } else {
+        Object.values(defaultOrgStructure).forEach(struct => {
+            if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
+                if (struct[selectedGeneralAdmin]) {
+                    struct[selectedGeneralAdmin].forEach(b => list.add(b));
+                }
+            } else {
+                Object.values(struct).forEach(branches => branches.forEach(b => list.add(b)));
+            }
+        });
+        (state.users || []).forEach(u => {
+            const sub = u.subAdmin || u.branch;
+            if (sub && sub !== 'all') list.add(sub);
+        });
+        (state.settings.branches || []).forEach(b => { if (b && b !== 'all') list.add(b); });
+        (state.settings.subAdministrations || []).forEach(b => { if (b && b !== 'all') list.add(b); });
+    }
+    return Array.from(list);
+};
 
 const ensureDefaultScope = (stateObj: any) => {
     if (!stateObj) return;
     if (!stateObj.settings) stateObj.settings = {};
     if (!stateObj.settings.sectors || !Array.isArray(stateObj.settings.sectors) || stateObj.settings.sectors.length === 0) {
-        stateObj.settings.sectors = [
-            'قطاع شمال المنيا',
-            'قطاع جنوب المنيا',
-            'قطاع بني سويف',
-            'قطاع أسيوط'
-        ];
+        stateObj.settings.sectors = getAvailableSectors();
+    }
+    if (!stateObj.settings.generalAdministrations || !Array.isArray(stateObj.settings.generalAdministrations) || stateObj.settings.generalAdministrations.length === 0) {
+        stateObj.settings.generalAdministrations = getGeneralAdminsForSector('all');
     }
     if (!stateObj.settings.branches || !Array.isArray(stateObj.settings.branches) || stateObj.settings.branches.length === 0) {
-        stateObj.settings.branches = [
-            'هندسة كهرباء بني مزار',
-            'فرع بني مزار شرق',
-            'فرع بني مزار غرب',
-            'هندسة كهرباء مغاغة',
-            'هندسة كهرباء العدوة',
-            'هندسة كهرباء مطاي',
-            'هندسة كهرباء سمالوط',
-            'هندسة كهرباء المنيا',
-            'هندسة كهرباء ملوي',
-            'هندسة كهرباء أبو قرقاص'
-        ];
+        stateObj.settings.branches = getSubAdmins('all', 'all');
     }
     if (stateObj.users && Array.isArray(stateObj.users)) {
         stateObj.users.forEach((u: any) => {
-            if (!u.sector) {
-                u.sector = (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') ? 'all' : 'قطاع شمال المنيا';
-            }
-            if (!u.branch) {
-                u.branch = (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') ? 'all' : 'هندسة كهرباء بني مزار';
+            if (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') {
+                u.sector = 'all';
+                u.generalAdmin = 'all';
+                u.subAdmin = 'all';
+                u.branch = 'all';
+            } else {
+                if (!u.sector) u.sector = 'قطاع شمال المنيا';
+                if (!u.generalAdmin) u.generalAdmin = 'الإدارة العامة لهندسات شمال المنيا';
+                if (!u.subAdmin) u.subAdmin = u.branch || 'هندسة كهرباء بني مزار';
+                if (!u.branch) u.branch = u.subAdmin;
             }
         });
     }
     if (stateObj.meters && Array.isArray(stateObj.meters)) {
         stateObj.meters.forEach((m: any) => {
             if (!m.sector) m.sector = 'قطاع شمال المنيا';
-            if (!m.branch) m.branch = 'هندسة كهرباء بني مزار';
+            if (!m.generalAdmin) m.generalAdmin = 'الإدارة العامة لهندسات شمال المنيا';
+            if (!m.subAdmin) m.subAdmin = m.branch || 'هندسة كهرباء بني مزار';
+            if (!m.branch) m.branch = m.subAdmin;
         });
     }
     ['mukayasat', 'judicialControl', 'lostMeterMemos', 'transformers', 'treasuryTransactions', 'treasurySettlements'].forEach(coll => {
         if (stateObj[coll] && Array.isArray(stateObj[coll])) {
             stateObj[coll].forEach((item: any) => {
                 if (!item.sector) item.sector = 'قطاع شمال المنيا';
-                if (!item.branch) item.branch = 'هندسة كهرباء بني مزار';
+                if (!item.generalAdmin) item.generalAdmin = 'الإدارة العامة لهندسات شمال المنيا';
+                if (!item.subAdmin) item.subAdmin = item.branch || 'هندسة كهرباء بني مزار';
+                if (!item.branch) item.branch = item.subAdmin;
             });
         }
     });
 };
 
 const getCurrentDataScope = () => {
-    if (!loggedInUser) return { sector: 'all', branch: 'all', isGlobal: true };
+    if (!loggedInUser) return { sector: 'all', generalAdmin: 'all', branch: 'all', isGlobal: true };
     const isAdmin = loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'supervisor';
     if (isAdmin) {
         return {
             sector: currentAdminScopeSector,
+            generalAdmin: currentAdminScopeGeneralAdmin,
             branch: currentAdminScopeBranch,
-            isGlobal: currentAdminScopeSector === 'all' && currentAdminScopeBranch === 'all'
+            isGlobal: currentAdminScopeSector === 'all' && currentAdminScopeGeneralAdmin === 'all' && currentAdminScopeBranch === 'all'
         };
     }
     const userSector = loggedInUser.sector || 'قطاع شمال المنيا';
-    const userBranch = loggedInUser.branch || 'هندسة كهرباء بني مزار';
+    const userGenAdmin = loggedInUser.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+    const userBranch = loggedInUser.subAdmin || loggedInUser.branch || 'هندسة كهرباء بني مزار';
     return {
         sector: userSector,
+        generalAdmin: userGenAdmin,
         branch: userBranch,
-        isGlobal: userSector === 'all' && userBranch === 'all'
+        isGlobal: userSector === 'all' && userGenAdmin === 'all' && userBranch === 'all'
     };
 };
 
@@ -538,9 +722,13 @@ const matchesCurrentScope = (item: any): boolean => {
     if (scope.isGlobal) return true;
 
     const itemSector = item.sector || 'قطاع شمال المنيا';
-    const itemBranch = item.branch || 'هندسة كهرباء بني مزار';
+    const itemGenAdmin = item.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+    const itemBranch = item.subAdmin || item.branch || 'هندسة كهرباء بني مزار';
 
     if (scope.sector !== 'all' && itemSector !== scope.sector) {
+        return false;
+    }
+    if (scope.generalAdmin !== 'all' && itemGenAdmin !== scope.generalAdmin) {
         return false;
     }
     if (scope.branch !== 'all' && itemBranch !== scope.branch) {
@@ -557,10 +745,18 @@ const stampItemWithScope = (item: any): any => {
             ? scope.sector 
             : (loggedInUser?.sector && loggedInUser.sector !== 'all' ? loggedInUser.sector : (currentAdminScopeSector !== 'all' ? currentAdminScopeSector : 'قطاع شمال المنيا'));
     }
+    if (!item.generalAdmin) {
+        item.generalAdmin = (!scope.isGlobal && scope.generalAdmin !== 'all')
+            ? scope.generalAdmin
+            : (loggedInUser?.generalAdmin && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : (currentAdminScopeGeneralAdmin !== 'all' ? currentAdminScopeGeneralAdmin : 'الإدارة العامة لهندسات شمال المنيا'));
+    }
     if (!item.branch) {
         item.branch = (!scope.isGlobal && scope.branch !== 'all') 
             ? scope.branch 
             : (loggedInUser?.branch && loggedInUser.branch !== 'all' ? loggedInUser.branch : (currentAdminScopeBranch !== 'all' ? currentAdminScopeBranch : 'هندسة كهرباء بني مزار'));
+    }
+    if (!item.subAdmin) {
+        item.subAdmin = item.branch;
     }
     return item;
 };
@@ -576,17 +772,24 @@ const updateAdminScopeUI = () => {
         if (badge) badge.style.display = 'none';
 
         const secSelect = document.getElementById('scope-sector-select') as HTMLSelectElement | null;
+        const genSelect = document.getElementById('scope-general-admin-select') as HTMLSelectElement | null;
         const brSelect = document.getElementById('scope-branch-select') as HTMLSelectElement | null;
 
         if (secSelect) {
             secSelect.innerHTML = '<option value="all">🌐 جميع القطاعات</option>' + 
-                (state.settings.sectors || []).map((s: string) => `<option value="${s}" ${currentAdminScopeSector === s ? 'selected' : ''}>${s}</option>`).join('');
+                getAvailableSectors().map((s: string) => `<option value="${s}" ${currentAdminScopeSector === s ? 'selected' : ''}>${s}</option>`).join('');
             secSelect.value = currentAdminScopeSector;
         }
 
+        if (genSelect) {
+            genSelect.innerHTML = '<option value="all">🏢 جميع الإدارات العامة</option>' + 
+                getGeneralAdminsForSector(currentAdminScopeSector).map((g: string) => `<option value="${g}" ${currentAdminScopeGeneralAdmin === g ? 'selected' : ''}>${g}</option>`).join('');
+            genSelect.value = currentAdminScopeGeneralAdmin;
+        }
+
         if (brSelect) {
-            brSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات</option>' + 
-                (state.settings.branches || []).map((b: string) => `<option value="${b}" ${currentAdminScopeBranch === b ? 'selected' : ''}>${b}</option>`).join('');
+            brSelect.innerHTML = '<option value="all">🏛️ جميع الإدارات الفرعية / الهندسات</option>' + 
+                getSubAdmins(currentAdminScopeSector, currentAdminScopeGeneralAdmin).map((b: string) => `<option value="${b}" ${currentAdminScopeBranch === b ? 'selected' : ''}>${b}</option>`).join('');
             brSelect.value = currentAdminScopeBranch;
         }
     } else {
@@ -595,8 +798,9 @@ const updateAdminScopeUI = () => {
             badge.style.display = 'flex';
             if (badgeText) {
                 const sec = loggedInUser?.sector || 'قطاع شمال المنيا';
-                const br = loggedInUser?.branch || 'هندسة كهرباء بني مزار';
-                badgeText.textContent = `${sec} - ${br}`;
+                const gen = loggedInUser?.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+                const br = loggedInUser?.subAdmin || loggedInUser?.branch || 'هندسة كهرباء بني مزار';
+                badgeText.textContent = `${sec} - ${gen} - ${br}`;
             }
         }
     }
@@ -647,7 +851,7 @@ const refreshCurrentActiveSection = () => {
     }
 };
 
-let loggedInUser: { fullName: string; role: string; username?: string; sector?: string; branch?: string } | null = null;
+let loggedInUser: { fullName: string; role: string; username?: string; sector?: string; generalAdmin?: string; subAdmin?: string; branch?: string } | null = null;
 let currentForm: HTMLFormElement | null = null; // This variable is declared but never used. Consider removing it.
 let currentFormParent: HTMLElement | null = null;
 
@@ -1165,38 +1369,157 @@ const populateSelect = (selectElement: HTMLSelectElement | null, options: string
  * Populates the username dropdown on the login screen.
  */
 const populateUserDropdown = () => {
-    const usernameSelect = document.getElementById('username') as HTMLSelectElement;
+    const sectorSelect = document.getElementById('login-sector') as HTMLSelectElement | null;
+    const genAdminSelect = document.getElementById('login-general-admin') as HTMLSelectElement | null;
+    const subAdminSelect = document.getElementById('login-sub-admin') as HTMLSelectElement | null;
+    const usernameSelect = document.getElementById('username') as HTMLSelectElement | null;
+
     if (!usernameSelect) return;
 
-    usernameSelect.innerHTML = '<option value="" disabled selected>اختر اسم المستخدم...</option>';
-    state.users.forEach(user => {
-        const option = document.createElement('option');
-        option.value = user.username;
-        option.textContent = user.fullName + (user.isSuspended ? ' ⛔ (موقوف من الخزينة)' : '');
-        usernameSelect.appendChild(option);
-    });
-    usernameSelect.value = '';
+    // Helper to refresh users dropdown based on current login filters
+    const updateFilteredUsersList = (preserveSelection = false) => {
+        const selSector = sectorSelect ? sectorSelect.value : 'all';
+        const selGen = genAdminSelect ? genAdminSelect.value : 'all';
+        const selSub = subAdminSelect ? subAdminSelect.value : 'all';
+        const previousUsername = usernameSelect.value;
 
-    const passwordInput = document.getElementById('password') as HTMLInputElement | null;
-    if (passwordInput) passwordInput.value = '';
+        usernameSelect.innerHTML = '<option value="" disabled selected>اختر اسم المستخدم...</option>';
 
-    const affBox = document.getElementById('login-user-affiliation');
-    if (affBox) affBox.style.display = 'none';
+        const filteredUsers = state.users.filter(user => {
+            const isGlobalAdmin = user.username === 'admin' || user.username === 'المدير' || user.role === 'admin' || user.role === 'supervisor' || user.sector === 'all';
+            if (isGlobalAdmin) return true; // Global admins can log in from any branch
 
+            const uSector = user.sector || 'قطاع شمال المنيا';
+            const uGen = user.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+            const uSub = user.subAdmin || user.branch || 'هندسة كهرباء بني مزار';
+
+            if (selSector !== 'all' && uSector !== selSector) return false;
+            if (selGen !== 'all' && uGen !== selGen) return false;
+            if (selSub !== 'all' && uSub !== selSub) return false;
+
+            return true;
+        });
+
+        filteredUsers.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.username;
+            const isGlobalAdmin = user.username === 'admin' || user.username === 'المدير' || user.role === 'admin' || user.role === 'supervisor';
+            const badge = isGlobalAdmin ? ' ⭐ (إدارة عامة)' : '';
+            option.textContent = user.fullName + badge + (user.isSuspended ? ' ⛔ (موقوف)' : '');
+            usernameSelect.appendChild(option);
+        });
+
+        if (preserveSelection && previousUsername && filteredUsers.some(u => u.username === previousUsername)) {
+            usernameSelect.value = previousUsername;
+        } else {
+            usernameSelect.value = '';
+            const passwordInput = document.getElementById('password') as HTMLInputElement | null;
+            if (passwordInput) passwordInput.value = '';
+            const affBox = document.getElementById('login-user-affiliation');
+            if (affBox) affBox.style.display = 'none';
+        }
+    };
+
+    // Helper to update subAdmin dropdown based on sector and genAdmin
+    const updateSubAdminDropdown = () => {
+        if (!subAdminSelect) return;
+        const currentSector = sectorSelect ? sectorSelect.value : 'all';
+        const currentGen = genAdminSelect ? genAdminSelect.value : 'all';
+        const currentVal = subAdminSelect.value;
+
+        const subList = getSubAdmins(currentSector, currentGen);
+        subAdminSelect.innerHTML = '<option value="all">🏛️ جميع الإدارات الفرعية / الهندسات</option>' +
+            subList.map(b => `<option value="${b}">${b}</option>`).join('');
+
+        if (currentVal && (currentVal === 'all' || subList.includes(currentVal))) {
+            subAdminSelect.value = currentVal;
+        } else {
+            subAdminSelect.value = 'all';
+        }
+    };
+
+    // Helper to update generalAdmin dropdown based on sector
+    const updateGeneralAdminDropdown = () => {
+        if (!genAdminSelect) return;
+        const currentSector = sectorSelect ? sectorSelect.value : 'all';
+        const currentVal = genAdminSelect.value;
+
+        const genList = getGeneralAdminsForSector(currentSector);
+        genAdminSelect.innerHTML = '<option value="all">🏢 جميع الإدارات العامة</option>' +
+            genList.map(g => `<option value="${g}">${g}</option>`).join('');
+
+        if (currentVal && (currentVal === 'all' || genList.includes(currentVal))) {
+            genAdminSelect.value = currentVal;
+        } else {
+            genAdminSelect.value = 'all';
+        }
+        updateSubAdminDropdown();
+    };
+
+    // Initialize login dropdowns
+    if (sectorSelect) {
+        const sectorsList = getAvailableSectors();
+        const curSec = sectorSelect.value || 'all';
+        sectorSelect.innerHTML = '<option value="all">🌐 جميع القطاعات</option>' +
+            sectorsList.map(s => `<option value="${s}">${s}</option>`).join('');
+        if (sectorsList.includes(curSec)) sectorSelect.value = curSec;
+        else sectorSelect.value = 'all';
+
+        sectorSelect.onchange = () => {
+            updateGeneralAdminDropdown();
+            updateFilteredUsersList();
+        };
+    }
+
+    if (genAdminSelect) {
+        updateGeneralAdminDropdown();
+        genAdminSelect.onchange = () => {
+            updateSubAdminDropdown();
+            updateFilteredUsersList();
+        };
+    }
+
+    if (subAdminSelect) {
+        updateSubAdminDropdown();
+        subAdminSelect.onchange = () => {
+            updateFilteredUsersList();
+        };
+    }
+
+    // Populate initial users list
+    updateFilteredUsersList();
+
+    // Username selection listener
     usernameSelect.onchange = () => {
         const val = usernameSelect.value;
         const u = state.users.find(usr => usr.username === val);
         const affBoxEl = document.getElementById('login-user-affiliation');
         const affTextEl = document.getElementById('login-user-affiliation-text');
+
         if (u && affBoxEl && affTextEl) {
-            if (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor' || u.sector === 'all') {
+            const isGlobalAdmin = u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor' || u.sector === 'all';
+            if (isGlobalAdmin) {
                 affTextEl.textContent = 'إدارة عامة وشاملة (جميع القطاعات والفروع)';
                 affBoxEl.style.display = 'block';
             } else {
                 const sec = u.sector || 'قطاع شمال المنيا';
-                const br = u.branch || 'هندسة كهرباء بني مزار';
-                affTextEl.textContent = `${sec} - ${br}`;
+                const gen = u.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+                const br = u.subAdmin || u.branch || 'هندسة كهرباء بني مزار';
+                affTextEl.textContent = `${sec} | ${gen} | ${br}`;
                 affBoxEl.style.display = 'block';
+
+                // Automatically reflect user's sector, genAdmin, and subAdmin if currently set to 'all'
+                if (sectorSelect && sectorSelect.value === 'all' && sec) {
+                    sectorSelect.value = sec;
+                    updateGeneralAdminDropdown();
+                }
+                if (genAdminSelect && genAdminSelect.value === 'all' && gen) {
+                    genAdminSelect.value = gen;
+                    updateSubAdminDropdown();
+                }
+                if (subAdminSelect && subAdminSelect.value === 'all' && br) {
+                    subAdminSelect.value = br;
+                }
             }
         } else if (affBoxEl) {
             affBoxEl.style.display = 'none';
@@ -1668,10 +1991,13 @@ const handleLogin = async (event: Event) => {
             role: user.role,
             username: user.username,
             sector: user.sector || 'all',
-            branch: user.branch || 'all'
+            generalAdmin: user.generalAdmin || (user.sector === 'all' ? 'all' : 'الإدارة العامة لهندسات شمال المنيا'),
+            subAdmin: user.subAdmin || user.branch || (user.sector === 'all' ? 'all' : 'هندسة كهرباء بني مزار'),
+            branch: user.subAdmin || user.branch || (user.sector === 'all' ? 'all' : 'هندسة كهرباء بني مزار')
         };
         localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
         currentAdminScopeSector = 'all';
+        currentAdminScopeGeneralAdmin = 'all';
         currentAdminScopeBranch = 'all';
         updateAdminScopeUI();
         errorElement?.classList.add('hidden');
@@ -18491,7 +18817,8 @@ const renderJudicialCollectionSection = () => {
             <th>اسم المستخدم</th>
             <th>الدور الوظيفي</th>
             <th>القطاع</th>
-            <th>الفرع / الهندسة</th>
+            <th>الإدارة العامة</th>
+            <th>الإدارة الفرعية / الهندسة</th>
             <th>حالة الحساب / الإيقاف</th>
             <th>إجراءات</th>
         </tr>
@@ -18519,15 +18846,19 @@ const renderJudicialCollectionSection = () => {
             const secBadge = user.sector === 'all' 
                 ? '<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">🌐 شامل (الكل)</span>' 
                 : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.sector || 'قطاع شمال المنيا'}</span>`;
-            const brBadge = user.branch === 'all' 
+            const genBadge = (user.generalAdmin === 'all' || user.sector === 'all')
+                ? '<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">🏢 شامل (الكل)</span>' 
+                : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا'}</span>`;
+            const brBadge = (user.branch === 'all' || user.subAdmin === 'all' || user.sector === 'all')
                 ? '<span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:bold;">🏛️ شامل (الكل)</span>' 
-                : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.branch || 'هندسة كهرباء بني مزار'}</span>`;
+                : `<span class="badge" style="background:#f8fafc; color:#334155; font-weight:600;">${user.subAdmin || user.branch || 'هندسة كهرباء بني مزار'}</span>`;
 
             row.innerHTML = ` 
             <td><b>${user.fullName}</b></td>
             <td><code>@${user.username}</code></td>
             <td><span class="badge" style="background:#f1f5f9; color:#334155;">${roleName}</span></td>
             <td>${secBadge}</td>
+            <td>${genBadge}</td>
             <td>${brBadge}</td>
             <td>
                 ${statusHtml}
@@ -18558,18 +18889,50 @@ const renderJudicialCollectionSection = () => {
         });
 
         const sectorSelect = form.querySelector('#user-sector') as HTMLSelectElement | null;
+        const genAdminSelect = form.querySelector('#user-general-admin') as HTMLSelectElement | null;
+        const branchSelect = form.querySelector('#user-branch') as HTMLSelectElement | null;
+
+        const updateUserFormDynamicSelects = () => {
+            const curSec = sectorSelect?.value || 'all';
+            const curGen = genAdminSelect?.value || 'all';
+
+            if (genAdminSelect) {
+                const genList = getGeneralAdminsForSector(curSec);
+                const prevGen = genAdminSelect.value;
+                genAdminSelect.innerHTML = '<option value="all">🏢 جميع الإدارات العامة (شامل)</option>' + 
+                    genList.map((g: string) => `<option value="${g}">${g}</option>`).join('');
+                if (prevGen && (prevGen === 'all' || genList.includes(prevGen))) {
+                    genAdminSelect.value = prevGen;
+                } else {
+                    genAdminSelect.value = 'all';
+                }
+            }
+
+            if (branchSelect) {
+                const subList = getSubAdmins(curSec, genAdminSelect?.value || 'all');
+                const prevSub = branchSelect.value;
+                branchSelect.innerHTML = '<option value="all">🏛️ جميع الإدارات الفرعية / الهندسات (شامل)</option>' + 
+                    subList.map((b: string) => `<option value="${b}">${b}</option>`).join('');
+                if (prevSub && (prevSub === 'all' || subList.includes(prevSub))) {
+                    branchSelect.value = prevSub;
+                } else {
+                    branchSelect.value = 'all';
+                }
+            }
+        };
+
         if (sectorSelect) {
             sectorSelect.innerHTML = '<option value="all">🌐 جميع القطاعات (شامل)</option>' + 
-                (state.settings.sectors || []).map((s: string) => `<option value="${s}">${s}</option>`).join('');
+                getAvailableSectors().map((s: string) => `<option value="${s}">${s}</option>`).join('');
             sectorSelect.value = 'all';
+            sectorSelect.onchange = () => updateUserFormDynamicSelects();
         }
 
-        const branchSelect = form.querySelector('#user-branch') as HTMLSelectElement | null;
-        if (branchSelect) {
-            branchSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات (شامل)</option>' + 
-                (state.settings.branches || []).map((b: string) => `<option value="${b}">${b}</option>`).join('');
-            branchSelect.value = 'all';
+        if (genAdminSelect) {
+            genAdminSelect.onchange = () => updateUserFormDynamicSelects();
         }
+
+        updateUserFormDynamicSelects();
 
         // Hide form for non-admins
         const userFormContainer = document.querySelector('#user-management .form-container');
@@ -18594,7 +18957,9 @@ const renderJudicialCollectionSection = () => {
         const role = (form.querySelector('#user-role') as HTMLSelectElement).value;
         const password = (form.querySelector('#user-password') as HTMLInputElement).value;
         const sector = (form.querySelector('#user-sector') as HTMLSelectElement)?.value || 'all';
+        const generalAdmin = (form.querySelector('#user-general-admin') as HTMLSelectElement)?.value || 'all';
         const branch = (form.querySelector('#user-branch') as HTMLSelectElement)?.value || 'all';
+        const subAdmin = branch;
 
         const existingUser = state.users.find(u => u.username === username && u.id !== id);
         if (existingUser) {
@@ -18609,6 +18974,10 @@ const renderJudicialCollectionSection = () => {
             const user = state.users[userIndex];
             user.fullName = fullName;
             user.username = username;
+            user.sector = sector;
+            user.generalAdmin = generalAdmin;
+            user.subAdmin = subAdmin;
+            user.branch = branch;
             // The main admin's role cannot be changed
             if (user.username !== 'admin') {
                 user.role = role;
@@ -18636,7 +19005,7 @@ const renderJudicialCollectionSection = () => {
                 showToast('كلمة المرور مطلوبة للمستخدم الجديد.', 'error');
                 return;
             }
-            state.users.push({ id, fullName, username, password, role, sector, branch });
+            state.users.push({ id, fullName, username, password, role, sector, generalAdmin, subAdmin, branch });
             logActivity('إضافة مستخدم', `إضافة مستخدم جديد: "${fullName}".`, `اسم المستخدم: ${username}, الدور الوظيفي: ${role}`);
             showToast('تمت إضافة المستخدم بنجاح.');
         }
@@ -18659,17 +19028,28 @@ const renderJudicialCollectionSection = () => {
         (form.querySelector('#user-password') as HTMLInputElement).value = '';
 
         const editSecSelect = form.querySelector('#user-sector') as HTMLSelectElement | null;
+        const editGenSelect = form.querySelector('#user-general-admin') as HTMLSelectElement | null;
+        const editBrSelect = form.querySelector('#user-branch') as HTMLSelectElement | null;
+
         if (editSecSelect) {
             editSecSelect.innerHTML = '<option value="all">🌐 جميع القطاعات (شامل)</option>' + 
-                (state.settings.sectors || []).map((s: string) => `<option value="${s}" ${user.sector === s ? 'selected' : ''}>${s}</option>`).join('');
+                getAvailableSectors().map((s: string) => `<option value="${s}" ${user.sector === s ? 'selected' : ''}>${s}</option>`).join('');
             editSecSelect.value = user.sector || 'all';
         }
 
-        const editBrSelect = form.querySelector('#user-branch') as HTMLSelectElement | null;
+        if (editGenSelect) {
+            const genList = getGeneralAdminsForSector(user.sector || 'all');
+            editGenSelect.innerHTML = '<option value="all">🏢 جميع الإدارات العامة (شامل)</option>' + 
+                genList.map((g: string) => `<option value="${g}" ${user.generalAdmin === g ? 'selected' : ''}>${g}</option>`).join('');
+            editGenSelect.value = user.generalAdmin || 'all';
+        }
+
         if (editBrSelect) {
-            editBrSelect.innerHTML = '<option value="all">🏛️ جميع الفروع / الهندسات (شامل)</option>' + 
-                (state.settings.branches || []).map((b: string) => `<option value="${b}" ${user.branch === b ? 'selected' : ''}>${b}</option>`).join('');
-            editBrSelect.value = user.branch || 'all';
+            const userSub = user.subAdmin || user.branch || 'all';
+            const subList = getSubAdmins(user.sector || 'all', user.generalAdmin || 'all');
+            editBrSelect.innerHTML = '<option value="all">🏛️ جميع الإدارات الفرعية / الهندسات (شامل)</option>' + 
+                subList.map((b: string) => `<option value="${b}" ${userSub === b ? 'selected' : ''}>${b}</option>`).join('');
+            editBrSelect.value = userSub;
         }
         (form.querySelector('#user-confirmPassword') as HTMLInputElement).value = '';
 
@@ -20820,17 +21200,28 @@ const renderJudicialCollectionSection = () => {
     });
     document.getElementById('login-form')?.addEventListener('submit', handleLogin);
         document.getElementById('header-logout-btn')?.addEventListener('click', handleLogout);
-        // مستمعات شريط تبديل النطاق (القطاع والفرع) للأدمن
+        // مستمعات شريط تبديل النطاق (القطاع، الإدارة العامة، والفرع) للأدمن
         document.getElementById('scope-sector-select')?.addEventListener('change', (e) => {
             currentAdminScopeSector = (e.target as HTMLSelectElement).value;
+            currentAdminScopeGeneralAdmin = 'all';
+            currentAdminScopeBranch = 'all';
+            updateAdminScopeUI();
             refreshCurrentActiveSection();
             showToast(`تم تبديل عرض القطاع: ${currentAdminScopeSector === 'all' ? 'جميع القطاعات' : currentAdminScopeSector}`, 'info');
+        });
+
+        document.getElementById('scope-general-admin-select')?.addEventListener('change', (e) => {
+            currentAdminScopeGeneralAdmin = (e.target as HTMLSelectElement).value;
+            currentAdminScopeBranch = 'all';
+            updateAdminScopeUI();
+            refreshCurrentActiveSection();
+            showToast(`تم تبديل عرض الإدارة العامة: ${currentAdminScopeGeneralAdmin === 'all' ? 'جميع الإدارات العامة' : currentAdminScopeGeneralAdmin}`, 'info');
         });
 
         document.getElementById('scope-branch-select')?.addEventListener('change', (e) => {
             currentAdminScopeBranch = (e.target as HTMLSelectElement).value;
             refreshCurrentActiveSection();
-            showToast(`تم تبديل عرض الفرع: ${currentAdminScopeBranch === 'all' ? 'جميع الفروع' : currentAdminScopeBranch}`, 'info');
+            showToast(`تم تبديل عرض الإدارة الفرعية: ${currentAdminScopeBranch === 'all' ? 'جميع الإدارات الفرعية' : currentAdminScopeBranch}`, 'info');
         });
 
         // Main App Listeners

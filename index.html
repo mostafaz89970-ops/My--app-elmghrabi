@@ -829,6 +829,24 @@
           <p class="login-subtitle">مرحباً بعودتك! يرجى إدخال بياناتك.</p>
         </div>
         <form id="login-form" autocomplete="off">
+          <div class="input-group" id="login-sector-group">
+            <label for="login-sector">القطاع</label>
+            <select id="login-sector" name="loginSector">
+              <option value="all">🌐 جميع القطاعات</option>
+            </select>
+          </div>
+          <div class="input-group" id="login-general-admin-group">
+            <label for="login-general-admin">الإدارة العامة</label>
+            <select id="login-general-admin" name="loginGeneralAdmin">
+              <option value="all">🏢 جميع الإدارات العامة</option>
+            </select>
+          </div>
+          <div class="input-group" id="login-sub-admin-group">
+            <label for="login-sub-admin">الإدارة الفرعية / الهندسة</label>
+            <select id="login-sub-admin" name="loginSubAdmin">
+              <option value="all">🏛️ جميع الإدارات الفرعية / الهندسات</option>
+            </select>
+          </div>
           <div class="input-group">
             <label for="username">اسم المستخدم</label>
             <select id="username" name="username" required="" autocomplete="off"><option value="" disabled selected>اختر اسم المستخدم...</option></select>
@@ -1088,8 +1106,11 @@
                 <select id="scope-sector-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
                     <option value="all">🌐 جميع القطاعات</option>
                 </select>
+                <select id="scope-general-admin-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
+                    <option value="all">🏢 جميع الإدارات العامة</option>
+                </select>
                 <select id="scope-branch-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
-                    <option value="all">🏛️ جميع الفروع / الهندسات</option>
+                    <option value="all">🏛️ جميع الإدارات الفرعية / الهندسات</option>
                 </select>
             </div>
 
@@ -3512,9 +3533,15 @@
                         </select>
                     </div>
                     <div class="input-group">
-                        <label for="user-branch">الفرع / الهندسة</label>
+                        <label for="user-general-admin">الإدارة العامة</label>
+                        <select id="user-general-admin">
+                            <option value="all">🏢 جميع الإدارات العامة (شامل)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="user-branch">الإدارة الفرعية / الهندسة</label>
                         <select id="user-branch">
-                            <option value="all">🏛️ جميع الفروع / الهندسات (شامل)</option>
+                            <option value="all">🏛️ جميع الإدارات الفرعية / الهندسات (شامل)</option>
                         </select>
                     </div>
                     <div class="input-group">
