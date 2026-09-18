@@ -4697,15 +4697,24 @@ const handlePrintJudicialControlDetails = () => {
         } catch (e) {}
 
         if (!isConnected) {
-            showToast('يرجى تحديد واختيار منفذ طابعة VTC (كابل USB أو منفذ COM التسلسلي) من نافذة المتصفح...', 'info');
             try {
-                port = await nav.serial.requestPort();
-            } catch (e: any) {
-                if (e.name === 'NotFoundError') {
-                    showToast('تم إلغاء اختيار منفذ طابعة VTC.', 'warning');
-                    return false;
+                const existingPorts = await nav.serial.getPorts();
+                if (existingPorts && existingPorts.length > 0) {
+                    port = existingPorts[0];
                 }
-                throw e;
+            } catch (e) {}
+
+            if (!port) {
+                showToast('يرجى اختيار منفذ طابعة VTC (مثل COM6 أو Standard Serial over Bluetooth) من نافذة المتصفح...', 'info');
+                try {
+                    port = await nav.serial.requestPort();
+                } catch (e: any) {
+                    if (e.name === 'NotFoundError') {
+                        showToast('تم إلغاء اختيار منفذ طابعة VTC.', 'warning');
+                        return false;
+                    }
+                    throw e;
+                }
             }
 
             if (!port) {
@@ -4713,7 +4722,9 @@ const handlePrintJudicialControlDetails = () => {
             }
 
             try {
-                await port.open({ baudRate: 9600 });
+                if (!port.readable || !port.writable) {
+                    await port.open({ baudRate: 9600 });
+                }
             } catch (err: any) {
                 console.warn('Port open warning:', err);
             }
@@ -4723,11 +4734,11 @@ const handlePrintJudicialControlDetails = () => {
         showToast('جاري إرسال الإيصال إلى طابعة VTC عبر اللابتوب...', 'info');
         const writer = port.writable.getWriter();
         try {
-            const chunkSize = 256;
+            const chunkSize = 128;
             for (let i = 0; i < escPosData.length; i += chunkSize) {
                 const chunk = escPosData.slice(i, i + chunkSize);
                 await writer.write(chunk);
-                await new Promise(r => setTimeout(r, 15));
+                await new Promise(r => setTimeout(r, 30));
             }
             showToast('تمت طباعة الإيصال على طابعة VTC بنجاح عبر اللابتوب! 🖨️', 'success');
             return true;
@@ -5034,11 +5045,11 @@ const handlePrintJudicialControlDetails = () => {
                         <input type="radio" name="printer-mode" value="usb" ${savedMode === 'usb' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
                         <div style="flex: 1;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <strong style="color: #0f172a; font-size: 0.95rem;">💻🔌 كابل USB أو منفذ تسلسلي COM (طابعة VTC للابتوب)</strong>
+                                <strong style="color: #0f172a; font-size: 0.95rem;">💻🔌 طابعة VTC عبر منفذ COM6 أو كابل USB (مباشر للابتوب)</strong>
                                 <span style="background: #0284c7; color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">الأفضل للابتوب ⭐</span>
                             </div>
                             <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
-                                اتصال مباشر بطابعة VTC عبر كابل USB أو منفذ Bluetooth COM المقترن بويندوز دون برامج إضافية.
+                                اتصال مباشر بطابعة VTC عبر منفذ Bluetooth COM6 أو USB على اللابتوب. يطبع الإيصال فوراً كرسومات حرارية نقية بدون أي كود برمجي.
                                 ${hasSerialSupport ? '<span style="color: #16a34a; font-weight: bold;">(مدعوم بمتصفحك على اللابتوب 🟢)</span>' : '<span style="color: #d97706; font-weight: bold;">(استخدم Google Chrome أو Edge ⚠️)</span>'}
                             </div>
                         </div>
@@ -5049,7 +5060,7 @@ const handlePrintJudicialControlDetails = () => {
                         <input type="radio" name="printer-mode" value="bluetooth" ${savedMode === 'bluetooth' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
                         <div style="flex: 1;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <strong style="color: #0f172a; font-size: 0.95rem;">📱💻 بلوتوث مباشر (طابعة VTC المحمولة للموبايل واللابتوب)</strong>
+                                <strong style="color: #0f172a; font-size: 0.95rem;">📱💻 بلوتوث مباشر (طابعة VTC للموبايل واللابتوب)</strong>
                                 <span style="background: #0ea5e9; color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">بلوتوث لاسلكي</span>
                             </div>
                             <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
@@ -5064,11 +5075,11 @@ const handlePrintJudicialControlDetails = () => {
                         <input type="radio" name="printer-mode" value="system" ${savedMode === 'system' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
                         <div style="flex: 1;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <strong style="color: #0f172a; font-size: 0.95rem;">📄 طباعة النظام الافتراضية (طابعات ويندوز / المعاينة)</strong>
-                                <span style="background: #f1f5f9; color: #475569; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">Windows Print</span>
+                                <strong style="color: #0f172a; font-size: 0.95rem;">📄 طباعة النظام الافتراضية (معاينة / طابعات ويندوز / PDF)</strong>
+                                <span style="background: #f1f5f9; color: #475569; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">معاينة / PDF</span>
                             </div>
                             <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
-                                فتح نافذة طباعة ويندوز لاختيار طابعة VTC المعرفة على الجهاز أو الحفظ بصيغة PDF.
+                                فتح نافذة الطباعة بالمتصفح، يتم تضمين الإيصال كصورة رسومية عالية الدقة لمنع تشوه الخطوط أو طباعة الأكواد.
                             </div>
                         </div>
                     </label>
@@ -5236,9 +5247,10 @@ const handlePrintJudicialControlDetails = () => {
             `;
         }
 
-        const generateCitizenThermalHTML = (paperWidth: number = 58): string => {
+        const generateCitizenThermalHTML = (paperWidth: number = 58, canvas?: HTMLCanvasElement): string => {
             const isBig = paperWidth === 80;
             const wrapWidth = isBig ? '72mm' : '52mm';
+            const canvasDataUrl = canvas ? canvas.toDataURL('image/png') : null;
             return `
         <!DOCTYPE html>
         <html lang="ar" dir="rtl">
@@ -5483,6 +5495,11 @@ const handlePrintJudicialControlDetails = () => {
         </head>
         <body>
             <div class="thermal-wrapper">
+                ${canvasDataUrl ? `
+                <div style="text-align: center; margin: 0; padding: 0; width: 100%;">
+                    <img src="${canvasDataUrl}" alt="إيصال زينات" style="width: 100%; max-width: ${wrapWidth}; display: block; margin: 0 auto; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;" />
+                </div>
+                ` : `
                 <div class="header-box">
                     <div class="company-title">${headerInfo.company}</div>
                     <div class="sector-title">${headerInfo.sector}</div>
@@ -5553,6 +5570,7 @@ const handlePrintJudicialControlDetails = () => {
                 </div>
 
                 <div class="cut-marker">----------------- قص الإيصال من هنا -----------------</div>
+                `}
             </div>
         </body>
         </html>
@@ -5580,7 +5598,8 @@ const handlePrintJudicialControlDetails = () => {
 
         const executePrintAction = async (mode: 'usb' | 'bluetooth' | 'rawbt' | 'system', paperWidth: number) => {
             const canvasWidth = paperWidth === 80 ? 576 : 384;
-            const htmlContent = generateCitizenThermalHTML(paperWidth);
+            const canvas = renderThermalReceiptToCanvas(receiptData, canvasWidth);
+            const htmlContent = generateCitizenThermalHTML(paperWidth, canvas);
 
             if (mode === 'usb') {
                 const nav = navigator as any;
@@ -5590,7 +5609,6 @@ const handlePrintJudicialControlDetails = () => {
                     return;
                 }
                 try {
-                    const canvas = renderThermalReceiptToCanvas(receiptData, canvasWidth);
                     const escPosData = canvasToEscPosRaster(canvas);
                     await printViaWebSerial(escPosData);
                 } catch (err: any) {
@@ -5608,7 +5626,6 @@ const handlePrintJudicialControlDetails = () => {
                     return;
                 }
                 try {
-                    const canvas = renderThermalReceiptToCanvas(receiptData, canvasWidth);
                     const escPosData = canvasToEscPosRaster(canvas);
                     await printViaWebBluetooth(escPosData);
                 } catch (err: any) {
@@ -5620,7 +5637,6 @@ const handlePrintJudicialControlDetails = () => {
                 }
             } else if (mode === 'rawbt') {
                 try {
-                    const canvas = renderThermalReceiptToCanvas(receiptData, canvasWidth);
                     printViaRawBT(canvas);
                     showToast('تم إرسال الإيصال لتطبيق RawBT بنجاح 🖨️', 'success');
                 } catch (err: any) {
