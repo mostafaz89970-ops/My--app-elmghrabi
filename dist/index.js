@@ -20037,6 +20037,42 @@ const formatArabicDocumentDate = (rawDate) => {
     }
     return `${d.getDate()}-${arabicMonths[d.getMonth()]}-${d.getFullYear()}`;
 };
+// دالة استخراج فرع الإيرادات تلقائياً وبشكل ديناميكي من بيانات تسجيل الدخول الحالية
+const getAutoLoginRevenueBranch = (explicitBranch) => {
+    if (explicitBranch && explicitBranch.trim()) {
+        const trimmed = explicitBranch.trim();
+        if (trimmed.includes('هندسة كهرباء') || trimmed.includes('هندسة')) {
+            const cleaned = trimmed
+                .replace(/هندسة\s*كهرباء/g, '')
+                .replace(/هندسة/g, '')
+                .replace(/فرع\s*إيرادات/g, '')
+                .replace(/إيرادات/g, '')
+                .trim();
+            return cleaned ? `إيرادات ${cleaned}` : trimmed;
+        }
+        return trimmed;
+    }
+    const hInfo = getDynamicReceiptHeader();
+    // قراءة الفرع من بيانات المستخدم المسجل دخوله حالياً
+    const userBranch = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) || (hInfo === null || hInfo === void 0 ? void 0 : hInfo.branchName) || '';
+    let cleanCity = userBranch
+        .replace(/هندسة\s*كهرباء/g, '')
+        .replace(/هندسة/g, '')
+        .replace(/فرع\s*إيرادات/g, '')
+        .replace(/إيرادات/g, '')
+        .replace(/^\d+[\s\-_]*/g, '')
+        .trim();
+    if (!cleanCity && (hInfo === null || hInfo === void 0 ? void 0 : hInfo.revenueBranch)) {
+        cleanCity = hInfo.revenueBranch
+            .replace(/فرع\s*إيرادات/g, '')
+            .replace(/إيرادات/g, '')
+            .trim();
+    }
+    if (cleanCity) {
+        return `إيرادات ${cleanCity}`;
+    }
+    return (hInfo === null || hInfo === void 0 ? void 0 : hInfo.revenueBranch) || 'إيرادات بنى مزار شرق';
+};
 // دالة طباعة مستند (بيانات طلب الخدمة) مطابقاً 1:1 لصورة النموذج الرسمية
 const printServiceRequestExactDocument = (record) => {
     if (!record)
@@ -20046,9 +20082,9 @@ const printServiceRequestExactDocument = (record) => {
         showToast('فشل فتح نافذة الطباعة. يرجى السماح بالنوافذ المنبثقة.', 'error');
         return;
     }
-    const companyName = record.companyName || 'شركة مصر الوسطى لتوزيع الكهرباء';
-    const branchSetting = state.settings.branch || (state.settings.branches && state.settings.branches[0]) || '';
-    const branchName = record.branchName || (branchSetting ? (branchSetting.startsWith('إيرادات') ? branchSetting : `إيرادات ${branchSetting}`) : 'إيرادات بنى مزار شرق');
+    const hInfo = getDynamicReceiptHeader();
+    const companyName = record.companyName || hInfo.company || 'شركة مصر الوسطى لتوزيع الكهرباء';
+    const branchName = getAutoLoginRevenueBranch(record.branchName);
     const docDate = formatArabicDocumentDate(record.date || record['issue-date'] || new Date());
     const orderNo = record['order-number'] || record.orderNumber || record.requestNumber || '';
     const requestDate = formatArabicDocumentDate(record['request-date'] || record['issue-date'] || record.date);
@@ -20394,9 +20430,9 @@ const renderAccountingSubscriptionsSection = () => {
     const body = section.querySelector('.accounting-subscriptions-body');
     if (!body)
         return;
-    const defaultCompany = 'شركة مصر الوسطى لتوزيع الكهرباء';
-    const branchSetting = state.settings.branch || (state.settings.branches && state.settings.branches[0]) || '';
-    const defaultBranch = branchSetting ? (branchSetting.startsWith('إيرادات') ? branchSetting : `إيرادات ${branchSetting}`) : 'إيرادات بنى مزار شرق';
+    const hInfo = getDynamicReceiptHeader();
+    const defaultCompany = hInfo.company || 'شركة مصر الوسطى لتوزيع الكهرباء';
+    const defaultBranch = getAutoLoginRevenueBranch();
     const todayArabic = formatArabicDocumentDate(new Date());
     body.innerHTML = `
         <div class="subscriptions-container" style="max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
