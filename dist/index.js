@@ -18293,6 +18293,159 @@ const openAccountingImageViewer = (src, title = 'عرض الصورة', initialSc
     });
     document.body.appendChild(overlay);
 };
+const showTransferAccountingRecordModal = (recordId, onDone) => {
+    var _a, _b, _c;
+    const records = getAllAccountingRequests();
+    const record = records.find(r => Number(r.id) === Number(recordId));
+    if (!record) {
+        showToast('تعذر العثور على بيانات هذا السجل.', 'error');
+        return;
+    }
+    const existingModal = document.getElementById('transfer-accounting-record-modal');
+    if (existingModal)
+        existingModal.remove();
+    const currentSector = record.sector || 'قطاع شمال المنيا';
+    const currentGA = record.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+    const currentBranch = record.subAdmin || record.branch || record.branchName || 'هندسة كهرباء بني مزار';
+    const modal = document.createElement('div');
+    modal.id = 'transfer-accounting-record-modal';
+    modal.style.cssText = 'position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(4px);';
+    modal.innerHTML = `
+        <div style="background: #ffffff; width: 100%; max-width: 540px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2); overflow: hidden; border: 1px solid #e2e8f0;">
+            <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px;">🏢</span>
+                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700;">تحويل الطلب إلى إدارة أخرى</h3>
+                </div>
+                <button type="button" id="btn-close-transfer-modal" style="background: none; border: none; color: white; font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px;">✕</button>
+            </div>
+            
+            <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; font-size: 13px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="color: #64748b;">اسم العميل:</span>
+                        <strong style="color: #0f172a;">${record['client-name'] || '-'}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="color: #64748b;">رقم الطلب:</span>
+                        <strong style="color: #0284c7;">${record['order-number'] || '-'}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #64748b;">الإدارة الحالية المسجل بها:</span>
+                        <strong style="color: #dc2626;">${currentBranch}</strong>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 5px;">القطاع التابع له الإدارة:</label>
+                        <select id="transfer-modal-sector" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 14px;">
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 5px;">الإدارة العامة المحول إليها:</label>
+                        <select id="transfer-modal-gen-admin" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 14px;">
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 5px;">الإدارة الفرعية / الفرع المستلم:</label>
+                        <select id="transfer-modal-branch" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 14px; font-weight: bold; color: #0369a1;">
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 5px;">سبب أو ملاحظات التحويل (اختياري):</label>
+                        <input type="text" id="transfer-modal-reason" placeholder="مثال: تم تسجيل الطلب بالخطأ ويتبع فرع آخر..." style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 14px;">
+                    <button type="button" id="btn-cancel-transfer-modal" class="btn secondary" style="padding: 8px 16px;">إلغاء</button>
+                    <button type="button" id="btn-submit-transfer-modal" class="btn" style="background: #0d9488; border-color: #0f766e; color: white; font-weight: bold; padding: 8px 18px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <span>تأكيد التحويل للإدارة 🚀</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        `;
+    document.body.appendChild(modal);
+    const sectorSel = document.getElementById('transfer-modal-sector');
+    const genSel = document.getElementById('transfer-modal-gen-admin');
+    const branchSel = document.getElementById('transfer-modal-branch');
+    const reasonInp = document.getElementById('transfer-modal-reason');
+    // Populate sectors
+    const sectors = getAvailableSectors();
+    populateSelect(sectorSel, sectors, '');
+    if (sectors.includes(currentSector))
+        sectorSel.value = currentSector;
+    const updateBranches = () => {
+        const currentSec = sectorSel.value;
+        const currentGeneral = genSel.value;
+        const branches = getSubAdmins(currentSec, currentGeneral);
+        populateSelect(branchSel, branches, '-- اختر الإدارة المستلمة --');
+    };
+    const updateGenAdmins = () => {
+        const currentSec = sectorSel.value;
+        const gas = getGeneralAdminsForSector(currentSec);
+        populateSelect(genSel, gas, '');
+        if (gas.includes(currentGA))
+            genSel.value = currentGA;
+        updateBranches();
+    };
+    sectorSel.addEventListener('change', updateGenAdmins);
+    genSel.addEventListener('change', updateBranches);
+    updateGenAdmins();
+    // Close handlers
+    const closeModal = () => modal.remove();
+    (_a = document.getElementById('btn-close-transfer-modal')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', closeModal);
+    (_b = document.getElementById('btn-cancel-transfer-modal')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal)
+            closeModal();
+    });
+    // Submit handler
+    (_c = document.getElementById('btn-submit-transfer-modal')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', async () => {
+        var _a;
+        const targetSector = sectorSel.value;
+        const targetGA = genSel.value;
+        const targetBranch = branchSel.value;
+        const reason = ((_a = reasonInp === null || reasonInp === void 0 ? void 0 : reasonInp.value) === null || _a === void 0 ? void 0 : _a.trim()) || 'تسجيل بالخطأ';
+        if (!targetBranch || targetBranch.startsWith('--')) {
+            showToast('يرجى اختيار الإدارة الفرعية / الفرع المحول إليه.', 'error');
+            return;
+        }
+        if (targetBranch === currentBranch) {
+            showToast('السجل مسجل بالفعل في هذه الإدارة الحالية.', 'warning');
+            return;
+        }
+        const allRecords = getAllAccountingRequests();
+        const recIdx = allRecords.findIndex(r => Number(r.id) === Number(recordId));
+        if (recIdx === -1) {
+            showToast('تعذر العثور على السجل في قاعدة البيانات.', 'error');
+            return;
+        }
+        const oldBranchName = allRecords[recIdx].subAdmin || allRecords[recIdx].branch || 'غير محدد';
+        allRecords[recIdx].sector = targetSector;
+        allRecords[recIdx].generalAdmin = targetGA;
+        allRecords[recIdx].subAdmin = targetBranch;
+        allRecords[recIdx].branch = targetBranch;
+        allRecords[recIdx].branchName = targetBranch;
+        allRecords[recIdx].department = targetBranch;
+        allRecords[recIdx].transferredAt = new Date().toISOString();
+        allRecords[recIdx].transferredBy = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'المسؤول';
+        allRecords[recIdx].transferReason = reason;
+        const saved = saveAccountingRequests(allRecords);
+        if (!saved)
+            return;
+        logActivity('تحويل سجل محاسبة', `تم تحويل طلب العميل "${allRecords[recIdx]['client-name']}" (طلب رقم ${allRecords[recIdx]['order-number'] || '-'}) من (${oldBranchName}) إلى (${targetBranch})`);
+        showToast(`تم تحويل الطلب بنجاح إلى (${targetBranch}).`, 'success');
+        closeModal();
+        if (onDone)
+            onDone();
+    });
+};
 const renderMeterNumberInputs = (count, initialValues = [], initialLocationTypes = []) => {
     const container = document.getElementById('accounting-meter-numbers-container');
     if (!container)
@@ -19780,6 +19933,7 @@ const renderAccountingSavedRecordsSection = () => {
                                 <th>رقم الطلب</th>
                                 <th>رقم العداد</th>
                                 <th>رقم القيد</th>
+                                <th>الإدارة / الفرع</th>
                                 <th>تاريخ الحفظ</th>
                                 <th>الإجراءات</th>
                             </tr>
@@ -19792,11 +19946,13 @@ const renderAccountingSavedRecordsSection = () => {
                                     <td>${record['order-number'] || '-'}</td>
                                     <td>${record['meter-number'] || '-'}</td>
                                     <td>${record['registration-number'] || '-'}</td>
+                                    <td><span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: 600; font-size: 12px;">${record.subAdmin || record.branch || record.branchName || 'هندسة كهرباء بني مزار'}</span></td>
                                     <td>${record.savedAt ? new Date(record.savedAt).toLocaleString('ar-EG') : '-'}</td>
                                     <td>
                                         <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
                                             <button type="button" class="action-btn view btn-view-accounting-record" data-id="${record.id}" title="عرض"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
                                             <button type="button" class="action-btn print btn-print-accounting-record" data-id="${record.id}" title="طباعة"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></button>
+                                            <button type="button" class="action-btn transfer btn-transfer-accounting-record" data-id="${record.id}" title="تحويل للإدارة المختصة" style="background: #f0fdf4; border-color: #16a34a; color: #15803d;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></button>
                                             ${hasButtonPermission('edit_button') ? `<button type="button" class="action-btn edit btn-edit-accounting-record" data-id="${record.id}" title="تعديل"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>` : ''}
                                             ${hasButtonPermission('delete_button') ? `<button type="button" class="action-btn delete btn-delete-accounting-record" data-id="${record.id}" title="حذف"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>` : ''}
                                         </div>
@@ -19867,14 +20023,20 @@ const renderAccountingSavedRecordsSection = () => {
                     <div class="info-card" style="margin-top: 18px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
                             <h4 style="margin: 0;">تفاصيل سجل تغيير نظام المحاسبة</h4>
-                            <button type="button" class="btn btn-primary btn-print-accounting-record" data-id="${record.id}" style="display: flex; align-items: center; gap: 8px; font-weight: 800; background: #0284c7; border-color: #0369a1; padding: 7px 16px; color: #fff; border-radius: 6px; cursor: pointer;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                                <span>طباعة بيانات طلب الخدمة 🖨️</span>
-                            </button>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-transfer-accounting-record" data-id="${record.id}" style="display: flex; align-items: center; gap: 8px; font-weight: 700; background: #0d9488; border-color: #0f766e; padding: 7px 16px; color: #fff; border-radius: 6px; cursor: pointer;">
+                                    <span>تحويل للإدارة 🏢</span>
+                                </button>
+                                <button type="button" class="btn btn-primary btn-print-accounting-record" data-id="${record.id}" style="display: flex; align-items: center; gap: 8px; font-weight: 800; background: #0284c7; border-color: #0369a1; padding: 7px 16px; color: #fff; border-radius: 6px; cursor: pointer;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                                    <span>طباعة بيانات طلب الخدمة 🖨️</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="details-grid">
                             <div class="detail-item"><label>اسم العميل</label><span class="value">${record['client-name'] || '-'}</span></div>
                             <div class="detail-item"><label>العنوان</label><span class="value">${record.address || '-'}</span></div>
+                            <div class="detail-item"><label>الإدارة التابع لها</label><span class="value" style="color: #0284c7; font-weight: bold;">${record.subAdmin || record.branch || record.branchName || 'هندسة كهرباء بني مزار'} (${record.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا'})</span></div>
                             <div class="detail-item"><label>رقم البطاقة</label><span class="value">${record['card-number'] || '-'}</span></div>
                             <div class="detail-item"><label>رقم الطلب</label><span class="value">${record['order-number'] || '-'}</span></div>
                             <div class="detail-item"><label>رقم الموبايل</label><span class="value">${record.mobile || '-'}</span></div>
@@ -20015,6 +20177,17 @@ const renderAccountingSavedRecordsSection = () => {
                 }, 0);
                 return;
             }
+            const transferButton = target.closest('.btn-transfer-accounting-record');
+            if (transferButton) {
+                const id = Number(transferButton.getAttribute('data-id'));
+                showTransferAccountingRecordModal(id, () => {
+                    renderTable(getMatchingRecords(currentSearchTerm));
+                    const detail = body.querySelector('.accounting-record-detail');
+                    if (detail)
+                        detail.remove();
+                });
+                return;
+            }
             if (deleteButton) {
                 if (!hasButtonPermission('delete_button')) {
                     showToast('عفواً، ليس لديك صلاحية حذف السجلات. هذه الصلاحية مقصورة على مسؤول المنظومة فقط.', 'error');
@@ -20022,10 +20195,13 @@ const renderAccountingSavedRecordsSection = () => {
                 }
                 const id = Number(deleteButton.getAttribute('data-id'));
                 if (confirm('هل أنت متأكد من حذف هذا السجل؟')) {
-                    const updatedRecords = getAccountingRequests().filter(item => Number(item.id) !== id);
+                    const updatedRecords = getAllAccountingRequests().filter(item => Number(item.id) !== id);
                     saveAccountingRequests(updatedRecords);
                     showToast('تم حذف السجل بنجاح.', 'success');
-                    renderTable(updatedRecords);
+                    renderTable(getMatchingRecords(currentSearchTerm));
+                    const detail = body.querySelector('.accounting-record-detail');
+                    if (detail)
+                        detail.remove();
                 }
             }
         });
@@ -20884,6 +21060,7 @@ const renderAccountingSubscriptionsSection = () => {
                     <td>
                         <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
                             <button type="button" class="btn secondary btn-sub-load" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px;">عرض في المستند 📄</button>
+                            <button type="button" class="btn btn-sub-transfer" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0d9488; border-color: #0f766e; color: #fff;">تحويل للإدارة 🏢</button>
                             ${canPrint ? `<button type="button" class="btn btn-sub-print" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة النموذج الجديد 🖨️</button>` : ''}
                             ${canDelete ? `<button type="button" class="btn btn-delete btn-sub-delete" data-id="${rec.id}" style="padding: 4px 8px; font-size: 12px;">حذف</button>` : ''}
                         </div>
@@ -21055,13 +21232,22 @@ const renderAccountingSubscriptionsSection = () => {
         if (searchMsg)
             searchMsg.innerHTML = '';
     });
-    // أحداث الجدول (عرض في المستند / طباعة / حذف)
+    // أحداث الجدول (عرض في المستند / طباعة / تحويل للإدارة / حذف)
     body.addEventListener('click', (event) => {
         var _a;
         const target = event.target;
         const loadBtn = target.closest('.btn-sub-load');
         const printBtn = target.closest('.btn-sub-print');
+        const transferBtn = target.closest('.btn-sub-transfer');
         const deleteBtn = target.closest('.btn-sub-delete');
+        if (transferBtn) {
+            const id = Number(transferBtn.getAttribute('data-id'));
+            showTransferAccountingRecordModal(id, () => {
+                renderSavedSubList();
+                resetDocForm();
+            });
+            return;
+        }
         if (loadBtn) {
             const id = Number(loadBtn.getAttribute('data-id'));
             const rec = getAccountingRequests().find(r => Number(r.id) === id);
