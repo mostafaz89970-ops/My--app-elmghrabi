@@ -4535,8 +4535,568 @@ const handlePrintJudicialControlDetails = () => {
         executePrintHtmlContent(receiptHTML);
     };
 
-    // دالة طباعة إيصال حراري مختصر ومخصص للمواطن (بون كاشير 80mm)
-    (window as any).printZinatThermalReceipt = (id: any) => {
+    // =========================================================================
+    // ================= منظومة الطباعة الحرارية المتقدمة للموبايل (طابعة VTC) =================
+    // =========================================================================
+
+    let cachedBluetoothDevice: any = null;
+    let cachedPrintCharacteristic: any = null;
+
+    // تحويل Canvas إلى بيانات نقطية بتسلسل أوامر ESC/POS متوافقة 100% مع طابعات VTC
+    const canvasToEscPosRaster = (canvas: HTMLCanvasElement): Uint8Array => {
+        const ctx = canvas.getContext('2d')!;
+        const width = canvas.width;
+        const height = canvas.height;
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+
+        const widthBytes = Math.ceil(width / 8);
+        const commands: number[] = [];
+
+        // تهيئة الطابعة: ESC @
+        commands.push(0x1B, 0x40);
+
+        // محاذاة في المنتصف: ESC a 1
+        commands.push(0x1B, 0x61, 0x01);
+
+        // أمر الصورة النقطية: GS v 0 0 xL xH yL yH
+        const xL = widthBytes & 0xFF;
+        const xH = (widthBytes >> 8) & 0xFF;
+        const yL = height & 0xFF;
+        const yH = (height >> 8) & 0xFF;
+
+        commands.push(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH);
+
+        for (let y = 0; y < height; y++) {
+            for (let b = 0; b < widthBytes; b++) {
+                let byteVal = 0;
+                for (let bit = 0; bit < 8; bit++) {
+                    const x = b * 8 + bit;
+                    if (x < width) {
+                        const idx = (y * width + x) * 4;
+                        const r = data[idx];
+                        const g = data[idx + 1];
+                        const bVal = data[idx + 2];
+                        const a = data[idx + 3];
+
+                        // حساب الإضاءة وتحويل النقط الداكنة إلى نقط طباعة حرارية
+                        const lum = a < 128 ? 255 : (r * 0.299 + g * 0.587 + bVal * 0.114);
+                        if (lum < 165) {
+                            byteVal |= (1 << (7 - bit));
+                        }
+                    }
+                }
+                commands.push(byteVal);
+            }
+        }
+
+        // تلقيم الورق: ESC d 4
+        commands.push(0x1B, 0x64, 0x04);
+        commands.push(0x0A, 0x0A, 0x0A);
+
+        return new Uint8Array(commands);
+    };
+
+    // إرسال البيانات لطابعة VTC عبر تقنية Web Bluetooth
+    const printViaWebBluetooth = async (escPosData: Uint8Array): Promise<boolean> => {
+        const nav = navigator as any;
+        if (!nav.bluetooth) {
+            throw new Error('خاصية Web Bluetooth غير مدعومة في هذا المتصفح. يرجى فتح المنظومة عبر متصفح Google Chrome أو Edge على هاتف أندرويد.');
+        }
+
+        const PRINTER_SERVICES = [
+            '000018f0-0000-1000-8000-00805f9b34fb', // Standard ESC/POS
+            '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC transparent UART (VTC / Mobile POS)
+            '0000e7c0-0000-1000-8000-00805f9b34fb',
+            '0000fff0-0000-1000-8000-00805f9b34fb',
+            '0000af30-0000-1000-8000-00805f9b34fb',
+            '0000ff00-0000-1000-8000-00805f9b34fb',
+            'e7810a71-73ae-499d-8c15-faa9aef0c3f2'
+        ];
+
+        let device = cachedBluetoothDevice;
+        let char = cachedPrintCharacteristic;
+
+        if (!device || !device.gatt?.connected || !char) {
+            showToast('يرجى تحديد واختيار طابعة VTC من قائمة أجهزة البلوتوث المجاورة...', 'info');
+            try {
+                device = await nav.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: PRINTER_SERVICES
+                });
+            } catch (e: any) {
+                if (e.name === 'NotFoundError') {
+                    showToast('تم إلغاء اقتران طابعة البلوتوث.', 'warning');
+                    return false;
+                }
+                throw e;
+            }
+
+            if (!device || !device.gatt) {
+                throw new Error('تعذر العثور على طابعة البلوتوث VTC.');
+            }
+
+            cachedBluetoothDevice = device;
+            showToast(`جاري الاتصال بطابعة (${device.name || 'VTC'})...`, 'info');
+
+            const server = await device.gatt.connect();
+            const services = await server.getPrimaryServices();
+
+            char = null;
+            for (const s of services) {
+                try {
+                    const chars = await s.getCharacteristics();
+                    for (const c of chars) {
+                        if (c.properties.write || c.properties.writeWithoutResponse) {
+                            char = c;
+                            break;
+                        }
+                    }
+                } catch (ignore) {}
+                if (char) break;
+            }
+
+            if (!char) {
+                throw new Error('تم الاتصال بطابعة VTC ولكن لم يتم العثور على منفذ الإرسال (Write Channel).');
+            }
+            cachedPrintCharacteristic = char;
+        }
+
+        showToast(`جاري إرسال الإيصال إلى طابعة ${device.name || 'VTC'}...`, 'info');
+
+        // تقسيم البيانات إلى حزم صغيرة لضمان استقرار الطباعة وعدم امتلاء الذاكرة المؤقتة
+        const chunkSize = 256;
+        for (let i = 0; i < escPosData.length; i += chunkSize) {
+            const chunk = escPosData.slice(i, i + chunkSize);
+            if (char.writeValueWithoutResponse) {
+                await char.writeValueWithoutResponse(chunk);
+            } else {
+                await char.writeValue(chunk);
+            }
+            await new Promise(r => setTimeout(r, 20));
+        }
+
+        showToast(`تمت طباعة الإيصال على طابعة ${device.name || 'VTC'} بنجاح! 🖨️`, 'success');
+        return true;
+    };
+
+    // إرسال الإيصال عبر تطبيق RawBT للأندرويد
+    const printViaRawBT = (canvas: HTMLCanvasElement): void => {
+        const dataUrl = canvas.toDataURL('image/png');
+        const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+        const rawbtUrl = `rawbt:data:image/png;base64,${base64}`;
+
+        const a = document.createElement('a');
+        a.href = rawbtUrl;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            try { a.remove(); } catch(e) {}
+        }, 1000);
+    };
+
+    // رسم الإيصال الحراري العربي بدقة فائقة على Canvas
+    const renderThermalReceiptToCanvas = (data: any, canvasWidth = 384): HTMLCanvasElement => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasWidth;
+        canvas.height = 1400; // مساحة مؤقتة
+        const ctx = canvas.getContext('2d')!;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#000000';
+        (ctx as any).direction = 'rtl';
+        ctx.textBaseline = 'top';
+
+        const pad = canvasWidth === 576 ? 16 : 10;
+        const cw = canvasWidth - (pad * 2);
+        let y = 14;
+
+        const drawCenterText = (text: string, font: string, spacing = 22) => {
+            ctx.font = font;
+            ctx.textAlign = 'center';
+            ctx.fillText(text, canvasWidth / 2, y);
+            y += spacing;
+        };
+
+        const drawDashed = (dashedY: number) => {
+            ctx.save();
+            ctx.setLineDash([4, 3]);
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(pad, dashedY);
+            ctx.lineTo(canvasWidth - pad, dashedY);
+            ctx.stroke();
+            ctx.restore();
+        };
+
+        const isBig = canvasWidth === 576;
+        drawCenterText(data.headerInfo.company, `bold ${isBig ? 18 : 15}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 24 : 20);
+        drawCenterText(data.headerInfo.sector, `bold ${isBig ? 15 : 13}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 21 : 18);
+        drawCenterText(data.headerInfo.branchName, `bold ${isBig ? 15 : 13}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 19 : 17);
+        drawCenterText(data.headerInfo.revenueBranch, `bold ${isBig ? 14 : 12}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 22 : 19);
+
+        // شارة إيصال المواطن
+        const badgeTxt = 'إيصال سداد نقدية (نسخة المواطن)';
+        ctx.font = `bold ${isBig ? 14 : 12}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        const bw = ctx.measureText(badgeTxt).width + (isBig ? 20 : 14);
+        const bh = isBig ? 24 : 20;
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#000000';
+        ctx.strokeRect((canvasWidth - bw) / 2, y, bw, bh);
+        ctx.textAlign = 'center';
+        ctx.fillText(badgeTxt, canvasWidth / 2, y + (isBig ? 4 : 3));
+        y += bh + 8;
+
+        // شريط نوع التحصيل مقابل زينات
+        const banH = isBig ? 26 : 22;
+        ctx.fillRect(pad, y, cw, banH);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${isBig ? 15 : 13}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('نوع التحصيل: مقابل زينات', canvasWidth / 2, y + (isBig ? 4 : 3));
+        ctx.fillStyle = '#000000';
+        y += banH + 8;
+
+        drawDashed(y);
+        y += 8;
+
+        // رقم الإيصال والتاريخ
+        ctx.font = `bold ${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.fillText(`رقم الإيصال: ${data.receiptNo}`, canvasWidth - pad, y);
+        ctx.textAlign = 'left';
+        ctx.fillText(`${data.printDate}`, pad, y);
+        y += isBig ? 20 : 17;
+
+        drawDashed(y);
+        y += 8;
+
+        // جدول التفاصيل
+        const infoRows: { lbl: string; val: string }[] = [
+            { lbl: 'نوع التحصيل:', val: 'مقابل زينات' },
+            { lbl: 'نوع الإيصال:', val: 'إيصال سداد نقدية (نسخة المواطن)' },
+            { lbl: 'اسم المواطن:', val: data.item.requesterName || '-' },
+            { lbl: 'العنوان:', val: data.item.address || '-' },
+            ...(data.item.mobile ? [{ lbl: 'رقم الموبايل:', val: data.item.mobile }] : []),
+            ...(data.item.technician ? [{ lbl: 'الفني المسؤول:', val: data.item.technician }] : []),
+            ...(data.item.requestDate ? [{ lbl: 'تاريخ الطلب:', val: data.item.requestDate }] : [])
+        ];
+
+        const labelColW = isBig ? 120 : 85;
+        infoRows.forEach(row => {
+            ctx.font = `bold ${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+            ctx.textAlign = 'right';
+            ctx.fillText(row.lbl, canvasWidth - pad, y);
+
+            ctx.font = `${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+            const valX = canvasWidth - pad - labelColW;
+            const maxValW = valX - pad;
+            const words = (row.val || '-').split(/\s+/);
+            let curLine = '';
+            const lines: string[] = [];
+            for (let i = 0; i < words.length; i++) {
+                const test = curLine ? curLine + ' ' + words[i] : words[i];
+                if (ctx.measureText(test).width > maxValW && i > 0) {
+                    lines.push(curLine);
+                    curLine = words[i];
+                } else {
+                    curLine = test;
+                }
+            }
+            if (curLine) lines.push(curLine);
+
+            lines.forEach((l, idx) => {
+                ctx.fillText(l, valX, y + (idx * (isBig ? 18 : 15)));
+            });
+            y += Math.max(isBig ? 20 : 16, lines.length * (isBig ? 18 : 15) + 2);
+        });
+
+        y += 4;
+
+        // الصندوق المالي
+        const finStartY = y;
+        const finBoxHeight = isBig ? 125 : 108;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(pad, finStartY, cw, finBoxHeight);
+
+        y += 7;
+        ctx.font = `bold ${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.fillText('نوع الخدمة / البند:', canvasWidth - pad - 6, y);
+        ctx.textAlign = 'left';
+        ctx.fillText('رسوم وتوصيل زينات', pad + 6, y);
+        y += isBig ? 19 : 16;
+
+        ctx.textAlign = 'right';
+        ctx.fillText('إجمالي المبلغ:', canvasWidth - pad - 6, y);
+        ctx.textAlign = 'left';
+        ctx.fillText(`${data.total.toLocaleString()} ج.م`, pad + 6, y);
+        y += isBig ? 20 : 17;
+
+        // شريط المبلغ المسدد
+        const paidBarH = isBig ? 25 : 22;
+        ctx.fillRect(pad, y, cw, paidBarH);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${isBig ? 14 : 12}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.fillText('المبلغ المسدد:', canvasWidth - pad - 6, y + (isBig ? 4 : 3));
+        ctx.font = `bold ${isBig ? 16 : 14}px monospace, sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.fillText(`${data.paid.toLocaleString()} ج.م`, pad + 6, y + (isBig ? 3 : 2));
+        ctx.fillStyle = '#000000';
+        y += paidBarH + 5;
+
+        // التفقيط
+        ctx.font = `bold ${isBig ? 11 : 9.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`فقط وقدره: ${data.tafqeetPaid}`, canvasWidth / 2, y);
+        y += isBig ? 18 : 15;
+
+        // المتبقي
+        ctx.font = `bold ${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.fillText('المبلغ المتبقي:', canvasWidth - pad - 6, y);
+        ctx.textAlign = 'left';
+        ctx.fillText(data.remaining > 0 ? `${data.remaining.toLocaleString()} ج.م` : '0 ج.م (خالص تماماً)', pad + 6, y);
+        y = finStartY + finBoxHeight + 8;
+
+        // شارة الحالة
+        const stText = data.isFullyPaid ? '✔️ خالص ومسدد بالكامل' : '⏳ دفعة نقدية - متبقي طرف المواطن';
+        ctx.font = `bold ${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        const stW = ctx.measureText(stText).width + (isBig ? 20 : 14);
+        const stH = isBig ? 24 : 20;
+        ctx.strokeRect((canvasWidth - stW) / 2, y, stW, stH);
+        ctx.textAlign = 'center';
+        ctx.fillText(stText, canvasWidth / 2, y + (isBig ? 4 : 3));
+        y += stH + 10;
+
+        // جدول دفعات مصغر إن وجد
+        if (data.paymentsList && data.paymentsList.length > 1) {
+            ctx.font = `bold ${isBig ? 12 : 10}px "Tajawal", Segoe UI, Arial, sans-serif`;
+            ctx.textAlign = 'right';
+            ctx.fillText('سجل الدفعات النقدية:', canvasWidth - pad, y);
+            y += isBig ? 16 : 14;
+
+            data.paymentsList.forEach((p: any) => {
+                ctx.font = `${isBig ? 11 : 9.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
+                ctx.textAlign = 'right';
+                ctx.fillText(`${p.date || '-'} | إيصال: ${p.receiptNumber || '-'}`, canvasWidth - pad, y);
+                ctx.textAlign = 'left';
+                ctx.fillText(`${(Number(p.amount) || 0).toLocaleString()} ج.م`, pad, y);
+                y += isBig ? 15 : 13;
+            });
+            y += 6;
+        }
+
+        drawDashed(y);
+        y += 10;
+
+        // التوقيعات
+        ctx.font = `bold ${isBig ? 12 : 10}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.fillText('المحصل / المسؤول', canvasWidth - pad - 10, y);
+        ctx.textAlign = 'left';
+        ctx.fillText('توقيع المواطن / المستلم', pad + 10, y);
+        y += isBig ? 16 : 14;
+
+        ctx.font = `${isBig ? 11 : 9.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.fillText(data.collectorName, canvasWidth - pad - 10, y);
+        y += isBig ? 24 : 20;
+
+        ctx.textAlign = 'right';
+        ctx.fillText('التوقيع: .............', canvasWidth - pad - 10, y);
+        ctx.textAlign = 'left';
+        ctx.fillText('التوقيع: .............', pad + 10, y);
+        y += isBig ? 24 : 20;
+
+        drawDashed(y);
+        y += 10;
+
+        // التذييل
+        ctx.font = `bold ${isBig ? 11 : 9.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠️ إيصال سداد رسمي معتمد مقابل توصيل زينات.', canvasWidth / 2, y);
+        y += isBig ? 16 : 14;
+        ctx.fillText(`شكراً لتعاملكم معنا • ${data.printTime}`, canvasWidth / 2, y);
+        y += isBig ? 26 : 22;
+
+        // اقتصاص الارتفاع النهائي الفعلي
+        const trimmed = document.createElement('canvas');
+        trimmed.width = canvasWidth;
+        trimmed.height = y;
+        const tCtx = trimmed.getContext('2d')!;
+        tCtx.drawImage(canvas, 0, 0, canvasWidth, y, 0, 0, canvasWidth, y);
+        return trimmed;
+    };
+
+    // نافذة اختيار وربط طابعة VTC الحرارية من الموبايل
+    const showThermalPrinterSelectionModal = (onConfirm: (mode: 'bluetooth' | 'rawbt' | 'system', paperWidth: number, remember: boolean) => void) => {
+        let modal = document.getElementById('modal-thermal-printer-selector');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modal-thermal-printer-selector';
+            modal.style.cssText = 'display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 100000; align-items: center; justify-content: center; backdrop-filter: blur(4px); font-family: "Tajawal", sans-serif; direction: rtl; padding: 12px;';
+            document.body.appendChild(modal);
+        }
+
+        const savedMode = localStorage.getItem('preferred_thermal_printer_mode') || 'bluetooth';
+        const savedWidth = Number(localStorage.getItem('preferred_thermal_paper_width')) || 58;
+        const hasBluetoothSupport = Boolean((navigator as any).bluetooth);
+
+        modal.innerHTML = `
+            <div style="background: #ffffff; border-radius: 16px; max-width: 480px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35); overflow: hidden; border: 1px solid #e2e8f0; animation: fadeIn 0.2s ease-out;">
+                <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; padding: 18px 20px; text-align: right; position: relative;">
+                    <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                        🖨️ اختيار طابعة الإيصال الحراري (طابعة VTC)
+                    </h3>
+                    <p style="margin: 0; font-size: 0.85rem; opacity: 0.9;">حدد طريقة إرسال الإيصال إلى طابعة VTC أو طابعات الهاتف</p>
+                    <button id="close-printer-modal-btn" style="position: absolute; left: 16px; top: 16px; background: rgba(255,255,255,0.2); border: none; color: #fff; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center;">✕</button>
+                </div>
+
+                <div style="padding: 20px;">
+                    <div style="font-size: 0.9rem; font-weight: bold; color: #334155; margin-bottom: 10px;">طريقة الاتصال بالطابعة:</div>
+
+                    <!-- Option 1: Web Bluetooth Direct (VTC) -->
+                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 2px solid ${savedMode === 'bluetooth' ? '#0284c7' : '#e2e8f0'}; border-radius: 10px; margin-bottom: 10px; cursor: pointer; background: ${savedMode === 'bluetooth' ? '#f0f9ff' : '#fff'}; transition: all 0.2s;" id="label-mode-bluetooth">
+                        <input type="radio" name="printer-mode" value="bluetooth" ${savedMode === 'bluetooth' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <strong style="color: #0f172a; font-size: 0.95rem;">📱 بلوتوث مباشر (طابعة VTC المحمولة)</strong>
+                                <span style="background: #0284c7; color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">الأفضل لـ VTC ⭐</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
+                                اتصال واقتران مباشر بطابعة VTC عبر بلوتوث المتصفح دون الحاجة لبرامج وسيطة.
+                                ${hasBluetoothSupport ? '<span style="color: #16a34a; font-weight: bold;">(مدعوم بمتصفحك 🟢)</span>' : '<span style="color: #d97706; font-weight: bold;">(يفضل استخدام Chrome على أندرويد ⚠️)</span>'}
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- Option 2: RawBT App -->
+                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 2px solid ${savedMode === 'rawbt' ? '#0284c7' : '#e2e8f0'}; border-radius: 10px; margin-bottom: 10px; cursor: pointer; background: ${savedMode === 'rawbt' ? '#f0f9ff' : '#fff'}; transition: all 0.2s;" id="label-mode-rawbt">
+                        <input type="radio" name="printer-mode" value="rawbt" ${savedMode === 'rawbt' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <strong style="color: #0f172a; font-size: 0.95rem;">⚡ تطبيق RawBT للطباعة الحرارية (أندرويد)</strong>
+                                <span style="background: #e0e7ff; color: #4338ca; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">تطبيق أندرويد</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
+                                إرسال فوري ومباشر إلى تطبيق RawBT لطابعات البلوتوث المحمولة المثبتة على هاتفك.
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- Option 3: System Print -->
+                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 2px solid ${savedMode === 'system' ? '#0284c7' : '#e2e8f0'}; border-radius: 10px; margin-bottom: 14px; cursor: pointer; background: ${savedMode === 'system' ? '#f0f9ff' : '#fff'}; transition: all 0.2s;" id="label-mode-system">
+                        <input type="radio" name="printer-mode" value="system" ${savedMode === 'system' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <strong style="color: #0f172a; font-size: 0.95rem;">📄 طباعة النظام الافتراضية (معاينة الجوال)</strong>
+                                <span style="background: #f1f5f9; color: #475569; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">Print Dialog</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
+                                فتح نافذة الطباعة الافتراضية بنظام التشغيل لاختيار الطابعة أو الحفظ كـ PDF.
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- Paper Size -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;">
+                        <div style="font-size: 0.85rem; font-weight: bold; color: #334155; margin-bottom: 6px;">حجم رول الورق للطابعة:</div>
+                        <div style="display: flex; gap: 20px; font-size: 0.85rem;">
+                            <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <input type="radio" name="printer-paper-width" value="58" ${savedWidth === 58 ? 'checked' : ''} style="accent-color: #0284c7;">
+                                <span>58 مم (طابعات VTC المحمولة القياسية)</span>
+                            </label>
+                            <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <input type="radio" name="printer-paper-width" value="80" ${savedWidth === 80 ? 'checked' : ''} style="accent-color: #0284c7;">
+                                <span>80 مم (بون كاشير كبير)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Remember Choice Checkbox -->
+                    <div style="margin-bottom: 18px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #334155; cursor: pointer;">
+                            <input type="checkbox" id="remember-printer-choice" checked style="width: 16px; height: 16px; accent-color: #0284c7;">
+                            <span>تذكر هذا الاختيار واستخدمه تلقائياً عند الطباعة الحرارية من الموبايل</span>
+                        </label>
+                    </div>
+
+                    <!-- Actions -->
+                    <div style="display: flex; gap: 10px;">
+                        <button id="confirm-print-btn" class="btn btn-primary" style="flex: 2; padding: 10px; font-size: 0.95rem; font-weight: bold; background: #0284c7; border-color: #0369a1; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <span>تأكيد والطباعة الآن 🖨️</span>
+                        </button>
+                        <button id="cancel-print-btn" class="btn secondary" style="flex: 1; padding: 10px; font-size: 0.9rem;">
+                            إلغاء
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        modal.style.display = 'flex';
+
+        const updateHighlights = () => {
+            const checkedVal = (modal!.querySelector('input[name="printer-mode"]:checked') as HTMLInputElement)?.value;
+            ['bluetooth', 'rawbt', 'system'].forEach(m => {
+                const el = document.getElementById(`label-mode-${m}`);
+                if (el) {
+                    if (m === checkedVal) {
+                        el.style.borderColor = '#0284c7';
+                        el.style.background = '#f0f9ff';
+                    } else {
+                        el.style.borderColor = '#e2e8f0';
+                        el.style.background = '#fff';
+                    }
+                }
+            });
+        };
+
+        modal.querySelectorAll('input[name="printer-mode"]').forEach(radio => {
+            radio.addEventListener('change', updateHighlights);
+        });
+
+        const closeModal = () => {
+            if (modal) modal.style.display = 'none';
+        };
+
+        document.getElementById('close-printer-modal-btn')?.addEventListener('click', closeModal);
+        document.getElementById('cancel-print-btn')?.addEventListener('click', closeModal);
+
+        document.getElementById('confirm-print-btn')?.addEventListener('click', () => {
+            const mode = ((modal!.querySelector('input[name="printer-mode"]:checked') as HTMLInputElement)?.value || 'bluetooth') as 'bluetooth' | 'rawbt' | 'system';
+            const width = Number((modal!.querySelector('input[name="printer-paper-width"]:checked') as HTMLInputElement)?.value || 58);
+            const remember = Boolean((document.getElementById('remember-printer-choice') as HTMLInputElement)?.checked);
+
+            closeModal();
+            onConfirm(mode, width, remember);
+        });
+    };
+
+    // دالة فتح إعدادات الطابعة الحرارية وتغيير الطريقة المفضلة في أي وقت
+    (window as any).openThermalPrinterSettingsModal = () => {
+        showThermalPrinterSelectionModal((mode, width, remember) => {
+            if (remember) {
+                localStorage.setItem('preferred_thermal_printer_mode', mode);
+                localStorage.setItem('preferred_thermal_paper_width', String(width));
+            }
+            showToast(`تم حفظ وتحديث إعدادات الطابعة بنجاح: ${mode === 'bluetooth' ? 'طابعة VTC بلوتوث' : mode === 'rawbt' ? 'تطبيق RawBT' : 'طباعة النظام'} (${width} مم).`, 'success');
+        });
+    };
+
+    // دالة إعادة تعيين اختيار الطابعة
+    (window as any).resetThermalPrinterChoice = () => {
+        localStorage.removeItem('preferred_thermal_printer_mode');
+        showToast('تمت إعادة تعيين اختيار الطابعة الحرارية، سيتم إظهار نافذة الاختيار في المرة القادمة.', 'info');
+    };
+
+    // دالة طباعة إيصال حراري مختصر ومخصص للمواطن (بون كاشير 80mm / 58mm لطابعات VTC المحمولة)
+    (window as any).printZinatThermalReceipt = async (id: any, forceSelectModal = false) => {
         const item = (state.zinatCollection || []).find(i => 
             (id != null && (String(i.id) === String(id) || Number(i.id) === Number(id))) ||
             (i.requesterName && String(i.requesterName).trim() === String(id).trim())
@@ -4896,7 +5456,72 @@ const handlePrintJudicialControlDetails = () => {
         </html>
         `;
 
-        executePrintHtmlContent(citizenThermalHTML);
+        // تجهيز كائن البيانات للطباعة المباشرة على طابعات VTC
+        const receiptData = {
+            item,
+            total,
+            paid,
+            remaining,
+            isFullyPaid,
+            receiptNo,
+            collectorName,
+            headerInfo,
+            printDate,
+            printTime,
+            tafqeetPaid,
+            paymentsList
+        };
+
+        const savedMode = localStorage.getItem('preferred_thermal_printer_mode') as 'bluetooth' | 'rawbt' | 'system' | null;
+        const savedWidth = Number(localStorage.getItem('preferred_thermal_paper_width')) || 58;
+
+        const executePrintAction = async (mode: 'bluetooth' | 'rawbt' | 'system', paperWidth: number) => {
+            const canvasWidth = paperWidth === 80 ? 576 : 384;
+
+            if (mode === 'bluetooth') {
+                const nav = navigator as any;
+                if (!nav.bluetooth) {
+                    showToast('المتصفح الحالي لا يدعم Web Bluetooth، جاري الفتح عبر الطباعة الافتراضية...', 'warning');
+                    executePrintHtmlContent(citizenThermalHTML);
+                    return;
+                }
+                try {
+                    const canvas = renderThermalReceiptToCanvas(receiptData, canvasWidth);
+                    const escPosData = canvasToEscPosRaster(canvas);
+                    await printViaWebBluetooth(escPosData);
+                } catch (err: any) {
+                    console.error('Bluetooth print failed:', err);
+                    showToast(`تعذر الاتصال بطابعة VTC: ${err.message || err}`, 'error');
+                    if (confirm('تعذر استكمال الطباعة عبر بلوتوث VTC. هل ترغب في استخدام طباعة الهاتف الافتراضية بدلاً منها؟')) {
+                        executePrintHtmlContent(citizenThermalHTML);
+                    }
+                }
+            } else if (mode === 'rawbt') {
+                try {
+                    const canvas = renderThermalReceiptToCanvas(receiptData, canvasWidth);
+                    printViaRawBT(canvas);
+                    showToast('تم إرسال الإيصال لتطبيق RawBT بنجاح 🖨️', 'success');
+                } catch (err: any) {
+                    console.error('RawBT print failed:', err);
+                    executePrintHtmlContent(citizenThermalHTML);
+                }
+            } else {
+                executePrintHtmlContent(citizenThermalHTML);
+            }
+        };
+
+        if (savedMode && !forceSelectModal) {
+            showToast(`جاري تجهيز الطباعة (${savedMode === 'bluetooth' ? 'طابعة VTC بلوتوث' : savedMode === 'rawbt' ? 'تطبيق RawBT' : 'طباعة النظام'})...`, 'info');
+            await executePrintAction(savedMode, savedWidth);
+        } else {
+            showThermalPrinterSelectionModal((chosenMode, chosenWidth, remember) => {
+                if (remember) {
+                    localStorage.setItem('preferred_thermal_printer_mode', chosenMode);
+                    localStorage.setItem('preferred_thermal_paper_width', String(chosenWidth));
+                }
+                executePrintAction(chosenMode, chosenWidth);
+            });
+        }
     };
 
     // --- قسم التحصيل ---
@@ -5441,10 +6066,11 @@ const handlePrintJudicialControlDetails = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
                     <span style="font-size: 10px; margin-right: 2px;">كامل</span>
                 </button>
-                <button class="btn btn-print-thermal" style="margin-right: 4px; padding: 3px 7px; cursor: pointer; background-color: #0284c7; color: #ffffff; border: 1px solid #0369a1; border-radius: 4px; font-weight: bold; display: inline-flex; align-items: center; gap: 3px;" onclick="window.printZinatThermalReceipt('${item.id || item.requesterName}')" title="طباعة إيصال حراري مختصر للمواطن (بون كاشير 80mm)">
+                <button class="btn btn-print-thermal" style="margin-right: 4px; padding: 3px 7px; cursor: pointer; background-color: #0284c7; color: #ffffff; border: 1px solid #0369a1; border-radius: 4px; font-weight: bold; display: inline-flex; align-items: center; gap: 3px;" onclick="window.printZinatThermalReceipt('${item.id || item.requesterName}')" title="طباعة إيصال حراري مختصر للمواطن (طابعة VTC / بلوتوث)">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z"></path><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="13" y2="14"></line></svg>
                     <span style="font-size: 10px;">حراري للمواطن</span>
                 </button>
+                <button class="btn btn-sm" style="padding: 3px 5px; cursor: pointer; background: #0369a1; color: #ffffff; border: 1px solid #0284c7; border-radius: 4px; margin-right: 2px;" onclick="window.openThermalPrinterSettingsModal()" title="إعدادات طابعة VTC واختيار طريقة الطباعة">⚙️</button>
                 ${isAdmin && hasButtonPermission('delete_button') ? `<button class="btn btn-delete" onclick="window.deleteZinatRecord(${item.id})">حذف</button>` : ''}
             </td>
         `;
