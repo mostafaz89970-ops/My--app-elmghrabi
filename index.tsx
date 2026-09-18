@@ -19393,6 +19393,7 @@ const handlePrintJudicialControlDetails = () => {
                     <button type="button" class="btn" data-target="accounting-save-registration">التسجيل</button>
                     <button type="button" class="btn secondary" data-target="accounting-saved-records">السجلات المحفوظة</button>
                     <button type="button" class="btn secondary" data-target="accounting-query">استعلام متعدد</button>
+                    <button type="button" class="btn secondary" data-target="accounting-subscriptions">الاشتراكات (بيانات طلب الخدمة)</button>
                 </div>
             </div>
         `;
@@ -19402,6 +19403,7 @@ const handlePrintJudicialControlDetails = () => {
                     if (target === 'accounting-save-registration') renderAccountingRegistrationSection();
                     else if (target === 'accounting-saved-records') renderAccountingSavedRecordsSection();
                     else if (target === 'accounting-query') renderAccountingQuerySection();
+                    else if (target === 'accounting-subscriptions') renderAccountingSubscriptionsSection();
                 });
             });
         }
@@ -19982,6 +19984,24 @@ const handlePrintJudicialControlDetails = () => {
         body.innerHTML = `
         <div class="info-card">
             <h4>بيانات طلب الخدمة</h4>
+            <!-- حقل البحث لجلب بيانات الطلب لاستكمال المعاينة -->
+            <div class="accounting-lookup-box" style="background: linear-gradient(135deg, #f8fafc, #f1f5f9); border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 14px 18px; margin-bottom: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                <div style="font-weight: 800; color: #0284c7; margin-bottom: 8px; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <span>جلب بيانات الطلب لاستكمال المعاينة (برقم الطلب أو الرقم القومي):</span>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 260px;">
+                        <input id="accounting-lookup-query" type="text" placeholder="أدخل رقم الطلب أو الرقم القومي ثم اضغط جلب البيانات..." style="width: 100%; padding: 9px 14px; border: 1.5px solid #94a3b8; border-radius: 6px; font-size: 0.95rem;">
+                    </div>
+                    <button type="button" id="accounting-lookup-btn" class="btn" style="min-width: 140px; padding: 9px 18px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                        <span>⚡ جلب البيانات</span>
+                    </button>
+                    <button type="button" id="accounting-lookup-clear-btn" class="btn secondary" style="padding: 9px 14px;">مسح البحث</button>
+                </div>
+                <div id="accounting-lookup-msg" style="font-size: 0.88rem; margin-top: 8px; min-height: 20px;"></div>
+            </div>
+
             <div class="accounting-ocr-tools" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
                 <input id="accounting-ocr-images" type="file" accept="image/*" capture="environment" multiple class="hidden">
                 <button type="button" id="accounting-ocr-upload-btn" class="btn secondary">تحميل/تصوير أوراق الطلب</button>
@@ -20405,6 +20425,112 @@ const handlePrintJudicialControlDetails = () => {
         registerPreview('accounting-model-image', 'accounting-model-preview');
         registerPreview('accounting-certificate-image', 'accounting-certificate-preview');
         registerPreview('accounting-inspection-image', 'accounting-inspection-preview');
+
+        // منطق جلب بيانات الطلب لاستكمال المعاينة (برقم الطلب أو الرقم القومي)
+        const lookupInput = document.getElementById('accounting-lookup-query') as HTMLInputElement | null;
+        const lookupBtn = document.getElementById('accounting-lookup-btn');
+        const lookupClearBtn = document.getElementById('accounting-lookup-clear-btn');
+        const lookupMsg = document.getElementById('accounting-lookup-msg');
+
+        const performLookup = () => {
+            const rawQuery = (lookupInput?.value || '').trim();
+            if (!rawQuery) {
+                showToast('يرجى إدخال رقم الطلب أو الرقم القومي للبحث', 'warning');
+                return;
+            }
+            const cleanQuery = rawQuery.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+
+            // 1. البحث في سجلات نظام المحاسبة المحفوظة مسبقاً
+            const accountingList = getAccountingRequests();
+            const foundInAccounting = accountingList.find(r => {
+                const orderNo = String(r['order-number'] || r.orderNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const cardNo = String(r['card-number'] || r.cardNumber || r.nationalId || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                return (orderNo && orderNo === cleanQuery) || (cardNo && cardNo === cleanQuery);
+            });
+
+            if (foundInAccounting) {
+                populateForm(foundInAccounting);
+                if (lookupMsg) {
+                    lookupMsg.innerHTML = `<span style="color: #16a34a; font-weight: 700;">✓ تم جلب بيانات السجل المسجل مسبقاً: <strong>${foundInAccounting['client-name'] || ''}</strong> (طلب رقم: ${foundInAccounting['order-number'] || '-'})</span>`;
+                }
+                showToast('تم جلب بيانات الطلب بنجاح. يمكنك استكمال أو تعديل البيانات.', 'success');
+                return;
+            }
+
+            // 2. البحث في المقايسات والمعاينات الفنية
+            const mukayasatList = state.mukayasat || [];
+            const foundInMukayasa = mukayasatList.find(m => {
+                const orderNo = String(m.requestNumber || m.orderNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const cardNo = String(m.nationalId || m.cardNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                return (orderNo && orderNo === cleanQuery) || (cardNo && cardNo === cleanQuery);
+            });
+
+            // 3. البحث في الطلبات الواردة وقيد الانتظار
+            const pendingList = state.pendingRequests || [];
+            const foundInPending = !foundInMukayasa ? pendingList.find(p => {
+                const orderNo = String(p.requestNumber || p.orderNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const cardNo = String(p.nationalId || p.cardNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                return (orderNo && orderNo === cleanQuery) || (cardNo && cardNo === cleanQuery);
+            }) : null;
+
+            // 4. البحث في المشتركين
+            const subscribersList = state.subscribers || [];
+            const foundInSubscribers = (!foundInMukayasa && !foundInPending) ? subscribersList.find(s => {
+                const orderNo = String(s.requestNumber || s.subscriptionCode || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const cardNo = String(s.nationalId || s.cardNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                return (orderNo && orderNo === cleanQuery) || (cardNo && cardNo === cleanQuery);
+            }) : null;
+
+            const sourceItem = foundInMukayasa || foundInPending || foundInSubscribers;
+            if (sourceItem) {
+                const mappedRecord: Record<string, any> = {
+                    'client-name': sourceItem.requesterName || sourceItem.subscriberName || '',
+                    'address': sourceItem.address || '',
+                    'card-number': sourceItem.nationalId || sourceItem.cardNumber || '',
+                    'order-number': sourceItem.requestNumber || sourceItem.orderNumber || sourceItem.subscriptionCode || '',
+                    'inspection-receipt': sourceItem.inspectionReceiptNumber || sourceItem.receiptNumber || sourceItem.inspectionReceipt || '',
+                    'mobile': sourceItem.mobile || sourceItem.phone || '',
+                    'client-description': sourceItem.clientStatus || sourceItem.clientDescription || 'مالك',
+                    'owner-name': sourceItem.ownerName || sourceItem.requesterName || sourceItem.subscriberName || '',
+                    'location-description': (sourceItem.establishmentType || sourceItem.locationDescription || '').includes('تجار') ? 'تجاري' : 'منزلي',
+                    'east-boundary': sourceItem.boundaryEast || sourceItem['east-boundary'] || '',
+                    'west-boundary': sourceItem.boundaryWest || sourceItem['west-boundary'] || '',
+                    'north-boundary': sourceItem.boundaryNorth || sourceItem['north-boundary'] || '',
+                    'south-boundary': sourceItem.boundarySouth || sourceItem['south-boundary'] || '',
+                    'model-number': sourceItem.modelNumber || sourceItem['model-number'] || '',
+                    'registration-number': sourceItem.registrationNumber || sourceItem['registration-number'] || '',
+                    'issue-date': sourceItem.issueDate || sourceItem['issue-date'] || sourceItem.contractDate || '',
+                    'inspection-completion-date': sourceItem.inspectionCompletionDate || sourceItem.inspectionDate || '',
+                    'meter-count': (sourceItem.singlePhaseMeters || sourceItem.threePhaseMeters) ? String((sourceItem.singlePhaseMeters || 0) + (sourceItem.threePhaseMeters || 0)) : '1',
+                    'meter-details': sourceItem.meterChassisNumber ? [{ number: sourceItem.meterChassisNumber, locationType: (sourceItem.establishmentType || '').includes('تجار') ? 'تجاري' : 'منزلي' }] : []
+                };
+
+                populateForm(mappedRecord);
+                const sourceLabel = foundInMukayasa ? 'المقايسات والمعاينات' : (foundInPending ? 'الطلبات الواردة' : 'المشتركين');
+                if (lookupMsg) {
+                    lookupMsg.innerHTML = `<span style="color: #16a34a; font-weight: 700;">✓ تم جلب بيانات المعاينة من (${sourceLabel}): <strong>${mappedRecord['client-name']}</strong> (طلب: ${mappedRecord['order-number']})</span>`;
+                }
+                showToast('تم جلب بيانات الطلب بنجاح! يمكنك استكمال البيانات بعد المعاينة وحفظها.', 'success');
+                return;
+            }
+
+            if (lookupMsg) {
+                lookupMsg.innerHTML = `<span style="color: #dc2626; font-weight: 700;">✗ لم يتم العثور على طلب برقم "${rawQuery}" في السجلات أو المقايسات. يمكنك إدخال البيانات يدوياً.</span>`;
+            }
+            showToast('لم يتم العثور على طلب مطابق للرقم المدخل.', 'warning');
+        };
+
+        lookupBtn?.addEventListener('click', performLookup);
+        lookupInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performLookup();
+            }
+        });
+        lookupClearBtn?.addEventListener('click', () => {
+            if (lookupInput) lookupInput.value = '';
+            if (lookupMsg) lookupMsg.innerHTML = '';
+        });
 
         body.addEventListener('click', (event) => {
             const target = event.target as HTMLElement;
@@ -21000,6 +21126,884 @@ const handlePrintJudicialControlDetails = () => {
     const renderAccountingSystemPage = () => {
         renderAccountingSystemSection();
     };
+
+    // دالة مساعدة لتنسيق التاريخ بالشهور العربية مطابقاً للصورة الرسمية (مثال: 31-أغسطس-2026)
+    const formatArabicDocumentDate = (rawDate?: string | Date): string => {
+        const arabicMonths = [
+            'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+            'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+        ];
+        if (!rawDate) {
+            const now = new Date();
+            return `${now.getDate()}-${arabicMonths[now.getMonth()]}-${now.getFullYear()}`;
+        }
+        if (typeof rawDate === 'string' && /[أ-ي]/.test(rawDate)) {
+            return rawDate;
+        }
+        const d = new Date(rawDate);
+        if (isNaN(d.getTime())) {
+            const now = new Date();
+            return `${now.getDate()}-${arabicMonths[now.getMonth()]}-${now.getFullYear()}`;
+        }
+        return `${d.getDate()}-${arabicMonths[d.getMonth()]}-${d.getFullYear()}`;
+    };
+
+    // دالة طباعة مستند (بيانات طلب الخدمة) مطابقاً 1:1 لصورة النموذج الرسمية
+    const printServiceRequestExactDocument = (record: Record<string, any>) => {
+        if (!record) return;
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            showToast('فشل فتح نافذة الطباعة. يرجى السماح بالنوافذ المنبثقة.', 'error');
+            return;
+        }
+
+        const companyName = record.companyName || 'شركة مصر الوسطى لتوزيع الكهرباء';
+        const branchSetting = (state.settings as any).branch || (state.settings.branches && state.settings.branches[0]) || '';
+        const branchName = record.branchName || (branchSetting ? (branchSetting.startsWith('إيرادات') ? branchSetting : `إيرادات ${branchSetting}`) : 'إيرادات بنى مزار شرق');
+        const docDate = formatArabicDocumentDate(record.date || record['issue-date'] || new Date());
+        const orderNo = record['order-number'] || record.orderNumber || record.requestNumber || '';
+        const requestDate = formatArabicDocumentDate(record['request-date'] || record['issue-date'] || record.date);
+        const serviceType = record['service-type'] || 'توصيل تيار    وحدات سكنية';
+        const clientName = record['client-name'] || record.clientName || record.requesterName || '';
+        const subscriptionType = record['subscription-type'] || 'أفراد';
+        const cardNumber = record['card-number'] || record.cardNumber || record.nationalId || '';
+        const inspectionReceipt = record['inspection-receipt'] || record.inspectionReceipt || record.receiptNumber || '';
+        const issuePlace = record['issue-place'] || 'بنى مزار';
+        const issueDate = formatArabicDocumentDate(record['issue-date'] || record.issueDate || record['inspection-completion-date'] || record.date);
+        const address = record.address || '';
+        const mobile = record.mobile || record.phone || '';
+        const locationDescription = record['location-description'] || record.locationDescription || 'منزل';
+        const clientDescription = record['client-description'] || record.clientDescription || 'مالك';
+        const eastBoundary = record['east-boundary'] || record.boundaryEast || '';
+        const westBoundary = record['west-boundary'] || record.boundaryWest || '';
+        const northBoundary = record['north-boundary'] || record.boundaryNorth || '';
+        const southBoundary = record['south-boundary'] || record.boundarySouth || '';
+        const ownerName = record['owner-name'] || record.ownerName || record['client-name'] || 'مالك';
+        const contractDate = formatArabicDocumentDate(record['contract-date'] || record['issue-date'] || record.date);
+
+        const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>بيانات طلب الخدمة - ${clientName || orderNo}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 15mm 20mm 15mm 20mm;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif;
+            direction: rtl;
+            background: #fff;
+            color: #000;
+            line-height: 1.5;
+            padding: 20px;
+        }
+        .print-toolbar {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 25px;
+            padding: 10px;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+        }
+        .print-toolbar button {
+            background: #0284c7;
+            color: #fff;
+            border: none;
+            padding: 8px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .print-toolbar button.secondary {
+            background: #64748b;
+        }
+        @media print {
+            .print-toolbar {
+                display: none !important;
+            }
+            body {
+                padding: 0 !important;
+            }
+            .document-sheet {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }
+        }
+        .document-sheet {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 10px;
+        }
+        .doc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 6px;
+        }
+        .doc-header-right {
+            text-align: right;
+            font-size: 16px;
+            font-weight: bold;
+            line-height: 1.4;
+        }
+        .doc-header-center {
+            text-align: center;
+            flex: 1;
+            padding-top: 18px;
+        }
+        .doc-title {
+            font-size: 26px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .doc-header-left {
+            text-align: left;
+            font-size: 15px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .divider {
+            border-bottom: 2px solid #000;
+            margin: 8px 0 16px 0;
+        }
+        .doc-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 16px;
+            margin-bottom: 16px;
+        }
+        .doc-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 20px;
+        }
+        .col-half {
+            flex: 1;
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+        }
+        .col-full {
+            width: 100%;
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+        }
+        .doc-label {
+            font-weight: bold;
+            white-space: nowrap;
+            font-size: 16px;
+        }
+        .doc-value {
+            font-weight: bold;
+            flex: 1;
+            word-break: break-word;
+            font-size: 16px;
+        }
+        .footer-divider {
+            border-bottom: 2px solid #000;
+            margin: 25px 0 10px 0;
+        }
+        .footer-note {
+            font-size: 14.5px;
+            font-weight: bold;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="print-toolbar">
+        <button onclick="window.print()">🖨️ طباعة الآن (Ctrl+P)</button>
+        <button class="secondary" onclick="window.close()">إغلاق</button>
+    </div>
+
+    <div class="document-sheet">
+        <div class="doc-header">
+            <div class="doc-header-right">
+                <div>${companyName}</div>
+                <div>${branchName}</div>
+            </div>
+            <div class="doc-header-center">
+                <span class="doc-title">بيانات طلب الخدمة</span>
+            </div>
+            <div class="doc-header-left">
+                <span>التاريخ : ${docDate}</span>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="doc-grid">
+            <div class="doc-row">
+                <div class="col-half">
+                    <span class="doc-label">رقم الطلب :</span>
+                    <span class="doc-value">${orderNo}</span>
+                </div>
+                <div class="col-half">
+                    <span class="doc-label">تاريخ الطلب :</span>
+                    <span class="doc-value">${requestDate}</span>
+                </div>
+            </div>
+
+            <div class="doc-row">
+                <div class="col-full">
+                    <span class="doc-label">الخـدمــــــة :</span>
+                    <span class="doc-value">${serviceType}</span>
+                </div>
+            </div>
+
+            <div class="doc-row">
+                <div class="col-half">
+                    <span class="doc-label">اسم العميـــل :</span>
+                    <span class="doc-value">${clientName}</span>
+                </div>
+                <div class="col-half">
+                    <span class="doc-label">نوع الأشتراك :</span>
+                    <span class="doc-value">${subscriptionType}</span>
+                </div>
+            </div>
+
+            <div class="doc-row">
+                <div class="col-half">
+                    <span class="doc-label">رقم البطاقــــة :</span>
+                    <span class="doc-value">${cardNumber}</span>
+                </div>
+                <div class="col-half">
+                    <span class="doc-label">إيصال المعاينة :</span>
+                    <span class="doc-value">${inspectionReceipt}</span>
+                </div>
+            </div>
+
+            <div class="doc-row">
+                <div class="col-half">
+                    <span class="doc-label">جهة صدورها :</span>
+                    <span class="doc-value">${issuePlace}</span>
+                </div>
+                <div class="col-half">
+                    <span class="doc-label">تاريخ صدورها :</span>
+                    <span class="doc-value">${issueDate}</span>
+                </div>
+            </div>
+
+            <div class="doc-row">
+                <div class="col-full">
+                    <span class="doc-label">العنـــــــوان :</span>
+                    <span class="doc-value">${address}</span>
+                </div>
+            </div>
+
+            <div class="doc-row">
+                <div class="col-full">
+                    <span class="doc-label">رقم التليفون :</span>
+                    <span class="doc-value">${mobile}</span>
+                </div>
+            </div>
+
+            <div class="doc-row">
+                <div class="col-half">
+                    <span class="doc-label">وصف المكان :</span>
+                    <span class="doc-value">${locationDescription}</span>
+                </div>
+                <div class="col-half">
+                    <span class="doc-label">صفة العميـل :</span>
+                    <span class="doc-value">${clientDescription}</span>
+                </div>
+            </div>
+
+            <div class="doc-row">
+                <div class="col-half">
+                    <span class="doc-label">الحد الشرقى :</span>
+                    <span class="doc-value">${eastBoundary}</span>
+                </div>
+                <div class="col-half">
+                    <span class="doc-label">الحد الغربى :</span>
+                    <span class="doc-value">${westBoundary}</span>
+                </div>
+            </div>
+
+            <div class="doc-row">
+                <div class="col-half">
+                    <span class="doc-label">الحد الشمالى :</span>
+                    <span class="doc-value">${northBoundary}</span>
+                </div>
+                <div class="col-half">
+                    <span class="doc-label">الحد الجنوبى :</span>
+                    <span class="doc-value">${southBoundary}</span>
+                </div>
+            </div>
+
+            <div class="doc-row">
+                <div class="col-half">
+                    <span class="doc-label">اسم مالك العقار :</span>
+                    <span class="doc-value">${ownerName}</span>
+                </div>
+                <div class="col-half">
+                    <span class="doc-label">تاريخ العقد :</span>
+                    <span class="doc-value">${contractDate}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-divider"></div>
+        <div class="footer-note">* بيانات البطاقة هى بيانات بطاقة مقدم الطلب</div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            setTimeout(function() {
+                window.focus();
+                window.print();
+            }, 300);
+        };
+    </script>
+</body>
+</html>`;
+
+        printWindow.document.write(html);
+        printWindow.document.close();
+    };
+
+    // قسم الاشتراكات (بيانات طلب الخدمة)
+    const renderAccountingSubscriptionsSection = () => {
+        const activeSection = document.querySelector('.content-section.active') as HTMLElement | null;
+        if (activeSection && activeSection.id !== 'accounting-subscriptions') previousPageId = activeSection.id;
+        document.querySelectorAll('.content-section.active').forEach(section => section.classList.remove('active'));
+        const section = document.getElementById('accounting-subscriptions');
+        if (!section) return;
+        section.classList.add('active');
+        setPageTitle('الاشتراكات');
+
+        const body = section.querySelector('.accounting-subscriptions-body');
+        if (!body) return;
+
+        const defaultCompany = 'شركة مصر الوسطى لتوزيع الكهرباء';
+        const branchSetting = (state.settings as any).branch || (state.settings.branches && state.settings.branches[0]) || '';
+        const defaultBranch = branchSetting ? (branchSetting.startsWith('إيرادات') ? branchSetting : `إيرادات ${branchSetting}`) : 'إيرادات بنى مزار شرق';
+        const todayArabic = formatArabicDocumentDate(new Date());
+
+        body.innerHTML = `
+        <div class="subscriptions-container" style="max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
+            <!-- شريط البحث السريع والأزرار العلوية -->
+            <div class="info-card" style="padding: 16px 20px; background: #fff; border: 1px solid var(--border-color, #cbd5e1); border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+                    <div style="font-weight: 800; font-size: 1.1rem; color: var(--primary-color, #0284c7); display: flex; align-items: center; gap: 8px;">
+                        <span>📋 الاشتراكات - بيانات طلب الخدمة</span>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" id="sub-doc-print-btn" class="btn" style="background: #0284c7; border-color: #0369a1; color: #fff; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>🖨️ طباعة بيانات طلب الخدمة (مطابق للأصل)</span>
+                        </button>
+                        <button type="button" id="sub-doc-save-btn" class="btn" style="background: #16a34a; border-color: #15803d; color: #fff; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>💾 حفظ / تحديث الاشتراك</span>
+                        </button>
+                        <button type="button" id="sub-doc-reset-btn" class="btn secondary" style="font-weight: bold;">
+                            <span>➕ اشتراك جديد</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 280px;">
+                        <input id="sub-doc-search-query" type="text" placeholder="بحث برقم الطلب، الرقم القومي، أو اسم العميل لجلب البيانات..." style="width: 100%; padding: 9px 14px; border: 1.5px solid #94a3b8; border-radius: 6px; font-size: 0.95rem;">
+                    </div>
+                    <button type="button" id="sub-doc-search-btn" class="btn" style="min-width: 130px; padding: 9px 18px; font-weight: 800;">
+                        <span>⚡ جلب / بحث</span>
+                    </button>
+                    <button type="button" id="sub-doc-search-clear" class="btn secondary" style="padding: 9px 14px;">مسح</button>
+                </div>
+                <div id="sub-doc-search-msg" style="font-size: 0.88rem; margin-top: 8px; min-height: 20px;"></div>
+            </div>
+
+            <!-- ورقة المستند التفاعلية المطابقة للصورة الأصلية 1:1 -->
+            <div class="sub-paper-wrapper" style="background: #e2e8f0; padding: 25px; border-radius: 12px; display: flex; justify-content: center; box-shadow: inset 0 2px 6px rgba(0,0,0,0.08);">
+                <div id="sub-document-sheet" style="background: #ffffff; width: 100%; max-width: 820px; padding: 35px 45px; border: 1px solid #94a3b8; border-radius: 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); color: #000; font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif;">
+                    <input type="hidden" id="sub-input-record-id" value="">
+
+                    <!-- الترويسة -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                        <div style="text-align: right; font-size: 15px; font-weight: bold; line-height: 1.4;">
+                            <input id="sub-input-company" type="text" value="${defaultCompany}" style="font-weight: bold; font-size: 15px; border: none; border-bottom: 1px dashed transparent; background: transparent; width: 260px;" title="اسم الشركة">
+                            <br>
+                            <input id="sub-input-branch" type="text" value="${defaultBranch}" style="font-weight: bold; font-size: 14px; border: none; border-bottom: 1px dashed transparent; background: transparent; width: 260px;" title="اسم الفرع / الإيرادات">
+                        </div>
+                        <div style="text-align: center; flex: 1; padding-top: 14px;">
+                            <span style="font-size: 24px; font-weight: 900; letter-spacing: 0.5px; border-bottom: 2px solid #000; padding-bottom: 2px;">بيانات طلب الخدمة</span>
+                        </div>
+                        <div style="text-align: left; font-size: 14px; font-weight: bold; white-space: nowrap;">
+                            <span>التاريخ : </span>
+                            <input id="sub-input-date" type="text" value="${todayArabic}" style="font-weight: bold; font-size: 14px; border: none; border-bottom: 1px dashed #cbd5e1; background: transparent; width: 130px; text-align: center;">
+                        </div>
+                    </div>
+
+                    <!-- الفاصل العلوي -->
+                    <div style="border-bottom: 2px solid #000; margin: 8px 0 16px 0;"></div>
+
+                    <!-- شبكة حقول النموذج -->
+                    <div style="display: flex; flex-direction: column; gap: 11px; font-size: 15px;">
+                        <!-- السطر 1: رقم الطلب وتاريخ الطلب -->
+                        <div style="display: flex; justify-content: space-between; gap: 20px;">
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">رقم الطلب :</label>
+                                <input id="sub-input-order-number" type="text" placeholder="مثال: 50232" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">تاريخ الطلب :</label>
+                                <input id="sub-input-request-date" type="text" value="${todayArabic}" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                        </div>
+
+                        <!-- السطر 2: الخدمة -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">الخـدمــــــة :</label>
+                            <input id="sub-input-service" type="text" value="توصيل تيار    وحدات سكنية" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                        </div>
+
+                        <!-- السطر 3: اسم العميل ونوع الاشتراك -->
+                        <div style="display: flex; justify-content: space-between; gap: 20px;">
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">اسم العميـــل :</label>
+                                <input id="sub-input-client-name" type="text" placeholder="اسم العميل الرباعي" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">نوع الأشتراك :</label>
+                                <input id="sub-input-subscription-type" type="text" value="أفراد" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                        </div>
+
+                        <!-- السطر 4: رقم البطاقة وإيصال المعاينة -->
+                        <div style="display: flex; justify-content: space-between; gap: 20px;">
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">رقم البطاقــــة :</label>
+                                <input id="sub-input-card-number" type="text" placeholder="الرقم القومي (14 رقم)" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">إيصال المعاينة :</label>
+                                <input id="sub-input-inspection-receipt" type="text" placeholder="رقم إيصال المعاينة" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                        </div>
+
+                        <!-- السطر 5: جهة صدورها وتاريخ صدورها -->
+                        <div style="display: flex; justify-content: space-between; gap: 20px;">
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">جهة صدورها :</label>
+                                <input id="sub-input-issue-place" type="text" value="بنى مزار" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">تاريخ صدورها :</label>
+                                <input id="sub-input-issue-date" type="text" value="${todayArabic}" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                        </div>
+
+                        <!-- السطر 6: العنوان -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">العنـــــــوان :</label>
+                            <input id="sub-input-address" type="text" placeholder="عنوان تركيب العداد" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                        </div>
+
+                        <!-- السطر 7: رقم التليفون -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">رقم التليفون :</label>
+                            <input id="sub-input-mobile" type="text" placeholder="رقم المحمول أو الهاتف" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                        </div>
+
+                        <!-- السطر 8: وصف المكان وصفة العميل -->
+                        <div style="display: flex; justify-content: space-between; gap: 20px;">
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">وصف المكان :</label>
+                                <input id="sub-input-location-description" type="text" value="منزل" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">صفة العميـل :</label>
+                                <input id="sub-input-client-description" type="text" value="مالك" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                        </div>
+
+                        <!-- السطر 9: الحدود الشرقية والغربية -->
+                        <div style="display: flex; justify-content: space-between; gap: 20px;">
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">الحد الشرقى :</label>
+                                <input id="sub-input-east-boundary" type="text" placeholder="الحد الشرقي" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">الحد الغربى :</label>
+                                <input id="sub-input-west-boundary" type="text" placeholder="الحد الغربي" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                        </div>
+
+                        <!-- السطر 10: الحدود الشمالية والجنوبية -->
+                        <div style="display: flex; justify-content: space-between; gap: 20px;">
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">الحد الشمالى :</label>
+                                <input id="sub-input-north-boundary" type="text" placeholder="الحد الشمالي / البحري" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">الحد الجنوبى :</label>
+                                <input id="sub-input-south-boundary" type="text" placeholder="الحد الجنوبي / القبلي" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                        </div>
+
+                        <!-- السطر 11: اسم مالك العقار وتاريخ العقد -->
+                        <div style="display: flex; justify-content: space-between; gap: 20px;">
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">اسم مالك العقار :</label>
+                                <input id="sub-input-owner-name" type="text" value="مالك" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">تاريخ العقد :</label>
+                                <input id="sub-input-contract-date" type="text" value="${todayArabic}" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- الفاصل السفلي -->
+                    <div style="border-bottom: 2px solid #000; margin: 25px 0 10px 0;"></div>
+                    <div style="font-size: 14.5px; font-weight: bold; color: #000;">* بيانات البطاقة هى بيانات بطاقة مقدم الطلب</div>
+                </div>
+            </div>
+
+            <!-- جدول السجلات المحفوظة للاشتراكات -->
+            <div class="info-card" style="padding: 16px 20px; background: #fff; border: 1px solid var(--border-color, #cbd5e1); border-radius: 10px;">
+                <h4 style="margin-bottom: 12px; font-weight: 800;">سجلات طلبات الخدمة والاشتراكات المحفوظة</h4>
+                <div class="responsive-table">
+                    <table class="data-table" style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>رقم الطلب</th>
+                                <th>اسم العميل</th>
+                                <th>الرقم القومي</th>
+                                <th>العنوان</th>
+                                <th>الموبايل</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sub-saved-records-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        `;
+
+        const getDocFormData = (): Record<string, any> => {
+            return {
+                id: (document.getElementById('sub-input-record-id') as HTMLInputElement)?.value || '',
+                companyName: (document.getElementById('sub-input-company') as HTMLInputElement)?.value?.trim() || defaultCompany,
+                branchName: (document.getElementById('sub-input-branch') as HTMLInputElement)?.value?.trim() || defaultBranch,
+                date: (document.getElementById('sub-input-date') as HTMLInputElement)?.value?.trim() || todayArabic,
+                'order-number': (document.getElementById('sub-input-order-number') as HTMLInputElement)?.value?.trim() || '',
+                'request-date': (document.getElementById('sub-input-request-date') as HTMLInputElement)?.value?.trim() || todayArabic,
+                'service-type': (document.getElementById('sub-input-service') as HTMLInputElement)?.value?.trim() || 'توصيل تيار    وحدات سكنية',
+                'client-name': (document.getElementById('sub-input-client-name') as HTMLInputElement)?.value?.trim() || '',
+                'subscription-type': (document.getElementById('sub-input-subscription-type') as HTMLInputElement)?.value?.trim() || 'أفراد',
+                'card-number': (document.getElementById('sub-input-card-number') as HTMLInputElement)?.value?.trim() || '',
+                'inspection-receipt': (document.getElementById('sub-input-inspection-receipt') as HTMLInputElement)?.value?.trim() || '',
+                'issue-place': (document.getElementById('sub-input-issue-place') as HTMLInputElement)?.value?.trim() || 'بنى مزار',
+                'issue-date': (document.getElementById('sub-input-issue-date') as HTMLInputElement)?.value?.trim() || todayArabic,
+                address: (document.getElementById('sub-input-address') as HTMLInputElement)?.value?.trim() || '',
+                mobile: (document.getElementById('sub-input-mobile') as HTMLInputElement)?.value?.trim() || '',
+                'location-description': (document.getElementById('sub-input-location-description') as HTMLInputElement)?.value?.trim() || 'منزل',
+                'client-description': (document.getElementById('sub-input-client-description') as HTMLInputElement)?.value?.trim() || 'مالك',
+                'east-boundary': (document.getElementById('sub-input-east-boundary') as HTMLInputElement)?.value?.trim() || '',
+                'west-boundary': (document.getElementById('sub-input-west-boundary') as HTMLInputElement)?.value?.trim() || '',
+                'north-boundary': (document.getElementById('sub-input-north-boundary') as HTMLInputElement)?.value?.trim() || '',
+                'south-boundary': (document.getElementById('sub-input-south-boundary') as HTMLInputElement)?.value?.trim() || '',
+                'owner-name': (document.getElementById('sub-input-owner-name') as HTMLInputElement)?.value?.trim() || 'مالك',
+                'contract-date': (document.getElementById('sub-input-contract-date') as HTMLInputElement)?.value?.trim() || todayArabic
+            };
+        };
+
+        const setDocFormData = (rec: Record<string, any>) => {
+            const setVal = (id: string, val: string) => {
+                const el = document.getElementById(id) as HTMLInputElement | null;
+                if (el) el.value = val || '';
+            };
+
+            setVal('sub-input-record-id', rec.id ? String(rec.id) : '');
+            setVal('sub-input-company', rec.companyName || defaultCompany);
+            setVal('sub-input-branch', rec.branchName || defaultBranch);
+            setVal('sub-input-date', formatArabicDocumentDate(rec.date || rec['issue-date'] || new Date()));
+            setVal('sub-input-order-number', rec['order-number'] || rec.orderNumber || rec.requestNumber || '');
+            setVal('sub-input-request-date', formatArabicDocumentDate(rec['request-date'] || rec['issue-date'] || rec.date));
+            setVal('sub-input-service', rec['service-type'] || 'توصيل تيار    وحدات سكنية');
+            setVal('sub-input-client-name', rec['client-name'] || rec.clientName || rec.requesterName || '');
+            setVal('sub-input-subscription-type', rec['subscription-type'] || 'أفراد');
+            setVal('sub-input-card-number', rec['card-number'] || rec.cardNumber || rec.nationalId || '');
+            setVal('sub-input-inspection-receipt', rec['inspection-receipt'] || rec.inspectionReceipt || rec.receiptNumber || '');
+            setVal('sub-input-issue-place', rec['issue-place'] || 'بنى مزار');
+            setVal('sub-input-issue-date', formatArabicDocumentDate(rec['issue-date'] || rec.issueDate || rec['inspection-completion-date'] || rec.date));
+            setVal('sub-input-address', rec.address || '');
+            setVal('sub-input-mobile', rec.mobile || rec.phone || '');
+            setVal('sub-input-location-description', rec['location-description'] || rec.locationDescription || 'منزل');
+            setVal('sub-input-client-description', rec['client-description'] || rec.clientDescription || 'مالك');
+            setVal('sub-input-east-boundary', rec['east-boundary'] || rec.boundaryEast || '');
+            setVal('sub-input-west-boundary', rec['west-boundary'] || rec.boundaryWest || '');
+            setVal('sub-input-north-boundary', rec['north-boundary'] || rec.boundaryNorth || '');
+            setVal('sub-input-south-boundary', rec['south-boundary'] || rec.boundarySouth || '');
+            setVal('sub-input-owner-name', rec['owner-name'] || rec.ownerName || rec['client-name'] || 'مالك');
+            setVal('sub-input-contract-date', formatArabicDocumentDate(rec['contract-date'] || rec['issue-date'] || rec.date));
+        };
+
+        const resetDocForm = () => {
+            setDocFormData({
+                id: '',
+                companyName: defaultCompany,
+                branchName: defaultBranch,
+                date: todayArabic,
+                'order-number': '',
+                'request-date': todayArabic,
+                'service-type': 'توصيل تيار    وحدات سكنية',
+                'client-name': '',
+                'subscription-type': 'أفراد',
+                'card-number': '',
+                'inspection-receipt': '',
+                'issue-place': 'بنى مزار',
+                'issue-date': todayArabic,
+                address: '',
+                mobile: '',
+                'location-description': 'منزل',
+                'client-description': 'مالك',
+                'east-boundary': '',
+                'west-boundary': '',
+                'north-boundary': '',
+                'south-boundary': '',
+                'owner-name': 'مالك',
+                'contract-date': todayArabic
+            });
+            const msgEl = document.getElementById('sub-doc-search-msg');
+            if (msgEl) msgEl.innerHTML = '';
+        };
+
+        const renderSavedSubList = () => {
+            const tableBody = document.getElementById('sub-saved-records-body');
+            if (!tableBody) return;
+            const records = getAccountingRequests();
+            if (!records.length) {
+                tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #64748b; padding: 18px;">لا توجد اشتراكات محفوظة حتى الآن.</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = records.map(rec => `
+                <tr>
+                    <td style="font-weight: bold;">${rec['order-number'] || '-'}</td>
+                    <td style="font-weight: bold;">${rec['client-name'] || '-'}</td>
+                    <td>${rec['card-number'] || '-'}</td>
+                    <td>${rec.address || '-'}</td>
+                    <td>${rec.mobile || '-'}</td>
+                    <td>
+                        <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
+                            <button type="button" class="btn secondary btn-sub-load" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px;">عرض في المستند 📄</button>
+                            <button type="button" class="btn btn-sub-print" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة 🖨️</button>
+                            <button type="button" class="btn btn-delete btn-sub-delete" data-id="${rec.id}" style="padding: 4px 8px; font-size: 12px;">حذف</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        };
+
+        renderSavedSubList();
+
+        // زر الطباعة المطابقة للأصل
+        document.getElementById('sub-doc-print-btn')?.addEventListener('click', () => {
+            const currentData = getDocFormData();
+            printServiceRequestExactDocument(currentData);
+        });
+
+        // زر حفظ أو تحديث الاشتراك
+        document.getElementById('sub-doc-save-btn')?.addEventListener('click', () => {
+            const currentData = getDocFormData();
+            if (!currentData['client-name'] && !currentData['order-number']) {
+                showToast('يرجى إدخال اسم العميل أو رقم الطلب على الأقل لحفظ الاشتراك.', 'error');
+                return;
+            }
+
+            const records = getAccountingRequests();
+            const existingId = currentData.id ? Number(currentData.id) : null;
+            if (existingId) {
+                const idx = records.findIndex(r => Number(r.id) === existingId);
+                if (idx !== -1) {
+                    records[idx] = { ...records[idx], ...currentData, id: existingId, updatedAt: new Date().toISOString() };
+                    saveAccountingRequests(records);
+                    showToast('تم تحديث بيانات الاشتراك بنجاح.', 'success');
+                } else {
+                    currentData.id = Date.now();
+                    currentData.savedAt = new Date().toISOString();
+                    records.unshift(currentData);
+                    saveAccountingRequests(records);
+                    showToast('تم حفظ الاشتراك الجديد بنجاح.', 'success');
+                }
+            } else {
+                currentData.id = Date.now();
+                currentData.savedAt = new Date().toISOString();
+                records.unshift(currentData);
+                saveAccountingRequests(records);
+                const idEl = document.getElementById('sub-input-record-id') as HTMLInputElement | null;
+                if (idEl) idEl.value = String(currentData.id);
+                showToast('تم حفظ بيانات الاشتراك بنجاح.', 'success');
+            }
+
+            renderSavedSubList();
+        });
+
+        // زر اشتراك جديد
+        document.getElementById('sub-doc-reset-btn')?.addEventListener('click', () => {
+            resetDocForm();
+            showToast('تم تفريغ حقول المستند لكتابة اشتراك جديد.', 'info');
+        });
+
+        // البحث والجلب في صفحة الاشتراكات
+        const searchInput = document.getElementById('sub-doc-search-query') as HTMLInputElement | null;
+        const searchBtn = document.getElementById('sub-doc-search-btn');
+        const clearBtn = document.getElementById('sub-doc-search-clear');
+        const searchMsg = document.getElementById('sub-doc-search-msg');
+
+        const doSubSearch = () => {
+            const rawQuery = (searchInput?.value || '').trim();
+            if (!rawQuery) {
+                showToast('يرجى إدخال رقم الطلب أو الرقم القومي أو الاسم للبحث', 'warning');
+                return;
+            }
+            const cleanQuery = rawQuery.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+
+            // 1. البحث في سجلات المحاسبة المحفوظة
+            const records = getAccountingRequests();
+            const foundInSaved = records.find(r => {
+                const orderNo = String(r['order-number'] || r.orderNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const cardNo = String(r['card-number'] || r.cardNumber || r.nationalId || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const name = String(r['client-name'] || '').trim().toLowerCase();
+                return (orderNo && orderNo === cleanQuery) || (cardNo && cardNo === cleanQuery) || (name && name.includes(cleanQuery));
+            });
+
+            if (foundInSaved) {
+                setDocFormData(foundInSaved);
+                if (searchMsg) searchMsg.innerHTML = `<span style="color: #16a34a; font-weight: bold;">✓ تم جلب بيانات الاشتراك من السجلات المحفوظة: ${foundInSaved['client-name'] || ''} (طلب: ${foundInSaved['order-number'] || '-'})</span>`;
+                showToast('تم جلب بيانات الاشتراك بنجاح.', 'success');
+                document.getElementById('sub-document-sheet')?.scrollIntoView({ behavior: 'smooth' });
+                return;
+            }
+
+            // 2. البحث في المقايسات والمعاينات
+            const mukayasatList = state.mukayasat || [];
+            const foundInMukayasa = mukayasatList.find(m => {
+                const orderNo = String(m.requestNumber || m.orderNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const cardNo = String(m.nationalId || m.cardNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const name = String(m.requesterName || '').trim().toLowerCase();
+                return (orderNo && orderNo === cleanQuery) || (cardNo && cardNo === cleanQuery) || (name && name.includes(cleanQuery));
+            });
+
+            // 3. البحث في الطلبات الواردة
+            const pendingList = state.pendingRequests || [];
+            const foundInPending = !foundInMukayasa ? pendingList.find(p => {
+                const orderNo = String(p.requestNumber || p.orderNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const cardNo = String(p.nationalId || p.cardNumber || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const name = String(p.requesterName || '').trim().toLowerCase();
+                return (orderNo && orderNo === cleanQuery) || (cardNo && cardNo === cleanQuery) || (name && name.includes(cleanQuery));
+            }) : null;
+
+            const source = foundInMukayasa || foundInPending;
+            if (source) {
+                setDocFormData({
+                    id: '',
+                    companyName: defaultCompany,
+                    branchName: defaultBranch,
+                    date: todayArabic,
+                    'order-number': source.requestNumber || source.orderNumber || '',
+                    'request-date': todayArabic,
+                    'service-type': 'توصيل تيار    وحدات سكنية',
+                    'client-name': source.requesterName || source.subscriberName || '',
+                    'subscription-type': 'أفراد',
+                    'card-number': source.nationalId || source.cardNumber || '',
+                    'inspection-receipt': source.inspectionReceiptNumber || source.receiptNumber || '',
+                    'issue-place': 'بنى مزار',
+                    'issue-date': formatArabicDocumentDate(source.issueDate || source.contractDate || new Date()),
+                    address: source.address || '',
+                    mobile: source.mobile || source.phone || '',
+                    'location-description': (source.establishmentType || '').includes('تجار') ? 'تجاري' : 'منزل',
+                    'client-description': source.clientStatus || 'مالك',
+                    'east-boundary': source.boundaryEast || '',
+                    'west-boundary': source.boundaryWest || '',
+                    'north-boundary': source.boundaryNorth || '',
+                    'south-boundary': source.boundarySouth || '',
+                    'owner-name': source.ownerName || source.requesterName || 'مالك',
+                    'contract-date': todayArabic
+                });
+                const srcLabel = foundInMukayasa ? 'المقايسات والمعاينات' : 'الطلبات الواردة';
+                if (searchMsg) searchMsg.innerHTML = `<span style="color: #16a34a; font-weight: bold;">✓ تم جلب البيانات من (${srcLabel}): ${source.requesterName || ''} (طلب: ${source.requestNumber || '-'})</span>`;
+                showToast('تم جلب البيانات بنجاح في نموذج المستند.', 'success');
+                document.getElementById('sub-document-sheet')?.scrollIntoView({ behavior: 'smooth' });
+                return;
+            }
+
+            if (searchMsg) searchMsg.innerHTML = `<span style="color: #dc2626; font-weight: bold;">✗ لم يتم العثور على سجل مطابق للبحث "${rawQuery}". يمكنك تعبئة البيانات يدوياً.</span>`;
+            showToast('لم يتم العثور على سجل مطابق.', 'warning');
+        };
+
+        searchBtn?.addEventListener('click', doSubSearch);
+        searchInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                doSubSearch();
+            }
+        });
+        clearBtn?.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            if (searchMsg) searchMsg.innerHTML = '';
+        });
+
+        // أحداث الجدول (عرض في المستند / طباعة / حذف)
+        body.addEventListener('click', (event) => {
+            const target = event.target as HTMLElement;
+            const loadBtn = target.closest('.btn-sub-load');
+            const printBtn = target.closest('.btn-sub-print');
+            const deleteBtn = target.closest('.btn-sub-delete');
+
+            if (loadBtn) {
+                const id = Number(loadBtn.getAttribute('data-id'));
+                const rec = getAccountingRequests().find(r => Number(r.id) === id);
+                if (rec) {
+                    setDocFormData(rec);
+                    showToast('تم عرض بيانات الاشتراك في المستند أعلاه.', 'info');
+                    document.getElementById('sub-document-sheet')?.scrollIntoView({ behavior: 'smooth' });
+                }
+                return;
+            }
+
+            if (printBtn) {
+                const id = Number(printBtn.getAttribute('data-id'));
+                const rec = getAccountingRequests().find(r => Number(r.id) === id);
+                if (rec) {
+                    printServiceRequestExactDocument(rec);
+                }
+                return;
+            }
+
+            if (deleteBtn) {
+                const id = Number(deleteBtn.getAttribute('data-id'));
+                if (confirm('هل أنت متأكد من حذف هذا الاشتراك؟')) {
+                    const filtered = getAccountingRequests().filter(r => Number(r.id) !== id);
+                    saveAccountingRequests(filtered);
+                    showToast('تم حذف الاشتراك بنجاح.', 'success');
+                    renderSavedSubList();
+                    resetDocForm();
+                }
+            }
+        });
+    };
+
 
 
     let settingsSectionRendered = false;
@@ -23726,6 +24730,8 @@ const setupOrgHierarchyEvents = () => {
             renderAccountingSavedRecordsSection();
         } else if (targetId === 'accounting-query') {
             renderAccountingQuerySection();
+        } else if (targetId === 'accounting-subscriptions') {
+            renderAccountingSubscriptionsSection();
         } else if (targetId === 'collection-judicial') {
             renderJudicialCollectionSection();
         } else if (targetId === 'collection-zinat') {
