@@ -3947,15 +3947,9 @@ window.printCollectionReceipt = (id, type = 'zinat') => {
     let isSettled = false;
     if (paymentsList.length > 0) {
         const lastP = paymentsList[paymentsList.length - 1];
-        if (lastP.treasuryStatus === 'تم التوريد والتصفية بالخزينة' || lastP.treasuryStatus === 'تم التوريد' || lastP.treasuryStatus === 'مصفى' || lastP.isSettled) {
+        if (lastP.treasuryStatus === 'تم التوريد والتصفية بالخزينة' || lastP.treasuryStatus === 'تم التوريد' || lastP.treasuryStatus === 'مصفى' || lastP.isSettled === true) {
             isSettled = true;
         }
-    }
-    if (!isSettled && (state.treasurySettlements || []).length > 0) {
-        isSettled = (state.treasurySettlements || []).some((s) => {
-            const matchCollector = s.collectorName === collectorName || s.collectorUsername === (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.username) || s.username === (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.username);
-            return matchCollector && paymentsList.some((p) => normalizeDateStr(p.date) === normalizeDateStr(s.settlementDate) || (p.receiptNumber && p.receiptNumber === s.receiptNumber));
-        });
     }
     const logoSrc = state.settings.companyLogo;
     const logoHTML = logoSrc ? `<img src="${logoSrc}" alt="Logo" style="max-height: 80px; max-width: 95px; object-fit: contain;">` : '';
@@ -4723,7 +4717,8 @@ const renderJudicialCollectionSection = () => {
                 time: new Date().toLocaleTimeString('ar-EG'),
                 collectedBy: (_a = loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) !== null && _a !== void 0 ? _a : 'غير معروف',
                 collectorUsername: (_b = loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.username) !== null && _b !== void 0 ? _b : '',
-                treasuryStatus: 'معلقة'
+                treasuryStatus: 'معلقة',
+                isSettled: false
             });
             logActivity('تحصيل مبلغ ضبطية', `تم تحصيل مبلغ ${payVal} ج.م (إيصال: ${receiptNumber}) من المخالف ${item.subscriberName} - معلقة بالخزينة لحين التوريد والتصفية`);
             if (await saveState()) {
@@ -5002,36 +4997,13 @@ const renderZinatCollectionSection = () => {
         if (paid > 0) {
             const payments = item.payments || [];
             const isItemSettled = payments.length > 0 && payments.every((p) => {
-                if (p.treasuryStatus === 'تم التوريد والتصفية بالخزينة' || p.treasuryStatus === 'تم التوريد' || p.isSettled) {
-                    return true;
-                }
-                const pDateNorm = normalizeDateStr(p.date);
-                const colName = p.collectedBy || item.technician || 'غير معروف';
-                const colUser = p.collectorUsername || '';
-                // 1. فحص مباشر في سجل تصفيات الخزينة
-                const settledInTreasury = (state.treasurySettlements || []).some((s) => {
-                    const matchCollector = (colUser && s.collectorUsername === colUser) ||
-                        (colName && s.collectorName === colName) ||
-                        (colName && s.collectorUsername === colName);
-                    const matchDate = !pDateNorm || normalizeDateStr(s.settlementDate) === pDateNorm;
-                    return matchCollector && matchDate;
-                });
-                if (settledInTreasury)
-                    return true;
-                // 2. فحص ملخص عهدة المحصل
-                const user = (state.users || []).find(u => (colUser && u.username === colUser) || (colName && u.fullName === colName) || (colName && u.username === colName));
-                if (user) {
-                    const summary = calculateUserCustodySummary(user, pDateNorm);
-                    if (summary.status === 'settled')
-                        return true;
-                }
-                return false;
+                return Boolean(p.isSettled === true || p.treasuryStatus === 'تم التوريد والتصفية بالخزينة' || p.treasuryStatus === 'تم التوريد' || p.treasuryStatus === 'مصفى');
             });
             if (isItemSettled) {
-                treasuryBadge = '<span class="status-badge bg-success" style="font-weight:bold; background-color:#dcfce7; color:#15803d; border:1px solid #86efac;">تم التوريد بالخزينة</span>';
+                treasuryBadge = '<span class="status-badge bg-success" style="font-weight:bold; background-color:#dcfce7; color:#15803d; border:1px solid #86efac;">✔️ تم التوريد بالخزينة</span>';
             }
             else {
-                treasuryBadge = '<span class="status-badge bg-warning" style="font-weight:bold; background-color:#fef3c7; color:#b45309; border:1px solid #fcd34d;">مطلوب التصفية</span>';
+                treasuryBadge = '<span class="status-badge bg-warning" style="font-weight:bold; background-color:#fef3c7; color:#b45309; border:1px solid #fcd34d;">⏳ معلق طرف المحصل (مطلوب التصفية)</span>';
             }
         }
         const row = document.createElement('tr');
@@ -5176,7 +5148,8 @@ window.openZinatPaymentModal = async (id) => {
             time: new Date().toLocaleTimeString('ar-EG'),
             collectedBy: (_a = loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) !== null && _a !== void 0 ? _a : 'غير معروف',
             collectorUsername: (_b = loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.username) !== null && _b !== void 0 ? _b : '',
-            treasuryStatus: 'معلقة'
+            treasuryStatus: 'معلقة',
+            isSettled: false
         });
         logActivity('تحصيل زينات', `تم تحصيل مبلغ ${payVal} ج.م (إيصال: ${receiptNumber}) من ${item.requesterName} - معلقة بالخزينة لحين التوريد والتصفية`);
         if (await saveState()) {
@@ -5659,21 +5632,13 @@ const renderTreasuryTransactionsLog = () => {
     const toDate = toDateInput ? toDateInput.value : '';
     // Combine all transactions into one master log
     const list = [];
-    // Helper to check user settlement status for a given collector and date
-    const isCollectorSettled = (collectorName, collectorUser, pDate) => {
-        const user = state.users.find(u => u.username === collectorUser || u.fullName === collectorName);
-        if (!user)
-            return false;
-        const summary = calculateUserCustodySummary(user, pDate);
-        return summary.status === 'settled';
-    };
     // 1. Zinat collections
     (state.zinatCollection || []).filter(matchesCurrentScope).forEach((item) => {
         (item.payments || []).forEach((p, pIdx) => {
             const pDateNorm = normalizeDateStr(p.date);
             const colName = p.collectedBy || item.technician || 'غير معروف';
             const colUser = p.collectorUsername || '';
-            const settled = p.treasuryStatus === 'تم التوريد والتصفية بالخزينة' || isCollectorSettled(colName, colUser, pDateNorm);
+            const settled = Boolean(p.isSettled === true || p.treasuryStatus === 'تم التوريد والتصفية بالخزينة');
             list.push({
                 id: `zinat-${item.id}-${pIdx}`,
                 type: 'zinat',
@@ -5697,7 +5662,7 @@ const renderTreasuryTransactionsLog = () => {
             const pDateNorm = normalizeDateStr(p.date);
             const colName = p.collectedBy || 'غير معروف';
             const colUser = p.collectorUsername || '';
-            const settled = p.treasuryStatus === 'تم التوريد والتصفية بالخزينة' || isCollectorSettled(colName, colUser, pDateNorm);
+            const settled = Boolean(p.isSettled === true || p.treasuryStatus === 'تم التوريد والتصفية بالخزينة');
             list.push({
                 id: `judicial-${item.id}-${pIdx}`,
                 type: 'judicial',
@@ -6125,6 +6090,7 @@ const handleTreasurySettlementSubmit = async (event) => {
     renderTreasuryUserSettlements();
     renderTreasuryTransactionsLog();
     renderZinatCollectionSection();
+    renderJudicialCollectionSection();
     // Print receipt
     window.printSingleTreasuryReceipt(receiptNumber, 'تصفية عهدة محصل', paidAmount, user.fullName, 'الخزينة العامة', activeTreasuryDateFilter, notes);
 };
