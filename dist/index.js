@@ -464,14 +464,19 @@ const getSubAdmins = (selectedSector, selectedGeneralAdmin) => {
     return Array.from(list);
 };
 // عمليات إدارة الهيكل الإداري (إضافة، تعديل، حذف)
+// دالة التحقق مما إذا كان المستخدم مديراً للنظام
+const isSystemAdmin = (user) => {
+    const u = user || loggedInUser;
+    if (!u)
+        return false;
+    return u.username === 'admin' || u.username === 'المدير' || u.role === 'admin';
+};
 // دالة استخراج الترويسة الديناميكية لجميع الإيصالات والتقارير بناءً على تسجيل الدخول
 const getDynamicReceiptHeader = (userOrCollector) => {
     let sec = loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector;
     let br = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch);
     // For global admin with active scope filter
-    const isGlobalAdmin = loggedInUser &&
-        ((loggedInUser.username === 'admin' || loggedInUser.username === 'المدير') ||
-            (loggedInUser.role === 'admin' && (loggedInUser.branch === 'all' || !loggedInUser.branch)));
+    const isGlobalAdmin = isSystemAdmin(loggedInUser);
     if (isGlobalAdmin) {
         if (currentAdminScopeSector && currentAdminScopeSector !== 'all')
             sec = currentAdminScopeSector;
@@ -953,10 +958,8 @@ const ensureDefaultScope = (stateObj) => {
 const getCurrentDataScope = () => {
     if (!loggedInUser)
         return { sector: 'all', generalAdmin: 'all', branch: 'all', isGlobal: true };
-    // Only the global system administrator who is not assigned to a specific department has a global scope
-    const isGlobalAdmin = (loggedInUser.username === 'admin' || loggedInUser.username === 'المدير' || loggedInUser.role === 'admin') &&
-        (loggedInUser.sector === 'all' || !loggedInUser.branch || loggedInUser.branch === 'all');
-    if (isGlobalAdmin) {
+    // مدير النظام يطلع على كل شيء وتكون صلاحيته عامة وشاملة لجميع الإدارات والفروع
+    if (isSystemAdmin(loggedInUser)) {
         return {
             sector: currentAdminScopeSector,
             generalAdmin: currentAdminScopeGeneralAdmin,
@@ -1056,9 +1059,7 @@ const stampItemWithScope = (item) => {
     return item;
 };
 const updateAdminScopeUI = () => {
-    const isGlobalAdmin = loggedInUser &&
-        ((loggedInUser.username === 'admin' || loggedInUser.username === 'المدير') ||
-            (loggedInUser.role === 'admin' && (loggedInUser.branch === 'all' || !loggedInUser.branch)));
+    const isGlobalAdmin = isSystemAdmin(loggedInUser);
     const container = document.getElementById('admin-scope-container');
     const badge = document.getElementById('user-branch-badge');
     const badgeText = document.getElementById('user-branch-text');
@@ -1961,7 +1962,7 @@ const hasPermission = (permissionKey) => {
     if (!loggedInUser)
         return false;
     // Super admin has all permissions
-    if (loggedInUser.username === 'admin')
+    if (isSystemAdmin(loggedInUser))
         return true;
     const permission = state.settings.permissions[permissionKey];
     return permission && permission.roles.includes(loggedInUser.role);
@@ -1970,7 +1971,7 @@ const hasDashboardPermission = (permissionKey) => {
     if (!loggedInUser)
         return false;
     // Super admin has all permissions
-    if (loggedInUser.username === 'admin')
+    if (isSystemAdmin(loggedInUser))
         return true;
     const permission = state.settings.dashboardPermissions[permissionKey];
     // If permission doesn't exist in settings, default to showing the card for backward compatibility
@@ -1980,7 +1981,7 @@ const hasButtonPermission = (permissionKey) => {
     if (!loggedInUser)
         return false;
     // Super admin has all permissions
-    if (loggedInUser.username === 'admin')
+    if (isSystemAdmin(loggedInUser))
         return true;
     const permission = state.settings.buttonPermissions[permissionKey];
     return permission && permission.roles.includes(loggedInUser.role);
@@ -1989,7 +1990,7 @@ const hasReportPermission = (permissionKey) => {
     if (!loggedInUser)
         return false;
     // Super admin has all permissions
-    if (loggedInUser.username === 'admin')
+    if (isSystemAdmin(loggedInUser))
         return true;
     const permission = state.settings.reportPermissions[permissionKey];
     // If permission doesn't exist in settings, default to allowing for backward compatibility
