@@ -3717,6 +3717,63 @@ const handlePrintJudicialControlDetails = () => {
         printWindow.close();
     }, 500);
 };
+// Helper function for printing HTML content with robust iframe fallback for Electron / blocked popups
+const executePrintHtmlContent = (htmlContent) => {
+    var _a;
+    let printWin = null;
+    try {
+        printWin = window.open('', '_blank');
+    }
+    catch (e) {
+        printWin = null;
+    }
+    if (printWin && printWin.document) {
+        try {
+            printWin.document.open();
+            printWin.document.write(htmlContent);
+            printWin.document.close();
+            setTimeout(() => {
+                printWin.focus();
+                printWin.print();
+                printWin.close();
+            }, 500);
+            return;
+        }
+        catch (err) {
+            console.warn('Direct popup print failed, using iframe fallback', err);
+        }
+    }
+    // Invisible iframe fallback (works 100% in Electron, browsers with popup blocker enabled, etc.)
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.visibility = 'hidden';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument || ((_a = iframe.contentWindow) === null || _a === void 0 ? void 0 : _a.document);
+    if (doc) {
+        doc.open();
+        doc.write(htmlContent);
+        doc.close();
+        setTimeout(() => {
+            var _a, _b;
+            (_a = iframe.contentWindow) === null || _a === void 0 ? void 0 : _a.focus();
+            (_b = iframe.contentWindow) === null || _b === void 0 ? void 0 : _b.print();
+            setTimeout(() => {
+                try {
+                    document.body.removeChild(iframe);
+                }
+                catch (e) { }
+            }, 1500);
+        }, 500);
+    }
+    else {
+        showToast('تعذر فتح الطباعة. يرجى التحقق من إعدادات الطابعة.', 'error');
+    }
+};
 // --- قسم التحصيل ---
 const renderJudicialCollectionSection = () => {
     const tableBody = document.querySelector('#collection-judicial-table tbody');
@@ -3999,16 +4056,15 @@ const renderJudicialCollectionSection = () => {
         showToast('تم تسجيل تركيب العداد بنجاح.');
     };
     // Expose function to window for printing receipts
-    window.printCollectionReceipt = (id, type) => {
+    window.printCollectionReceipt = (id, type = 'zinat') => {
         let item;
         let title = '';
-        const numericId = Number(id);
         if (type === 'judicial') {
-            item = state.judicialControl.find(i => Number(i.id) === numericId);
+            item = (state.judicialControl || []).find(i => String(i.id) === String(id) || Number(i.id) === Number(id));
             title = 'إيصال تحصيل مبالغ ومصالحات الضبطية القضائية';
         }
         else {
-            item = state.zinatCollection.find(i => Number(i.id) === numericId);
+            item = (state.zinatCollection || []).find(i => String(i.id) === String(id) || Number(i.id) === Number(id));
             title = 'إيصال تحصيل رسوم وتصاريح زينات';
         }
         if (!item) {
@@ -4073,16 +4129,11 @@ const renderJudicialCollectionSection = () => {
             </div>
             `;
         }
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            showToast('تعذر فتح نافذة الطباعة، يرجى السماح بالنوافذ المنبثقة Popups.', 'error');
-            return;
-        }
         const subscriberOrRequester = item.subscriberName || item.requesterName || 'غير محدد';
         const addressText = item.address || '-';
         const mobileText = item.mobile || '';
         const notesText = item.notes || '';
-        printWindow.document.write(`
+        const receiptHTML = `
         <!DOCTYPE html>
         <html lang="ar" dir="rtl">
         <head>
@@ -4271,13 +4322,8 @@ const renderJudicialCollectionSection = () => {
             </div>
         </body>
         </html>
-        `);
-        printWindow.document.close();
-        setTimeout(() => {
-            printWindow.focus();
-            printWindow.print();
-            printWindow.close();
-        }, 500);
+        `;
+        executePrintHtmlContent(receiptHTML);
     };
     // Expose function to window for printing expired practices
     window.printExpiredPractices = () => {
@@ -4504,8 +4550,8 @@ const renderZinatCollectionSection = () => {
             <td>${statusBadge}</td>
             <td>${treasuryBadge}</td>
             <td class="actions-cell">
-                ${!isFullyPaid ? (isAdmin ? `<button class="btn btn-edit-details" onclick="window.openZinatPaymentModal(${item.id})">تحصيل</button>` : '') : '<span class="status-badge bg-success">تم السداد</span>'}
-                ${hasButtonPermission('print_button') ? `<button class="btn btn-print-receipt" style="margin-right: 5px; padding: 2px 5px;" onclick="window.printCollectionReceipt(${item.id}, 'zinat')" title="طباعة إيصال"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></button>` : ''}
+                ${!isFullyPaid ? (isAdmin ? `<button class="btn btn-edit-details" onclick="window.openZinatPaymentModal(${item.id})">تحصيل</button>` : '') : ''}
+                <button class="btn btn-print-receipt" style="margin-right: 5px; padding: 4px 8px; cursor: pointer;" onclick="window.printCollectionReceipt('${item.id}', 'zinat')" title="طباعة إيصال التحصيل"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></button>
                 ${isAdmin && hasButtonPermission('delete_button') ? `<button class="btn btn-delete" onclick="window.deleteZinatRecord(${item.id})">حذف</button>` : ''}
             </td>
         `;
@@ -6880,17 +6926,12 @@ const handlePrintTable = (tableId, title) => {
         showToast('لم يتم العثور على الجدول.', 'error');
         return;
     }
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-        showToast('فشل فتح نافذة الطباعة.', 'error');
-        return;
-    }
     const companyName = (state.settings.replacementReportCompanyName || state.settings.companyName || 'ELMAGHRABI').replace(/\n/g, '<br>');
     const printDate = new Date().toLocaleString('ar-EG');
     const logoSrc = state.settings.companyLogo;
     const logoHTML = logoSrc ? `<img src="${logoSrc}" alt="Logo" class="company-logo">` : '';
     const tableHTML = table.outerHTML;
-    printWindow.document.write(`
+    const printContentHTML = `
         <!DOCTYPE html>
         <html lang="ar" dir="rtl">
         <head>
@@ -6938,9 +6979,8 @@ const handlePrintTable = (tableId, title) => {
             ${tableHTML}
         </body>
         </html>
-    `);
-    printWindow.document.close();
-    setTimeout(() => { printWindow.focus(); printWindow.print(); printWindow.close(); }, 500);
+        `;
+    executePrintHtmlContent(printContentHTML);
 };
 window.handlePrintTable = handlePrintTable;
 const renderLostMemosSection = () => {

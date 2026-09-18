@@ -44,8 +44,11 @@ function createWindow() {
   // تحميل ملف index.html الخاص بالتطبيق.
   mainWindow.loadFile(path.join(__dirname, 'المنظومة الموحدة للعدادات.html'));
 
-  // فتح الروابط الخارجية في المتصفح الافتراضي بدلاً من نافذة Electron
+  // السماح بنوافذ الطباعة الداخلية وفتح الروابط الخارجية في المتصفح الافتراضي
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (!url || url === 'about:blank' || url.startsWith('blob:') || !url.startsWith('http')) {
+      return { action: 'allow' };
+    }
     shell.openExternal(url);
     return { action: 'deny' };
   });
