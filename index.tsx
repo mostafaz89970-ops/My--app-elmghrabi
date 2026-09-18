@@ -19465,7 +19465,7 @@ const handlePrintJudicialControlDetails = () => {
             <style>
                 @page {
                     size: A4 portrait;
-                    margin: 8mm 10mm;
+                    margin: 8mm 8mm;
                 }
                 * {
                     box-sizing: border-box;
@@ -19475,25 +19475,25 @@ const handlePrintJudicialControlDetails = () => {
                     background: #f1f5f9;
                     color: #0f172a;
                     margin: 0;
-                    padding: 16px;
+                    padding: 14px;
                     direction: rtl;
-                    line-height: 1.45;
+                    line-height: 1.4;
                 }
                 .page-container {
                     max-width: 860px;
                     margin: 0 auto;
                     background: #ffffff;
                     border: 2px solid #0f172a;
-                    border-radius: 10px;
-                    padding: 16px 20px;
+                    border-radius: 8px;
+                    padding: 10px 16px;
                     box-shadow: 0 4px 15px rgba(0,0,0,0.08);
                 }
                 .action-bar {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    margin-bottom: 14px;
-                    padding: 8px 14px;
+                    margin-bottom: 12px;
+                    padding: 7px 14px;
                     background: #0f172a;
                     color: #fff;
                     border-radius: 8px;
@@ -19521,20 +19521,20 @@ const handlePrintJudicialControlDetails = () => {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    border-bottom: 2.5px solid #0f172a;
-                    padding-bottom: 10px;
-                    margin-bottom: 12px;
+                    border-bottom: 2px solid #0f172a;
+                    padding-bottom: 6px;
+                    margin-bottom: 8px;
                 }
                 .header-right {
                     text-align: right;
-                    line-height: 1.35;
+                    line-height: 1.3;
                 }
-                .header-right .ministry { font-size: 12.5px; font-weight: 800; color: #1e293b; }
-                .header-right .holding { font-size: 12px; font-weight: 800; color: #334155; }
-                .header-right .company { font-size: 13.5px; font-weight: 900; color: #0f172a; }
-                .header-right .sector { font-size: 12.5px; font-weight: 800; color: #1e40af; }
-                .header-right .branch { font-size: 12.5px; font-weight: 800; color: #065f46; }
-                .header-right .rev-branch { font-size: 12px; font-weight: 800; color: #047857; }
+                .header-right .ministry { font-size: 12px; font-weight: 800; color: #1e293b; }
+                .header-right .holding { font-size: 11.5px; font-weight: 800; color: #334155; }
+                .header-right .company { font-size: 13px; font-weight: 900; color: #0f172a; }
+                .header-right .sector { font-size: 12px; font-weight: 800; color: #1e40af; }
+                .header-right .branch { font-size: 12px; font-weight: 800; color: #065f46; }
+                .header-right .rev-branch { font-size: 11.5px; font-weight: 800; color: #047857; }
 
                 .header-center {
                     text-align: center;
@@ -19545,19 +19545,19 @@ const handlePrintJudicialControlDetails = () => {
                     display: inline-block;
                     background: #0f172a;
                     color: #ffffff;
-                    font-size: 20px;
+                    font-size: 19px;
                     font-weight: 900;
-                    padding: 6px 26px;
+                    padding: 5px 22px;
                     border-radius: 8px;
                     letter-spacing: 0.5px;
                     border: 2px solid #0f172a;
                     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
                 }
                 .header-center .sub-title {
-                    font-size: 11.5px;
+                    font-size: 11px;
                     font-weight: 800;
                     color: #475569;
-                    margin-top: 4px;
+                    margin-top: 3px;
                 }
                 .header-center .order-chip {
                     display: inline-block;
@@ -19565,10 +19565,10 @@ const handlePrintJudicialControlDetails = () => {
                     border: 1.5px solid #cbd5e1;
                     border-radius: 6px;
                     padding: 2px 10px;
-                    font-size: 12px;
+                    font-size: 11.5px;
                     font-weight: 800;
                     color: #0f172a;
-                    margin-top: 4px;
+                    margin-top: 3px;
                 }
 
                 .header-left {
@@ -19576,26 +19576,26 @@ const handlePrintJudicialControlDetails = () => {
                     display: flex;
                     flex-direction: column;
                     align-items: flex-end;
-                    gap: 4px;
+                    gap: 3px;
                 }
                 .logo-img {
-                    max-height: 70px;
-                    max-width: 105px;
+                    max-height: 65px;
+                    max-width: 95px;
                     object-fit: contain;
                 }
                 .meta-tags {
-                    font-size: 10.5px;
+                    font-size: 10px;
                     font-weight: 700;
                     color: #475569;
                     text-align: left;
-                    line-height: 1.4;
+                    line-height: 1.35;
                 }
 
                 /* Section Styling */
                 .section-card {
                     border: 1.5px solid #0f172a;
-                    border-radius: 8px;
-                    margin-bottom: 10px;
+                    border-radius: 6px;
+                    margin-bottom: 7px;
                     overflow: hidden;
                     background: #ffffff;
                     page-break-inside: avoid;
@@ -19604,8 +19604,8 @@ const handlePrintJudicialControlDetails = () => {
                     background: #f1f5f9;
                     color: #0f172a;
                     font-weight: 900;
-                    font-size: 12.5px;
-                    padding: 4px 10px;
+                    font-size: 12px;
+                    padding: 3px 8px;
                     border-bottom: 1.5px solid #0f172a;
                     display: flex;
                     align-items: center;
@@ -19614,10 +19614,10 @@ const handlePrintJudicialControlDetails = () => {
                 .data-table {
                     width: 100%;
                     border-collapse: collapse;
-                    font-size: 11.5px;
+                    font-size: 11px;
                 }
                 .data-table td {
-                    padding: 4.5px 8px;
+                    padding: 3.5px 7px;
                     border: 1px solid #cbd5e1;
                     vertical-align: middle;
                 }
@@ -19639,18 +19639,18 @@ const handlePrintJudicialControlDetails = () => {
                 .meters-table {
                     width: 100%;
                     border-collapse: collapse;
-                    font-size: 11.5px;
+                    font-size: 11px;
                     text-align: center;
                 }
                 .meters-table th {
                     background: #e2e8f0;
                     color: #0f172a;
                     font-weight: 900;
-                    padding: 5px;
+                    padding: 4px;
                     border: 1px solid #94a3b8;
                 }
                 .meters-table td {
-                    padding: 4.5px;
+                    padding: 3.5px;
                     border: 1px solid #cbd5e1;
                     font-weight: 700;
                 }
@@ -19658,27 +19658,27 @@ const handlePrintJudicialControlDetails = () => {
                 /* Attachments */
                 .attachments-grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 10px;
-                    padding: 8px;
+                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                    gap: 8px;
+                    padding: 6px;
                 }
                 .attachment-item {
                     border: 1px solid #cbd5e1;
                     border-radius: 6px;
-                    padding: 6px;
+                    padding: 5px;
                     text-align: center;
                     background: #f8fafc;
                     page-break-inside: avoid;
                 }
                 .attachment-item h5 {
-                    margin: 0 0 4px 0;
-                    font-size: 11.5px;
+                    margin: 0 0 3px 0;
+                    font-size: 11px;
                     font-weight: 800;
                     color: #1e293b;
                 }
                 .attachment-item img {
                     max-width: 100%;
-                    max-height: 200px;
+                    max-height: 160px;
                     object-fit: contain;
                     border: 1px solid #cbd5e1;
                     border-radius: 4px;
@@ -19689,21 +19689,21 @@ const handlePrintJudicialControlDetails = () => {
                 .signatures-container {
                     display: flex;
                     justify-content: space-between;
-                    margin-top: 12px;
-                    padding-top: 8px;
+                    margin-top: 8px;
+                    padding-top: 6px;
                     border-top: 1.5px dashed #0f172a;
                     page-break-inside: avoid;
                 }
                 .sign-box {
                     width: 31%;
                     text-align: center;
-                    font-size: 11.5px;
+                    font-size: 11px;
                     font-weight: 800;
                     color: #0f172a;
-                    line-height: 1.5;
+                    line-height: 1.4;
                 }
                 .sign-line {
-                    margin-top: 28px;
+                    margin-top: 18px;
                     border-bottom: 1.5px dotted #64748b;
                     width: 80%;
                     margin-left: auto;
@@ -19711,28 +19711,29 @@ const handlePrintJudicialControlDetails = () => {
                 }
 
                 .print-footer {
-                    margin-top: 10px;
+                    margin-top: 6px;
                     border-top: 1px solid #cbd5e1;
-                    padding-top: 5px;
+                    padding-top: 4px;
                     font-size: 10px;
-                    color: #64748b;
+                    color: #475569;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                 }
 
                 @media print {
-                    body {
-                        background: #ffffff;
-                        padding: 0;
+                    html, body {
+                        background: #ffffff !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
                     .page-container {
-                        border: 2px solid #000;
-                        box-shadow: none;
-                        padding: 8px;
-                        max-width: 100%;
+                        border: 1.5px solid #000 !important;
+                        box-shadow: none !important;
+                        padding: 8px 12px !important;
+                        max-width: 100% !important;
                     }
                     .action-bar {
                         display: none !important;
@@ -19777,8 +19778,6 @@ const handlePrintJudicialControlDetails = () => {
                         ${logoSrc ? `<img src="${logoSrc}" alt="شعار الشركة" class="logo-img">` : ''}
                         <div class="meta-tags">
                             <div>التاريخ: ${printDate}</div>
-                            <div>الوقت: ${printTime}</div>
-                            <div>كود السجل: #${record.id || '-'}</div>
                         </div>
                     </div>
                 </div>
@@ -19953,8 +19952,8 @@ const handlePrintJudicialControlDetails = () => {
 
                 <!-- Footer -->
                 <div class="print-footer">
-                    <div>نظام إدارة ومتابعة العدادات والتحصيل الموحد • طُبع بواسطة: ${loggedInUser?.fullName || 'النظام'}</div>
-                    <div>تاريخ وتوقيت الطباعة: ${printDate} ${printTime}</div>
+                    <div>منظومة إدارة ومتابعة العدادات والتحصيل الموحد • ${headerInfo.company || ''}</div>
+                    <div>اعتماد رسمي</div>
                 </div>
             </div>
         </body>
@@ -20092,6 +20091,7 @@ const handlePrintJudicialControlDetails = () => {
                 <div class="input-group">
                     <label for="accounting-registration-number">رقم القيد بشهادة التركيب</label>
                     <input id="accounting-registration-number" type="text" placeholder="ادخل رقم القيد">
+                    <div id="accounting-reg-duplicate-msg" style="font-size: 12px; font-weight: bold; margin-top: 4px; display: none;"></div>
                 </div>
                 <div class="input-group">
                     <label for="accounting-issue-date">تاريخ صدورها</label>
@@ -20382,6 +20382,10 @@ const handlePrintJudicialControlDetails = () => {
             if (inspectionPreview) inspectionPreview.innerHTML = '';
             const cancelBtn = document.getElementById('accounting-cancel-edit');
             if (cancelBtn) cancelBtn.classList.add('hidden');
+            const regInput = document.getElementById('accounting-registration-number') as HTMLInputElement | null;
+            if (regInput) regInput.style.borderColor = '';
+            const regMsg = document.getElementById('accounting-reg-duplicate-msg');
+            if (regMsg) { regMsg.style.display = 'none'; regMsg.innerHTML = ''; }
         };
 
         const renderSavedAccountingRecords = () => {
@@ -20425,6 +20429,41 @@ const handlePrintJudicialControlDetails = () => {
         registerPreview('accounting-model-image', 'accounting-model-preview');
         registerPreview('accounting-certificate-image', 'accounting-certificate-preview');
         registerPreview('accounting-inspection-image', 'accounting-inspection-preview');
+
+        // التحقق اللحظي من عدم تكرار رقم القيد بشهادة التركيب
+        const regInputEl = document.getElementById('accounting-registration-number') as HTMLInputElement | null;
+        const regMsgEl = document.getElementById('accounting-reg-duplicate-msg');
+        regInputEl?.addEventListener('input', () => {
+            const raw = regInputEl.value.trim();
+            if (!raw) {
+                if (regMsgEl) { regMsgEl.style.display = 'none'; regMsgEl.innerHTML = ''; }
+                regInputEl.style.borderColor = '';
+                return;
+            }
+            const norm = raw.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+            const currentRecId = (document.getElementById('accounting-record-id') as HTMLInputElement | null)?.value;
+            const records = getAccountingRequests();
+            const dup = records.find(r => {
+                if (currentRecId && String(r.id) === String(currentRecId)) return false;
+                const exReg = String(r['registration-number'] || r.registrationNumber || '').replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                return exReg && exReg === norm;
+            });
+            if (dup) {
+                regInputEl.style.borderColor = '#dc2626';
+                if (regMsgEl) {
+                    regMsgEl.style.display = 'block';
+                    regMsgEl.style.color = '#dc2626';
+                    regMsgEl.innerHTML = `⚠️ رقم القيد مسجل مسبقاً للعميل: <strong>${dup['client-name'] || ''}</strong> (طلب: ${dup['order-number'] || '-'})`;
+                }
+            } else {
+                regInputEl.style.borderColor = '#16a34a';
+                if (regMsgEl) {
+                    regMsgEl.style.display = 'block';
+                    regMsgEl.style.color = '#16a34a';
+                    regMsgEl.innerHTML = `✓ رقم القيد متاح وغير مكرر`;
+                }
+            }
+        });
 
         // منطق جلب بيانات الطلب لاستكمال المعاينة (برقم الطلب أو الرقم القومي)
         const lookupInput = document.getElementById('accounting-lookup-query') as HTMLInputElement | null;
@@ -20627,6 +20666,26 @@ const handlePrintJudicialControlDetails = () => {
             }
 
             const recordIdValue = (document.getElementById('accounting-record-id') as HTMLInputElement | null)?.value;
+
+            const regNumber = (formData['registration-number'] || '').trim();
+            if (regNumber) {
+                const normReg = regNumber.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                const allRecords = getAccountingRequests();
+                const duplicate = allRecords.find(r => {
+                    if (recordIdValue && String(r.id) === String(recordIdValue)) return false;
+                    const exReg = String(r['registration-number'] || r.registrationNumber || '').replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+                    return exReg && exReg === normReg;
+                });
+                if (duplicate) {
+                    showToast(`عفواً، رقم القيد (${regNumber}) مسجل مسبقاً باسم العميل "${duplicate['client-name'] || duplicate.clientName || 'غير محدد'}" (طلب: ${duplicate['order-number'] || duplicate.orderNumber || '-'}). لا يمكن تكرار رقم القيد بشهادة التركيب.`, 'error');
+                    const regInput = document.getElementById('accounting-registration-number') as HTMLInputElement | null;
+                    if (regInput) {
+                        regInput.focus();
+                        regInput.style.borderColor = '#dc2626';
+                    }
+                    return;
+                }
+            }
             const modelInput = document.getElementById('accounting-model-image') as HTMLInputElement | null;
             const certificateInput = document.getElementById('accounting-certificate-image') as HTMLInputElement | null;
             const inspectionInput = document.getElementById('accounting-inspection-image') as HTMLInputElement | null;
@@ -21310,36 +21369,39 @@ const handlePrintJudicialControlDetails = () => {
         }
         .doc-header-right {
             text-align: right;
-            font-size: 16px;
-            font-weight: bold;
+            font-size: 15px;
+            font-weight: 600;
             line-height: 1.4;
+            color: #111;
         }
         .doc-header-center {
             text-align: center;
             flex: 1;
-            padding-top: 18px;
+            padding-top: 12px;
         }
         .doc-title {
-            font-size: 26px;
-            font-weight: bold;
-            letter-spacing: 0.5px;
+            font-size: 23px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            color: #000;
         }
         .doc-header-left {
             text-align: left;
-            font-size: 15px;
-            font-weight: bold;
+            font-size: 14.5px;
+            font-weight: 500;
             white-space: nowrap;
+            color: #111;
         }
         .divider {
-            border-bottom: 2px solid #000;
-            margin: 8px 0 16px 0;
+            border-bottom: 1.5px solid #222;
+            margin: 8px 0 14px 0;
         }
         .doc-grid {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            font-size: 16px;
-            margin-bottom: 16px;
+            gap: 10px;
+            font-size: 15px;
+            margin-bottom: 14px;
         }
         .doc-row {
             display: flex;
@@ -21360,24 +21422,27 @@ const handlePrintJudicialControlDetails = () => {
             gap: 10px;
         }
         .doc-label {
-            font-weight: bold;
+            font-weight: 600;
             white-space: nowrap;
-            font-size: 16px;
+            font-size: 15px;
+            color: #111;
         }
         .doc-value {
-            font-weight: bold;
+            font-weight: normal;
             flex: 1;
             word-break: break-word;
-            font-size: 16px;
+            font-size: 15px;
+            color: #111;
         }
         .footer-divider {
-            border-bottom: 2px solid #000;
-            margin: 25px 0 10px 0;
+            border-bottom: 1.5px solid #222;
+            margin: 20px 0 8px 0;
         }
         .footer-note {
-            font-size: 14.5px;
-            font-weight: bold;
-            margin-top: 6px;
+            font-size: 13.5px;
+            font-weight: normal;
+            color: #222;
+            margin-top: 4px;
         }
     </style>
 </head>
@@ -21591,143 +21656,143 @@ const handlePrintJudicialControlDetails = () => {
 
                     <!-- الترويسة -->
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
-                        <div style="text-align: right; font-size: 15px; font-weight: bold; line-height: 1.4;">
-                            <input id="sub-input-company" type="text" value="${defaultCompany}" style="font-weight: bold; font-size: 15px; border: none; border-bottom: 1px dashed transparent; background: transparent; width: 260px;" title="اسم الشركة">
+                        <div style="text-align: right; font-size: 15px; font-weight: 600; line-height: 1.4;">
+                            <input id="sub-input-company" type="text" value="${defaultCompany}" style="font-weight: 600; font-size: 15px; border: none; border-bottom: 1px dashed transparent; background: transparent; width: 260px;" title="اسم الشركة">
                             <br>
-                            <input id="sub-input-branch" type="text" value="${defaultBranch}" style="font-weight: bold; font-size: 14px; border: none; border-bottom: 1px dashed transparent; background: transparent; width: 260px;" title="اسم الفرع / الإيرادات">
+                            <input id="sub-input-branch" type="text" value="${defaultBranch}" style="font-weight: 600; font-size: 14px; border: none; border-bottom: 1px dashed transparent; background: transparent; width: 260px;" title="اسم الفرع / الإيرادات">
                         </div>
-                        <div style="text-align: center; flex: 1; padding-top: 14px;">
-                            <span style="font-size: 24px; font-weight: 900; letter-spacing: 0.5px; border-bottom: 2px solid #000; padding-bottom: 2px;">بيانات طلب الخدمة</span>
+                        <div style="text-align: center; flex: 1; padding-top: 12px;">
+                            <span style="font-size: 23px; font-weight: 700; letter-spacing: 0.3px; border-bottom: 2px solid #000; padding-bottom: 2px;">بيانات طلب الخدمة</span>
                         </div>
-                        <div style="text-align: left; font-size: 14px; font-weight: bold; white-space: nowrap;">
+                        <div style="text-align: left; font-size: 14px; font-weight: 500; white-space: nowrap;">
                             <span>التاريخ : </span>
-                            <input id="sub-input-date" type="text" value="${todayArabic}" style="font-weight: bold; font-size: 14px; border: none; border-bottom: 1px dashed #cbd5e1; background: transparent; width: 130px; text-align: center;">
+                            <input id="sub-input-date" type="text" value="${todayArabic}" style="font-weight: 500; font-size: 14px; border: none; border-bottom: 1px dashed #cbd5e1; background: transparent; width: 130px; text-align: center;">
                         </div>
                     </div>
 
                     <!-- الفاصل العلوي -->
-                    <div style="border-bottom: 2px solid #000; margin: 8px 0 16px 0;"></div>
+                    <div style="border-bottom: 1.5px solid #222; margin: 8px 0 14px 0;"></div>
 
                     <!-- شبكة حقول النموذج -->
-                    <div style="display: flex; flex-direction: column; gap: 11px; font-size: 15px;">
+                    <div style="display: flex; flex-direction: column; gap: 10px; font-size: 15px;">
                         <!-- السطر 1: رقم الطلب وتاريخ الطلب -->
                         <div style="display: flex; justify-content: space-between; gap: 20px;">
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">رقم الطلب :</label>
-                                <input id="sub-input-order-number" type="text" placeholder="مثال: 50232" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">رقم الطلب :</label>
+                                <input id="sub-input-order-number" type="text" placeholder="مثال: 50232" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">تاريخ الطلب :</label>
-                                <input id="sub-input-request-date" type="text" value="${todayArabic}" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">تاريخ الطلب :</label>
+                                <input id="sub-input-request-date" type="text" value="${todayArabic}" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                         </div>
 
                         <!-- السطر 2: الخدمة -->
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">الخـدمــــــة :</label>
-                            <input id="sub-input-service" type="text" value="توصيل تيار    وحدات سكنية" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">الخـدمــــــة :</label>
+                            <input id="sub-input-service" type="text" value="توصيل تيار    وحدات سكنية" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                         </div>
 
                         <!-- السطر 3: اسم العميل ونوع الاشتراك -->
                         <div style="display: flex; justify-content: space-between; gap: 20px;">
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">اسم العميـــل :</label>
-                                <input id="sub-input-client-name" type="text" placeholder="اسم العميل الرباعي" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">اسم العميـــل :</label>
+                                <input id="sub-input-client-name" type="text" placeholder="اسم العميل الرباعي" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">نوع الأشتراك :</label>
-                                <input id="sub-input-subscription-type" type="text" value="أفراد" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">نوع الأشتراك :</label>
+                                <input id="sub-input-subscription-type" type="text" value="أفراد" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                         </div>
 
                         <!-- السطر 4: رقم البطاقة وإيصال المعاينة -->
                         <div style="display: flex; justify-content: space-between; gap: 20px;">
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">رقم البطاقــــة :</label>
-                                <input id="sub-input-card-number" type="text" placeholder="الرقم القومي (14 رقم)" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">رقم البطاقــــة :</label>
+                                <input id="sub-input-card-number" type="text" placeholder="الرقم القومي (14 رقم)" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">إيصال المعاينة :</label>
-                                <input id="sub-input-inspection-receipt" type="text" placeholder="رقم إيصال المعاينة" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">إيصال المعاينة :</label>
+                                <input id="sub-input-inspection-receipt" type="text" placeholder="رقم إيصال المعاينة" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                         </div>
 
                         <!-- السطر 5: جهة صدورها وتاريخ صدورها -->
                         <div style="display: flex; justify-content: space-between; gap: 20px;">
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">جهة صدورها :</label>
-                                <input id="sub-input-issue-place" type="text" value="بنى مزار" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">جهة صدورها :</label>
+                                <input id="sub-input-issue-place" type="text" value="بنى مزار" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">تاريخ صدورها :</label>
-                                <input id="sub-input-issue-date" type="text" value="${todayArabic}" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">تاريخ صدورها :</label>
+                                <input id="sub-input-issue-date" type="text" value="${todayArabic}" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                         </div>
 
                         <!-- السطر 6: العنوان -->
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">العنـــــــوان :</label>
-                            <input id="sub-input-address" type="text" placeholder="عنوان تركيب العداد" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">العنـــــــوان :</label>
+                            <input id="sub-input-address" type="text" placeholder="عنوان تركيب العداد" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                         </div>
 
                         <!-- السطر 7: رقم التليفون -->
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">رقم التليفون :</label>
-                            <input id="sub-input-mobile" type="text" placeholder="رقم المحمول أو الهاتف" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                            <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">رقم التليفون :</label>
+                            <input id="sub-input-mobile" type="text" placeholder="رقم المحمول أو الهاتف" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                         </div>
 
                         <!-- السطر 8: وصف المكان وصفة العميل -->
                         <div style="display: flex; justify-content: space-between; gap: 20px;">
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">وصف المكان :</label>
-                                <input id="sub-input-location-description" type="text" value="منزل" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">وصف المكان :</label>
+                                <input id="sub-input-location-description" type="text" value="منزل" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">صفة العميـل :</label>
-                                <input id="sub-input-client-description" type="text" value="مالك" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">صفة العميـل :</label>
+                                <input id="sub-input-client-description" type="text" value="مالك" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                         </div>
 
                         <!-- السطر 9: الحدود الشرقية والغربية -->
                         <div style="display: flex; justify-content: space-between; gap: 20px;">
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">الحد الشرقى :</label>
-                                <input id="sub-input-east-boundary" type="text" placeholder="الحد الشرقي" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">الحد الشرقى :</label>
+                                <input id="sub-input-east-boundary" type="text" placeholder="الحد الشرقي" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">الحد الغربى :</label>
-                                <input id="sub-input-west-boundary" type="text" placeholder="الحد الغربي" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">الحد الغربى :</label>
+                                <input id="sub-input-west-boundary" type="text" placeholder="الحد الغربي" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                         </div>
 
                         <!-- السطر 10: الحدود الشمالية والجنوبية -->
                         <div style="display: flex; justify-content: space-between; gap: 20px;">
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">الحد الشمالى :</label>
-                                <input id="sub-input-north-boundary" type="text" placeholder="الحد الشمالي / البحري" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">الحد الشمالى :</label>
+                                <input id="sub-input-north-boundary" type="text" placeholder="الحد الشمالي / البحري" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">الحد الجنوبى :</label>
-                                <input id="sub-input-south-boundary" type="text" placeholder="الحد الجنوبي / القبلي" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">الحد الجنوبى :</label>
+                                <input id="sub-input-south-boundary" type="text" placeholder="الحد الجنوبي / القبلي" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                         </div>
 
                         <!-- السطر 11: اسم مالك العقار وتاريخ العقد -->
                         <div style="display: flex; justify-content: space-between; gap: 20px;">
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">اسم مالك العقار :</label>
-                                <input id="sub-input-owner-name" type="text" value="مالك" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">اسم مالك العقار :</label>
+                                <input id="sub-input-owner-name" type="text" value="مالك" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                             <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                                <label style="font-weight: bold; white-space: nowrap; min-width: 95px;">تاريخ العقد :</label>
-                                <input id="sub-input-contract-date" type="text" value="${todayArabic}" style="flex: 1; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd;">
+                                <label style="font-weight: 600; white-space: nowrap; min-width: 95px; color: #111;">تاريخ العقد :</label>
+                                <input id="sub-input-contract-date" type="text" value="${todayArabic}" style="flex: 1; font-weight: normal; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 15px; background: #fdfdfd; color: #111;">
                             </div>
                         </div>
                     </div>
 
                     <!-- الفاصل السفلي -->
-                    <div style="border-bottom: 2px solid #000; margin: 25px 0 10px 0;"></div>
-                    <div style="font-size: 14.5px; font-weight: bold; color: #000;">* بيانات البطاقة هى بيانات بطاقة مقدم الطلب</div>
+                    <div style="border-bottom: 1.5px solid #222; margin: 20px 0 8px 0;"></div>
+                    <div style="font-size: 13.5px; font-weight: normal; color: #222;">* بيانات البطاقة هى بيانات بطاقة مقدم الطلب</div>
                 </div>
             </div>
 
