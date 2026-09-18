@@ -1222,6 +1222,25 @@ const stampItemWithScope = (item: any): any => {
     return item;
 };
 
+const getUserDefaultDepartmentScope = (): { sector: string; generalAdmin: string; subAdmin: string } => {
+    const scope = getCurrentDataScope();
+    const effectiveSector = (!scope.isGlobal && scope.sector !== 'all') 
+        ? scope.sector 
+        : (loggedInUser?.sector && loggedInUser.sector !== 'all' ? loggedInUser.sector : (currentAdminScopeSector !== 'all' ? currentAdminScopeSector : 'قطاع شمال المنيا'));
+    const effectiveGenAdmin = (!scope.isGlobal && scope.generalAdmin !== 'all')
+        ? scope.generalAdmin
+        : (loggedInUser?.generalAdmin && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : (currentAdminScopeGeneralAdmin !== 'all' ? currentAdminScopeGeneralAdmin : 'الإدارة العامة لهندسات شمال المنيا'));
+    const effectiveBranch = (!scope.isGlobal && scope.branch !== 'all') 
+        ? scope.branch 
+        : (loggedInUser?.branch && loggedInUser.branch !== 'all' ? loggedInUser.branch : (currentAdminScopeBranch !== 'all' ? currentAdminScopeBranch : 'هندسة كهرباء بني مزار'));
+
+    return {
+        sector: effectiveSector,
+        generalAdmin: effectiveGenAdmin,
+        subAdmin: effectiveBranch
+    };
+};
+
 const updateAdminScopeUI = () => {
     const isGlobalAdmin = isSystemAdmin(loggedInUser);
     const container = document.getElementById('admin-scope-container');
@@ -2774,6 +2793,22 @@ const columnConfigs: { [key: string]: ColumnDefinition[] } = {
         { key: 'accountRefM', header: 'م' },
         ...baseColumns,
         {
+            key: 'sector',
+            header: 'القطاع',
+            render: (item: DataItem) => {
+                if (item.sector) return item.sector;
+                if (item.generalAdmin) {
+                    const struct = getActiveOrgStructure();
+                    for (const [sec, gas] of Object.entries(struct)) {
+                        if (Object.keys(gas).includes(item.generalAdmin)) {
+                            return sec;
+                        }
+                    }
+                }
+                return 'قطاع شمال المنيا';
+            }
+        },
+        {
             key: 'generalAdmin',
             header: 'الإدارة العامة',
             render: (item: DataItem) => item.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا'
@@ -3067,6 +3102,13 @@ const populateMeterFormForSearch = (data: DataItem) => {
     // Handle ID
     (document.getElementById('meter-id') as HTMLInputElement).value = String(data.id);
 
+    // ضبط حقول الإدارات لبيانات المشترك
+    setupDepartmentFormFields('', {
+        sector: data.sector,
+        generalAdmin: data.generalAdmin,
+        subAdmin: data.subAdmin || data.branch || data.branchName
+    });
+
     // Show clear button
     document.getElementById('meter-search-clear-btn')?.classList.remove('hidden');
 
@@ -3103,6 +3145,7 @@ const clearMeterRegistrationSearch = () => {
 
     form.reset();
     (document.getElementById('meter-id') as HTMLInputElement).value = '';
+    setupDepartmentFormFields('');
 
     const inputs = form.querySelectorAll('input, select, textarea');
     inputs.forEach((input: any) => {
@@ -3272,8 +3315,82 @@ const ensureMeterSupplyCompanyField = (prefix: string) => {
     }
 };
 
+const setupDepartmentFormFields = (prefix: string = '', initialValues?: { sector?: string; generalAdmin?: string; subAdmin?: string }) => {
+    const sectorSel = document.getElementById(`${prefix}sector`) as HTMLSelectElement | null;
+    const genSel = document.getElementById(`${prefix}generalAdmin`) as HTMLSelectElement | null;
+    const subSel = document.getElementById(`${prefix}subAdmin`) as HTMLSelectElement | null;
+
+    if (!sectorSel || !genSel || !subSel) return;
+
+    const userScope = getUserDefaultDepartmentScope();
+    const initSector = initialValues?.sector || userScope.sector;
+    const initGA = initialValues?.generalAdmin || userScope.generalAdmin;
+    const initSub = initialValues?.subAdmin || userScope.subAdmin;
+
+    const updateSubAdmins = (selectedSub?: string) => {
+        const sec = sectorSel.value;
+        const ga = genSel.value;
+        const subs = getSubAdmins(sec, ga);
+        populateSelect(subSel, subs, '-- اختر الإدارة الفرعية --');
+        if (selectedSub && subs.includes(selectedSub)) {
+            subSel.value = selectedSub;
+        } else if (subs.length > 0) {
+            subSel.value = subs[0];
+        }
+    };
+
+    const updateGenAdmins = (selectedGA?: string, selectedSub?: string) => {
+        const sec = sectorSel.value;
+        const gas = getGeneralAdminsForSector(sec);
+        populateSelect(genSel, gas, '-- اختر الإدارة العامة --');
+        if (selectedGA && gas.includes(selectedGA)) {
+            genSel.value = selectedGA;
+        } else if (gas.length > 0) {
+            genSel.value = gas[0];
+        }
+        updateSubAdmins(selectedSub);
+    };
+
+    // Populate Sectors
+    const sectors = getAvailableSectors();
+    populateSelect(sectorSel, sectors, '-- اختر القطاع --');
+    if (initSector && sectors.includes(initSector)) {
+        sectorSel.value = initSector;
+    } else if (sectors.length > 0) {
+        sectorSel.value = sectors[0];
+    }
+
+    // Attach cascading listeners only once per element
+    if (!sectorSel.dataset.hasCascadeListener) {
+        sectorSel.dataset.hasCascadeListener = 'true';
+        sectorSel.addEventListener('change', () => {
+            const sec = sectorSel.value;
+            const gas = getGeneralAdminsForSector(sec);
+            populateSelect(genSel, gas, '-- اختر الإدارة العامة --');
+            if (gas.length > 0) genSel.value = gas[0];
+            const subs = getSubAdmins(sec, genSel.value);
+            populateSelect(subSel, subs, '-- اختر الإدارة الفرعية --');
+            if (subs.length > 0) subSel.value = subs[0];
+        });
+    }
+
+    if (!genSel.dataset.hasCascadeListener) {
+        genSel.dataset.hasCascadeListener = 'true';
+        genSel.addEventListener('change', () => {
+            const sec = sectorSel.value;
+            const ga = genSel.value;
+            const subs = getSubAdmins(sec, ga);
+            populateSelect(subSel, subs, '-- اختر الإدارة الفرعية --');
+            if (subs.length > 0) subSel.value = subs[0];
+        });
+    }
+
+    updateGenAdmins(initGA, initSub);
+};
+
 const openMeterForm = () => {
     ensureMeterSupplyCompanyField('');
+    setupDepartmentFormFields('');
     const form = document.getElementById('meter-form') as HTMLFormElement;
     form.reset();
     clearFormErrors(form);
@@ -3287,6 +3404,9 @@ const openMeterForm = () => {
         supplySelect.value = '';
         supplySelect.setAttribute('autocomplete', 'off');
     }
+
+    // إعادة ضبط حقول الإدارات لبيانات تسجيل الدخول
+    setupDepartmentFormFields('');
 
     (document.getElementById('meter-id') as HTMLInputElement).value = '';
 
@@ -3375,6 +3495,7 @@ const resetMeterForm = () => {
     form.reset(); // Clear all fields
     clearFormErrors(form);
     (document.getElementById('meter-id') as HTMLInputElement).value = '';
+    setupDepartmentFormFields('');
 
     updateMeterFormVisibility();
 };
@@ -3517,6 +3638,11 @@ const handleMeterFormSubmit = async (event: Event) => {
         formData.installationStatus = 'تركيب جديد';
     }
 
+    if (formData.subAdmin) {
+        formData.branch = formData.subAdmin;
+        formData.branchName = formData.subAdmin;
+    }
+
     stampItemWithScope(formData);
     if (existingId) {
         // Update existing record
@@ -3542,6 +3668,11 @@ const handleMeterFormSubmit = async (event: Event) => {
             subscriptionCode: formData.subscriptionCode,
             panelNumber: formData.panelNumber,
             accountReference: formData.accountReference,
+            sector: formData.sector,
+            generalAdmin: formData.generalAdmin,
+            subAdmin: formData.subAdmin,
+            branch: formData.branch || formData.subAdmin,
+            branchName: formData.branchName || formData.subAdmin,
             // Also copy individual ref parts for consistency
             accountRefF: formData.accountRefF,
             accountRefH: formData.accountRefH,
@@ -10829,6 +10960,13 @@ const handlePrintJudicialControlDetails = () => {
         populateSelect(document.getElementById('details-subscriberType') as HTMLSelectElement, ['جديد', 'مرفوع أعطال', 'مرفوع إحلال', 'استغناء', 'تغير عقد اشتراك', 'استبدال', 'هدم', 'تم الإصلاح', 'لا يمكن إصلاحه', 'تم استبداله', 'تم تغير العداد', 'بيانات مستوردة من إكسل', 'بيانات مستوردة'], 'اختر حالة المشترك...');
         populateSelect(document.getElementById('details-locationDescription') as HTMLSelectElement, state.settings.placeDescriptions, 'اختر وصف المكان...');
 
+        // Populate department dropdowns
+        setupDepartmentFormFields('details-', {
+            sector: meter.sector,
+            generalAdmin: meter.generalAdmin,
+            subAdmin: meter.subAdmin || meter.branch || meter.branchName
+        });
+
         // Populate form fields from meter object
         Object.keys(meter).forEach(key => {
             const input = document.getElementById(`details-${key}`) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
@@ -10979,6 +11117,11 @@ const handlePrintJudicialControlDetails = () => {
         updatedData.accountReference = `${updatedData.accountRefF || ''}${updatedData.accountRefH || ''}${updatedData.accountRefY || ''}${updatedData.accountRefM || ''}`;
         Object.assign(updatedData, { accountRefF: updatedData.accountRefF, accountRefH: updatedData.accountRefH, accountRefY: updatedData.accountRefY, accountRefM: updatedData.accountRefM });
 
+        if (updatedData.subAdmin) {
+            updatedData.branch = updatedData.subAdmin;
+            updatedData.branchName = updatedData.subAdmin;
+        }
+
         stampItemWithScope(updatedData);
         state.meters[meterIndex] = { ...originalMeter, ...updatedData };
 
@@ -10986,6 +11129,7 @@ const handlePrintJudicialControlDetails = () => {
         const changes: string[] = [];
         const fieldLabels: { [key: string]: string } = {
             subscriberName: 'اسم المشترك', address: 'العنوان', subscriptionCode: 'كود الاشتراك',
+            sector: 'القطاع', generalAdmin: 'الإدارة العامة', subAdmin: 'الإدارة الفرعية',
             subscriberType: 'الحالة', meterChassisNumber: 'شاسية العداد', panelNumber: 'رقم اللوحة',
             locationDescription: 'وصف المكان',
             accountReference: 'مرجع الحساب', meterCapacity: 'قدرة العداد', meterType: 'نوع العداد',
