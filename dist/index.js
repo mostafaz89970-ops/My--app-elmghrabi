@@ -4238,56 +4238,74 @@ window.printZinatThermalReceipt = (id) => {
                     margin: 0;
                 }
                 * {
-                    box-sizing: border-box;
-                    -webkit-print-color-adjust: exact;
-                    print-color-adjust: exact;
+                    box-sizing: border-box !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
                 }
-                body {
-                    font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                html, body {
+                    width: 100% !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
                     background: #fff;
                     color: #000;
-                    margin: 0 auto;
-                    padding: 4mm 3mm;
                     direction: rtl;
-                    width: 78mm;
-                    max-width: 80mm;
-                    font-size: 11px;
-                    line-height: 1.35;
+                    font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 }
                 .thermal-wrapper {
-                    width: 100%;
-                    margin: 0 auto;
+                    width: 70mm !important;
+                    max-width: 70mm !important;
+                    margin: 0 auto !important;
+                    padding: 2mm 1.5mm !important;
                     text-align: center;
+                    box-sizing: border-box !important;
+                    overflow: hidden !important;
+                    word-wrap: break-word !important;
+                    word-break: break-word !important;
+                    font-size: 10.5px;
+                    line-height: 1.35;
                 }
                 .header-box {
                     border-bottom: 2px dashed #000;
                     padding-bottom: 5px;
-                    margin-bottom: 6px;
+                    margin-bottom: 5px;
                 }
                 .company-title {
-                    font-size: 12.5px;
+                    font-size: 12px;
                     font-weight: 900;
                     margin: 0 0 2px 0;
                 }
                 .sector-title {
-                    font-size: 10.5px;
+                    font-size: 10px;
                     font-weight: 700;
                     margin: 0 0 2px 0;
                 }
                 .branch-title {
-                    font-size: 10px;
+                    font-size: 9.5px;
                     font-weight: 600;
                     margin: 0 0 4px 0;
                 }
                 .badge-title {
                     display: inline-block;
                     border: 1.5px solid #000;
-                    padding: 2px 10px;
+                    padding: 2px 8px;
                     font-weight: 900;
-                    font-size: 12px;
+                    font-size: 11px;
                     border-radius: 4px;
-                    margin: 3px 0;
+                    margin: 2px 0;
                     background: #f1f5f9;
+                }
+                .category-box {
+                    display: block;
+                    border: 1.5px solid #000;
+                    background: #000;
+                    color: #fff;
+                    font-weight: 900;
+                    font-size: 11.5px;
+                    padding: 2.5px 4px;
+                    margin: 4px 0 2px 0;
+                    border-radius: 3px;
+                    text-align: center;
+                    letter-spacing: 0.3px;
                 }
                 .meta-row {
                     display: flex;
@@ -4295,70 +4313,77 @@ window.printZinatThermalReceipt = (id) => {
                     font-size: 9px;
                     font-weight: bold;
                     margin-top: 4px;
-                    border-bottom: 1px dotted #666;
+                    border-bottom: 1px dotted #555;
                     padding-bottom: 3px;
                 }
                 .info-table {
-                    width: 100%;
+                    width: 100% !important;
                     border-collapse: collapse;
-                    font-size: 10.5px;
+                    font-size: 10px;
                     text-align: right;
                     margin: 5px 0;
+                    table-layout: fixed !important;
                 }
                 .info-table td {
-                    padding: 3px 1px;
+                    padding: 2.5px 1px;
                     vertical-align: top;
+                    word-break: break-word !important;
+                    overflow-wrap: break-word !important;
                 }
                 .info-table td.lbl {
                     font-weight: 700;
-                    width: 34%;
+                    width: 36%;
                     color: #111;
                 }
                 .info-table td.val {
                     font-weight: 900;
+                    width: 64%;
                     color: #000;
                 }
                 .financial-box {
                     border: 1.5px solid #000;
-                    border-radius: 6px;
-                    padding: 6px;
-                    margin: 6px 0;
+                    border-radius: 5px;
+                    padding: 5px;
+                    margin: 5px 0;
                     text-align: center;
                     background: #fafafa;
+                    box-sizing: border-box;
+                    width: 100%;
                 }
                 .fin-row {
                     display: flex;
                     justify-content: space-between;
-                    font-size: 11px;
+                    align-items: center;
+                    font-size: 10px;
                     padding: 2px 0;
                 }
                 .fin-row.paid-highlight {
                     border-top: 1px dashed #000;
                     border-bottom: 1px dashed #000;
-                    padding: 5px 0;
-                    margin: 4px 0;
-                    font-size: 13px;
+                    padding: 4px 0;
+                    margin: 3px 0;
+                    font-size: 12px;
                     font-weight: 900;
                 }
                 .paid-amount {
-                    font-size: 16px;
+                    font-size: 15px;
                     font-weight: 900;
                     font-family: monospace, sans-serif;
                 }
                 .tafqeet-text {
-                    font-size: 9.5px;
+                    font-size: 9px;
                     font-weight: 700;
-                    margin-top: 3px;
+                    margin-top: 2px;
                     color: #111;
                 }
                 .status-tag {
                     display: inline-block;
                     border: 1.5px solid #000;
-                    padding: 3px 14px;
-                    font-size: 11px;
+                    padding: 3px 10px;
+                    font-size: 10.5px;
                     font-weight: 900;
                     border-radius: 4px;
-                    margin: 6px auto;
+                    margin: 5px auto;
                 }
                 .status-paid {
                     background: #f0fdf4;
@@ -4367,23 +4392,25 @@ window.printZinatThermalReceipt = (id) => {
                     background: #fefce8;
                 }
                 .payments-mini-table {
-                    width: 100%;
+                    width: 100% !important;
+                    table-layout: fixed !important;
                     border-collapse: collapse;
-                    font-size: 9px;
+                    font-size: 8.5px;
                     margin-top: 2px;
                 }
                 .payments-mini-table th, .payments-mini-table td {
-                    border: 1px solid #999;
-                    padding: 2px;
+                    border: 1px solid #777;
+                    padding: 2px 1px;
                     text-align: center;
+                    word-break: break-word !important;
                 }
                 .signatures {
                     display: flex;
                     justify-content: space-between;
-                    margin-top: 10px;
-                    padding-top: 6px;
+                    margin-top: 8px;
+                    padding-top: 5px;
                     border-top: 1px dashed #000;
-                    font-size: 9.5px;
+                    font-size: 9px;
                     font-weight: bold;
                     text-align: center;
                 }
@@ -4391,26 +4418,32 @@ window.printZinatThermalReceipt = (id) => {
                     width: 48%;
                 }
                 .footer-instructions {
-                    margin-top: 8px;
-                    font-size: 8.5px;
+                    margin-top: 6px;
+                    font-size: 8px;
                     font-weight: 700;
                     text-align: center;
-                    line-height: 1.35;
+                    line-height: 1.3;
                 }
                 .cut-marker {
-                    margin-top: 10px;
-                    border-bottom: 1px dashed #888;
+                    margin-top: 8px;
+                    border-bottom: 1px dashed #777;
                     text-align: center;
-                    font-size: 8px;
-                    color: #666;
+                    font-size: 7.5px;
+                    color: #555;
                     padding-bottom: 2px;
                 }
                 @media print {
-                    body {
-                        width: 78mm !important;
-                        max-width: 80mm !important;
-                        padding: 1mm 2mm !important;
+                    html, body {
+                        width: 100% !important;
                         margin: 0 !important;
+                        padding: 0 !important;
+                    }
+                    .thermal-wrapper {
+                        width: 70mm !important;
+                        max-width: 70mm !important;
+                        margin: 0 auto !important;
+                        padding: 1mm 1mm !important;
+                        overflow: hidden !important;
                     }
                 }
             </style>
@@ -4421,7 +4454,8 @@ window.printZinatThermalReceipt = (id) => {
                     <div class="company-title">${headerInfo.company}</div>
                     <div class="sector-title">${headerInfo.sector}</div>
                     <div class="branch-title">${headerInfo.branchLine}</div>
-                    <div><span class="badge-title">إيصال تحصيل زينات (نسخة المواطن)</span></div>
+                    <div><span class="badge-title">إيصال سداد نقدية (نسخة المواطن)</span></div>
+                    <div class="category-box">نوع التحصيل: مقابل زينات</div>
                 </div>
 
                 <div class="meta-row">
@@ -4430,6 +4464,8 @@ window.printZinatThermalReceipt = (id) => {
                 </div>
 
                 <table class="info-table">
+                    <tr><td class="lbl">نوع التحصيل:</td><td class="val">مقابل زينات</td></tr>
+                    <tr><td class="lbl">نوع الإيصال:</td><td class="val">إيصال سداد نقدية (نسخة المواطن)</td></tr>
                     <tr><td class="lbl">اسم المواطن:</td><td class="val">${item.requesterName || '-'}</td></tr>
                     <tr><td class="lbl">العنوان:</td><td class="val">${item.address || '-'}</td></tr>
                     ${item.mobile ? `<tr><td class="lbl">رقم الموبايل:</td><td class="val">${item.mobile}</td></tr>` : ''}
@@ -4439,6 +4475,10 @@ window.printZinatThermalReceipt = (id) => {
 
                 <div class="financial-box">
                     <div class="fin-row">
+                        <span>نوع الخدمة / البند:</span>
+                        <strong>مقابل رسوم وتوصيل زينات</strong>
+                    </div>
+                    <div class="fin-row">
                         <span>إجمالي المبلغ المطلوب:</span>
                         <strong>${total.toLocaleString()} ج.م</strong>
                     </div>
@@ -4447,7 +4487,7 @@ window.printZinatThermalReceipt = (id) => {
                         <span class="paid-amount">${paid.toLocaleString()} ج.م</span>
                     </div>
                     <div class="tafqeet-text">فقط وقدره: ${tafqeetPaid}</div>
-                    <div class="fin-row" style="margin-top: 4px; font-weight: bold; color: ${remaining > 0 ? '#b91c1c' : '#15803d'};">
+                    <div class="fin-row" style="margin-top: 3px; font-weight: bold; color: ${remaining > 0 ? '#b91c1c' : '#15803d'};">
                         <span>المبلغ المتبقي:</span>
                         <span>${remaining > 0 ? remaining.toLocaleString() + ' ج.م' : '0 ج.م (خالص تماماً)'}</span>
                     </div>
@@ -4474,7 +4514,7 @@ window.printZinatThermalReceipt = (id) => {
                 </div>
 
                 <div class="footer-instructions">
-                    <div>⚠️ احتفظ بهذا الإيصال كإثبات سداد رسمي وسند قانوني.</div>
+                    <div>⚠️ إيصال سداد رسمي معتمد مقابل توصيل زينات.</div>
                     <div>شكراً لتعاملكم معنا • ${printTime}</div>
                 </div>
 
