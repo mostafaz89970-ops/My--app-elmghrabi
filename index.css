@@ -848,6 +848,181 @@ body.sidebar-collapsed .user-profile-dropdown.active {
     align-items: center;
     justify-content: flex-end;
 }
+
+/* ==========================================================================
+   نظام بانلات لوحة التحكم التفاعلي الجديد (Panel-Based Dashboard)
+   ========================================================================== */
+.dashboard-panels-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.5rem;
+    align-items: start;
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .dashboard-panels-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Category Panel Card */
+.dashboard-category-panel {
+    background-color: var(--card-bg, #ffffff);
+    border-radius: 16px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.dashboard-category-panel:hover {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}
+
+/* Panel Header */
+.dashboard-category-panel .panel-header {
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: #ffffff;
+    user-select: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.dashboard-category-panel .panel-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dashboard-category-panel .panel-header-badge {
+    font-size: 0.78rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(4px);
+    font-weight: 800;
+    color: #ffffff;
+}
+
+/* Panel Theme Colors */
+.panel-theme-subscribers .panel-header { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); }
+.panel-theme-meters .panel-header { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); }
+.panel-theme-cards .panel-header { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+.panel-theme-treasury .panel-header { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
+.panel-theme-collection .panel-header { background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); }
+.panel-theme-judicial .panel-header { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); }
+.panel-theme-mukayasat .panel-header { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); }
+.panel-theme-accounting .panel-header { background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%); }
+.panel-theme-debts .panel-header { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); }
+.panel-theme-transformers .panel-header { background: linear-gradient(135deg, #475569 0%, #334155 100%); }
+.panel-theme-memos .panel-header { background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); }
+.panel-theme-admin .panel-header { background: linear-gradient(135deg, #334155 0%, #1e293b 100%); }
+
+/* Panel Body & Action Cards Grid */
+.dashboard-category-panel .panel-body {
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+    gap: 12px;
+    background: #f8fafc;
+}
+
+body.dark-mode .dashboard-category-panel {
+    background-color: #1e293b;
+    border-color: #334155;
+}
+body.dark-mode .dashboard-category-panel .panel-body {
+    background: #0f172a;
+}
+
+/* Individual Tile/Card in Panel */
+.panel-action-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 6px;
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    text-decoration: none;
+    color: #1e293b;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    cursor: pointer;
+    min-height: 94px;
+    text-align: center;
+}
+
+body.dark-mode .panel-action-card {
+    background: #1e293b;
+    border-color: #334155;
+    color: #f1f5f9;
+}
+
+.panel-action-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+    border-color: #38bdf8;
+}
+
+.panel-action-card .card-tile-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.panel-action-card:hover .card-tile-icon {
+    transform: scale(1.08);
+}
+
+.panel-action-card .card-tile-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.35;
+    word-break: break-word;
+    color: inherit;
+}
+
+.panel-action-card .card-tile-count {
+    margin-top: 4px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #0284c7;
+    background: #e0f2fe;
+    padding: 1px 7px;
+    border-radius: 12px;
+}
+body.dark-mode .panel-action-card .card-tile-count {
+    background: #0369a1;
+    color: #e0f2fe;
+}
+
+/* Tile Icon Palettes */
+.tile-cyan { background-color: #e0f2fe; color: #0284c7; }
+.tile-blue { background-color: #dbeafe; color: #2563eb; }
+.tile-indigo { background-color: #e0e7ff; color: #4f46e5; }
+.tile-purple { background-color: #f3e8ff; color: #7c3aed; }
+.tile-rose { background-color: #ffe4e6; color: #e11d48; }
+.tile-red { background-color: #fee2e2; color: #dc2626; }
+.tile-amber { background-color: #fef3c7; color: #d97706; }
+.tile-emerald { background-color: #d1fae5; color: #059669; }
+.tile-teal { background-color: #ccfbf1; color: #0d9488; }
+.tile-slate { background-color: #f1f5f9; color: #475569; }
 .card-value svg {
     width: 32px;
     height: 32px;

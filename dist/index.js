@@ -276,6 +276,8 @@ let state = {
             'delete_button': { name: 'زر الحذف', roles: ['admin'] },
             'print_button': { name: 'زر الطباعة', roles: ['admin', 'supervisor', 'reports'] },
             'print_list_button': { name: 'زر طباعة القوائم', roles: ['admin', 'supervisor', 'reports'] },
+            'bulk_delete_subscribers': { name: 'زر الحذف المتعدد (جميع المشتركين)', roles: ['admin'] },
+            'bulk_edit_subscribers': { name: 'قسم التعديلات الجماعية أعلى جدول المشتركين', roles: ['admin', 'supervisor'] },
         },
         reportPermissions: {
             'all-meters': { name: 'تقرير جميع العدادات', roles: ['admin', 'supervisor', 'reports'] },
@@ -1126,7 +1128,7 @@ const refreshCurrentActiveSection = () => {
     }
     else if (sectionId === 'subscribers-all') {
         let columns = [...columnConfigs['subscribers-all']];
-        if (isSystemAdmin(loggedInUser) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'supervisor') {
+        if (hasButtonPermission('bulk_delete_subscribers') || hasButtonPermission('bulk_edit_subscribers')) {
             columns.unshift({
                 key: 'selection',
                 header: '<input type="checkbox" id="select-all-subscribers">',
@@ -1381,6 +1383,20 @@ function ensureDefaultPermissions(settings) {
     for (const [key, val] of Object.entries(def.dashboardPermissions)) {
         if (!settings.dashboardPermissions[key]) {
             settings.dashboardPermissions[key] = JSON.parse(JSON.stringify(val));
+        }
+    }
+    if (!settings.buttonPermissions)
+        settings.buttonPermissions = {};
+    for (const [key, val] of Object.entries(def.buttonPermissions)) {
+        if (!settings.buttonPermissions[key]) {
+            settings.buttonPermissions[key] = JSON.parse(JSON.stringify(val));
+        }
+    }
+    if (!settings.reportPermissions)
+        settings.reportPermissions = {};
+    for (const [key, val] of Object.entries(def.reportPermissions)) {
+        if (!settings.reportPermissions[key]) {
+            settings.reportPermissions[key] = JSON.parse(JSON.stringify(val));
         }
     }
 }
@@ -2285,131 +2301,230 @@ const handleLogout = () => {
  * Renders the dashboard cards based on the state.
  */
 const renderDashboard = () => {
-    const grid = document.querySelector('.dashboard-grid');
+    const grid = document.querySelector('#dashboard .dashboard-panels-container, #dashboard .dashboard-grid');
     if (!grid)
         return;
-    grid.innerHTML = ''; // Clear existing cards
+    grid.className = 'dashboard-panels-container';
+    grid.innerHTML = ''; // Clear existing content
     const scopedMeters = (state.meters || []).filter(matchesCurrentScope);
     const scopedLostMemos = (state.lostMeterMemos || []).filter(matchesCurrentScope);
     const scopedJudicial = (state.judicialControl || []).filter(matchesCurrentScope);
     const scopedMukayasat = (state.mukayasat || []).filter(matchesCurrentScope);
     const scopedTransformers = (state.transformers || []).filter(matchesCurrentScope);
     const scopedZinat = (state.zinatCollection || []).filter(matchesCurrentScope);
-    let cardData = [
-        { key: 'all-subscribers-card', id: 'subscribers-all', title: 'جميع المشتركين', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', count: scopedMeters.length, color: 'bg-primary' },
-        { key: 'new-meters-card', id: 'subscribers-new', filter: 'جديد', title: 'عدادات جديدة', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>' },
-        { key: 'lifted-meters-card', id: 'subscribers-faults', filter: 'مرفوع أعطال', title: 'عدادات مرفوعة اعطال', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>' },
-        { key: 'replacement-card', id: 'subscribers-replacement', filter: 'مرفوع إحلال', title: 'إحلال وتجديد', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>' },
-        { key: 'repairs-card', id: 'repaired-meters', title: 'الإصلاحات', icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>', count: scopedMeters.filter(m => m.repairStatus).length, color: 'bg-success' },
-        { key: 'lost-memos-card', id: 'lost-memos-search', title: 'المذكــــرات', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>', count: scopedLostMemos.length, color: 'bg-secondary' },
-        { key: 'scrapped-meters-card', id: 'subscribers-demolition', filter: 'هدم', title: 'عدادات هدم', icon: '<path d="M12 20V10M18 20V4M6 20v-4"/>', color: 'bg-error' },
-        { key: 'judicial-control-card', id: 'judicial-control-list', title: 'الضبطية القضائية', icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>', count: scopedJudicial.length, color: 'bg-warning' },
-        { key: 'mukayasat-card', id: 'mukayasat-list', title: 'المعاينات الفنية', icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/>', count: scopedMukayasat.length, color: 'bg-info' },
+    const judicialUnsettledCount = scopedJudicial.filter(item => {
+        const total = Number(item.reconciliationAmount || 0);
+        if (total === 0)
+            return false;
+        const paid = (item.payments || []).reduce((sum, p) => sum + p.amount, 0);
+        return total - paid > 0;
+    }).length;
+    const zinatUnsettledCount = scopedZinat.filter(item => {
+        const total = Number(item.amount || 0);
+        if (total === 0)
+            return false;
+        const paid = (item.payments || []).reduce((sum, p) => sum + p.amount, 0);
+        return total - paid > 0;
+    }).length;
+    const panels = [
         {
-            key: 'transformers-card', id: 'transformer-list', title: 'إدارة المحولات', icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/><polyline points="7 12 12 7 17 12"></polyline><line x1="12" y1="22" x2="12" y2="7"></line>', count: scopedTransformers.length, color: 'bg-primary'
+            id: 'panel-subscribers',
+            title: 'قسم المشتركين',
+            themeClass: 'panel-theme-subscribers',
+            icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+            actions: [
+                { id: 'subscribers-all', title: 'جميع المشتركين', permission: 'view_subscribers_all', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', tileColor: 'tile-cyan', count: scopedMeters.length },
+                { id: 'customer-management', title: 'إدارة المشتركين', permission: 'view_customer_management', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>', tileColor: 'tile-blue' },
+                { id: 'subscriber-statement', title: 'استعلام عن مشترك', permission: 'view_subscriber_statement', icon: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>', tileColor: 'tile-indigo' },
+                { id: 'subscribers-new', title: 'مشترك جديد', permission: 'view_subscribers_new', filter: 'جديد', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>', tileColor: 'tile-emerald', count: scopedMeters.filter(m => m.subscriberType === 'جديد').length },
+                { id: 'charging-card', title: 'شحن كارت طاقة', permission: 'manage_charging_card', icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>', tileColor: 'tile-amber' },
+                { id: 'clear-card', title: 'مسح كارت', permission: 'manage_clear_card', icon: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>', tileColor: 'tile-purple' },
+                { id: 'new-card-with-charge', title: 'كارت بديل بشحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/><path d="M12 14v4M10 16h4"/>', tileColor: 'tile-teal' },
+                { id: 'new-card-no-charge', title: 'بديل بدون شحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>', tileColor: 'tile-slate' },
+                { id: 'subscribers-faults', title: 'مرفوع أعطال', permission: 'view_subscribers_faults', filter: 'مرفوع أعطال', icon: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>', tileColor: 'tile-amber', count: scopedMeters.filter(m => m.subscriberType === 'مرفوع أعطال').length },
+                { id: 'subscribers-replacement', title: 'إحلال وتجديد', permission: 'view_subscribers_replacement', filter: 'مرفوع إحلال', icon: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>', tileColor: 'tile-blue', count: scopedMeters.filter(m => m.subscriberType === 'مرفوع إحلال').length },
+                { id: 'subscribers-substituted', title: 'استبدال عداد', permission: 'view_subscribers_substituted', filter: 'استبدال', icon: '<polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>', tileColor: 'tile-indigo', count: scopedMeters.filter(m => m.subscriberType === 'استبدال').length },
+                { id: 'subscribers-scrapped', title: 'استغناء', permission: 'view_subscribers_scrapped', filter: 'استغناء', icon: '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>', tileColor: 'tile-slate', count: scopedMeters.filter(m => m.subscriberType === 'استغناء').length },
+                { id: 'subscribers-demolition', title: 'عدادات هدم', permission: 'view_subscribers_demolition', filter: 'هدم', icon: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>', tileColor: 'tile-red', count: scopedMeters.filter(m => m.subscriberType === 'هدم').length },
+            ]
         },
         {
-            key: 'judicial-collection-card',
-            id: 'collection-judicial',
-            title: 'تحصيل الضبطية',
-            icon: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-            count: scopedJudicial.filter(item => {
-                const total = Number(item.reconciliationAmount || 0);
-                if (total === 0)
-                    return false;
-                const paid = (item.payments || []).reduce((sum, p) => sum + p.amount, 0);
-                return total - paid > 0;
-            }).length,
-            color: 'bg-primary'
+            id: 'panel-meters',
+            title: 'إدارة العدادات والإصلاحات',
+            themeClass: 'panel-theme-meters',
+            icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>',
+            actions: [
+                { id: 'meter-management', title: 'إدارة العدادات', permission: 'view_meters', icon: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>', tileColor: 'tile-blue' },
+                { id: 'meter-registration', title: 'تسجيل عداد جديد', permission: 'add_meter', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>', tileColor: 'tile-cyan' },
+                { id: 'repaired-meters', title: 'سجل الإصلاحات', permission: 'view_repaired_meters', icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>', tileColor: 'tile-emerald', count: scopedMeters.filter(m => m.repairStatus).length },
+            ]
         },
         {
-            key: 'zinat-collection-card',
-            id: 'collection-zinat',
-            title: 'تحصيل زينات',
-            icon: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-            count: scopedZinat.filter(item => {
-                const total = Number(item.amount || 0);
-                if (total === 0)
-                    return false;
-                const paid = (item.payments || []).reduce((sum, p) => sum + p.amount, 0);
-                return total - paid > 0;
-            }).length,
-            color: 'bg-secondary'
+            id: 'panel-cards',
+            title: 'كروت التحكم الذكية',
+            themeClass: 'panel-theme-cards',
+            icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+            actions: [
+                { id: 'read-control-card', title: 'قراءة كارت التحكم', permission: 'read_control_card', icon: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>', tileColor: 'tile-purple' },
+                { id: 'issue-control-card', title: 'إصدار كروت التحكم', permission: 'issue_control_card', icon: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>', tileColor: 'tile-indigo' },
+            ]
         },
         {
-            key: 'zinat-registration-card',
-            id: 'zinat-registration',
-            title: 'إضافة طلب زينات',
-            icon: '<path d="M12 5v14M5 12h14"/>',
-            color: 'bg-info'
-        },
-        {
-            key: 'accounting-card',
-            id: 'accounting-system',
-            title: 'نظام المحاسبة',
-            icon: '<path d="M4 19h16M7 16V8m5 8V5m5 11v-7"/><path d="M7 8h10"/>',
-            color: 'bg-primary'
-        },
-        {
-            key: 'treasury-card',
-            id: 'treasury-dashboard',
-            title: 'الخزينة العامة',
+            id: 'panel-treasury',
+            title: 'الخزينة العامة والرقابة',
+            themeClass: 'panel-theme-treasury',
             icon: '<rect x="2" y="4" width="20" height="16" rx="2"></rect><circle cx="12" cy="12" r="3"></circle><path d="M12 9v1"></path><path d="M12 14v1"></path><path d="M14 12h1"></path><path d="M9 12h1"></path>',
-            count: calculateTreasuryDailyTotals().unsettledUsersCount,
-            color: 'bg-primary'
+            actions: [
+                { id: 'treasury-dashboard', title: 'لوحة الخزينة اليومية', permission: 'view_treasury_dashboard', icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>', tileColor: 'tile-emerald', count: calculateTreasuryDailyTotals().unsettledUsersCount },
+                { id: 'treasury-user-settlements', title: 'تصفيات وعهد المستخدمين', permission: 'manage_treasury_settlements', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>', tileColor: 'tile-teal' },
+                { id: 'treasury-transactions-log', title: 'سجل التوريدات والمعاملات', permission: 'view_treasury_transactions', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>', tileColor: 'tile-cyan' },
+            ]
         },
-        { key: 'users-card', id: 'user-management', title: 'المستخدمين', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', count: state.users.length, color: 'bg-muted' },
+        {
+            id: 'panel-collection',
+            title: 'التحصيل وزينات',
+            themeClass: 'panel-theme-collection',
+            icon: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+            actions: [
+                { id: 'collection-judicial', title: 'تحصيل الضبطية', permission: 'view_collection_judicial', icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>', tileColor: 'tile-amber', count: judicialUnsettledCount },
+                { id: 'collection-zinat', title: 'تحصيل زينات', permission: 'view_collection_zinat', icon: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>', tileColor: 'tile-rose', count: zinatUnsettledCount },
+                { id: 'zinat-registration', title: 'إضافة طلب زينات', permission: 'register_zinat', icon: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>', tileColor: 'tile-blue' },
+            ]
+        },
+        {
+            id: 'panel-judicial',
+            title: 'الضبطية القضائية',
+            themeClass: 'panel-theme-judicial',
+            icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+            actions: [
+                { id: 'judicial-control-list', title: 'قائمة محاضر الضبطية', permission: 'view_judicial_control_list', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', tileColor: 'tile-red', count: scopedJudicial.length },
+                { id: 'judicial-control-registration', title: 'إضافة محضر ضبطية', permission: 'manage_judicial_control', icon: '<polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>', tileColor: 'tile-rose' },
+            ]
+        },
+        {
+            id: 'panel-mukayasat',
+            title: 'المقايسات والمعاينات الفنية',
+            themeClass: 'panel-theme-mukayasat',
+            icon: '<polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline>',
+            actions: [
+                { id: 'mukayasat-registration', title: 'إدخال مقايسة', permission: 'manage_mukayasat', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>', tileColor: 'tile-teal' },
+                { id: 'mukayasat-list', title: 'المقايسات المحفوظة', permission: 'view_mukayasat_list', icon: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>', tileColor: 'tile-emerald', count: scopedMukayasat.length },
+                { id: 'pending-requests-section', title: 'الطلبات قيد الانتظار', permission: 'view_pending_requests', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', tileColor: 'tile-cyan' },
+            ]
+        },
+        {
+            id: 'panel-accounting',
+            title: 'نظام المحاسبة',
+            themeClass: 'panel-theme-accounting',
+            icon: '<path d="M4 19h16M7 16V8m5 8V5m5 11v-7"/><path d="M7 8h10"/>',
+            actions: [
+                { id: 'accounting-system', title: 'لوحة نظام المحاسبة', permission: 'view_accounting_system', icon: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>', tileColor: 'tile-cyan' },
+                { id: 'accounting-save-registration', title: 'تسجيل معاملة محاسبية', permission: 'accounting_save_registration', icon: '<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>', tileColor: 'tile-blue' },
+                { id: 'accounting-saved-records', title: 'السجلات المحفوظة', permission: 'accounting_saved_records', icon: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>', tileColor: 'tile-indigo' },
+                { id: 'accounting-query', title: 'استعلام السجلات', permission: 'accounting_query', icon: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>', tileColor: 'tile-teal' },
+                { id: 'accounting-subscriptions', title: 'الاشتراكات المحفوظة', permission: 'view_accounting_system', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>', tileColor: 'tile-purple' },
+            ]
+        },
+        {
+            id: 'panel-debts',
+            title: 'الاستثناءات والرسوم والديون',
+            themeClass: 'panel-theme-debts',
+            icon: '<circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 6v2m0 8v2"/>',
+            actions: [
+                { id: 'debts-management', title: 'حسابات الديون', permission: 'debts_management', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>', tileColor: 'tile-amber' },
+                { id: 'debt-types', title: 'أنواع الديون', permission: 'debt_types', icon: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>', tileColor: 'tile-rose' },
+                { id: 'fees-stamps', title: 'الرسوم والدمغات', permission: 'fees_stamps', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>', tileColor: 'tile-blue' },
+                { id: 'cleaning-fee-exceptions', title: 'استثناءات النظافة', permission: 'cleaning_fee_exceptions', icon: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>', tileColor: 'tile-emerald' },
+                { id: 'peak-debt-settings', title: 'دين فرق الذروة', permission: 'peak_debt_settings', icon: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>', tileColor: 'tile-purple' },
+            ]
+        },
+        {
+            id: 'panel-transformers',
+            title: 'المحولات والشبكات',
+            themeClass: 'panel-theme-transformers',
+            icon: '<path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/><polyline points="7 12 12 7 17 12"></polyline><line x1="12" y1="22" x2="12" y2="7"></line>',
+            actions: [
+                { id: 'transformer-list', title: 'قائمة المحولات', permission: 'view_transformer_list', icon: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>', tileColor: 'tile-slate', count: scopedTransformers.length },
+                { id: 'transformer-registration', title: 'إضافة محول جديد', permission: 'register_transformer', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>', tileColor: 'tile-blue' },
+                { id: 'transformer-query', title: 'استعلام عن محول', permission: 'query_transformer', icon: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>', tileColor: 'tile-indigo' },
+                { id: 'transformer-loads', title: 'أحمال وسجلات المحولات', permission: 'manage_transformer_loads', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>', tileColor: 'tile-cyan' },
+            ]
+        },
+        {
+            id: 'panel-memos',
+            title: 'المذكرات',
+            themeClass: 'panel-theme-memos',
+            icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>',
+            actions: [
+                { id: 'lost-memos-write', title: 'كتابة مذكرة فاقد', permission: 'manage_lost_meter_memos', icon: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>', tileColor: 'tile-indigo' },
+                { id: 'lost-memos-search', title: 'بحث عن مذكرة', permission: 'manage_lost_meter_memos', icon: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>', tileColor: 'tile-purple', count: scopedLostMemos.length },
+            ]
+        },
+        {
+            id: 'panel-admin',
+            title: 'الإدارة والنظام',
+            themeClass: 'panel-theme-admin',
+            icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+            actions: [
+                { id: 'user-management', title: 'المستخدمين', permission: 'manage_users', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', tileColor: 'tile-slate', count: state.users.length },
+                { id: 'org-hierarchy-management', title: 'الهيكل الإداري', permission: 'manage_users', icon: '<line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>', tileColor: 'tile-blue' },
+                { id: 'permissions', title: 'إدارة الصلاحيات', permission: 'manage_settings', icon: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>', tileColor: 'tile-amber' },
+                { id: 'activity-log', title: 'سجل العمليات', permission: 'view_activity_log', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/>', tileColor: 'tile-cyan' },
+                { id: 'technicians', title: 'إدارة الفنيين', permission: 'view_technicians', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>', tileColor: 'tile-teal' },
+                { id: 'reports', title: 'التقارير العامة', permission: 'view_reports', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>', tileColor: 'tile-indigo' },
+            ]
+        }
     ];
-    // If the logged in user is a mukayasat inspector, replace dashboard cards with inspection-specific cards
-    if (loggedInUser && loggedInUser.role === 'معاينات') {
-        cardData = [
-            { key: 'mukaysa-add-card', id: 'mukayasat-registration', title: 'ادخال مقايسة', icon: '<path d="M12 5v14M5 12h14"/>' },
-            { key: 'mukayasat-list-card', id: 'mukayasat-list', title: 'المقايسات المحفوظة', icon: '<path d="M3 6h18M3 12h18M3 18h18"/>', count: scopedMukayasat.length },
-        ];
-    }
-    const visibleCards = cardData.filter(card => {
-        // For regular users, respect dashboard visibility settings
-        if (loggedInUser && loggedInUser.role === 'معاينات') {
-            // Only show mukayasat related cards for this role
-            return ['mukaysa-add-card', 'mukayasat-list-card', 'mukayasat-card'].includes(card.key);
-        }
-        if (card.key === 'accounting-card') {
-            return hasPermission('view_accounting_system') && hasDashboardPermission('show_accounting_card');
-        }
-        const visibilityPermissionKey = `show_${card.key.replace(/-/g, '_')}`;
-        if (!hasDashboardPermission(visibilityPermissionKey))
-            return false;
-        // Check user preference from settings
-        if (state.settings.dashboardCardsVisibility[card.key] === false)
-            return false;
-        // Hide users card for non-admins/supervisors
-        if (card.key === 'users-card' && loggedInUser && !['admin', 'supervisor'].includes(loggedInUser.role) && loggedInUser.username !== 'admin')
-            return false;
-        return true;
-    });
-    visibleCards.forEach(data => {
-        let count = 0;
-        if (data.count !== undefined) {
-            count = data.count;
-        }
-        else if (data.filter) {
-            const filters = Array.isArray(data.filter) ? data.filter : [data.filter];
-            count = scopedMeters.filter(m => filters.includes(m.subscriberType)).length;
-        }
-        const filterString = Array.isArray(data.filter) ? data.filter.join(',') : data.filter;
-        const cardHTML = `
-            <a href="#" class="card nav-link" data-target="${data.id}" data-filter="${filterString || ''}">
-                <div class="card-header">
-                    <div class="card-icon ${data.color || ''}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${data.icon}</svg>
+    // Filter cards and panels according to permissions
+    panels.forEach(panel => {
+        const visibleActions = panel.actions.filter(action => {
+            // Role 'معاينات' check: only allow inspection actions
+            if (loggedInUser && loggedInUser.role === 'معاينات') {
+                return ['mukayasat-registration', 'mukayasat-list', 'pending-requests-section'].includes(action.id);
+            }
+            // System Admin has full access to everything
+            if (isSystemAdmin(loggedInUser))
+                return true;
+            // Check page permission
+            if (!hasPermission(action.permission))
+                return false;
+            // Special check for user management
+            if (action.id === 'user-management' && loggedInUser && !['admin', 'supervisor'].includes(loggedInUser.role) && loggedInUser.username !== 'admin') {
+                return false;
+            }
+            return true;
+        });
+        // Hide entire panel if user has no authorized actions in it
+        if (visibleActions.length === 0)
+            return;
+        const tilesHtml = visibleActions.map(action => {
+            const filterStr = Array.isArray(action.filter) ? action.filter.join(',') : (action.filter || '');
+            const countBadge = action.count !== undefined ? `<span class="card-tile-count">${action.count}</span>` : '';
+            return `
+                <a href="#" class="panel-action-card nav-link" data-target="${action.id}" data-filter="${filterStr}" data-permission="${action.permission}">
+                    <div class="card-tile-icon ${action.tileColor}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${action.icon}</svg>
                     </div>
-                    <h4>${data.title}</h4>
+                    <span class="card-tile-label">${action.title}</span>
+                    ${countBadge}
+                </a>
+            `;
+        }).join('');
+        const panelHtml = `
+            <div class="dashboard-category-panel ${panel.themeClass}">
+                <div class="panel-header">
+                    <div class="panel-header-left">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${panel.icon}</svg>
+                        <span>${panel.title}</span>
+                    </div>
+                    <span class="panel-header-badge">${visibleActions.length} ${visibleActions.length === 1 ? 'صفحة' : 'صفحات'}</span>
                 </div>
-                <div class="card-value">
-                    <span>${count}</span>
+                <div class="panel-body">
+                    ${tilesHtml}
                 </div>
-            </a>`;
-        grid.insertAdjacentHTML('beforeend', cardHTML);
+            </div>
+        `;
+        grid.insertAdjacentHTML('beforeend', panelHtml);
     });
     // Add large logo at the bottom of dashboard
     const dashboardSection = document.getElementById('dashboard');
@@ -2429,7 +2544,7 @@ const renderDashboard = () => {
             dashboardLogoContainer.innerHTML = `<div class="default-logo-svg" style="width: 400px; height: 400px; margin: 0 auto;">${defaultLogoSVG}</div>`;
         }
     }
-    document.querySelectorAll('.dashboard-grid .nav-link').forEach(link => {
+    document.querySelectorAll('#dashboard .nav-link').forEach(link => {
         link.addEventListener('click', handleNavigation);
     });
 };
@@ -2971,9 +3086,9 @@ const handleAllSubscribersSearch = () => {
             return false;
         return true;
     });
-    // Re-construct columns logic (including admin checkboxes)
+    // Re-construct columns logic (including checkboxes for bulk operations)
     let columns = [...columnConfigs['subscribers-all']];
-    if (isSystemAdmin(loggedInUser) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'supervisor') {
+    if (hasButtonPermission('bulk_delete_subscribers') || hasButtonPermission('bulk_edit_subscribers')) {
         columns.unshift({
             key: 'selection',
             header: '<input type="checkbox" id="select-all-subscribers">',
@@ -23459,6 +23574,10 @@ const handleDeleteSelectedNewMeters = async () => {
     showConfirmationDialog('تأكيد الحذف', `هل أنت متأكد من حذف ${ids.length} سجلات؟`, onConfirm);
 };
 const handleDeleteSelectedSubscribersAll = async () => {
+    if (!hasButtonPermission('bulk_delete_subscribers')) {
+        showToast('عفواً، ليس لديك صلاحية الحذف المتعدد.', 'error');
+        return;
+    }
     const checkboxes = document.querySelectorAll('#subscribers-all-table tbody input[type="checkbox"].select-subscriber-row:checked');
     if (checkboxes.length === 0) {
         showToast('يرجى تحديد مشترك واحد على الأقل.', 'error');
@@ -23478,6 +23597,10 @@ const handleDeleteSelectedSubscribersAll = async () => {
     showConfirmationDialog('تأكيد الحذف', `هل أنت متأكد من حذف ${ids.length} سجلات؟ لا يمكن التراجع عن هذا الإجراء.`, onConfirm);
 };
 const handleBulkUpdateLocation = async () => {
+    if (!hasButtonPermission('bulk_edit_subscribers')) {
+        showToast('عفواً، ليس لديك صلاحية التعديل الجماعي.', 'error');
+        return;
+    }
     const checkboxes = document.querySelectorAll('.select-subscriber-row:checked');
     if (checkboxes.length === 0) {
         showToast('يرجى تحديد مشترك واحد على الأقل.', 'error');
@@ -23510,6 +23633,10 @@ const handleBulkUpdateLocation = async () => {
     showConfirmationDialog('تأكيد التعديل الجماعي', `هل أنت متأكد من تغيير وصف المكان لـ ${ids.length} مشتركين إلى "${newValue}"؟`, onConfirm);
 };
 const handleBulkUpdateSupplyCompany = async () => {
+    if (!hasButtonPermission('bulk_edit_subscribers')) {
+        showToast('عفواً، ليس لديك صلاحية التعديل الجماعي.', 'error');
+        return;
+    }
     const checkboxes = document.querySelectorAll('.select-subscriber-row:checked');
     if (checkboxes.length === 0) {
         showToast('يرجى تحديد مشترك واحد على الأقل.', 'error');
@@ -23542,6 +23669,10 @@ const handleBulkUpdateSupplyCompany = async () => {
     showConfirmationDialog('تأكيد التعديل الجماعي', `هل أنت متأكد من تغيير شركة توريد العداد لـ ${ids.length} مشتركين إلى "${newValue}"؟`, onConfirm);
 };
 const handleBulkUpdateActivityType = async () => {
+    if (!hasButtonPermission('bulk_edit_subscribers')) {
+        showToast('عفواً، ليس لديك صلاحية التعديل الجماعي.', 'error');
+        return;
+    }
     const checkboxes = document.querySelectorAll('.select-subscriber-row:checked');
     if (checkboxes.length === 0) {
         showToast('يرجى تحديد مشترك واحد على الأقل.', 'error');
@@ -23575,6 +23706,10 @@ const handleBulkUpdateActivityType = async () => {
 };
 const handleBulkUpdateDepartments = async () => {
     var _a, _b;
+    if (!hasButtonPermission('bulk_edit_subscribers')) {
+        showToast('عفواً، ليس لديك صلاحية التعديل الجماعي.', 'error');
+        return;
+    }
     const checkboxes = document.querySelectorAll('#subscribers-all-table tbody input[type="checkbox"].select-subscriber-row:checked');
     if (checkboxes.length === 0) {
         showToast('يرجى تحديد مشترك واحد على الأقل من الجدول.', 'error');
@@ -23652,7 +23787,7 @@ const handleBulkUpdateDepartments = async () => {
         }
         else {
             let columns = [...columnConfigs['subscribers-all']];
-            if (isSystemAdmin(loggedInUser) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'supervisor') {
+            if (hasButtonPermission('bulk_delete_subscribers') || hasButtonPermission('bulk_edit_subscribers')) {
                 columns.unshift({
                     key: 'selection',
                     header: '<input type="checkbox" id="select-all-subscribers">',
@@ -23671,96 +23806,120 @@ const setupAllSubscribersBulkActions = () => {
     if (!section)
         return;
     (_a = document.getElementById('bulk-action-container-all')) === null || _a === void 0 ? void 0 : _a.remove();
+    const canBulkDelete = hasButtonPermission('bulk_delete_subscribers');
+    const canBulkEdit = hasButtonPermission('bulk_edit_subscribers');
+    if (!canBulkDelete && !canBulkEdit)
+        return;
     const container = document.createElement('div');
     container.id = 'bulk-action-container-all';
     container.className = 'bulk-actions-container';
     container.style.cssText = 'margin-bottom: 15px; padding: 10px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;';
-    container.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #e0f2fe; padding: 6px 10px; border-radius: 6px; border: 1px solid #7dd3fc;">
-            <span style="font-weight: bold; color: #0369a1; display: inline-flex; align-items: center; gap: 4px;">🏢 تحديث الإدارات بالإجماع:</span>
-            <select id="bulk-general-admin-select" style="padding: 6px 8px; border-radius: 4px; border: 1px solid #94a3b8; min-width: 160px; font-size: 13px;">
-                <option value="">-- اختر الإدارة العامة --</option>
-            </select>
-            <select id="bulk-sub-admin-select" style="padding: 6px 8px; border-radius: 4px; border: 1px solid #94a3b8; min-width: 160px; font-size: 13px;">
-                <option value="">-- اختر الإدارة الفرعية / الهندسة --</option>
-            </select>
-            <button id="btn-bulk-update-departments" class="btn" style="padding: 6px 12px; background-color: #0d9488; border-color: #0f766e; color: white; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
-                <span>تحديث الإدارات بالإجماع 💾</span>
-            </button>
-        </div>
-        <div style="width: 1px; height: 24px; background: #bae6fd; margin: 0 5px;"></div>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-weight: bold; color: #0369a1;">تعديل وصف المكان:</span>
-            <select id="bulk-location-description-select" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; min-width: 150px;">
-                <option value="">اختر...</option>
-            </select>
-            <button id="btn-bulk-update-location" class="btn" style="padding: 6px 10px; background-color: #0284c7; color: white;">تحديث</button>
-        </div>
-        <div style="width: 1px; height: 20px; background: #bae6fd; margin: 0 5px;"></div>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-weight: bold; color: #0369a1;">تعديل شركة التوريد:</span>
-            <select id="bulk-supply-company" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; min-width: 150px;">
-                <option value="">-- اختر الشركة --</option>
-            </select>
-            <button id="btn-bulk-update-supply-company" class="btn" style="padding: 6px 10px; background-color: #0284c7; color: white;">تحديث</button>
-        </div>
-        <div style="width: 1px; height: 20px; background: #bae6fd; margin: 0 5px;"></div>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-weight: bold; color: #0369a1;">تعديل نوع النشاط:</span>
-            <select id="bulk-activity-type" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; min-width: 150px;">
-                <option value="">-- اختر النشاط --</option>
-            </select>
-            <button id="btn-bulk-update-activity-type" class="btn" style="padding: 6px 10px; background-color: #0284c7; color: white;">تحديث</button>
-        </div>
-        <div style="width: 1px; height: 20px; background: #bae6fd; margin: 0 5px;"></div>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <button id="btn-delete-selected-subscribers-all" class="btn btn-danger" style="padding: 6px 10px; background-color: #dc3545; color: white;">حذف متعدد</button>
-        </div>
-    `;
+    let innerHTML = '';
+    if (canBulkEdit) {
+        innerHTML += `
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #e0f2fe; padding: 6px 10px; border-radius: 6px; border: 1px solid #7dd3fc;">
+                <span style="font-weight: bold; color: #0369a1; display: inline-flex; align-items: center; gap: 4px;">🏢 تحديث الإدارات بالإجماع:</span>
+                <select id="bulk-general-admin-select" style="padding: 6px 8px; border-radius: 4px; border: 1px solid #94a3b8; min-width: 160px; font-size: 13px;">
+                    <option value="">-- اختر الإدارة العامة --</option>
+                </select>
+                <select id="bulk-sub-admin-select" style="padding: 6px 8px; border-radius: 4px; border: 1px solid #94a3b8; min-width: 160px; font-size: 13px;">
+                    <option value="">-- اختر الإدارة الفرعية / الهندسة --</option>
+                </select>
+                <button id="btn-bulk-update-departments" class="btn" style="padding: 6px 12px; background-color: #0d9488; border-color: #0f766e; color: white; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+                    <span>تحديث الإدارات بالإجماع 💾</span>
+                </button>
+            </div>
+            <div style="width: 1px; height: 24px; background: #bae6fd; margin: 0 5px;"></div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-weight: bold; color: #0369a1;">تعديل وصف المكان:</span>
+                <select id="bulk-location-description-select" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; min-width: 150px;">
+                    <option value="">اختر...</option>
+                </select>
+                <button id="btn-bulk-update-location" class="btn" style="padding: 6px 10px; background-color: #0284c7; color: white;">تحديث</button>
+            </div>
+            <div style="width: 1px; height: 20px; background: #bae6fd; margin: 0 5px;"></div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-weight: bold; color: #0369a1;">تعديل شركة التوريد:</span>
+                <select id="bulk-supply-company" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; min-width: 150px;">
+                    <option value="">-- اختر الشركة --</option>
+                </select>
+                <button id="btn-bulk-update-supply-company" class="btn" style="padding: 6px 10px; background-color: #0284c7; color: white;">تحديث</button>
+            </div>
+            <div style="width: 1px; height: 20px; background: #bae6fd; margin: 0 5px;"></div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-weight: bold; color: #0369a1;">تعديل نوع النشاط:</span>
+                <select id="bulk-activity-type" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; min-width: 150px;">
+                    <option value="">-- اختر النشاط --</option>
+                </select>
+                <button id="btn-bulk-update-activity-type" class="btn" style="padding: 6px 10px; background-color: #0284c7; color: white;">تحديث</button>
+            </div>
+            `;
+    }
+    if (canBulkDelete) {
+        if (canBulkEdit) {
+            innerHTML += `<div style="width: 1px; height: 20px; background: #bae6fd; margin: 0 5px;"></div>`;
+        }
+        innerHTML += `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button id="btn-delete-selected-subscribers-all" class="btn btn-danger" style="padding: 6px 10px; background-color: #dc3545; color: white;">حذف متعدد</button>
+            </div>
+            `;
+    }
+    container.innerHTML = innerHTML;
     const table = document.getElementById('subscribers-all-table');
     const tableContainer = (table === null || table === void 0 ? void 0 : table.closest('.responsive-table')) || (table === null || table === void 0 ? void 0 : table.parentElement);
     if (tableContainer && tableContainer.parentElement) {
         tableContainer.parentElement.insertBefore(container, tableContainer);
     }
-    // ملء قوائم الإدارات لتحديث الإدارات بالإجماع
-    const bulkGenAdminSelect = document.getElementById('bulk-general-admin-select');
-    const bulkSubAdminSelect = document.getElementById('bulk-sub-admin-select');
-    if (bulkGenAdminSelect) {
-        const generalAdmins = getGeneralAdminsForSector('all');
-        populateSelect(bulkGenAdminSelect, generalAdmins, '-- اختر الإدارة العامة --');
-        bulkGenAdminSelect.addEventListener('change', () => {
-            const chosenGA = bulkGenAdminSelect.value;
-            if (bulkSubAdminSelect) {
-                const branches = chosenGA ? getSubAdmins('all', chosenGA) : getSubAdmins('all', 'all');
-                populateSelect(bulkSubAdminSelect, branches, '-- اختر الإدارة الفرعية / الهندسة --');
-            }
-        });
+    if (canBulkEdit) {
+        // ملء قوائم الإدارات لتحديث الإدارات بالإجماع
+        const bulkGenAdminSelect = document.getElementById('bulk-general-admin-select');
+        const bulkSubAdminSelect = document.getElementById('bulk-sub-admin-select');
+        if (bulkGenAdminSelect) {
+            const generalAdmins = getGeneralAdminsForSector('all');
+            populateSelect(bulkGenAdminSelect, generalAdmins, '-- اختر الإدارة العامة --');
+            bulkGenAdminSelect.addEventListener('change', () => {
+                const chosenGA = bulkGenAdminSelect.value;
+                if (bulkSubAdminSelect) {
+                    const branches = chosenGA ? getSubAdmins('all', chosenGA) : getSubAdmins('all', 'all');
+                    populateSelect(bulkSubAdminSelect, branches, '-- اختر الإدارة الفرعية / الهندسة --');
+                }
+            });
+        }
+        if (bulkSubAdminSelect) {
+            const allBranches = getSubAdmins('all', 'all');
+            populateSelect(bulkSubAdminSelect, allBranches, '-- اختر الإدارة الفرعية / الهندسة --');
+        }
+        (_b = document.getElementById('btn-bulk-update-departments')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleBulkUpdateDepartments);
+        // ضمان وجود بيانات في قائمة وصف المكان
+        if (!state.settings.placeDescriptions || state.settings.placeDescriptions.length === 0) {
+            state.settings.placeDescriptions = [
+                'شقة', 'مصلحة حكومية', 'مسجد', 'ورشة نجارة', 'مخبز', 'كنيسة', 'مساجد أهلية', 'ماكينة طحين',
+                'ورشة حدادة', 'محطه محمول متجددة', 'مخالف منزلى', 'محل خردوات', 'بيع هواتف محمولة', 'ادوات كهربائية',
+                'ورشة لحام كهرباء', 'أجهزة وادوات طبية', 'مغسلة سيارات', 'وكالة إعلان', 'تجاري', 'مكتب خدمات',
+                'أرض زراعية', 'استصلاح أراضى', 'رى أراضى', 'مزرعة', 'مزرعة دواجن', 'مزرعة مواشي', 'محطة صرف صحى',
+                'كودي مزرعة مواشي', 'كودي مزرعة دواجن', 'منزلي كودى', 'محال تجارية كودي', 'باقى المشتركين كودى',
+                'أستخدامات الرى كودى', 'أعلى شريحة تجارى كودى', 'قوي كودى', 'مسجد اهلى كودى', 'مسجد اوقاف كودى',
+                'كنيسة كودى', 'دور عبادة كودى', 'جمعية اهلية كودى', 'محطة محمول كودى', 'عداد خدمات كودي',
+                'مصعد تجارى كودي', 'جمعيه اهليه 50%', 'استراحات حكوميه'
+            ];
+        }
+        const locDescSel = document.getElementById('bulk-location-description-select');
+        if (locDescSel)
+            populateSelect(locDescSel, state.settings.placeDescriptions, 'اختر...');
+        (_c = document.getElementById('btn-bulk-update-location')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', handleBulkUpdateLocation);
+        const supplySel = document.getElementById('bulk-supply-company');
+        if (supplySel)
+            populateSelect(supplySel, state.settings.meterSupplyCompanies, 'اختر الشركة...');
+        (_d = document.getElementById('btn-bulk-update-supply-company')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', handleBulkUpdateSupplyCompany);
+        const actSel = document.getElementById('bulk-activity-type');
+        if (actSel)
+            populateSelect(actSel, state.settings.activityTypes, '-- اختر النشاط --');
+        (_e = document.getElementById('btn-bulk-update-activity-type')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', handleBulkUpdateActivityType);
     }
-    if (bulkSubAdminSelect) {
-        const allBranches = getSubAdmins('all', 'all');
-        populateSelect(bulkSubAdminSelect, allBranches, '-- اختر الإدارة الفرعية / الهندسة --');
+    if (canBulkDelete) {
+        (_f = document.getElementById('btn-delete-selected-subscribers-all')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', handleDeleteSelectedSubscribersAll);
     }
-    (_b = document.getElementById('btn-bulk-update-departments')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleBulkUpdateDepartments);
-    // ضمان وجود بيانات في قائمة وصف المكان
-    if (!state.settings.placeDescriptions || state.settings.placeDescriptions.length === 0) {
-        state.settings.placeDescriptions = [
-            'شقة', 'مصلحة حكومية', 'مسجد', 'ورشة نجارة', 'مخبز', 'كنيسة', 'مساجد أهلية', 'ماكينة طحين',
-            'ورشة حدادة', 'محطه محمول متجددة', 'مخالف منزلى', 'محل خردوات', 'بيع هواتف محمولة', 'ادوات كهربائية',
-            'ورشة لحام كهرباء', 'أجهزة وادوات طبية', 'مغسلة سيارات', 'وكالة إعلان', 'تجاري', 'مكتب خدمات',
-            'أرض زراعية', 'استصلاح أراضى', 'رى أراضى', 'مزرعة', 'مزرعة دواجن', 'مزرعة مواشي', 'محطة صرف صحى',
-            'كودي مزرعة مواشي', 'كودي مزرعة دواجن', 'منزلي كودى', 'محال تجارية كودي', 'باقى المشتركين كودى',
-            'أستخدامات الرى كودى', 'أعلى شريحة تجارى كودى', 'قوي كودى', 'مسجد اهلى كودى', 'مسجد اوقاف كودى',
-            'كنيسة كودى', 'دور عبادة كودى', 'جمعية اهلية كودى', 'محطة محمول كودى', 'عداد خدمات كودي',
-            'مصعد تجارى كودي', 'جمعيه اهليه 50%', 'استراحات حكوميه'
-        ];
-    }
-    populateSelect(document.getElementById('bulk-location-description-select'), state.settings.placeDescriptions, 'اختر...');
-    (_c = document.getElementById('btn-bulk-update-location')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', handleBulkUpdateLocation);
-    populateSelect(document.getElementById('bulk-supply-company'), state.settings.meterSupplyCompanies, 'اختر الشركة...');
-    (_d = document.getElementById('btn-bulk-update-supply-company')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', handleBulkUpdateSupplyCompany);
-    populateSelect(document.getElementById('bulk-activity-type'), state.settings.activityTypes, '-- اختر النشاط --');
-    (_e = document.getElementById('btn-bulk-update-activity-type')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', handleBulkUpdateActivityType);
-    (_f = document.getElementById('btn-delete-selected-subscribers-all')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', handleDeleteSelectedSubscribersAll);
     // منطق تحديد الكل (مع مراعاة الصفوف الظاهرة فقط عند الفلترة)
     const selectAllCb = document.getElementById('select-all-subscribers');
     selectAllCb === null || selectAllCb === void 0 ? void 0 : selectAllCb.addEventListener('change', (e) => {
@@ -24016,8 +24175,8 @@ function handleNavigation(event) {
             backBtn.classList.add('btn', 'secondary'); // تحويله لنمط زر ثانوي ليتناسق مع أزرار البحث
         }
         let columns = [...columnConfigs['subscribers-all']];
-        // إضافة عمود الاختيار فقط للمسؤولين والمشرفين
-        if (isSystemAdmin(loggedInUser) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'supervisor') {
+        // إضافة عمود الاختيار بناء على صلاحيات الحذف المتعدد أو التعديلات الجماعية
+        if (hasButtonPermission('bulk_delete_subscribers') || hasButtonPermission('bulk_edit_subscribers')) {
             columns.unshift({
                 key: 'selection',
                 header: '<input type="checkbox" id="select-all-subscribers">',
