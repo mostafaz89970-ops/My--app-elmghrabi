@@ -2471,23 +2471,23 @@
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                             <span>إضافة طلب زينات</span>
                         </button>
-                        <button class="btn" id="print-collection-zinat-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg><span>طباعة القائمة</span></button>
+                        <button class="btn" id="print-collection-zinat-btn" onclick="window.handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات')"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg><span>طباعة القائمة</span></button>
                     </div>
                 </div>
                 <div class="responsive-table">
                     <table id="collection-zinat-table">
                         <thead>
                             <tr>
-                                <th>اسم الطالب</th>
+                                <th>اسم المواطن / المشترك</th>
                                 <th>العنوان</th>
                                 <th>رقم الموبايل</th>
                                 <th>الفني المسؤول</th>
                                 <th>تاريخ الطلب</th>
                                 <th>المبلغ المطلوب</th>
                                 <th>المبلغ المدفوع</th>
-                                <th>رقم الإيصال</th>
                                 <th>المتبقي</th>
                                 <th>حالة السداد</th>
+                                <th>الخزينة</th>
                                 <th>إجراءات</th>
                             </tr>
                         </thead>
@@ -6393,97 +6393,97 @@
 
 
         <!-- Modal: Add Sector -->
-        <div id="modal-org-add-sector" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width: 480px;">
-                <div class="modal-header">
-                    <h4>🌐 إضافة قطاع جديد</h4>
-                    <button type="button" class="close-modal">&times;</button>
+        <div id="modal-org-add-sector" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+            <div class="modal-content" style="background: #ffffff; border-radius: 14px; max-width: 480px; width: 92%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); overflow: hidden; animation: fadeIn 0.2s ease-out; padding: 24px; position: relative;">
+                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 14px; margin-bottom: 20px;">
+                    <h4 style="margin: 0; font-size: 1.15rem; color: #1e293b; font-weight: 700;">🌐 إضافة قطاع جديد</h4>
+                    <button type="button" class="close-modal" style="background: transparent; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: #64748b;">&times;</button>
                 </div>
-                <div class="modal-body" style="padding: 20px;">
-                    <div class="input-group">
-                        <label for="new-sector-name-input">اسم القطاع الجديد</label>
-                        <input type="text" id="new-sector-name-input" class="form-control" placeholder="مثال: قطاع شمال الجيزة" style="width:100%; padding:9px;">
+                <div class="modal-body" style="padding: 0 0 20px 0;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="new-sector-name-input" style="font-weight: 600; margin-bottom: 8px; display: block; color: #334155;">اسم القطاع الجديد</label>
+                        <input type="text" id="new-sector-name-input" class="form-control" placeholder="مثال: قطاع شمال المنيا" style="width: 100%; padding: 10px 14px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;">
                     </div>
                 </div>
-                <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px;">
-                    <button type="button" class="btn secondary close-modal">إلغاء</button>
-                    <button type="button" class="btn primary" id="btn-save-new-sector">حفظ القطاع</button>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <button type="button" class="btn secondary close-modal" style="padding: 8px 18px; border-radius: 8px;">إلغاء</button>
+                    <button type="button" class="btn primary" id="btn-save-new-sector" style="padding: 8px 20px; border-radius: 8px; background: #2563eb; color: #fff; font-weight: 600;">حفظ القطاع</button>
                 </div>
             </div>
         </div>
 
         <!-- Modal: Add General Admin -->
-        <div id="modal-org-add-genadmin" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width: 500px;">
-                <div class="modal-header">
-                    <h4>🏢 إضافة إدارة عامة جديدة</h4>
-                    <button type="button" class="close-modal">&times;</button>
+        <div id="modal-org-add-genadmin" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+            <div class="modal-content" style="background: #ffffff; border-radius: 14px; max-width: 500px; width: 92%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); overflow: hidden; animation: fadeIn 0.2s ease-out; padding: 24px; position: relative;">
+                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 14px; margin-bottom: 20px;">
+                    <h4 style="margin: 0; font-size: 1.15rem; color: #1e293b; font-weight: 700;">🏢 إضافة إدارة عامة جديدة</h4>
+                    <button type="button" class="close-modal" style="background: transparent; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: #64748b;">&times;</button>
                 </div>
-                <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
-                    <div class="input-group">
-                        <label for="genadmin-target-sector-select">القطاع التابع له</label>
-                        <select id="genadmin-target-sector-select" class="form-control" style="width:100%; padding:9px;"></select>
+                <div class="modal-body" style="padding: 0 0 20px 0; display: flex; flex-direction: column; gap: 15px;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="genadmin-target-sector-select" style="font-weight: 600; margin-bottom: 8px; display: block; color: #334155;">القطاع التابع له</label>
+                        <select id="genadmin-target-sector-select" class="form-control" style="width: 100%; padding: 10px 14px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;"></select>
                     </div>
-                    <div class="input-group">
-                        <label for="new-genadmin-name-input">اسم الإدارة العامة الجديدة</label>
-                        <input type="text" id="new-genadmin-name-input" class="form-control" placeholder="مثال: الإدارة العامة لهندسات..." style="width:100%; padding:9px;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="new-genadmin-name-input" style="font-weight: 600; margin-bottom: 8px; display: block; color: #334155;">اسم الإدارة العامة الجديدة</label>
+                        <input type="text" id="new-genadmin-name-input" class="form-control" placeholder="مثال: الإدارة العامة لإيرادات شمال" style="width: 100%; padding: 10px 14px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;">
                     </div>
                 </div>
-                <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px;">
-                    <button type="button" class="btn secondary close-modal">إلغاء</button>
-                    <button type="button" class="btn primary" id="btn-save-new-genadmin">حفظ الإدارة العامة</button>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <button type="button" class="btn secondary close-modal" style="padding: 8px 18px; border-radius: 8px;">إلغاء</button>
+                    <button type="button" class="btn primary" id="btn-save-new-genadmin" style="padding: 8px 20px; border-radius: 8px; background: #059669; color: #fff; font-weight: 600;">حفظ الإدارة العامة</button>
                 </div>
             </div>
         </div>
 
         <!-- Modal: Add Sub Admin / Branch -->
-        <div id="modal-org-add-subadmin" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width: 520px;">
-                <div class="modal-header">
-                    <h4>🏛️ إضافة إدارة فرعية / هندسة جديدة</h4>
-                    <button type="button" class="close-modal">&times;</button>
+        <div id="modal-org-add-subadmin" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+            <div class="modal-content" style="background: #ffffff; border-radius: 14px; max-width: 520px; width: 92%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); overflow: hidden; animation: fadeIn 0.2s ease-out; padding: 24px; position: relative;">
+                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 14px; margin-bottom: 20px;">
+                    <h4 style="margin: 0; font-size: 1.15rem; color: #1e293b; font-weight: 700;">🏛️ إضافة إدارة فرعية / هندسة جديدة</h4>
+                    <button type="button" class="close-modal" style="background: transparent; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: #64748b;">&times;</button>
                 </div>
-                <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
-                    <div class="input-group">
-                        <label for="subadmin-target-sector-select">القطاع</label>
-                        <select id="subadmin-target-sector-select" class="form-control" style="width:100%; padding:9px;"></select>
+                <div class="modal-body" style="padding: 0 0 20px 0; display: flex; flex-direction: column; gap: 15px;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="subadmin-target-sector-select" style="font-weight: 600; margin-bottom: 8px; display: block; color: #334155;">القطاع</label>
+                        <select id="subadmin-target-sector-select" class="form-control" style="width: 100%; padding: 10px 14px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;"></select>
                     </div>
-                    <div class="input-group">
-                        <label for="subadmin-target-genadmin-select">الإدارة العامة</label>
-                        <select id="subadmin-target-genadmin-select" class="form-control" style="width:100%; padding:9px;"></select>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="subadmin-target-genadmin-select" style="font-weight: 600; margin-bottom: 8px; display: block; color: #334155;">الإدارة العامة</label>
+                        <select id="subadmin-target-genadmin-select" class="form-control" style="width: 100%; padding: 10px 14px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;"></select>
                     </div>
-                    <div class="input-group">
-                        <label for="new-subadmin-name-input">اسم الإدارة الفرعية / الهندسة</label>
-                        <input type="text" id="new-subadmin-name-input" class="form-control" placeholder="مثال: هندسة كهرباء مغاغة شرق" style="width:100%; padding:9px;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="new-subadmin-name-input" style="font-weight: 600; margin-bottom: 8px; display: block; color: #334155;">اسم الإدارة الفرعية / الهندسة</label>
+                        <input type="text" id="new-subadmin-name-input" class="form-control" placeholder="مثال: هندسة كهرباء مغاغة" style="width: 100%; padding: 10px 14px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;">
                     </div>
                 </div>
-                <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px;">
-                    <button type="button" class="btn secondary close-modal">إلغاء</button>
-                    <button type="button" class="btn primary" id="btn-save-new-subadmin">حفظ الإدارة الفرعية</button>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <button type="button" class="btn secondary close-modal" style="padding: 8px 18px; border-radius: 8px;">إلغاء</button>
+                    <button type="button" class="btn primary" id="btn-save-new-subadmin" style="padding: 8px 20px; border-radius: 8px; background: #d97706; color: #fff; font-weight: 600;">حفظ الفرع</button>
                 </div>
             </div>
         </div>
 
         <!-- Modal: Edit Item Name -->
-        <div id="modal-org-edit-item" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width: 500px;">
-                <div class="modal-header">
-                    <h4 id="org-edit-modal-title">✏️ تعديل الاسم</h4>
-                    <button type="button" class="close-modal">&times;</button>
+        <div id="modal-org-edit-item" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+            <div class="modal-content" style="background: #ffffff; border-radius: 14px; max-width: 500px; width: 92%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); overflow: hidden; animation: fadeIn 0.2s ease-out; padding: 24px; position: relative;">
+                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 14px; margin-bottom: 20px;">
+                    <h4 id="org-edit-modal-title" style="margin: 0; font-size: 1.15rem; color: #1e293b; font-weight: 700;">✏️ تعديل الاسم</h4>
+                    <button type="button" class="close-modal" style="background: transparent; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: #64748b;">&times;</button>
                 </div>
-                <div class="modal-body" style="padding: 20px;">
+                <div class="modal-body" style="padding: 0 0 20px 0;">
                     <input type="hidden" id="org-edit-type">
                     <input type="hidden" id="org-edit-sector">
                     <input type="hidden" id="org-edit-genadmin">
                     <input type="hidden" id="org-edit-oldname">
-                    <div class="input-group">
-                        <label id="org-edit-input-label" for="org-edit-name-input">الاسم الجديد</label>
-                        <input type="text" id="org-edit-name-input" class="form-control" style="width:100%; padding:9px;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label id="org-edit-input-label" for="org-edit-name-input" style="font-weight: 600; margin-bottom: 8px; display: block; color: #334155;">الاسم الجديد</label>
+                        <input type="text" id="org-edit-name-input" class="form-control" style="width: 100%; padding: 10px 14px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;">
                     </div>
                 </div>
-                <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px;">
-                    <button type="button" class="btn secondary close-modal">إلغاء</button>
-                    <button type="button" class="btn primary" id="btn-save-org-edit">حفظ التعديل</button>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <button type="button" class="btn secondary close-modal" style="padding: 8px 18px; border-radius: 8px;">إلغاء</button>
+                    <button type="button" class="btn primary" id="btn-save-org-edit" style="padding: 8px 20px; border-radius: 8px; background: #2563eb; color: #fff; font-weight: 600;">حفظ التعديل</button>
                 </div>
             </div>
         </div>

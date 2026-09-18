@@ -3472,3 +3472,43 @@ body.dark-mode .org-branch-chip:hover {
     align-items: center;
     gap: 4px;
 }
+
+/* عزل صفحات الهيكل الإداري والمستخدمين تماماً لمنع أي تداخل بصري */
+#org-hierarchy-management,
+#user-management {
+    display: none;
+}
+#org-hierarchy-management.active,
+#user-management.active {
+    display: block !important;
+}
+
+/* تنسيقات النوافذ المنبثقة للهيكل الإداري بالوضع الداكن */
+body.dark-mode #modal-org-add-sector .modal-content,
+body.dark-mode #modal-org-add-genadmin .modal-content,
+body.dark-mode #modal-org-add-subadmin .modal-content,
+body.dark-mode #modal-org-edit-item .modal-content {
+    background: #1e293b !important;
+    color: #f8fafc !important;
+    border: 1px solid #334155;
+}
+body.dark-mode #modal-org-add-sector h4,
+body.dark-mode #modal-org-add-genadmin h4,
+body.dark-mode #modal-org-add-subadmin h4,
+body.dark-mode #modal-org-edit-item h4 {
+    color: #f8fafc !important;
+}
+body.dark-mode #modal-org-add-sector label,
+body.dark-mode #modal-org-add-genadmin label,
+body.dark-mode #modal-org-add-subadmin label,
+body.dark-mode #modal-org-edit-item label {
+    color: #cbd5e1 !important;
+}
+body.dark-mode #modal-org-add-sector .form-control,
+body.dark-mode #modal-org-add-genadmin .form-control,
+body.dark-mode #modal-org-add-subadmin .form-control,
+body.dark-mode #modal-org-edit-item .form-control {
+    background: #0f172a !important;
+    color: #f8fafc !important;
+    border-color: #475569 !important;
+}
