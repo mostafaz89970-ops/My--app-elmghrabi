@@ -1108,7 +1108,16 @@ const refreshCurrentActiveSection = () => {
         renderDashboard();
     }
     else if (sectionId === 'subscribers-all') {
-        renderFilteredMeterTable('subscribers-all-table', ['جديد', 'مرفوع أعطال', 'مرفوع إحلال', 'استغناء', 'تغير عقد اشتراك', 'استبدال', 'هدم', 'تم الإصلاح', 'لا يمكن إصلاحه', 'تم استبداله'], columnConfigs['subscribers-all']);
+        let columns = [...columnConfigs['subscribers-all']];
+        if (isSystemAdmin(loggedInUser) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'supervisor') {
+            columns.unshift({
+                key: 'selection',
+                header: '<input type="checkbox" id="select-all-subscribers">',
+                render: (item) => `<input type="checkbox" class="select-subscriber-row" value="${item.id}">`
+            });
+            setTimeout(setupAllSubscribersBulkActions, 0);
+        }
+        renderFilteredMeterTable('subscribers-all-table', ['جديد', 'مرفوع أعطال', 'مرفوع إحلال', 'استغناء', 'تغير عقد اشتراك', 'استبدال', 'هدم', 'تم الإصلاح', 'لا يمكن إصلاحه', 'تم استبداله'], columns);
     }
     else if (sectionId === 'subscribers-new') {
         renderFilteredMeterTable('subscribers-new-table', ['جديد'], columnConfigs['subscribers-new']);
@@ -2521,6 +2530,16 @@ const columnConfigs = {
         { key: 'accountRefY', header: 'ي' },
         { key: 'accountRefM', header: 'م' },
         ...baseColumns,
+        {
+            key: 'generalAdmin',
+            header: 'الإدارة العامة',
+            render: (item) => item.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا'
+        },
+        {
+            key: 'subAdmin',
+            header: 'الإدارة الفرعية',
+            render: (item) => item.subAdmin || item.branch || item.branchName || 'هندسة كهرباء بني مزار'
+        },
         { key: 'meterChassisNumber', header: 'شاسية العداد' },
         { key: 'meterType', header: 'نوع العداد' },
         { key: 'meterCapacity', header: 'قدرة العداد' },
@@ -2913,7 +2932,7 @@ const handleAllSubscribersSearch = () => {
     });
     // Re-construct columns logic (including admin checkboxes)
     let columns = [...columnConfigs['subscribers-all']];
-    if ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'admin' || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'supervisor') {
+    if (isSystemAdmin(loggedInUser) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'supervisor') {
         columns.unshift({
             key: 'selection',
             header: '<input type="checkbox" id="select-all-subscribers">',
@@ -23232,16 +23251,122 @@ const handleBulkUpdateActivityType = async () => {
     };
     showConfirmationDialog('تأكيد التعديل الجماعي', `هل أنت متأكد من تغيير نوع النشاط لـ ${ids.length} مشتركين إلى "${newValue}"؟`, onConfirm);
 };
-const setupAllSubscribersBulkActions = () => {
-    var _a, _b, _c, _d;
-    const section = document.getElementById('subscribers-all');
-    if (!section || document.getElementById('bulk-action-container-all'))
+const handleBulkUpdateDepartments = async () => {
+    var _a, _b;
+    const checkboxes = document.querySelectorAll('#subscribers-all-table tbody input[type="checkbox"].select-subscriber-row:checked');
+    if (checkboxes.length === 0) {
+        showToast('يرجى تحديد مشترك واحد على الأقل من الجدول.', 'error');
         return;
+    }
+    const genSelect = document.getElementById('bulk-general-admin-select');
+    const subSelect = document.getElementById('bulk-sub-admin-select');
+    const newGeneralAdmin = ((_a = genSelect === null || genSelect === void 0 ? void 0 : genSelect.value) === null || _a === void 0 ? void 0 : _a.trim()) || '';
+    const newSubAdmin = ((_b = subSelect === null || subSelect === void 0 ? void 0 : subSelect.value) === null || _b === void 0 ? void 0 : _b.trim()) || '';
+    if (!newGeneralAdmin && !newSubAdmin) {
+        showToast('يرجى اختيار الإدارة العامة أو الإدارة الفرعية المراد تحديثها.', 'error');
+        return;
+    }
+    const ids = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
+    const descParts = [];
+    if (newGeneralAdmin)
+        descParts.push(`الإدارة العامة: "${newGeneralAdmin}"`);
+    if (newSubAdmin)
+        descParts.push(`الإدارة الفرعية: "${newSubAdmin}"`);
+    // البحث عن القطاع المطابق للإدارة العامة المختارة إن وجد
+    let matchingSector = '';
+    if (newGeneralAdmin) {
+        const struct = getActiveOrgStructure();
+        for (const [sec, gas] of Object.entries(struct)) {
+            if (Object.keys(gas).includes(newGeneralAdmin)) {
+                matchingSector = sec;
+                break;
+            }
+        }
+    }
+    const onConfirm = async () => {
+        let updatedCount = 0;
+        state.meters = (state.meters || []).map(m => {
+            if (ids.includes(m.id)) {
+                updatedCount++;
+                const updated = Object.assign({}, m);
+                if (matchingSector)
+                    updated.sector = matchingSector;
+                if (newGeneralAdmin)
+                    updated.generalAdmin = newGeneralAdmin;
+                if (newSubAdmin) {
+                    updated.subAdmin = newSubAdmin;
+                    updated.branch = newSubAdmin;
+                    updated.branchName = newSubAdmin;
+                }
+                return updated;
+            }
+            return m;
+        });
+        if (Array.isArray(state.subscribers)) {
+            state.subscribers = state.subscribers.map(s => {
+                if (ids.includes(s.id)) {
+                    const updated = Object.assign({}, s);
+                    if (matchingSector)
+                        updated.sector = matchingSector;
+                    if (newGeneralAdmin)
+                        updated.generalAdmin = newGeneralAdmin;
+                    if (newSubAdmin) {
+                        updated.subAdmin = newSubAdmin;
+                        updated.branch = newSubAdmin;
+                        updated.branchName = newSubAdmin;
+                    }
+                    return updated;
+                }
+                return s;
+            });
+        }
+        logActivity('تعديل جماعي للإدارات', `تم تحديث الإدارات لـ ${updatedCount} مشتركين (${descParts.join('، ')})`);
+        await saveState();
+        showToast(`تم تحديث الإدارات بالإجماع لـ ${updatedCount} مشتركين بنجاح.`, 'success');
+        // إعادة تحميل الجدول أو تحديثه
+        const link = document.querySelector('.sidebar-nav .nav-link[data-target="subscribers-all"]');
+        if (link) {
+            link.click();
+        }
+        else {
+            let columns = [...columnConfigs['subscribers-all']];
+            if (isSystemAdmin(loggedInUser) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'supervisor') {
+                columns.unshift({
+                    key: 'selection',
+                    header: '<input type="checkbox" id="select-all-subscribers">',
+                    render: (item) => `<input type="checkbox" class="select-subscriber-row" value="${item.id}">`
+                });
+                setTimeout(setupAllSubscribersBulkActions, 0);
+            }
+            renderFilteredMeterTable('subscribers-all-table', ['جديد', 'مرفوع أعطال', 'مرفوع إحلال', 'استغناء', 'تغير عقد اشتراك', 'استبدال', 'هدم', 'تم الإصلاح', 'لا يمكن إصلاحه', 'تم استبداله'], columns);
+        }
+    };
+    showConfirmationDialog('تأكيد تحديث الإدارات بالإجماع', `هل أنت متأكد من تطبيق (${descParts.join(' و ')}) بالإجماع على المشتركين المحددين (${ids.length} مشتركين)؟`, onConfirm);
+};
+const setupAllSubscribersBulkActions = () => {
+    var _a, _b, _c, _d, _e, _f;
+    const section = document.getElementById('subscribers-all');
+    if (!section)
+        return;
+    (_a = document.getElementById('bulk-action-container-all')) === null || _a === void 0 ? void 0 : _a.remove();
     const container = document.createElement('div');
     container.id = 'bulk-action-container-all';
     container.className = 'bulk-actions-container';
-    container.style.cssText = 'margin-bottom: 15px; padding: 10px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 4px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;';
+    container.style.cssText = 'margin-bottom: 15px; padding: 10px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;';
     container.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #e0f2fe; padding: 6px 10px; border-radius: 6px; border: 1px solid #7dd3fc;">
+            <span style="font-weight: bold; color: #0369a1; display: inline-flex; align-items: center; gap: 4px;">🏢 تحديث الإدارات بالإجماع:</span>
+            <select id="bulk-general-admin-select" style="padding: 6px 8px; border-radius: 4px; border: 1px solid #94a3b8; min-width: 160px; font-size: 13px;">
+                <option value="">-- اختر الإدارة العامة --</option>
+            </select>
+            <select id="bulk-sub-admin-select" style="padding: 6px 8px; border-radius: 4px; border: 1px solid #94a3b8; min-width: 160px; font-size: 13px;">
+                <option value="">-- اختر الإدارة الفرعية / الهندسة --</option>
+            </select>
+            <button id="btn-bulk-update-departments" class="btn" style="padding: 6px 12px; background-color: #0d9488; border-color: #0f766e; color: white; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+                <span>تحديث الإدارات بالإجماع 💾</span>
+            </button>
+        </div>
+        <div style="width: 1px; height: 24px; background: #bae6fd; margin: 0 5px;"></div>
         <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-weight: bold; color: #0369a1;">تعديل وصف المكان:</span>
             <select id="bulk-location-description-select" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; min-width: 150px;">
@@ -23275,6 +23400,25 @@ const setupAllSubscribersBulkActions = () => {
     if (tableContainer && tableContainer.parentElement) {
         tableContainer.parentElement.insertBefore(container, tableContainer);
     }
+    // ملء قوائم الإدارات لتحديث الإدارات بالإجماع
+    const bulkGenAdminSelect = document.getElementById('bulk-general-admin-select');
+    const bulkSubAdminSelect = document.getElementById('bulk-sub-admin-select');
+    if (bulkGenAdminSelect) {
+        const generalAdmins = getGeneralAdminsForSector('all');
+        populateSelect(bulkGenAdminSelect, generalAdmins, '-- اختر الإدارة العامة --');
+        bulkGenAdminSelect.addEventListener('change', () => {
+            const chosenGA = bulkGenAdminSelect.value;
+            if (bulkSubAdminSelect) {
+                const branches = chosenGA ? getSubAdmins('all', chosenGA) : getSubAdmins('all', 'all');
+                populateSelect(bulkSubAdminSelect, branches, '-- اختر الإدارة الفرعية / الهندسة --');
+            }
+        });
+    }
+    if (bulkSubAdminSelect) {
+        const allBranches = getSubAdmins('all', 'all');
+        populateSelect(bulkSubAdminSelect, allBranches, '-- اختر الإدارة الفرعية / الهندسة --');
+    }
+    (_b = document.getElementById('btn-bulk-update-departments')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleBulkUpdateDepartments);
     // ضمان وجود بيانات في قائمة وصف المكان
     if (!state.settings.placeDescriptions || state.settings.placeDescriptions.length === 0) {
         state.settings.placeDescriptions = [
@@ -23289,12 +23433,12 @@ const setupAllSubscribersBulkActions = () => {
         ];
     }
     populateSelect(document.getElementById('bulk-location-description-select'), state.settings.placeDescriptions, 'اختر...');
-    (_a = document.getElementById('btn-bulk-update-location')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', handleBulkUpdateLocation);
+    (_c = document.getElementById('btn-bulk-update-location')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', handleBulkUpdateLocation);
     populateSelect(document.getElementById('bulk-supply-company'), state.settings.meterSupplyCompanies, 'اختر الشركة...');
-    (_b = document.getElementById('btn-bulk-update-supply-company')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleBulkUpdateSupplyCompany);
+    (_d = document.getElementById('btn-bulk-update-supply-company')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', handleBulkUpdateSupplyCompany);
     populateSelect(document.getElementById('bulk-activity-type'), state.settings.activityTypes, '-- اختر النشاط --');
-    (_c = document.getElementById('btn-bulk-update-activity-type')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', handleBulkUpdateActivityType);
-    (_d = document.getElementById('btn-delete-selected-subscribers-all')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', handleDeleteSelectedSubscribersAll);
+    (_e = document.getElementById('btn-bulk-update-activity-type')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', handleBulkUpdateActivityType);
+    (_f = document.getElementById('btn-delete-selected-subscribers-all')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', handleDeleteSelectedSubscribersAll);
     // منطق تحديد الكل (مع مراعاة الصفوف الظاهرة فقط عند الفلترة)
     const selectAllCb = document.getElementById('select-all-subscribers');
     selectAllCb === null || selectAllCb === void 0 ? void 0 : selectAllCb.addEventListener('change', (e) => {
@@ -23551,7 +23695,7 @@ function handleNavigation(event) {
         }
         let columns = [...columnConfigs['subscribers-all']];
         // إضافة عمود الاختيار فقط للمسؤولين والمشرفين
-        if ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'admin' || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'supervisor') {
+        if (isSystemAdmin(loggedInUser) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'supervisor') {
             columns.unshift({
                 key: 'selection',
                 header: '<input type="checkbox" id="select-all-subscribers">',
