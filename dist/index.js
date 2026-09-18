@@ -4184,6 +4184,7 @@ window.printCollectionReceipt = (id, type = 'zinat') => {
 // =========================================================================
 let cachedBluetoothDevice = null;
 let cachedPrintCharacteristic = null;
+let cachedSerialPort = null;
 // تحويل Canvas إلى بيانات نقطية بتسلسل أوامر ESC/POS متوافقة 100% مع طابعات VTC
 const canvasToEscPosRaster = (canvas) => {
     const ctx = canvas.getContext('2d');
@@ -4304,6 +4305,62 @@ const printViaWebBluetooth = async (escPosData) => {
     }
     showToast(`تمت طباعة الإيصال على طابعة ${device.name || 'VTC'} بنجاح! 🖨️`, 'success');
     return true;
+};
+// إرسال البيانات لطابعة VTC عبر كابل USB أو المنفذ التسلسلي (Web Serial API) - مخصص للابتوب والكمبيوتر
+const printViaWebSerial = async (escPosData) => {
+    const nav = navigator;
+    if (!nav.serial) {
+        throw new Error('خاصية اتصالات USB والمنافذ التسلسلية (Web Serial) غير مدعومة في هذا المتصفح. يرجى استخدام متصفح Google Chrome أو Microsoft Edge على اللابتوب.');
+    }
+    let port = cachedSerialPort;
+    let isConnected = false;
+    try {
+        if (port && port.writable) {
+            isConnected = true;
+        }
+    }
+    catch (e) { }
+    if (!isConnected) {
+        showToast('يرجى تحديد واختيار منفذ طابعة VTC (كابل USB أو منفذ COM التسلسلي) من نافذة المتصفح...', 'info');
+        try {
+            port = await nav.serial.requestPort();
+        }
+        catch (e) {
+            if (e.name === 'NotFoundError') {
+                showToast('تم إلغاء اختيار منفذ طابعة VTC.', 'warning');
+                return false;
+            }
+            throw e;
+        }
+        if (!port) {
+            throw new Error('تعذر العثور على منفذ طابعة VTC.');
+        }
+        try {
+            await port.open({ baudRate: 9600 });
+        }
+        catch (err) {
+            console.warn('Port open warning:', err);
+        }
+        cachedSerialPort = port;
+    }
+    showToast('جاري إرسال الإيصال إلى طابعة VTC عبر اللابتوب...', 'info');
+    const writer = port.writable.getWriter();
+    try {
+        const chunkSize = 256;
+        for (let i = 0; i < escPosData.length; i += chunkSize) {
+            const chunk = escPosData.slice(i, i + chunkSize);
+            await writer.write(chunk);
+            await new Promise(r => setTimeout(r, 15));
+        }
+        showToast('تمت طباعة الإيصال على طابعة VTC بنجاح عبر اللابتوب! 🖨️', 'success');
+        return true;
+    }
+    finally {
+        try {
+            writer.releaseLock();
+        }
+        catch (e) { }
+    }
 };
 // إرسال الإيصال عبر تطبيق RawBT للأندرويد
 const printViaRawBT = (canvas) => {
@@ -4546,61 +4603,79 @@ const showThermalPrinterSelectionModal = (onConfirm) => {
         modal.style.cssText = 'display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 100000; align-items: center; justify-content: center; backdrop-filter: blur(4px); font-family: "Tajawal", sans-serif; direction: rtl; padding: 12px;';
         document.body.appendChild(modal);
     }
-    const savedMode = localStorage.getItem('preferred_thermal_printer_mode') || 'bluetooth';
-    const savedWidth = Number(localStorage.getItem('preferred_thermal_paper_width')) || 58;
+    const isLaptopOrPC = !(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    const hasSerialSupport = Boolean(navigator.serial);
     const hasBluetoothSupport = Boolean(navigator.bluetooth);
+    const defaultMode = isLaptopOrPC ? (hasSerialSupport ? 'usb' : 'system') : 'bluetooth';
+    const savedMode = localStorage.getItem('preferred_thermal_printer_mode') || defaultMode;
+    const savedWidth = Number(localStorage.getItem('preferred_thermal_paper_width')) || 58;
     modal.innerHTML = `
-            <div style="background: #ffffff; border-radius: 16px; max-width: 480px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35); overflow: hidden; border: 1px solid #e2e8f0; animation: fadeIn 0.2s ease-out;">
+            <div style="background: #ffffff; border-radius: 16px; max-width: 500px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35); overflow: hidden; border: 1px solid #e2e8f0; animation: fadeIn 0.2s ease-out;">
                 <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; padding: 18px 20px; text-align: right; position: relative;">
                     <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
-                        🖨️ اختيار طابعة الإيصال الحراري (طابعة VTC)
+                        🖨️ ربط طابعة VTC الحرارية (اللابتوب والموبايل)
                     </h3>
-                    <p style="margin: 0; font-size: 0.85rem; opacity: 0.9;">حدد طريقة إرسال الإيصال إلى طابعة VTC أو طابعات الهاتف</p>
+                    <p style="margin: 0; font-size: 0.85rem; opacity: 0.9;">حدد طريقة إرسال الإيصال إلى طابعة VTC عبر اللابتوب أو الموبايل</p>
                     <button id="close-printer-modal-btn" style="position: absolute; left: 16px; top: 16px; background: rgba(255,255,255,0.2); border: none; color: #fff; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center;">✕</button>
                 </div>
 
                 <div style="padding: 20px;">
                     <div style="font-size: 0.9rem; font-weight: bold; color: #334155; margin-bottom: 10px;">طريقة الاتصال بالطابعة:</div>
 
-                    <!-- Option 1: Web Bluetooth Direct (VTC) -->
-                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 2px solid ${savedMode === 'bluetooth' ? '#0284c7' : '#e2e8f0'}; border-radius: 10px; margin-bottom: 10px; cursor: pointer; background: ${savedMode === 'bluetooth' ? '#f0f9ff' : '#fff'}; transition: all 0.2s;" id="label-mode-bluetooth">
-                        <input type="radio" name="printer-mode" value="bluetooth" ${savedMode === 'bluetooth' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
+                    <!-- Option 1: USB Cable or Serial COM (Best for Laptop / PC) -->
+                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 2px solid ${savedMode === 'usb' ? '#0284c7' : '#e2e8f0'}; border-radius: 10px; margin-bottom: 10px; cursor: pointer; background: ${savedMode === 'usb' ? '#f0f9ff' : '#fff'}; transition: all 0.2s;" id="label-mode-usb">
+                        <input type="radio" name="printer-mode" value="usb" ${savedMode === 'usb' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
                         <div style="flex: 1;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <strong style="color: #0f172a; font-size: 0.95rem;">📱 بلوتوث مباشر (طابعة VTC المحمولة)</strong>
-                                <span style="background: #0284c7; color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">الأفضل لـ VTC ⭐</span>
+                                <strong style="color: #0f172a; font-size: 0.95rem;">💻🔌 كابل USB أو منفذ تسلسلي COM (طابعة VTC للابتوب)</strong>
+                                <span style="background: #0284c7; color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">الأفضل للابتوب ⭐</span>
                             </div>
                             <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
-                                اتصال واقتران مباشر بطابعة VTC عبر بلوتوث المتصفح دون الحاجة لبرامج وسيطة.
-                                ${hasBluetoothSupport ? '<span style="color: #16a34a; font-weight: bold;">(مدعوم بمتصفحك 🟢)</span>' : '<span style="color: #d97706; font-weight: bold;">(يفضل استخدام Chrome على أندرويد ⚠️)</span>'}
+                                اتصال مباشر بطابعة VTC عبر كابل USB أو منفذ Bluetooth COM المقترن بويندوز دون برامج إضافية.
+                                ${hasSerialSupport ? '<span style="color: #16a34a; font-weight: bold;">(مدعوم بمتصفحك على اللابتوب 🟢)</span>' : '<span style="color: #d97706; font-weight: bold;">(استخدم Google Chrome أو Edge ⚠️)</span>'}
                             </div>
                         </div>
                     </label>
 
-                    <!-- Option 2: RawBT App -->
-                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 2px solid ${savedMode === 'rawbt' ? '#0284c7' : '#e2e8f0'}; border-radius: 10px; margin-bottom: 10px; cursor: pointer; background: ${savedMode === 'rawbt' ? '#f0f9ff' : '#fff'}; transition: all 0.2s;" id="label-mode-rawbt">
-                        <input type="radio" name="printer-mode" value="rawbt" ${savedMode === 'rawbt' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
+                    <!-- Option 2: Web Bluetooth Direct (VTC) -->
+                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 2px solid ${savedMode === 'bluetooth' ? '#0284c7' : '#e2e8f0'}; border-radius: 10px; margin-bottom: 10px; cursor: pointer; background: ${savedMode === 'bluetooth' ? '#f0f9ff' : '#fff'}; transition: all 0.2s;" id="label-mode-bluetooth">
+                        <input type="radio" name="printer-mode" value="bluetooth" ${savedMode === 'bluetooth' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
                         <div style="flex: 1;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <strong style="color: #0f172a; font-size: 0.95rem;">⚡ تطبيق RawBT للطباعة الحرارية (أندرويد)</strong>
-                                <span style="background: #e0e7ff; color: #4338ca; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">تطبيق أندرويد</span>
+                                <strong style="color: #0f172a; font-size: 0.95rem;">📱💻 بلوتوث مباشر (طابعة VTC المحمولة للموبايل واللابتوب)</strong>
+                                <span style="background: #0ea5e9; color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">بلوتوث لاسلكي</span>
                             </div>
                             <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
-                                إرسال فوري ومباشر إلى تطبيق RawBT لطابعات البلوتوث المحمولة المثبتة على هاتفك.
+                                اقتران لاسلكي مباشر بطابعة VTC عبر بلوتوث المتصفح (Chrome / Edge).
+                                ${hasBluetoothSupport ? '<span style="color: #16a34a; font-weight: bold;">(مدعوم 🟢)</span>' : '<span style="color: #d97706; font-weight: bold;">(يتطلب بلوتوث ومتصفح Chrome ⚠️)</span>'}
                             </div>
                         </div>
                     </label>
 
                     <!-- Option 3: System Print -->
-                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 2px solid ${savedMode === 'system' ? '#0284c7' : '#e2e8f0'}; border-radius: 10px; margin-bottom: 14px; cursor: pointer; background: ${savedMode === 'system' ? '#f0f9ff' : '#fff'}; transition: all 0.2s;" id="label-mode-system">
+                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 2px solid ${savedMode === 'system' ? '#0284c7' : '#e2e8f0'}; border-radius: 10px; margin-bottom: 10px; cursor: pointer; background: ${savedMode === 'system' ? '#f0f9ff' : '#fff'}; transition: all 0.2s;" id="label-mode-system">
                         <input type="radio" name="printer-mode" value="system" ${savedMode === 'system' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
                         <div style="flex: 1;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <strong style="color: #0f172a; font-size: 0.95rem;">📄 طباعة النظام الافتراضية (معاينة الجوال)</strong>
-                                <span style="background: #f1f5f9; color: #475569; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">Print Dialog</span>
+                                <strong style="color: #0f172a; font-size: 0.95rem;">📄 طباعة النظام الافتراضية (طابعات ويندوز / المعاينة)</strong>
+                                <span style="background: #f1f5f9; color: #475569; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">Windows Print</span>
                             </div>
                             <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
-                                فتح نافذة الطباعة الافتراضية بنظام التشغيل لاختيار الطابعة أو الحفظ كـ PDF.
+                                فتح نافذة طباعة ويندوز لاختيار طابعة VTC المعرفة على الجهاز أو الحفظ بصيغة PDF.
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- Option 4: RawBT App (Mobile only) -->
+                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 2px solid ${savedMode === 'rawbt' ? '#0284c7' : '#e2e8f0'}; border-radius: 10px; margin-bottom: 14px; cursor: pointer; background: ${savedMode === 'rawbt' ? '#f0f9ff' : '#fff'}; transition: all 0.2s;" id="label-mode-rawbt">
+                        <input type="radio" name="printer-mode" value="rawbt" ${savedMode === 'rawbt' ? 'checked' : ''} style="margin-top: 3px; accent-color: #0284c7;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <strong style="color: #0f172a; font-size: 0.95rem;">⚡ تطبيق RawBT للطباعة الحرارية (أندرويد)</strong>
+                                <span style="background: #e0e7ff; color: #4338ca; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 6px;">أندرويد فقط</span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
+                                إرسال فوري ومباشر إلى تطبيق RawBT لطابعات البلوتوث المحمولة على هواتف الأندرويد.
                             </div>
                         </div>
                     </label>
@@ -4624,7 +4699,7 @@ const showThermalPrinterSelectionModal = (onConfirm) => {
                     <div style="margin-bottom: 18px;">
                         <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #334155; cursor: pointer;">
                             <input type="checkbox" id="remember-printer-choice" checked style="width: 16px; height: 16px; accent-color: #0284c7;">
-                            <span>تذكر هذا الاختيار واستخدمه تلقائياً عند الطباعة الحرارية من الموبايل</span>
+                            <span>تذكر هذا الاختيار واستخدمه تلقائياً عند الطباعة الحرارية</span>
                         </label>
                     </div>
 
@@ -4644,7 +4719,7 @@ const showThermalPrinterSelectionModal = (onConfirm) => {
     const updateHighlights = () => {
         var _a;
         const checkedVal = (_a = modal.querySelector('input[name="printer-mode"]:checked')) === null || _a === void 0 ? void 0 : _a.value;
-        ['bluetooth', 'rawbt', 'system'].forEach(m => {
+        ['usb', 'bluetooth', 'rawbt', 'system'].forEach(m => {
             const el = document.getElementById(`label-mode-${m}`);
             if (el) {
                 if (m === checkedVal) {
@@ -4669,7 +4744,7 @@ const showThermalPrinterSelectionModal = (onConfirm) => {
     (_b = document.getElementById('cancel-print-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', closeModal);
     (_c = document.getElementById('confirm-print-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => {
         var _a, _b, _c;
-        const mode = (((_a = modal.querySelector('input[name="printer-mode"]:checked')) === null || _a === void 0 ? void 0 : _a.value) || 'bluetooth');
+        const mode = (((_a = modal.querySelector('input[name="printer-mode"]:checked')) === null || _a === void 0 ? void 0 : _a.value) || 'usb');
         const width = Number(((_b = modal.querySelector('input[name="printer-paper-width"]:checked')) === null || _b === void 0 ? void 0 : _b.value) || 58);
         const remember = Boolean((_c = document.getElementById('remember-printer-choice')) === null || _c === void 0 ? void 0 : _c.checked);
         closeModal();
@@ -4683,7 +4758,8 @@ window.openThermalPrinterSettingsModal = () => {
             localStorage.setItem('preferred_thermal_printer_mode', mode);
             localStorage.setItem('preferred_thermal_paper_width', String(width));
         }
-        showToast(`تم حفظ وتحديث إعدادات الطابعة بنجاح: ${mode === 'bluetooth' ? 'طابعة VTC بلوتوث' : mode === 'rawbt' ? 'تطبيق RawBT' : 'طباعة النظام'} (${width} مم).`, 'success');
+        const modeName = mode === 'usb' ? 'كابل USB / COM (لابتوب)' : mode === 'bluetooth' ? 'طابعة VTC بلوتوث' : mode === 'rawbt' ? 'تطبيق RawBT' : 'طباعة النظام';
+        showToast(`تم حفظ وتحديث إعدادات الطابعة بنجاح: ${modeName} (${width} مم).`, 'success');
     });
 };
 // دالة إعادة تعيين اختيار الطابعة
@@ -5072,7 +5148,27 @@ window.printZinatThermalReceipt = async (id, forceSelectModal = false) => {
     const executePrintAction = async (mode, paperWidth) => {
         const canvasWidth = paperWidth === 80 ? 576 : 384;
         const htmlContent = generateCitizenThermalHTML(paperWidth);
-        if (mode === 'bluetooth') {
+        if (mode === 'usb') {
+            const nav = navigator;
+            if (!nav.serial) {
+                showToast('خاصية اتصالات USB والمنافذ التسلسلية غير مدعومة في هذا المتصفح، جاري الفتح عبر طباعة النظام...', 'warning');
+                executePrintHtmlContent(htmlContent);
+                return;
+            }
+            try {
+                const canvas = renderThermalReceiptToCanvas(receiptData, canvasWidth);
+                const escPosData = canvasToEscPosRaster(canvas);
+                await printViaWebSerial(escPosData);
+            }
+            catch (err) {
+                console.error('USB/Serial print failed:', err);
+                showToast(`تعذر الاتصال بطابعة VTC عبر USB/COM: ${err.message || err}`, 'error');
+                if (confirm('تعذر استكمال الطباعة عبر منفذ USB/COM لطابعة VTC. هل ترغب في استخدام طباعة الويندوز الافتراضية بدلاً منها؟')) {
+                    executePrintHtmlContent(htmlContent);
+                }
+            }
+        }
+        else if (mode === 'bluetooth') {
             const nav = navigator;
             if (!nav.bluetooth) {
                 showToast('المتصفح الحالي لا يدعم Web Bluetooth، جاري الفتح عبر الطباعة الافتراضية...', 'warning');
@@ -5108,7 +5204,8 @@ window.printZinatThermalReceipt = async (id, forceSelectModal = false) => {
         }
     };
     if (savedMode && !forceSelectModal) {
-        showToast(`جاري تجهيز الطباعة (${savedMode === 'bluetooth' ? 'طابعة VTC بلوتوث' : savedMode === 'rawbt' ? 'تطبيق RawBT' : 'طباعة النظام'})...`, 'info');
+        const modeName = savedMode === 'usb' ? 'كابل USB / COM (لابتوب)' : savedMode === 'bluetooth' ? 'طابعة VTC بلوتوث' : savedMode === 'rawbt' ? 'تطبيق RawBT' : 'طباعة النظام';
+        showToast(`جاري تجهيز الطباعة (${modeName})...`, 'info');
         await executePrintAction(savedMode, savedWidth);
     }
     else {
