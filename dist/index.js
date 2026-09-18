@@ -464,6 +464,55 @@ const getSubAdmins = (selectedSector, selectedGeneralAdmin) => {
     return Array.from(list);
 };
 // عمليات إدارة الهيكل الإداري (إضافة، تعديل، حذف)
+// دالة استخراج الترويسة الديناميكية لجميع الإيصالات والتقارير بناءً على تسجيل الدخول
+const getDynamicReceiptHeader = (userOrCollector) => {
+    let sec = loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector;
+    let br = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch);
+    // For admin with active scope filter
+    if (loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.username === 'admin' || loggedInUser.role === 'supervisor')) {
+        if (currentAdminScopeSector && currentAdminScopeSector !== 'all')
+            sec = currentAdminScopeSector;
+        if (currentAdminScopeBranch && currentAdminScopeBranch !== 'all')
+            br = currentAdminScopeBranch;
+    }
+    if (userOrCollector) {
+        const found = (state.users || []).find(u => u.fullName === userOrCollector || u.username === userOrCollector);
+        if (found) {
+            if (found.sector && found.sector !== 'all')
+                sec = found.sector;
+            if ((found.subAdmin || found.branch) && found.subAdmin !== 'all' && found.branch !== 'all') {
+                br = found.subAdmin || found.branch;
+            }
+        }
+    }
+    if (!sec || sec === 'all' || sec === '🌐 الإدارة المركزية العامة') {
+        sec = 'قطاع توزيع كهرباء المنيا شمال';
+    }
+    else if (sec === 'قطاع شمال المنيا') {
+        sec = 'قطاع توزيع كهرباء المنيا شمال';
+    }
+    else if (sec === 'قطاع جنوب المنيا') {
+        sec = 'قطاع توزيع كهرباء المنيا جنوب';
+    }
+    else if (!sec.includes('توزيع')) {
+        sec = sec.replace('قطاع', 'قطاع توزيع كهرباء');
+    }
+    if (!br || br === 'all' || br === 'المسؤولين العامين والمديرين') {
+        br = 'هندسة كهرباء بني مزار';
+    }
+    let cleanCity = br.replace(/هندسة\s*كهرباء/g, '').replace(/فرع/g, '').trim();
+    if (!cleanCity)
+        cleanCity = br;
+    const revBranch = `فرع إيرادات ${cleanCity}`;
+    const branchLine = `${br} - ${revBranch}`;
+    return {
+        company: 'شركة مصر الوسطى لتوزيع الكهرباء',
+        sector: sec,
+        branchName: br,
+        revenueBranch: revBranch,
+        branchLine: branchLine
+    };
+};
 const addSectorToOrg = (sectorName) => {
     const name = sectorName.trim();
     if (!name) {
@@ -867,10 +916,8 @@ const updateAdminScopeUI = () => {
         if (badge) {
             badge.style.display = 'flex';
             if (badgeText) {
-                const sec = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector) || 'قطاع شمال المنيا';
-                const gen = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.generalAdmin) || 'الإدارة العامة لهندسات شمال المنيا';
-                const br = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) || 'هندسة كهرباء بني مزار';
-                badgeText.textContent = `${sec} - ${gen} - ${br}`;
+                const hInfo = getDynamicReceiptHeader();
+                badgeText.textContent = `${hInfo.sector} - ${hInfo.branchLine}`;
             }
         }
     }
@@ -1549,7 +1596,9 @@ const updateUI = () => {
         updateAdminScopeUI();
         // App container elements
         document.getElementById('sidebar-user-name').textContent = loggedInUser.fullName;
-        document.getElementById('sidebar-user-role').textContent = loggedInUser.role === 'admin' ? 'Admin' : 'User';
+        const hInfo = getDynamicReceiptHeader();
+        document.getElementById('sidebar-user-role').textContent = `${loggedInUser.role === 'admin' ? 'مدير النظام' : loggedInUser.role} (${hInfo.branchName})`;
+        state.settings.companyAddress = `${hInfo.sector} - ${hInfo.branchLine}`;
         const avatarImg = document.querySelector('.user-profile img');
         if (avatarImg) {
             avatarImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(loggedInUser.fullName)}&background=3b82f6&color=fff`;
@@ -3901,12 +3950,17 @@ const renderJudicialCollectionSection = () => {
         }
         if (!item)
             return;
-        const companyName = state.settings.replacementReportCompanyName || state.settings.companyName || 'ELMAGHRABI';
+        const headerInfo = getDynamicReceiptHeader(loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName);
         const printDate = new Date().toLocaleString('ar-EG');
         const total = Number(type === 'judicial' ? item.reconciliationAmount : item.amount) || 0;
         const paid = (item.payments || []).reduce((sum, p) => sum + p.amount, 0);
         const remaining = total - paid;
         const collectorName = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'غير محدد';
+        // Check if settled in treasury
+        const isSettled = (state.treasurySettlements || []).some((s) => {
+            const matchCollector = s.collectorName === collectorName || s.username === (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.username);
+            return matchCollector && ((item === null || item === void 0 ? void 0 : item.payments) || []).some((p) => p.date === s.settlementDate);
+        });
         const logoSrc = state.settings.companyLogo;
         const logoHTML = logoSrc ? `<img src="${logoSrc}" alt="Logo">` : '';
         let paymentHistoryHTML = '';
@@ -3944,13 +3998,25 @@ const renderJudicialCollectionSection = () => {
         
         <div class="header-container">
             <div class="company-info">
-                <h2>${companyName}</h2>
-                <h3>${title}</h3>
+                <h2 style="font-size: 15pt; font-weight: 800; color: #0f172a; margin: 0 0 3px 0;">${headerInfo.company}</h2>
+                <div style="font-size: 11pt; font-weight: 700; color: #1e40af; margin-bottom: 2px;">${headerInfo.sector}</div>
+                <div style="font-size: 10.5pt; font-weight: 600; color: #065f46; margin-bottom: 5px;">${headerInfo.branchLine}</div>
+                <h3 style="margin: 4px 0 0 0; font-size: 13pt; font-weight: 800; color: #0f172a; text-decoration: underline;">${title}</h3>
             </div>
             <div class="logo-container">
                 ${logoHTML}
             </div>
         </div>
+
+        ${isSettled ? `
+            <div style="background: #f0fdf4; border: 2px solid #22c55e; color: #15803d; padding: 7px 12px; border-radius: 8px; font-weight: 800; font-size: 11pt; text-align: center; margin-bottom: 12px;">
+                ✔️ تم التوريد والتصفية بالخزينة العامة رسمياً
+            </div>
+        ` : `
+            <div style="background: #fef2f2; border: 2px solid #ef4444; color: #b91c1c; padding: 7px 12px; border-radius: 8px; font-weight: 800; font-size: 11pt; text-align: center; margin-bottom: 12px;">
+                ⚠️ تنبيه رسمي: هذا الإيصال معلق طرف المحصل (غير مصفى بالخزينة حتى الآن - قيد التوريد والتصفية)
+            </div>
+        `}
 
         <div class="meta">تاريخ الطباعة: ${printDate}</div>
         
@@ -3960,6 +4026,7 @@ const renderJudicialCollectionSection = () => {
         <div class="row"><span class="label">المبلغ المطلوب:</span><span>${total.toLocaleString()} ج.م</span></div>
         <div class="row"><span class="label">المبلغ المدفوع:</span><span>${paid.toLocaleString()} ج.م</span></div>
         <div class="row total"><span class="label">المتبقي:</span><span>${remaining.toLocaleString()} ج.م</span></div>
+        <div class="row"><span class="label">حالة التوريد للخزينة:</span><span>${isSettled ? '<span style="color:#15803d; font-weight:bold;">✔️ تم التوريد والتصفية بالخزينة</span>' : '<span style="color:#dc2626; font-weight:bold;">⏳ معلق طرف المحصل (غير مصفى)</span>'}</span></div>
         ${paymentHistoryHTML}
         
         <div class="footer-info">
@@ -4961,7 +5028,7 @@ const renderTreasuryTransactionsLog = () => {
                 <td>${statusBadgeHtml}</td>
                 <td style="font-size:0.85rem; color:#64748b;">${item.notes || '-'}</td>
                 <td>
-                    <button class="btn btn-sm secondary" onclick="window.printSingleTreasuryReceipt('${item.receiptNumber}', '${item.typeName}', ${item.amount}, '${item.collector}', '${item.party}', '${item.date}')" title="طباعة إيصال">إيصال 🖨️</button>
+                    <button class="btn btn-sm secondary" onclick="window.printSingleTreasuryReceipt('${item.receiptNumber}', '${item.typeName}', ${item.amount}, '${item.collector}', '${item.party}', '${item.date}', '${item.notes || ''}', ${Boolean(item.isSettled || item.type === 'settlement' || item.type === 'manual_deposit')})" title="طباعة إيصال">إيصال 🖨️</button>
                 </td>
             `;
         tbody.appendChild(tr);
@@ -5038,17 +5105,30 @@ window.handlePrintLatestSettlementReceipt = (username) => {
     const latest = settlements[settlements.length - 1];
     window.printSingleTreasuryReceipt(latest.receiptNumber, 'تصفية عهدة محصل', latest.totalAmount, latest.collectorName || username, 'الخزينة العامة', latest.settlementDate, latest.notes);
 };
-window.printSingleTreasuryReceipt = (receiptNo, typeName, amount, collector, party, date, notes) => {
+window.printSingleTreasuryReceipt = (receiptNo, typeName, amount, collector, party, date, notes, isSettled) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow)
         return;
-    const companyName = state.settings.companyName || 'ELMAGHRABI';
-    const companySubtitle = state.settings.replacementReportCompanyName || 'شركة مصر الوسطى لتوزيع الكهرباء';
-    const companyAddress = state.settings.companyAddress || (state.settings.addresses && state.settings.addresses[0]) || 'قطاع شمال المنيا - هندسة كهرباء بني مزار';
+    // Determine dynamic receipt header: company -> sector -> branch & revenue branch
+    const headerInfo = getDynamicReceiptHeader(collector);
     const logoSrc = state.settings.companyLogo;
     const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 75px; max-width: 95px; object-fit: contain;">` : '';
     const tafqeet = tafqeetNumber(amount);
     const printTime = new Date().toLocaleTimeString('ar-EG');
+    // If isSettled not provided, determine based on type and settlements log
+    if (isSettled === undefined) {
+        if (typeName.includes('تصفية') || typeName.includes('إيداع') || party.includes('الخزينة العامة')) {
+            isSettled = true;
+        }
+        else {
+            isSettled = (state.treasurySettlements || []).some((s) => {
+                const matchCollector = s.collectorName === collector || s.username === collector;
+                const matchDate = s.settlementDate === date;
+                const matchReceipt = s.receiptNumber === receiptNo;
+                return matchReceipt || (matchCollector && matchDate);
+            });
+        }
+    }
     printWindow.document.write(`
             <!DOCTYPE html>
             <html lang="ar" dir="rtl">
@@ -5061,14 +5141,16 @@ window.printSingleTreasuryReceipt = (receiptNo, typeName, amount, collector, par
                     * { box-sizing: border-box; }
                     body { font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 15px; }
                     .receipt-card { max-width: 580px; margin: 0 auto; background: #fff; border: 2px solid #0f172a; border-radius: 12px; padding: 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); position: relative; overflow: hidden; }
-                    .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 46pt; color: rgba(15, 23, 42, 0.035); font-weight: 900; pointer-events: none; white-space: nowrap; user-select: none; }
+                    .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: ${isSettled ? '40pt' : '34pt'}; color: ${isSettled ? 'rgba(34, 197, 94, 0.07)' : 'rgba(239, 68, 68, 0.08)'}; font-weight: 900; pointer-events: none; white-space: nowrap; user-select: none; }
                     .receipt-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 14px; gap: 10px; }
-                    .company-info h2 { margin: 0; font-size: 15pt; color: #0f172a; font-weight: 800; }
-                    .company-info .sub-title { font-size: 10.5pt; color: #334155; font-weight: 600; margin-top: 3px; }
-                    .company-info .address-badge { font-size: 9.5pt; color: #0369a1; font-weight: 600; margin-top: 3px; }
+                    .company-info h2 { margin: 0 0 3px 0; font-size: 15pt; color: #0f172a; font-weight: 800; }
+                    .company-info .sector-line { font-size: 11pt; color: #1e40af; font-weight: 700; margin-bottom: 2px; }
+                    .company-info .branch-line { font-size: 10.5pt; color: #065f46; font-weight: 600; margin-bottom: 3px; }
+                    .company-info .dept-line { font-size: 8.5pt; color: #64748b; }
                     .logo-box img { max-height: 70px; max-width: 90px; object-fit: contain; }
-                    .receipt-title-box { text-align: center; margin-bottom: 14px; }
+                    .receipt-title-box { text-align: center; margin-bottom: 10px; }
                     .receipt-title { display: inline-block; background: #0f172a; color: #fff; padding: 5px 22px; border-radius: 20px; font-size: 12pt; font-weight: 800; }
+                    .settlement-alert-box { padding: 8px 14px; border-radius: 8px; font-weight: 800; font-size: 11pt; text-align: center; margin-bottom: 14px; }
                     .meta-strip { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 8px 14px; border-radius: 8px; font-size: 10pt; font-weight: bold; margin-bottom: 14px; border: 1px solid #e2e8f0; }
                     .meta-item { display: flex; align-items: center; gap: 6px; }
                     .amount-highlight-box { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px dashed #16a34a; border-radius: 10px; padding: 12px 16px; text-align: center; margin-bottom: 16px; }
@@ -5097,13 +5179,13 @@ window.printSingleTreasuryReceipt = (receiptNo, typeName, amount, collector, par
             </head>
             <body>
                 <div class="receipt-card">
-                    <div class="watermark">إيصال رسمي معتمد</div>
+                    <div class="watermark">${isSettled ? 'تم التوريد والتصفية' : 'غير مصفى بالخزينة'}</div>
                     <div class="receipt-header">
                         <div class="company-info">
-                            <h2>${companyName}</h2>
-                            <div class="sub-title">${companySubtitle}</div>
-                            <div class="address-badge">📍 <span>${companyAddress}</span></div>
-                            <div style="font-size: 8.5pt; color: #64748b; margin-top: 2px;">إدارة الخزينة والمتحصلات النقدية</div>
+                            <h2>${headerInfo.company}</h2>
+                            <div class="sector-line">${headerInfo.sector}</div>
+                            <div class="branch-line">${headerInfo.branchLine}</div>
+                            <div class="dept-line">إدارة الخزينة والمتحصلات النقدية</div>
                         </div>
                         <div class="logo-box">
                             ${logoHTML}
@@ -5113,6 +5195,16 @@ window.printSingleTreasuryReceipt = (receiptNo, typeName, amount, collector, par
                     <div class="receipt-title-box">
                         <span class="receipt-title">إيصال استلام نقدية بالخزينة</span>
                     </div>
+
+                    ${isSettled ? `
+                        <div class="settlement-alert-box" style="background: #f0fdf4; border: 2px solid #22c55e; color: #15803d;">
+                            ✔️ تم التوريد والتصفية بالخزينة العامة رسمياً
+                        </div>
+                    ` : `
+                        <div class="settlement-alert-box" style="background: #fef2f2; border: 2px solid #ef4444; color: #b91c1c;">
+                            ⚠️ تنبيه رسمي: هذا الإيصال معلق طرف المحصل (غير مصفى بالخزينة حتى الآن - قيد التوريد والتصفية)
+                        </div>
+                    `}
 
                     <div class="meta-strip">
                         <div class="meta-item"><span>رقم الإيصال:</span> <span style="font-family: monospace; color:#0369a1; font-size:11pt;">#${receiptNo}</span></div>
@@ -5137,6 +5229,14 @@ window.printSingleTreasuryReceipt = (receiptNo, typeName, amount, collector, par
                         <tr>
                             <td class="label">المستلم (مسؤول الخزينة):</td>
                             <td class="val">${party}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">حالة التوريد للخزينة:</td>
+                            <td class="val">
+                                ${isSettled
+        ? '<span style="background: #dcfce7; color: #15803d; border: 1px solid #86efac; padding: 3px 10px; border-radius: 6px; font-weight: 700;">✔️ تم التوريد والتصفية بالخزينة العامة</span>'
+        : '<span style="background: #fee2e2; color: #dc2626; border: 1px solid #f87171; padding: 3px 10px; border-radius: 6px; font-weight: 700;">⏳ معلق طرف المحصل (غير مصفى بالخزينة)</span>'}
+                            </td>
                         </tr>
                         ${notes ? `<tr><td class="label">البيان / ملاحظات:</td><td class="val">${notes}</td></tr>` : ''}
                     </table>
