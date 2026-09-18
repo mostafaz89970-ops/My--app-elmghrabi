@@ -718,6 +718,69 @@ const normalizeDateStr = (d: any): string => {
 };
 (window as any).normalizeDateStr = normalizeDateStr;
 
+function tafqeetNumber(num: number): string {
+    if (isNaN(num) || num <= 0) return 'صفر جنيه مصري';
+    
+    const ones = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
+    const tens = ['', 'عشرة', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
+    const teens = ['عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
+    const hundreds = ['', 'مائة', 'مائتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
+
+    function convertChunk(n: number): string {
+        let parts: string[] = [];
+        const h = Math.floor(n / 100);
+        const rem = n % 100;
+        if (h > 0) parts.push(hundreds[h]);
+        if (rem > 0) {
+            if (rem < 10) {
+                parts.push(ones[rem]);
+            } else if (rem >= 11 && rem <= 19) {
+                parts.push(teens[rem - 10]);
+            } else if (rem === 10 || rem % 10 === 0) {
+                parts.push(tens[Math.floor(rem / 10)]);
+            } else {
+                const unit = rem % 10;
+                const ten = Math.floor(rem / 10);
+                parts.push(ones[unit] + ' و' + tens[ten]);
+            }
+        }
+        return parts.join(' و');
+    }
+
+    const intPart = Math.floor(num);
+    const fractionPart = Math.round((num - intPart) * 100);
+
+    let words: string[] = [];
+    const millions = Math.floor(intPart / 1000000);
+    const thousands = Math.floor((intPart % 1000000) / 1000);
+    const remainder = intPart % 1000;
+
+    if (millions > 0) {
+        if (millions === 1) words.push('مليون');
+        else if (millions === 2) words.push('مليونان');
+        else if (millions >= 3 && millions <= 10) words.push(convertChunk(millions) + ' ملايين');
+        else words.push(convertChunk(millions) + ' مليون');
+    }
+
+    if (thousands > 0) {
+        if (thousands === 1) words.push('ألف');
+        else if (thousands === 2) words.push('ألفان');
+        else if (thousands >= 3 && thousands <= 10) words.push(convertChunk(thousands) + ' آلاف');
+        else words.push(convertChunk(thousands) + ' ألف');
+    }
+
+    if (remainder > 0) {
+        words.push(convertChunk(remainder));
+    }
+
+    let result = (words.length > 0 ? words.join(' و') : 'صفر') + ' جنيه مصري';
+    if (fractionPart > 0) {
+        result += ' و' + convertChunk(fractionPart) + ' قرشاً';
+    }
+    return result;
+}
+(window as any).tafqeetNumber = tafqeetNumber;
+
 /**
  * لافتة منبثقة أنيقة ومميزة لتأكيد عمليات الإضافة والتعديل والحذف في الهيكل الإداري
  */
@@ -4470,6 +4533,324 @@ const handlePrintJudicialControlDetails = () => {
         executePrintHtmlContent(receiptHTML);
     };
 
+    // دالة طباعة إيصال حراري مختصر ومخصص للمواطن (بون كاشير 80mm)
+    (window as any).printZinatThermalReceipt = (id: any) => {
+        const item = (state.zinatCollection || []).find(i => 
+            (id != null && (String(i.id) === String(id) || Number(i.id) === Number(id))) ||
+            (i.requesterName && String(i.requesterName).trim() === String(id).trim())
+        );
+
+        if (!item) {
+            showToast('تعذر العثور على بيانات السجل للطباعة الحرارية', 'error');
+            return;
+        }
+
+        const total = Number(item.amount) || 0;
+        const paymentsList: any[] = Array.isArray(item.payments) ? item.payments : [];
+        const paid = paymentsList.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+        const remaining = Math.max(0, total - paid);
+        const isFullyPaid = total > 0 && remaining <= 0;
+
+        // آخر إيصال أو دفعة
+        const lastPayment = paymentsList.length > 0 ? paymentsList[paymentsList.length - 1] : null;
+        const receiptNo = lastPayment?.receiptNumber || `ز-${item.id || Date.now().toString().slice(-6)}`;
+        let collectorName = lastPayment?.collectedBy || item.technician || loggedInUser?.fullName || 'محصل الزينات';
+
+        const headerInfo = getDynamicReceiptHeader(collectorName);
+        const printDate = new Date().toLocaleDateString('ar-EG');
+        const printTime = new Date().toLocaleTimeString('ar-EG');
+        const tafqeetPaid = tafqeetNumber(paid > 0 ? paid : total);
+
+        // جدول دفعات مصغر ومختصر إذا كان هناك أكثر من دفعة
+        let paymentsMiniHTML = '';
+        if (paymentsList.length > 1) {
+            paymentsMiniHTML = `
+            <div style="margin: 4px 0;">
+                <div style="font-size: 9px; font-weight: bold; text-align: right; margin-bottom: 2px;">سجل الدفعات النقدية:</div>
+                <table class="payments-mini-table">
+                    <thead>
+                        <tr>
+                            <th>المبلغ</th>
+                            <th>الإيصال</th>
+                            <th>التاريخ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${paymentsList.map((p: any) => `
+                            <tr>
+                                <td>${(Number(p.amount) || 0).toLocaleString()} ج.م</td>
+                                <td>${p.receiptNumber || '-'}</td>
+                                <td>${p.date || '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            `;
+        }
+
+        const citizenThermalHTML = `
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>إيصال زينات مواطن - ${item.requesterName}</title>
+            <style>
+                @page {
+                    size: 80mm auto;
+                    margin: 0;
+                }
+                * {
+                    box-sizing: border-box;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                body {
+                    font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: #fff;
+                    color: #000;
+                    margin: 0 auto;
+                    padding: 4mm 3mm;
+                    direction: rtl;
+                    width: 78mm;
+                    max-width: 80mm;
+                    font-size: 11px;
+                    line-height: 1.35;
+                }
+                .thermal-wrapper {
+                    width: 100%;
+                    margin: 0 auto;
+                    text-align: center;
+                }
+                .header-box {
+                    border-bottom: 2px dashed #000;
+                    padding-bottom: 5px;
+                    margin-bottom: 6px;
+                }
+                .company-title {
+                    font-size: 12.5px;
+                    font-weight: 900;
+                    margin: 0 0 2px 0;
+                }
+                .sector-title {
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    margin: 0 0 2px 0;
+                }
+                .branch-title {
+                    font-size: 10px;
+                    font-weight: 600;
+                    margin: 0 0 4px 0;
+                }
+                .badge-title {
+                    display: inline-block;
+                    border: 1.5px solid #000;
+                    padding: 2px 10px;
+                    font-weight: 900;
+                    font-size: 12px;
+                    border-radius: 4px;
+                    margin: 3px 0;
+                    background: #f1f5f9;
+                }
+                .meta-row {
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 9px;
+                    font-weight: bold;
+                    margin-top: 4px;
+                    border-bottom: 1px dotted #666;
+                    padding-bottom: 3px;
+                }
+                .info-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 10.5px;
+                    text-align: right;
+                    margin: 5px 0;
+                }
+                .info-table td {
+                    padding: 3px 1px;
+                    vertical-align: top;
+                }
+                .info-table td.lbl {
+                    font-weight: 700;
+                    width: 34%;
+                    color: #111;
+                }
+                .info-table td.val {
+                    font-weight: 900;
+                    color: #000;
+                }
+                .financial-box {
+                    border: 1.5px solid #000;
+                    border-radius: 6px;
+                    padding: 6px;
+                    margin: 6px 0;
+                    text-align: center;
+                    background: #fafafa;
+                }
+                .fin-row {
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 11px;
+                    padding: 2px 0;
+                }
+                .fin-row.paid-highlight {
+                    border-top: 1px dashed #000;
+                    border-bottom: 1px dashed #000;
+                    padding: 5px 0;
+                    margin: 4px 0;
+                    font-size: 13px;
+                    font-weight: 900;
+                }
+                .paid-amount {
+                    font-size: 16px;
+                    font-weight: 900;
+                    font-family: monospace, sans-serif;
+                }
+                .tafqeet-text {
+                    font-size: 9.5px;
+                    font-weight: 700;
+                    margin-top: 3px;
+                    color: #111;
+                }
+                .status-tag {
+                    display: inline-block;
+                    border: 1.5px solid #000;
+                    padding: 3px 14px;
+                    font-size: 11px;
+                    font-weight: 900;
+                    border-radius: 4px;
+                    margin: 6px auto;
+                }
+                .status-paid {
+                    background: #f0fdf4;
+                }
+                .status-part {
+                    background: #fefce8;
+                }
+                .payments-mini-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 9px;
+                    margin-top: 2px;
+                }
+                .payments-mini-table th, .payments-mini-table td {
+                    border: 1px solid #999;
+                    padding: 2px;
+                    text-align: center;
+                }
+                .signatures {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 10px;
+                    padding-top: 6px;
+                    border-top: 1px dashed #000;
+                    font-size: 9.5px;
+                    font-weight: bold;
+                    text-align: center;
+                }
+                .sign-col {
+                    width: 48%;
+                }
+                .footer-instructions {
+                    margin-top: 8px;
+                    font-size: 8.5px;
+                    font-weight: 700;
+                    text-align: center;
+                    line-height: 1.35;
+                }
+                .cut-marker {
+                    margin-top: 10px;
+                    border-bottom: 1px dashed #888;
+                    text-align: center;
+                    font-size: 8px;
+                    color: #666;
+                    padding-bottom: 2px;
+                }
+                @media print {
+                    body {
+                        width: 78mm !important;
+                        max-width: 80mm !important;
+                        padding: 1mm 2mm !important;
+                        margin: 0 !important;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="thermal-wrapper">
+                <div class="header-box">
+                    <div class="company-title">${headerInfo.company}</div>
+                    <div class="sector-title">${headerInfo.sector}</div>
+                    <div class="branch-title">${headerInfo.branchLine}</div>
+                    <div><span class="badge-title">إيصال تحصيل زينات (نسخة المواطن)</span></div>
+                </div>
+
+                <div class="meta-row">
+                    <span>رقم الإيصال: <strong>${receiptNo}</strong></span>
+                    <span>التاريخ: ${printDate}</span>
+                </div>
+
+                <table class="info-table">
+                    <tr><td class="lbl">اسم المواطن:</td><td class="val">${item.requesterName || '-'}</td></tr>
+                    <tr><td class="lbl">العنوان:</td><td class="val">${item.address || '-'}</td></tr>
+                    ${item.mobile ? `<tr><td class="lbl">رقم الموبايل:</td><td class="val">${item.mobile}</td></tr>` : ''}
+                    ${item.technician ? `<tr><td class="lbl">الفني المسؤول:</td><td class="val">${item.technician}</td></tr>` : ''}
+                    ${item.requestDate ? `<tr><td class="lbl">تاريخ الطلب:</td><td class="val">${item.requestDate}</td></tr>` : ''}
+                </table>
+
+                <div class="financial-box">
+                    <div class="fin-row">
+                        <span>إجمالي المبلغ المطلوب:</span>
+                        <strong>${total.toLocaleString()} ج.م</strong>
+                    </div>
+                    <div class="fin-row paid-highlight">
+                        <span>المبلغ المسدد:</span>
+                        <span class="paid-amount">${paid.toLocaleString()} ج.م</span>
+                    </div>
+                    <div class="tafqeet-text">فقط وقدره: ${tafqeetPaid}</div>
+                    <div class="fin-row" style="margin-top: 4px; font-weight: bold; color: ${remaining > 0 ? '#b91c1c' : '#15803d'};">
+                        <span>المبلغ المتبقي:</span>
+                        <span>${remaining > 0 ? remaining.toLocaleString() + ' ج.م' : '0 ج.م (خالص تماماً)'}</span>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="status-tag ${isFullyPaid ? 'status-paid' : 'status-part'}">
+                        ${isFullyPaid ? '✔️ خالص ومسدد بالكامل' : '⏳ دفعة نقدية - متبقي طرف المواطن'}
+                    </span>
+                </div>
+
+                ${paymentsMiniHTML}
+
+                <div class="signatures">
+                    <div class="sign-col">
+                        <div>المحصل / المسؤول</div>
+                        <div style="font-size: 8.5px; margin-top: 2px;">${collectorName}</div>
+                        <div style="margin-top: 15px;">التوقيع: .............</div>
+                    </div>
+                    <div class="sign-col">
+                        <div>توقيع المواطن / المستلم</div>
+                        <div style="margin-top: 22px;">التوقيع: .............</div>
+                    </div>
+                </div>
+
+                <div class="footer-instructions">
+                    <div>⚠️ احتفظ بهذا الإيصال كإثبات سداد رسمي وسند قانوني.</div>
+                    <div>شكراً لتعاملكم معنا • ${printTime}</div>
+                </div>
+
+                <div class="cut-marker">----------------- قص الإيصال من هنا -----------------</div>
+            </div>
+        </body>
+        </html>
+        `;
+
+        executePrintHtmlContent(citizenThermalHTML);
+    };
+
     // --- قسم التحصيل ---
     const renderJudicialCollectionSection = () => {
     const tableBody = document.querySelector('#collection-judicial-table tbody');
@@ -5030,7 +5411,14 @@ const handlePrintJudicialControlDetails = () => {
             <td>${treasuryBadge}</td>
             <td class="actions-cell">
                 ${!isFullyPaid ? (isAdmin ? `<button class="btn btn-edit-details" onclick="window.openZinatPaymentModal(${item.id})">تحصيل</button>` : '') : ''}
-                <button class="btn btn-print-receipt" style="margin-right: 5px; padding: 4px 8px; cursor: pointer;" onclick="window.printCollectionReceipt('${item.id || item.requesterName}', 'zinat')" title="طباعة إيصال التحصيل"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></button>
+                <button class="btn btn-print-receipt" style="margin-right: 4px; padding: 3px 6px; cursor: pointer;" onclick="window.printCollectionReceipt('${item.id || item.requesterName}', 'zinat')" title="طباعة جميع المعلومات (إيصال رسمي كامل)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    <span style="font-size: 10px; margin-right: 2px;">كامل</span>
+                </button>
+                <button class="btn btn-print-thermal" style="margin-right: 4px; padding: 3px 7px; cursor: pointer; background-color: #0284c7; color: #ffffff; border: 1px solid #0369a1; border-radius: 4px; font-weight: bold; display: inline-flex; align-items: center; gap: 3px;" onclick="window.printZinatThermalReceipt('${item.id || item.requesterName}')" title="طباعة إيصال حراري مختصر للمواطن (بون كاشير 80mm)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z"></path><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="13" y2="14"></line></svg>
+                    <span style="font-size: 10px;">حراري للمواطن</span>
+                </button>
                 ${isAdmin && hasButtonPermission('delete_button') ? `<button class="btn btn-delete" onclick="window.deleteZinatRecord(${item.id})">حذف</button>` : ''}
             </td>
         `;
@@ -5364,68 +5752,6 @@ const handlePrintJudicialControlDetails = () => {
         renderZinatCollectionSection();
 
         }
-
-    function tafqeetNumber(num: number): string {
-        if (isNaN(num) || num <= 0) return 'صفر جنيه مصري';
-        
-        const ones = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
-        const tens = ['', 'عشرة', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
-        const teens = ['عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
-        const hundreds = ['', 'مائة', 'مائتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
-
-        function convertChunk(n: number): string {
-            let parts: string[] = [];
-            const h = Math.floor(n / 100);
-            const rem = n % 100;
-            if (h > 0) parts.push(hundreds[h]);
-            if (rem > 0) {
-                if (rem < 10) {
-                    parts.push(ones[rem]);
-                } else if (rem >= 11 && rem <= 19) {
-                    parts.push(teens[rem - 10]);
-                } else if (rem === 10 || rem % 10 === 0) {
-                    parts.push(tens[Math.floor(rem / 10)]);
-                } else {
-                    const unit = rem % 10;
-                    const ten = Math.floor(rem / 10);
-                    parts.push(ones[unit] + ' و' + tens[ten]);
-                }
-            }
-            return parts.join(' و');
-        }
-
-        const intPart = Math.floor(num);
-        const fractionPart = Math.round((num - intPart) * 100);
-
-        let words: string[] = [];
-        const millions = Math.floor(intPart / 1000000);
-        const thousands = Math.floor((intPart % 1000000) / 1000);
-        const remainder = intPart % 1000;
-
-        if (millions > 0) {
-            if (millions === 1) words.push('مليون');
-            else if (millions === 2) words.push('مليونان');
-            else if (millions >= 3 && millions <= 10) words.push(convertChunk(millions) + ' ملايين');
-            else words.push(convertChunk(millions) + ' مليون');
-        }
-
-        if (thousands > 0) {
-            if (thousands === 1) words.push('ألف');
-            else if (thousands === 2) words.push('ألفان');
-            else if (thousands >= 3 && thousands <= 10) words.push(convertChunk(thousands) + ' آلاف');
-            else words.push(convertChunk(thousands) + ' ألف');
-        }
-
-        if (remainder > 0) {
-            words.push(convertChunk(remainder));
-        }
-
-        let result = (words.length > 0 ? words.join(' و') : 'صفر') + ' جنيه مصري';
-        if (fractionPart > 0) {
-            result += ' و' + convertChunk(fractionPart) + ' قرشاً';
-        }
-        return result;
-    }
 
     interface UserCustodySummary {
         user: any;
