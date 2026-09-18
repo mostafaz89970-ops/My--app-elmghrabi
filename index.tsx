@@ -4579,9 +4579,9 @@ const handlePrintJudicialControlDetails = () => {
                         const bVal = data[idx + 2];
                         const a = data[idx + 3];
 
-                        // حساب الإضاءة وتحويل النقط الداكنة إلى نقط طباعة حرارية
+                        // حساب الإضاءة وتحويل النقط الداكنة إلى نقط طباعة حرارية (عتبة أعلى لخط أغمق وأوضح)
                         const lum = a < 128 ? 255 : (r * 0.299 + g * 0.587 + bVal * 0.114);
-                        if (lum < 165) {
+                        if (lum < 185) {
                             byteVal |= (1 << (7 - bit));
                         }
                     }
@@ -4700,7 +4700,7 @@ const handlePrintJudicialControlDetails = () => {
     const renderThermalReceiptToCanvas = (data: any, canvasWidth = 384): HTMLCanvasElement => {
         const canvas = document.createElement('canvas');
         canvas.width = canvasWidth;
-        canvas.height = 1400; // مساحة مؤقتة
+        canvas.height = 2600; // مساحة مؤقتة واسعة
         const ctx = canvas.getContext('2d')!;
 
         ctx.fillStyle = '#ffffff';
@@ -4709,11 +4709,12 @@ const handlePrintJudicialControlDetails = () => {
         (ctx as any).direction = 'rtl';
         ctx.textBaseline = 'top';
 
-        const pad = canvasWidth === 576 ? 16 : 10;
+        const isBig = canvasWidth === 576;
+        const pad = isBig ? 12 : 8;
         const cw = canvasWidth - (pad * 2);
         let y = 14;
 
-        const drawCenterText = (text: string, font: string, spacing = 22) => {
+        const drawCenterText = (text: string, font: string, spacing = 26) => {
             ctx.font = font;
             ctx.textAlign = 'center';
             ctx.fillText(text, canvasWidth / 2, y);
@@ -4722,9 +4723,9 @@ const handlePrintJudicialControlDetails = () => {
 
         const drawDashed = (dashedY: number) => {
             ctx.save();
-            ctx.setLineDash([4, 3]);
+            ctx.setLineDash([5, 4]);
             ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(pad, dashedY);
             ctx.lineTo(canvasWidth - pad, dashedY);
@@ -4732,47 +4733,47 @@ const handlePrintJudicialControlDetails = () => {
             ctx.restore();
         };
 
-        const isBig = canvasWidth === 576;
-        drawCenterText(data.headerInfo.company, `bold ${isBig ? 18 : 15}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 24 : 20);
-        drawCenterText(data.headerInfo.sector, `bold ${isBig ? 15 : 13}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 21 : 18);
-        drawCenterText(data.headerInfo.branchName, `bold ${isBig ? 15 : 13}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 19 : 17);
-        drawCenterText(data.headerInfo.revenueBranch, `bold ${isBig ? 14 : 12}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 22 : 19);
+        // ترويسة الإيصال بخطوط كبيرة وواضحة جداً
+        drawCenterText(data.headerInfo.company, `900 ${isBig ? 24 : 19}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 32 : 26);
+        drawCenterText(data.headerInfo.sector, `bold ${isBig ? 20 : 16}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 28 : 23);
+        drawCenterText(data.headerInfo.branchName, `900 ${isBig ? 21 : 17}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 28 : 23);
+        drawCenterText(data.headerInfo.revenueBranch, `bold ${isBig ? 20 : 16}px "Tajawal", Segoe UI, Arial, sans-serif`, isBig ? 30 : 25);
 
         // شارة إيصال المواطن
         const badgeTxt = 'إيصال سداد نقدية (نسخة المواطن)';
-        ctx.font = `bold ${isBig ? 14 : 12}px "Tajawal", Segoe UI, Arial, sans-serif`;
-        const bw = ctx.measureText(badgeTxt).width + (isBig ? 20 : 14);
-        const bh = isBig ? 24 : 20;
-        ctx.lineWidth = 1.5;
+        ctx.font = `900 ${isBig ? 20 : 16}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        const bw = ctx.measureText(badgeTxt).width + (isBig ? 24 : 18);
+        const bh = isBig ? 32 : 27;
+        ctx.lineWidth = 2;
         ctx.strokeStyle = '#000000';
         ctx.strokeRect((canvasWidth - bw) / 2, y, bw, bh);
         ctx.textAlign = 'center';
-        ctx.fillText(badgeTxt, canvasWidth / 2, y + (isBig ? 4 : 3));
+        ctx.fillText(badgeTxt, canvasWidth / 2, y + (isBig ? 5 : 4));
         y += bh + 8;
 
         // شريط نوع التحصيل مقابل زينات
-        const banH = isBig ? 26 : 22;
+        const banH = isBig ? 34 : 28;
         ctx.fillRect(pad, y, cw, banH);
         ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${isBig ? 15 : 13}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.font = `900 ${isBig ? 21 : 17}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.textAlign = 'center';
-        ctx.fillText('نوع التحصيل: مقابل زينات', canvasWidth / 2, y + (isBig ? 4 : 3));
+        ctx.fillText('نوع التحصيل: مقابل زينات', canvasWidth / 2, y + (isBig ? 6 : 4));
         ctx.fillStyle = '#000000';
-        y += banH + 8;
+        y += banH + 10;
 
         drawDashed(y);
-        y += 8;
+        y += 10;
 
         // رقم الإيصال والتاريخ
-        ctx.font = `bold ${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.font = `900 ${isBig ? 17 : 14}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.textAlign = 'right';
         ctx.fillText(`رقم الإيصال: ${data.receiptNo}`, canvasWidth - pad, y);
         ctx.textAlign = 'left';
         ctx.fillText(`${data.printDate}`, pad, y);
-        y += isBig ? 20 : 17;
+        y += isBig ? 26 : 22;
 
         drawDashed(y);
-        y += 8;
+        y += 10;
 
         // جدول التفاصيل
         const infoRows: { lbl: string; val: string }[] = [
@@ -4785,13 +4786,13 @@ const handlePrintJudicialControlDetails = () => {
             ...(data.item.requestDate ? [{ lbl: 'تاريخ الطلب:', val: data.item.requestDate }] : [])
         ];
 
-        const labelColW = isBig ? 120 : 85;
+        const labelColW = isBig ? 145 : 105;
         infoRows.forEach(row => {
-            ctx.font = `bold ${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+            ctx.font = `bold ${isBig ? 17 : 14}px "Tajawal", Segoe UI, Arial, sans-serif`;
             ctx.textAlign = 'right';
             ctx.fillText(row.lbl, canvasWidth - pad, y);
 
-            ctx.font = `${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+            ctx.font = `900 ${isBig ? 18 : 15}px "Tajawal", Segoe UI, Arial, sans-serif`;
             const valX = canvasWidth - pad - labelColW;
             const maxValW = valX - pad;
             const words = (row.val || '-').split(/\s+/);
@@ -4808,121 +4809,127 @@ const handlePrintJudicialControlDetails = () => {
             }
             if (curLine) lines.push(curLine);
 
+            const rowLineH = isBig ? 24 : 20;
             lines.forEach((l, idx) => {
-                ctx.fillText(l, valX, y + (idx * (isBig ? 18 : 15)));
+                ctx.fillText(l, valX, y + (idx * rowLineH));
             });
-            y += Math.max(isBig ? 20 : 16, lines.length * (isBig ? 18 : 15) + 2);
+            y += Math.max(isBig ? 26 : 22, lines.length * rowLineH + 4);
         });
 
-        y += 4;
+        y += 6;
 
         // الصندوق المالي
         const finStartY = y;
-        const finBoxHeight = isBig ? 125 : 108;
-        ctx.lineWidth = 1.5;
+        const finBoxHeight = isBig ? 165 : 142;
+        ctx.lineWidth = 2;
         ctx.strokeRect(pad, finStartY, cw, finBoxHeight);
 
-        y += 7;
-        ctx.font = `bold ${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        y += 9;
+        ctx.font = `bold ${isBig ? 17 : 14}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.textAlign = 'right';
         ctx.fillText('نوع الخدمة / البند:', canvasWidth - pad - 6, y);
         ctx.textAlign = 'left';
+        ctx.font = `900 ${isBig ? 17 : 14}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.fillText('رسوم وتوصيل زينات', pad + 6, y);
-        y += isBig ? 19 : 16;
+        y += isBig ? 25 : 21;
 
+        ctx.font = `bold ${isBig ? 17 : 14}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.textAlign = 'right';
         ctx.fillText('إجمالي المبلغ:', canvasWidth - pad - 6, y);
         ctx.textAlign = 'left';
+        ctx.font = `900 ${isBig ? 19 : 16}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.fillText(`${data.total.toLocaleString()} ج.م`, pad + 6, y);
-        y += isBig ? 20 : 17;
+        y += isBig ? 26 : 22;
 
-        // شريط المبلغ المسدد
-        const paidBarH = isBig ? 25 : 22;
+        // شريط المبلغ المسدد - عريض وبارز جداً
+        const paidBarH = isBig ? 38 : 32;
         ctx.fillRect(pad, y, cw, paidBarH);
         ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${isBig ? 14 : 12}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.font = `900 ${isBig ? 18 : 15}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.textAlign = 'right';
-        ctx.fillText('المبلغ المسدد:', canvasWidth - pad - 6, y + (isBig ? 4 : 3));
-        ctx.font = `bold ${isBig ? 16 : 14}px monospace, sans-serif`;
+        ctx.fillText('المبلغ المسدد:', canvasWidth - pad - 8, y + (isBig ? 8 : 6));
+        ctx.font = `900 ${isBig ? 23 : 19}px monospace, sans-serif`;
         ctx.textAlign = 'left';
-        ctx.fillText(`${data.paid.toLocaleString()} ج.م`, pad + 6, y + (isBig ? 3 : 2));
+        ctx.fillText(`${data.paid.toLocaleString()} ج.م`, pad + 8, y + (isBig ? 6 : 5));
         ctx.fillStyle = '#000000';
-        y += paidBarH + 5;
+        y += paidBarH + 8;
 
         // التفقيط
-        ctx.font = `bold ${isBig ? 11 : 9.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.font = `900 ${isBig ? 15 : 13}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillText(`فقط وقدره: ${data.tafqeetPaid}`, canvasWidth / 2, y);
-        y += isBig ? 18 : 15;
+        y += isBig ? 24 : 20;
 
         // المتبقي
-        ctx.font = `bold ${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.font = `bold ${isBig ? 17 : 14}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.textAlign = 'right';
         ctx.fillText('المبلغ المتبقي:', canvasWidth - pad - 6, y);
         ctx.textAlign = 'left';
+        ctx.font = `900 ${isBig ? 18 : 15}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.fillText(data.remaining > 0 ? `${data.remaining.toLocaleString()} ج.م` : '0 ج.م (خالص تماماً)', pad + 6, y);
-        y = finStartY + finBoxHeight + 8;
+        y = finStartY + finBoxHeight + 10;
 
         // شارة الحالة
         const stText = data.isFullyPaid ? '✔️ خالص ومسدد بالكامل' : '⏳ دفعة نقدية - متبقي طرف المواطن';
-        ctx.font = `bold ${isBig ? 13 : 11}px "Tajawal", Segoe UI, Arial, sans-serif`;
-        const stW = ctx.measureText(stText).width + (isBig ? 20 : 14);
-        const stH = isBig ? 24 : 20;
+        ctx.font = `900 ${isBig ? 18 : 15}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        const stW = ctx.measureText(stText).width + (isBig ? 28 : 20);
+        const stH = isBig ? 32 : 27;
+        ctx.lineWidth = 1.5;
         ctx.strokeRect((canvasWidth - stW) / 2, y, stW, stH);
         ctx.textAlign = 'center';
-        ctx.fillText(stText, canvasWidth / 2, y + (isBig ? 4 : 3));
-        y += stH + 10;
+        ctx.fillText(stText, canvasWidth / 2, y + (isBig ? 6 : 4));
+        y += stH + 12;
 
         // جدول دفعات مصغر إن وجد
         if (data.paymentsList && data.paymentsList.length > 1) {
-            ctx.font = `bold ${isBig ? 12 : 10}px "Tajawal", Segoe UI, Arial, sans-serif`;
+            ctx.font = `900 ${isBig ? 16 : 13.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
             ctx.textAlign = 'right';
             ctx.fillText('سجل الدفعات النقدية:', canvasWidth - pad, y);
-            y += isBig ? 16 : 14;
+            y += isBig ? 20 : 17;
 
             data.paymentsList.forEach((p: any) => {
-                ctx.font = `${isBig ? 11 : 9.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
+                ctx.font = `bold ${isBig ? 14 : 12}px "Tajawal", Segoe UI, Arial, sans-serif`;
                 ctx.textAlign = 'right';
                 ctx.fillText(`${p.date || '-'} | إيصال: ${p.receiptNumber || '-'}`, canvasWidth - pad, y);
                 ctx.textAlign = 'left';
                 ctx.fillText(`${(Number(p.amount) || 0).toLocaleString()} ج.م`, pad, y);
-                y += isBig ? 15 : 13;
+                y += isBig ? 18 : 15;
             });
-            y += 6;
+            y += 8;
         }
 
         drawDashed(y);
-        y += 10;
+        y += 12;
 
         // التوقيعات
-        ctx.font = `bold ${isBig ? 12 : 10}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.font = `900 ${isBig ? 16 : 13.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.textAlign = 'right';
         ctx.fillText('المحصل / المسؤول', canvasWidth - pad - 10, y);
         ctx.textAlign = 'left';
         ctx.fillText('توقيع المواطن / المستلم', pad + 10, y);
-        y += isBig ? 16 : 14;
+        y += isBig ? 22 : 18;
 
-        ctx.font = `${isBig ? 11 : 9.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.font = `bold ${isBig ? 15 : 12.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.textAlign = 'right';
         ctx.fillText(data.collectorName, canvasWidth - pad - 10, y);
-        y += isBig ? 24 : 20;
+        y += isBig ? 28 : 24;
 
         ctx.textAlign = 'right';
         ctx.fillText('التوقيع: .............', canvasWidth - pad - 10, y);
         ctx.textAlign = 'left';
         ctx.fillText('التوقيع: .............', pad + 10, y);
-        y += isBig ? 24 : 20;
+        y += isBig ? 28 : 24;
 
         drawDashed(y);
-        y += 10;
+        y += 12;
 
         // التذييل
-        ctx.font = `bold ${isBig ? 11 : 9.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
+        ctx.font = `900 ${isBig ? 15 : 12.5}px "Tajawal", Segoe UI, Arial, sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillText('⚠️ إيصال سداد رسمي معتمد مقابل توصيل زينات.', canvasWidth / 2, y);
-        y += isBig ? 16 : 14;
+        y += isBig ? 22 : 18;
         ctx.fillText(`شكراً لتعاملكم معنا • ${data.printTime}`, canvasWidth / 2, y);
-        y += isBig ? 26 : 22;
+        y += isBig ? 32 : 26;
 
         // اقتصاص الارتفاع النهائي الفعلي
         const trimmed = document.createElement('canvas');
@@ -5151,7 +5158,10 @@ const handlePrintJudicialControlDetails = () => {
             `;
         }
 
-        const citizenThermalHTML = `
+        const generateCitizenThermalHTML = (paperWidth: number = 58): string => {
+            const isBig = paperWidth === 80;
+            const wrapWidth = isBig ? '72mm' : '52mm';
+            return `
         <!DOCTYPE html>
         <html lang="ar" dir="rtl">
         <head>
@@ -5160,7 +5170,7 @@ const handlePrintJudicialControlDetails = () => {
             <title>إيصال زينات مواطن - ${item.requesterName}</title>
             <style>
                 @page {
-                    size: 80mm auto;
+                    size: ${isBig ? '80mm' : '58mm'} auto;
                     margin: 0;
                 }
                 * {
@@ -5178,104 +5188,104 @@ const handlePrintJudicialControlDetails = () => {
                     font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 }
                 .thermal-wrapper {
-                    width: 70mm !important;
-                    max-width: 70mm !important;
+                    width: ${wrapWidth} !important;
+                    max-width: ${wrapWidth} !important;
                     margin: 0 auto !important;
-                    padding: 2mm 1.5mm !important;
+                    padding: ${isBig ? '3mm 2mm' : '1.5mm 1mm'} !important;
                     text-align: center;
                     box-sizing: border-box !important;
                     overflow: hidden !important;
                     word-wrap: break-word !important;
                     word-break: break-word !important;
-                    font-size: 10.5px;
-                    line-height: 1.35;
+                    font-size: ${isBig ? '14px' : '12.5px'};
+                    line-height: 1.4;
                 }
                 .header-box {
                     border-bottom: 2px dashed #000;
-                    padding-bottom: 5px;
-                    margin-bottom: 5px;
+                    padding-bottom: 6px;
+                    margin-bottom: 6px;
                 }
                 .company-title {
-                    font-size: 12px;
+                    font-size: ${isBig ? '18px' : '15px'};
                     font-weight: 900;
-                    margin: 0 0 2px 0;
+                    margin: 0 0 3px 0;
                 }
                 .sector-title {
-                    font-size: 10px;
-                    font-weight: 700;
-                    margin: 0 0 2px 0;
-                }
-                .branch-title {
-                    font-size: 10px;
+                    font-size: ${isBig ? '15px' : '13px'};
                     font-weight: 800;
                     margin: 0 0 2px 0;
                 }
+                .branch-title {
+                    font-size: ${isBig ? '16px' : '13.5px'};
+                    font-weight: 900;
+                    margin: 0 0 2px 0;
+                }
                 .rev-branch-title {
-                    font-size: 9.5px;
-                    font-weight: 700;
-                    margin: 0 0 3px 0;
+                    font-size: ${isBig ? '15px' : '13px'};
+                    font-weight: 800;
+                    margin: 0 0 4px 0;
                 }
                 .badge-title {
                     display: inline-block;
-                    border: 1.5px solid #000;
-                    padding: 2px 8px;
+                    border: 2px solid #000;
+                    padding: 3px 10px;
                     font-weight: 900;
-                    font-size: 11px;
-                    border-radius: 4px;
-                    margin: 2px 0;
+                    font-size: ${isBig ? '15px' : '13px'};
+                    border-radius: 5px;
+                    margin: 3px 0;
                     background: #f1f5f9;
                 }
                 .category-box {
                     display: block;
-                    border: 1.5px solid #000;
+                    border: 2px solid #000;
                     background: #000;
                     color: #fff;
                     font-weight: 900;
-                    font-size: 11.5px;
-                    padding: 2.5px 4px;
-                    margin: 4px 0 2px 0;
-                    border-radius: 3px;
+                    font-size: ${isBig ? '16px' : '13.5px'};
+                    padding: 4px 6px;
+                    margin: 5px 0 3px 0;
+                    border-radius: 4px;
                     text-align: center;
                     letter-spacing: 0.3px;
                 }
                 .meta-row {
                     display: flex;
                     justify-content: space-between;
-                    font-size: 9px;
-                    font-weight: bold;
-                    margin-top: 4px;
-                    border-bottom: 1px dotted #555;
-                    padding-bottom: 3px;
+                    font-size: ${isBig ? '14px' : '12px'};
+                    font-weight: 900;
+                    margin-top: 5px;
+                    border-bottom: 1.5px dashed #000;
+                    padding-bottom: 4px;
                 }
                 .info-table {
                     width: 100% !important;
                     border-collapse: collapse;
-                    font-size: 10px;
+                    font-size: ${isBig ? '14.5px' : '12.5px'};
                     text-align: right;
-                    margin: 5px 0;
+                    margin: 6px 0;
                     table-layout: fixed !important;
                 }
                 .info-table td {
-                    padding: 2.5px 1px;
+                    padding: 3px 1px;
                     vertical-align: top;
                     word-break: break-word !important;
                     overflow-wrap: break-word !important;
                 }
                 .info-table td.lbl {
-                    font-weight: 700;
-                    width: 36%;
+                    font-weight: 800;
+                    width: 38%;
                     color: #111;
                 }
                 .info-table td.val {
                     font-weight: 900;
-                    width: 64%;
+                    width: 62%;
                     color: #000;
                 }
                 .financial-box {
-                    border: 1.5px solid #000;
-                    border-radius: 5px;
-                    padding: 5px;
-                    margin: 5px 0;
+                    border: 2px solid #000;
+                    border-radius: 6px;
+                    padding: 6px 8px;
+                    margin: 6px 0;
                     text-align: center;
                     background: #fafafa;
                     box-sizing: border-box;
@@ -5285,36 +5295,40 @@ const handlePrintJudicialControlDetails = () => {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    font-size: 10px;
-                    padding: 2px 0;
+                    font-size: ${isBig ? '14.5px' : '12.5px'};
+                    font-weight: 800;
+                    padding: 2.5px 0;
                 }
                 .fin-row.paid-highlight {
-                    border-top: 1px dashed #000;
-                    border-bottom: 1px dashed #000;
-                    padding: 4px 0;
-                    margin: 3px 0;
-                    font-size: 12px;
+                    border-top: 2px solid #000;
+                    border-bottom: 2px solid #000;
+                    background: #000;
+                    color: #fff;
+                    padding: 5px 6px;
+                    margin: 4px 0;
+                    font-size: ${isBig ? '16px' : '13.5px'};
                     font-weight: 900;
+                    border-radius: 4px;
                 }
                 .paid-amount {
-                    font-size: 15px;
+                    font-size: ${isBig ? '22px' : '18px'};
                     font-weight: 900;
                     font-family: monospace, sans-serif;
                 }
                 .tafqeet-text {
-                    font-size: 9px;
-                    font-weight: 700;
-                    margin-top: 2px;
-                    color: #111;
+                    font-size: ${isBig ? '13px' : '11.5px'};
+                    font-weight: 900;
+                    margin-top: 3px;
+                    color: #000;
                 }
                 .status-tag {
                     display: inline-block;
-                    border: 1.5px solid #000;
-                    padding: 3px 10px;
-                    font-size: 10.5px;
+                    border: 2px solid #000;
+                    padding: 4px 12px;
+                    font-size: ${isBig ? '15px' : '13px'};
                     font-weight: 900;
-                    border-radius: 4px;
-                    margin: 5px auto;
+                    border-radius: 5px;
+                    margin: 6px auto;
                 }
                 .status-paid {
                     background: #f0fdf4;
@@ -5326,42 +5340,43 @@ const handlePrintJudicialControlDetails = () => {
                     width: 100% !important;
                     table-layout: fixed !important;
                     border-collapse: collapse;
-                    font-size: 8.5px;
-                    margin-top: 2px;
+                    font-size: ${isBig ? '13px' : '11.5px'};
+                    margin-top: 3px;
                 }
                 .payments-mini-table th, .payments-mini-table td {
-                    border: 1px solid #777;
-                    padding: 2px 1px;
+                    border: 1.5px solid #000;
+                    padding: 3px 2px;
                     text-align: center;
                     word-break: break-word !important;
+                    font-weight: 800;
                 }
                 .signatures {
                     display: flex;
                     justify-content: space-between;
-                    margin-top: 8px;
-                    padding-top: 5px;
-                    border-top: 1px dashed #000;
-                    font-size: 9px;
-                    font-weight: bold;
+                    margin-top: 10px;
+                    padding-top: 6px;
+                    border-top: 1.5px dashed #000;
+                    font-size: ${isBig ? '14px' : '12px'};
+                    font-weight: 900;
                     text-align: center;
                 }
                 .sign-col {
                     width: 48%;
                 }
                 .footer-instructions {
-                    margin-top: 6px;
-                    font-size: 8px;
-                    font-weight: 700;
+                    margin-top: 8px;
+                    font-size: ${isBig ? '13px' : '11px'};
+                    font-weight: 900;
                     text-align: center;
-                    line-height: 1.3;
+                    line-height: 1.4;
                 }
                 .cut-marker {
-                    margin-top: 8px;
-                    border-bottom: 1px dashed #777;
+                    margin-top: 10px;
+                    border-bottom: 1.5px dashed #555;
                     text-align: center;
-                    font-size: 7.5px;
-                    color: #555;
-                    padding-bottom: 2px;
+                    font-size: 11px;
+                    color: #333;
+                    padding-bottom: 4px;
                 }
                 @media print {
                     html, body {
@@ -5370,10 +5385,10 @@ const handlePrintJudicialControlDetails = () => {
                         padding: 0 !important;
                     }
                     .thermal-wrapper {
-                        width: 70mm !important;
-                        max-width: 70mm !important;
+                        width: ${wrapWidth} !important;
+                        max-width: ${wrapWidth} !important;
                         margin: 0 auto !important;
-                        padding: 1mm 1mm !important;
+                        padding: 1mm !important;
                         overflow: hidden !important;
                     }
                 }
@@ -5419,7 +5434,7 @@ const handlePrintJudicialControlDetails = () => {
                         <span class="paid-amount">${paid.toLocaleString()} ج.م</span>
                     </div>
                     <div class="tafqeet-text">فقط وقدره: ${tafqeetPaid}</div>
-                    <div class="fin-row" style="margin-top: 3px; font-weight: bold; color: ${remaining > 0 ? '#b91c1c' : '#15803d'};">
+                    <div class="fin-row" style="margin-top: 3px; font-weight: 900; color: ${remaining > 0 ? '#b91c1c' : '#15803d'};">
                         <span>المبلغ المتبقي:</span>
                         <span>${remaining > 0 ? remaining.toLocaleString() + ' ج.م' : '0 ج.م (خالص تماماً)'}</span>
                     </div>
@@ -5436,12 +5451,12 @@ const handlePrintJudicialControlDetails = () => {
                 <div class="signatures">
                     <div class="sign-col">
                         <div>المحصل / المسؤول</div>
-                        <div style="font-size: 8.5px; margin-top: 2px;">${collectorName}</div>
-                        <div style="margin-top: 15px;">التوقيع: .............</div>
+                        <div style="font-size: ${isBig ? '13px' : '11.5px'}; margin-top: 2px;">${collectorName}</div>
+                        <div style="margin-top: 18px;">التوقيع: .............</div>
                     </div>
                     <div class="sign-col">
                         <div>توقيع المواطن / المستلم</div>
-                        <div style="margin-top: 22px;">التوقيع: .............</div>
+                        <div style="margin-top: 26px;">التوقيع: .............</div>
                     </div>
                 </div>
 
@@ -5455,6 +5470,7 @@ const handlePrintJudicialControlDetails = () => {
         </body>
         </html>
         `;
+        };
 
         // تجهيز كائن البيانات للطباعة المباشرة على طابعات VTC
         const receiptData = {
@@ -5477,12 +5493,13 @@ const handlePrintJudicialControlDetails = () => {
 
         const executePrintAction = async (mode: 'bluetooth' | 'rawbt' | 'system', paperWidth: number) => {
             const canvasWidth = paperWidth === 80 ? 576 : 384;
+            const htmlContent = generateCitizenThermalHTML(paperWidth);
 
             if (mode === 'bluetooth') {
                 const nav = navigator as any;
                 if (!nav.bluetooth) {
                     showToast('المتصفح الحالي لا يدعم Web Bluetooth، جاري الفتح عبر الطباعة الافتراضية...', 'warning');
-                    executePrintHtmlContent(citizenThermalHTML);
+                    executePrintHtmlContent(htmlContent);
                     return;
                 }
                 try {
@@ -5493,7 +5510,7 @@ const handlePrintJudicialControlDetails = () => {
                     console.error('Bluetooth print failed:', err);
                     showToast(`تعذر الاتصال بطابعة VTC: ${err.message || err}`, 'error');
                     if (confirm('تعذر استكمال الطباعة عبر بلوتوث VTC. هل ترغب في استخدام طباعة الهاتف الافتراضية بدلاً منها؟')) {
-                        executePrintHtmlContent(citizenThermalHTML);
+                        executePrintHtmlContent(htmlContent);
                     }
                 }
             } else if (mode === 'rawbt') {
@@ -5503,10 +5520,10 @@ const handlePrintJudicialControlDetails = () => {
                     showToast('تم إرسال الإيصال لتطبيق RawBT بنجاح 🖨️', 'success');
                 } catch (err: any) {
                     console.error('RawBT print failed:', err);
-                    executePrintHtmlContent(citizenThermalHTML);
+                    executePrintHtmlContent(htmlContent);
                 }
             } else {
-                executePrintHtmlContent(citizenThermalHTML);
+                executePrintHtmlContent(htmlContent);
             }
         };
 
