@@ -832,19 +832,19 @@
           <div class="input-group" id="login-sector-group">
             <label for="login-sector">القطاع</label>
             <select id="login-sector" name="loginSector">
-              <option value="all">🌐 جميع القطاعات</option>
+              <option value="" disabled selected>-- اختر القطاع --</option>
             </select>
           </div>
           <div class="input-group" id="login-general-admin-group">
             <label for="login-general-admin">الإدارة العامة</label>
-            <select id="login-general-admin" name="loginGeneralAdmin">
-              <option value="all">🏢 جميع الإدارات العامة</option>
+            <select id="login-general-admin" name="loginGeneralAdmin" disabled>
+              <option value="" disabled selected>-- اختر الإدارة العامة --</option>
             </select>
           </div>
           <div class="input-group" id="login-sub-admin-group">
             <label for="login-sub-admin">الإدارة الفرعية / الهندسة</label>
-            <select id="login-sub-admin" name="loginSubAdmin">
-              <option value="all">🏛️ جميع الإدارات الفرعية / الهندسات</option>
+            <select id="login-sub-admin" name="loginSubAdmin" disabled>
+              <option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>
             </select>
           </div>
           <div class="input-group">
@@ -1057,6 +1057,7 @@
                       <summary><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg><span>الإدارة</span></summary>
                        <ul>
                           <li><a href="#" class="nav-link" data-target="user-management" data-permission="manage_users"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span>المستخدمين</span></a></li>
+                          <li><a href="#" class="nav-link" data-target="org-hierarchy-management" data-permission="manage_users"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg><span>الهيكل الإداري والقطاعات</span></a></li>
                           <li><a href="#" class="nav-link" data-target="permissions" data-permission="manage_settings"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg><span>الصلاحيات</span></a></li>
                           <li><a href="#" class="nav-link" data-target="activity-log" data-permission="view_activity_log"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg><span>نشاط المستخدمين</span></a></li>
                           <li><a href="#" class="nav-link" data-target="technicians" data-permission="view_technicians"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg><span>الفنيين</span></a></li>
@@ -3573,7 +3574,69 @@
             </div>
         </section>
 
-        <!-- Permissions Section -->
+        
+        <!-- Org Hierarchy Management Section -->
+        <section id="org-hierarchy-management" class="content-section">
+            <div class="section-header">
+                <div>
+                    <h3>إدارة الهيكل الإداري والقطاعات</h3>
+                    <p style="color: var(--text-color-muted); margin-top: 4px; font-size: 0.9rem;">إدارة القطاعات، الإدارات العامة، والإدارات الفرعية / الهندسات مع إمكانية الإضافة والتعديل والحذف الفوري</p>
+                </div>
+                <button class="btn btn-back-page" title="رجوع">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg><span>رجوع</span>
+                </button>
+            </div>
+
+            <!-- Stats Bar -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <div class="card" style="padding: 16px; display: flex; align-items: center; gap: 15px; border-top: 4px solid #3b82f6;">
+                    <div style="font-size: 2.2rem; background: #eff6ff; width: 55px; height: 55px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">🌐</div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-color-muted); font-weight: 600;">إجمالي القطاعات</div>
+                        <div id="org-stat-sectors" style="font-size: 1.6rem; font-weight: 800; color: #1e40af;">0</div>
+                    </div>
+                </div>
+                <div class="card" style="padding: 16px; display: flex; align-items: center; gap: 15px; border-top: 4px solid #10b981;">
+                    <div style="font-size: 2.2rem; background: #ecfdf5; width: 55px; height: 55px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">🏢</div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-color-muted); font-weight: 600;">إجمالي الإدارات العامة</div>
+                        <div id="org-stat-genadmins" style="font-size: 1.6rem; font-weight: 800; color: #065f46;">0</div>
+                    </div>
+                </div>
+                <div class="card" style="padding: 16px; display: flex; align-items: center; gap: 15px; border-top: 4px solid #f59e0b;">
+                    <div style="font-size: 2.2rem; background: #fffbeb; width: 55px; height: 55px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">🏛️</div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: var(--text-color-muted); font-weight: 600;">إجمالي الفروع / الهندسات</div>
+                        <div id="org-stat-subadmins" style="font-size: 1.6rem; font-weight: 800; color: #92400e;">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toolbar / Actions -->
+            <div class="card" style="padding: 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" class="btn" id="btn-open-add-sector-modal" style="background: #2563eb; color: #fff; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                        <span>🌐 إضافة قطاع جديد</span>
+                    </button>
+                    <button type="button" class="btn" id="btn-open-add-genadmin-modal" style="background: #059669; color: #fff; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                        <span>🏢 إضافة إدارة عامة</span>
+                    </button>
+                    <button type="button" class="btn" id="btn-open-add-subadmin-modal" style="background: #d97706; color: #fff; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                        <span>🏛️ إضافة إدارة فرعية / هندسة</span>
+                    </button>
+                </div>
+                <div style="flex: 1; max-width: 320px; min-width: 200px;">
+                    <input type="text" id="org-hierarchy-search" class="form-control" placeholder="🔍 تصفية وبحث في الهيكل الإداري..." style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                </div>
+            </div>
+
+            <!-- Tree Cards Container -->
+            <div id="org-hierarchy-tree-container" style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Populated dynamically by TypeScript -->
+            </div>
+        </section>
+
+<!-- Permissions Section -->
         <section id="permissions" class="content-section">
             <div class="section-header"><h2>إدارة الصلاحيات</h2></div>
             <div class="card"><div class="card-header"><h4>صلاحيات الأدوار الوظيفية</h4></div>
@@ -6327,6 +6390,103 @@
             </button>
         </div>
     </div>
+
+
+        <!-- Modal: Add Sector -->
+        <div id="modal-org-add-sector" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width: 480px;">
+                <div class="modal-header">
+                    <h4>🌐 إضافة قطاع جديد</h4>
+                    <button type="button" class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 20px;">
+                    <div class="input-group">
+                        <label for="new-sector-name-input">اسم القطاع الجديد</label>
+                        <input type="text" id="new-sector-name-input" class="form-control" placeholder="مثال: قطاع شمال الجيزة" style="width:100%; padding:9px;">
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn secondary close-modal">إلغاء</button>
+                    <button type="button" class="btn primary" id="btn-save-new-sector">حفظ القطاع</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Add General Admin -->
+        <div id="modal-org-add-genadmin" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h4>🏢 إضافة إدارة عامة جديدة</h4>
+                    <button type="button" class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                    <div class="input-group">
+                        <label for="genadmin-target-sector-select">القطاع التابع له</label>
+                        <select id="genadmin-target-sector-select" class="form-control" style="width:100%; padding:9px;"></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="new-genadmin-name-input">اسم الإدارة العامة الجديدة</label>
+                        <input type="text" id="new-genadmin-name-input" class="form-control" placeholder="مثال: الإدارة العامة لهندسات..." style="width:100%; padding:9px;">
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn secondary close-modal">إلغاء</button>
+                    <button type="button" class="btn primary" id="btn-save-new-genadmin">حفظ الإدارة العامة</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Add Sub Admin / Branch -->
+        <div id="modal-org-add-subadmin" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width: 520px;">
+                <div class="modal-header">
+                    <h4>🏛️ إضافة إدارة فرعية / هندسة جديدة</h4>
+                    <button type="button" class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                    <div class="input-group">
+                        <label for="subadmin-target-sector-select">القطاع</label>
+                        <select id="subadmin-target-sector-select" class="form-control" style="width:100%; padding:9px;"></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="subadmin-target-genadmin-select">الإدارة العامة</label>
+                        <select id="subadmin-target-genadmin-select" class="form-control" style="width:100%; padding:9px;"></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="new-subadmin-name-input">اسم الإدارة الفرعية / الهندسة</label>
+                        <input type="text" id="new-subadmin-name-input" class="form-control" placeholder="مثال: هندسة كهرباء مغاغة شرق" style="width:100%; padding:9px;">
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn secondary close-modal">إلغاء</button>
+                    <button type="button" class="btn primary" id="btn-save-new-subadmin">حفظ الإدارة الفرعية</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Edit Item Name -->
+        <div id="modal-org-edit-item" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h4 id="org-edit-modal-title">✏️ تعديل الاسم</h4>
+                    <button type="button" class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 20px;">
+                    <input type="hidden" id="org-edit-type">
+                    <input type="hidden" id="org-edit-sector">
+                    <input type="hidden" id="org-edit-genadmin">
+                    <input type="hidden" id="org-edit-oldname">
+                    <div class="input-group">
+                        <label id="org-edit-input-label" for="org-edit-name-input">الاسم الجديد</label>
+                        <input type="text" id="org-edit-name-input" class="form-control" style="width:100%; padding:9px;">
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn secondary close-modal">إلغاء</button>
+                    <button type="button" class="btn primary" id="btn-save-org-edit">حفظ التعديل</button>
+                </div>
+            </div>
+        </div>
 
 </body>
 </html>

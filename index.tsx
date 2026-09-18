@@ -100,6 +100,7 @@ interface AppSettings {
     generalAdministrations?: string[];
     subAdministrations?: string[];
     branches?: string[];
+    orgStructure?: Record<string, Record<string, string[]>>;
     footerText: string;
     technicians: string[];
     technicalEngineers: string[];
@@ -209,6 +210,7 @@ let state = {
         { id: 1, fullName: 'Admin User', username: 'admin', password: '123450', role: 'admin' }
     ] as AppUser[],
     settings: { // تم تطبيق الواجهة AppSettings هنا
+        orgStructure: undefined as Record<string, Record<string, string[]>> | undefined,
         companyName: 'ELMAGHRABI',
         maintenanceMode: false,
         maintenanceMessage: 'يجري حالياً إجراء صيانة دورية وتحديثات هامة على المنظومة بواسطة المطور. تم إيقاف الدخول مؤقتاً لجميع المستخدمين لضمان دقة البيانات وسلامتها.',
@@ -484,6 +486,11 @@ let currentAdminScopeBranch: string = 'all';
 
 // الهيكل الإداري الافتراضي والديناميكي
 const defaultOrgStructure: Record<string, Record<string, string[]>> = {
+    '🌐 الإدارة المركزية العامة': {
+        'الإدارة العامة للمنظومة والتحكم': [
+            'المسؤولين العامين والمديرين'
+        ]
+    },
     'قطاع شمال المنيا': {
         'الإدارة العامة لهندسات شمال المنيا': [
             'هندسة كهرباء بني مزار',
@@ -568,83 +575,285 @@ const defaultOrgStructure: Record<string, Record<string, string[]>> = {
     }
 };
 
+const getActiveOrgStructure = (): Record<string, Record<string, string[]>> => {
+    if (!state.settings) (state as any).settings = {};
+    if (!state.settings.orgStructure || Object.keys(state.settings.orgStructure).length === 0) {
+        state.settings.orgStructure = JSON.parse(JSON.stringify(defaultOrgStructure));
+    }
+    return state.settings.orgStructure;
+};
+
+const syncOrgStructureSettings = () => {
+    const struct = getActiveOrgStructure();
+    const sectors = Object.keys(struct);
+    const genAdmins = new Set<string>();
+    const branches = new Set<string>();
+
+    sectors.forEach(s => {
+        Object.keys(struct[s] || {}).forEach(ga => {
+            genAdmins.add(ga);
+            (struct[s][ga] || []).forEach(b => branches.add(b));
+        });
+    });
+
+    state.settings.sectors = sectors;
+    state.settings.generalAdministrations = Array.from(genAdmins);
+    state.settings.subAdministrations = Array.from(branches);
+    state.settings.branches = Array.from(branches);
+
+    saveState();
+    updateAdminScopeUI();
+    renderOrgHierarchySection();
+};
+
 const getAvailableSectors = (): string[] => {
-    const list = new Set<string>();
-    Object.keys(defaultOrgStructure).forEach(s => list.add(s));
-    (state.settings.sectors || []).forEach(s => { if (s && s !== 'all') list.add(s); });
-    (state.users || []).forEach(u => { if (u.sector && u.sector !== 'all') list.add(u.sector); });
-    (state.meters || []).forEach(m => { if (m.sector && m.sector !== 'all') list.add(m.sector); });
-    return Array.from(list);
+    const struct = getActiveOrgStructure();
+    return Object.keys(struct);
 };
 
 const getGeneralAdminsForSector = (selectedSector: string): string[] => {
-    const list = new Set<string>();
+    const struct = getActiveOrgStructure();
     if (selectedSector && selectedSector !== 'all') {
-        const struct = defaultOrgStructure[selectedSector];
-        if (struct) {
-            Object.keys(struct).forEach(ga => list.add(ga));
-        }
-        (state.users || []).forEach(u => {
-            if (u.sector === selectedSector && u.generalAdmin && u.generalAdmin !== 'all') {
-                list.add(u.generalAdmin);
-            }
-        });
-        (state.meters || []).forEach(m => {
-            if (m.sector === selectedSector && m.generalAdmin && m.generalAdmin !== 'all') {
-                list.add(m.generalAdmin);
-            }
-        });
-    } else {
-        Object.values(defaultOrgStructure).forEach(struct => {
-            Object.keys(struct).forEach(ga => list.add(ga));
-        });
-        (state.users || []).forEach(u => { if (u.generalAdmin && u.generalAdmin !== 'all') list.add(u.generalAdmin); });
-        (state.settings.generalAdministrations || []).forEach(ga => { if (ga && ga !== 'all') list.add(ga); });
+        return Object.keys(struct[selectedSector] || {});
     }
+    const list = new Set<string>();
+    Object.values(struct).forEach(s => {
+        Object.keys(s).forEach(ga => list.add(ga));
+    });
     return Array.from(list);
 };
 
 const getSubAdmins = (selectedSector: string, selectedGeneralAdmin: string): string[] => {
-    const list = new Set<string>();
+    const struct = getActiveOrgStructure();
     if (selectedSector && selectedSector !== 'all') {
-        const struct = defaultOrgStructure[selectedSector];
-        if (struct) {
-            if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
-                (struct[selectedGeneralAdmin] || []).forEach(b => list.add(b));
-            } else {
-                Object.values(struct).forEach(branches => branches.forEach(b => list.add(b)));
-            }
+        const s = struct[selectedSector];
+        if (!s) return [];
+        if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
+            return s[selectedGeneralAdmin] || [];
         }
-        (state.users || []).forEach(u => {
-            const matchSec = u.sector === selectedSector;
-            const matchGen = selectedGeneralAdmin === 'all' || !selectedGeneralAdmin || u.generalAdmin === selectedGeneralAdmin;
-            const sub = u.subAdmin || u.branch;
-            if (matchSec && matchGen && sub && sub !== 'all') list.add(sub);
-        });
-        (state.meters || []).forEach(m => {
-            const matchSec = m.sector === selectedSector;
-            const matchGen = selectedGeneralAdmin === 'all' || !selectedGeneralAdmin || m.generalAdmin === selectedGeneralAdmin;
-            const sub = m.subAdmin || m.branch;
-            if (matchSec && matchGen && sub && sub !== 'all') list.add(sub);
-        });
-    } else {
-        Object.values(defaultOrgStructure).forEach(struct => {
-            if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
-                if (struct[selectedGeneralAdmin]) {
-                    struct[selectedGeneralAdmin].forEach(b => list.add(b));
-                }
-            } else {
-                Object.values(struct).forEach(branches => branches.forEach(b => list.add(b)));
-            }
-        });
-        (state.users || []).forEach(u => {
-            const sub = u.subAdmin || u.branch;
-            if (sub && sub !== 'all') list.add(sub);
-        });
-        (state.settings.branches || []).forEach(b => { if (b && b !== 'all') list.add(b); });
-        (state.settings.subAdministrations || []).forEach(b => { if (b && b !== 'all') list.add(b); });
+        const list = new Set<string>();
+        Object.values(s).forEach(branches => branches.forEach(b => list.add(b)));
+        return Array.from(list);
     }
+    const list = new Set<string>();
+    Object.values(struct).forEach(s => {
+        if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
+            if (s[selectedGeneralAdmin]) s[selectedGeneralAdmin].forEach(b => list.add(b));
+        } else {
+            Object.values(s).forEach(branches => branches.forEach(b => list.add(b)));
+        }
+    });
     return Array.from(list);
+};
+
+// عمليات إدارة الهيكل الإداري (إضافة، تعديل، حذف)
+const addSectorToOrg = (sectorName: string): boolean => {
+    const name = sectorName.trim();
+    if (!name) {
+        showToast('يرجى كتابة اسم القطاع أولاً', 'error');
+        return false;
+    }
+    const struct = getActiveOrgStructure();
+    if (struct[name]) {
+        showToast('هذا القطاع موجود بالفعل!', 'error');
+        return false;
+    }
+    struct[name] = {};
+    syncOrgStructureSettings();
+    showToast(`تمت إضافة القطاع "${name}" بنجاح ✔️`, 'success');
+    return true;
+};
+
+const renameSectorInOrg = (oldName: string, newName: string): boolean => {
+    const nextName = newName.trim();
+    if (!nextName) {
+        showToast('اسم القطاع الجديد لا يمكن أن يكون فارغاً', 'error');
+        return false;
+    }
+    if (nextName === oldName) return true;
+    const struct = getActiveOrgStructure();
+    if (struct[nextName]) {
+        showToast('يوجد قطاع آخر بنفس هذا الاسم!', 'error');
+        return false;
+    }
+    struct[nextName] = struct[oldName] || {};
+    delete struct[oldName];
+
+    (state.users || []).forEach((u: any) => {
+        if (u.sector === oldName) u.sector = nextName;
+    });
+    (state.meters || []).forEach((m: any) => {
+        if (m.sector === oldName) m.sector = nextName;
+    });
+    ['mukayasat', 'judicialControl', 'lostMeterMemos', 'transformers', 'treasuryTransactions', 'treasurySettlements'].forEach(coll => {
+        if (state[coll as StateKey] && Array.isArray(state[coll as StateKey])) {
+            (state[coll as StateKey] as any[]).forEach((item: any) => {
+                if (item.sector === oldName) item.sector = nextName;
+            });
+        }
+    });
+
+    syncOrgStructureSettings();
+    showToast(`تم تعديل اسم القطاع إلى "${nextName}" بنجاح ✔️`, 'success');
+    return true;
+};
+
+const deleteSectorFromOrg = (sectorName: string): boolean => {
+    const struct = getActiveOrgStructure();
+    if (!struct[sectorName]) return false;
+
+    const userCount = (state.users || []).filter(u => u.sector === sectorName).length;
+    let confirmMsg = `هل أنت متأكد من حذف قطاع "${sectorName}" وجميع إداراته وفروعه؟`;
+    if (userCount > 0) {
+        confirmMsg += `\n⚠️ تنبيه: يوجد عدد (${userCount}) مستخدم مسجلين في هذا القطاع!`;
+    }
+    if (!confirm(confirmMsg)) return false;
+
+    delete struct[sectorName];
+    syncOrgStructureSettings();
+    showToast(`تم حذف قطاع "${sectorName}" بنجاح ✔️`, 'success');
+    return true;
+};
+
+const addGeneralAdminToOrg = (sectorName: string, genAdminName: string): boolean => {
+    const sName = sectorName.trim();
+    const gaName = genAdminName.trim();
+    if (!sName || !gaName) {
+        showToast('يرجى تحديد القطاع وكتابة اسم الإدارة العامة', 'error');
+        return false;
+    }
+    const struct = getActiveOrgStructure();
+    if (!struct[sName]) struct[sName] = {};
+    if (struct[sName][gaName]) {
+        showToast('هذه الإدارة العامة مسجلة بالفعل في هذا القطاع!', 'error');
+        return false;
+    }
+    struct[sName][gaName] = [];
+    syncOrgStructureSettings();
+    showToast(`تمت إضافة الإدارة العامة "${gaName}" إلى ${sName} بنجاح ✔️`, 'success');
+    return true;
+};
+
+const renameGeneralAdminInOrg = (sectorName: string, oldName: string, newName: string): boolean => {
+    const nextName = newName.trim();
+    if (!nextName) {
+        showToast('اسم الإدارة العامة لا يمكن أن يكون فارغاً', 'error');
+        return false;
+    }
+    if (nextName === oldName) return true;
+    const struct = getActiveOrgStructure();
+    if (!struct[sectorName]) return false;
+    if (struct[sectorName][nextName]) {
+        showToast('توجد إدارة عامة أخرى بنفس هذا الاسم في هذا القطاع!', 'error');
+        return false;
+    }
+    struct[sectorName][nextName] = struct[sectorName][oldName] || [];
+    delete struct[sectorName][oldName];
+
+    (state.users || []).forEach((u: any) => {
+        if (u.sector === sectorName && u.generalAdmin === oldName) {
+            u.generalAdmin = nextName;
+        }
+    });
+    (state.meters || []).forEach((m: any) => {
+        if (m.sector === sectorName && m.generalAdmin === oldName) {
+            m.generalAdmin = nextName;
+        }
+    });
+
+    syncOrgStructureSettings();
+    showToast(`تم تعديل اسم الإدارة العامة إلى "${nextName}" بنجاح ✔️`, 'success');
+    return true;
+};
+
+const deleteGeneralAdminFromOrg = (sectorName: string, genAdminName: string): boolean => {
+    const struct = getActiveOrgStructure();
+    if (!struct[sectorName] || !struct[sectorName][genAdminName]) return false;
+
+    const userCount = (state.users || []).filter(u => u.sector === sectorName && u.generalAdmin === genAdminName).length;
+    let confirmMsg = `هل أنت متأكد من حذف "${genAdminName}" التابعة لـ ${sectorName}؟`;
+    if (userCount > 0) {
+        confirmMsg += `\n⚠️ تنبيه: يوجد عدد (${userCount}) مستخدم مسجلين في هذه الإدارة!`;
+    }
+    if (!confirm(confirmMsg)) return false;
+
+    delete struct[sectorName][genAdminName];
+    syncOrgStructureSettings();
+    showToast(`تم حذف الإدارة العامة "${genAdminName}" بنجاح ✔️`, 'success');
+    return true;
+};
+
+const addSubAdminToOrg = (sectorName: string, genAdminName: string, subAdminName: string): boolean => {
+    const sName = sectorName.trim();
+    const gaName = genAdminName.trim();
+    const subName = subAdminName.trim();
+    if (!sName || !gaName || !subName) {
+        showToast('يرجى تحديد القطاع والإدارة العامة وكتابة اسم الفرع / الهندسة', 'error');
+        return false;
+    }
+    const struct = getActiveOrgStructure();
+    if (!struct[sName]) struct[sName] = {};
+    if (!struct[sName][gaName]) struct[sName][gaName] = [];
+    if (struct[sName][gaName].includes(subName)) {
+        showToast('هذه الإدارة الفرعية / الهندسة موجودة بالفعل!', 'error');
+        return false;
+    }
+    struct[sName][gaName].push(subName);
+    syncOrgStructureSettings();
+    showToast(`تمت إضافة "${subName}" بنجاح ✔️`, 'success');
+    return true;
+};
+
+const renameSubAdminInOrg = (sectorName: string, genAdminName: string, oldName: string, newName: string): boolean => {
+    const nextName = newName.trim();
+    if (!nextName) {
+        showToast('اسم الإدارة الفرعية لا يمكن أن يكون فارغاً', 'error');
+        return false;
+    }
+    if (nextName === oldName) return true;
+    const struct = getActiveOrgStructure();
+    if (!struct[sectorName] || !struct[sectorName][genAdminName]) return false;
+    const arr = struct[sectorName][genAdminName];
+    const idx = arr.indexOf(oldName);
+    if (idx === -1) return false;
+    if (arr.includes(nextName)) {
+        showToast('يوجد فرع آخر بنفس هذا الاسم!', 'error');
+        return false;
+    }
+    arr[idx] = nextName;
+
+    (state.users || []).forEach((u: any) => {
+        if (u.sector === sectorName && u.generalAdmin === genAdminName && (u.subAdmin === oldName || u.branch === oldName)) {
+            u.subAdmin = nextName;
+            u.branch = nextName;
+        }
+    });
+    (state.meters || []).forEach((m: any) => {
+        if (m.sector === sectorName && m.generalAdmin === genAdminName && (m.subAdmin === oldName || m.branch === oldName)) {
+            m.subAdmin = nextName;
+            m.branch = nextName;
+        }
+    });
+
+    syncOrgStructureSettings();
+    showToast(`تم تعديل اسم الفرع إلى "${nextName}" بنجاح ✔️`, 'success');
+    return true;
+};
+
+const deleteSubAdminFromOrg = (sectorName: string, genAdminName: string, subAdminName: string): boolean => {
+    const struct = getActiveOrgStructure();
+    if (!struct[sectorName] || !struct[sectorName][genAdminName]) return false;
+    const userCount = (state.users || []).filter(u => u.sector === sectorName && u.generalAdmin === genAdminName && (u.subAdmin === subAdminName || u.branch === subAdminName)).length;
+    let confirmMsg = `هل أنت متأكد من حذف "${subAdminName}"؟`;
+    if (userCount > 0) {
+        confirmMsg += `\n⚠️ تنبيه: يوجد عدد (${userCount}) مستخدم مسجلين في هذا الفرع!`;
+    }
+    if (!confirm(confirmMsg)) return false;
+
+    struct[sectorName][genAdminName] = struct[sectorName][genAdminName].filter(b => b !== subAdminName);
+    syncOrgStructureSettings();
+    showToast(`تم حذف "${subAdminName}" بنجاح ✔️`, 'success');
+    return true;
 };
 
 const ensureDefaultScope = (stateObj: any) => {
@@ -659,13 +868,19 @@ const ensureDefaultScope = (stateObj: any) => {
     if (!stateObj.settings.branches || !Array.isArray(stateObj.settings.branches) || stateObj.settings.branches.length === 0) {
         stateObj.settings.branches = getSubAdmins('all', 'all');
     }
+    if (!stateObj.settings) stateObj.settings = {};
+    if (!stateObj.settings.orgStructure || Object.keys(stateObj.settings.orgStructure).length === 0) {
+        stateObj.settings.orgStructure = JSON.parse(JSON.stringify(defaultOrgStructure));
+    }
     if (stateObj.users && Array.isArray(stateObj.users)) {
         stateObj.users.forEach((u: any) => {
             if (u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor') {
-                u.sector = 'all';
-                u.generalAdmin = 'all';
-                u.subAdmin = 'all';
-                u.branch = 'all';
+                if (!u.sector || u.sector === 'all') {
+                    u.sector = '🌐 الإدارة المركزية العامة';
+                    u.generalAdmin = 'الإدارة العامة للمنظومة والتحكم';
+                    u.subAdmin = 'المسؤولين العامين والمديرين';
+                    u.branch = 'المسؤولين العامين والمديرين';
+                }
             } else {
                 if (!u.sector) u.sector = 'قطاع شمال المنيا';
                 if (!u.generalAdmin) u.generalAdmin = 'الإدارة العامة لهندسات شمال المنيا';
@@ -1403,164 +1618,133 @@ const populateUserDropdown = () => {
     const genAdminSelect = document.getElementById('login-general-admin') as HTMLSelectElement | null;
     const subAdminSelect = document.getElementById('login-sub-admin') as HTMLSelectElement | null;
     const usernameSelect = document.getElementById('username') as HTMLSelectElement | null;
+    const passwordInput = document.getElementById('password') as HTMLInputElement | null;
+    const affBoxEl = document.getElementById('login-user-affiliation');
+    const affTextEl = document.getElementById('login-user-affiliation-text');
 
-    if (!usernameSelect) return;
+    if (!usernameSelect || !sectorSelect) return;
 
-    // Helper to refresh users dropdown based on current login filters
-    const updateFilteredUsersList = (preserveSelection = false) => {
-        const selSector = sectorSelect ? sectorSelect.value : 'all';
-        const selGen = genAdminSelect ? genAdminSelect.value : 'all';
-        const selSub = subAdminSelect ? subAdminSelect.value : 'all';
-        const previousUsername = usernameSelect.value;
+    if (passwordInput) passwordInput.value = '';
+    if (affBoxEl) affBoxEl.style.display = 'none';
 
-        usernameSelect.innerHTML = '<option value="" disabled selected>اختر اسم المستخدم...</option>';
+    // Populate Sectors
+    const sectors = getAvailableSectors();
+    sectorSelect.innerHTML = '<option value="" disabled selected>-- اختر القطاع --</option>' +
+        sectors.map(s => `<option value="${s}">${s}</option>`).join('');
+    sectorSelect.value = '';
 
-        const filteredUsers = state.users.filter(user => {
-            const isGlobalAdmin = user.username === 'admin' || user.username === 'المدير' || user.role === 'admin' || user.role === 'supervisor' || user.sector === 'all';
-            if (isGlobalAdmin) return true; // Global admins can log in from any branch
-
-            const uSector = user.sector || 'قطاع شمال المنيا';
-            const uGen = user.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
-            const uSub = user.subAdmin || user.branch || 'هندسة كهرباء بني مزار';
-
-            if (selSector !== 'all' && uSector !== selSector) return false;
-            if (selGen !== 'all' && uGen !== selGen) return false;
-            if (selSub !== 'all' && uSub !== selSub) return false;
-
-            return true;
-        });
-
-        filteredUsers.forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.username;
-            const isGlobalAdmin = user.username === 'admin' || user.username === 'المدير' || user.role === 'admin' || user.role === 'supervisor';
-            const badge = isGlobalAdmin ? ' ⭐ (إدارة عامة)' : '';
-            option.textContent = user.fullName + badge + (user.isSuspended ? ' ⛔ (موقوف)' : '');
-            usernameSelect.appendChild(option);
-        });
-
-        if (preserveSelection && previousUsername && filteredUsers.some(u => u.username === previousUsername)) {
-            usernameSelect.value = previousUsername;
-        } else {
-            usernameSelect.value = '';
-            const passwordInput = document.getElementById('password') as HTMLInputElement | null;
-            if (passwordInput) passwordInput.value = '';
-            const affBox = document.getElementById('login-user-affiliation');
-            if (affBox) affBox.style.display = 'none';
-        }
-    };
-
-    // Helper to update subAdmin dropdown based on sector and genAdmin
-    const updateSubAdminDropdown = () => {
-        if (!subAdminSelect) return;
-        const currentSector = sectorSelect ? sectorSelect.value : 'all';
-        const currentGen = genAdminSelect ? genAdminSelect.value : 'all';
-        const currentVal = subAdminSelect.value;
-
-        const subList = getSubAdmins(currentSector, currentGen);
-        subAdminSelect.innerHTML = '<option value="all">🏛️ جميع الإدارات الفرعية / الهندسات</option>' +
-            subList.map(b => `<option value="${b}">${b}</option>`).join('');
-
-        if (currentVal && (currentVal === 'all' || subList.includes(currentVal))) {
-            subAdminSelect.value = currentVal;
-        } else {
-            subAdminSelect.value = 'all';
-        }
-    };
-
-    // Helper to update generalAdmin dropdown based on sector
-    const updateGeneralAdminDropdown = () => {
-        if (!genAdminSelect) return;
-        const currentSector = sectorSelect ? sectorSelect.value : 'all';
-        const currentVal = genAdminSelect.value;
-
-        const genList = getGeneralAdminsForSector(currentSector);
-        genAdminSelect.innerHTML = '<option value="all">🏢 جميع الإدارات العامة</option>' +
-            genList.map(g => `<option value="${g}">${g}</option>`).join('');
-
-        if (currentVal && (currentVal === 'all' || genList.includes(currentVal))) {
-            genAdminSelect.value = currentVal;
-        } else {
-            genAdminSelect.value = 'all';
-        }
-        updateSubAdminDropdown();
-    };
-
-    // Initialize login dropdowns
-    if (sectorSelect) {
-        const sectorsList = getAvailableSectors();
-        const curSec = sectorSelect.value || 'all';
-        sectorSelect.innerHTML = '<option value="all">🌐 جميع القطاعات</option>' +
-            sectorsList.map(s => `<option value="${s}">${s}</option>`).join('');
-        if (sectorsList.includes(curSec)) sectorSelect.value = curSec;
-        else sectorSelect.value = 'all';
-
-        sectorSelect.onchange = () => {
-            updateGeneralAdminDropdown();
-            updateFilteredUsersList();
-        };
-    }
-
+    // Initially disable downstream selects
     if (genAdminSelect) {
-        updateGeneralAdminDropdown();
-        genAdminSelect.onchange = () => {
-            updateSubAdminDropdown();
-            updateFilteredUsersList();
-        };
+        genAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة العامة --</option>';
+        genAdminSelect.disabled = true;
+        genAdminSelect.value = '';
     }
-
     if (subAdminSelect) {
-        updateSubAdminDropdown();
-        subAdminSelect.onchange = () => {
-            updateFilteredUsersList();
+        subAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
+        subAdminSelect.disabled = true;
+        subAdminSelect.value = '';
+    }
+    usernameSelect.innerHTML = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>';
+    usernameSelect.disabled = true;
+    usernameSelect.value = '';
+
+    // Step 1: When Sector changes
+    sectorSelect.onchange = () => {
+        const selSec = sectorSelect.value;
+        if (passwordInput) passwordInput.value = '';
+        if (affBoxEl) affBoxEl.style.display = 'none';
+
+        if (genAdminSelect) {
+            const genList = getGeneralAdminsForSector(selSec);
+            genAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة العامة --</option>' +
+                genList.map(g => `<option value="${g}">${g}</option>`).join('');
+            genAdminSelect.disabled = false;
+            genAdminSelect.value = '';
+        }
+
+        if (subAdminSelect) {
+            subAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
+            subAdminSelect.disabled = true;
+            subAdminSelect.value = '';
+        }
+
+        usernameSelect.innerHTML = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>';
+        usernameSelect.disabled = true;
+        usernameSelect.value = '';
+    };
+
+    // Step 2: When General Admin changes
+    if (genAdminSelect) {
+        genAdminSelect.onchange = () => {
+            const selSec = sectorSelect.value;
+            const selGen = genAdminSelect.value;
+            if (passwordInput) passwordInput.value = '';
+            if (affBoxEl) affBoxEl.style.display = 'none';
+
+            if (subAdminSelect) {
+                const subList = getSubAdmins(selSec, selGen);
+                subAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>' +
+                    subList.map(b => `<option value="${b}">${b}</option>`).join('');
+                subAdminSelect.disabled = false;
+                subAdminSelect.value = '';
+            }
+
+            usernameSelect.innerHTML = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>';
+            usernameSelect.disabled = true;
+            usernameSelect.value = '';
         };
     }
 
-    // Populate initial users list
-    updateFilteredUsersList();
+    // Step 3: When Sub Admin changes
+    if (subAdminSelect) {
+        subAdminSelect.onchange = () => {
+            const selSec = sectorSelect.value;
+            const selGen = genAdminSelect ? genAdminSelect.value : '';
+            const selSub = subAdminSelect.value;
+            if (passwordInput) passwordInput.value = '';
+            if (affBoxEl) affBoxEl.style.display = 'none';
 
-    // Username selection listener
+            // Strict filtering: only users in this exact Sector, General Admin, and Sub Admin
+            const matchingUsers = state.users.filter(user => {
+                const uSec = user.sector || 'قطاع شمال المنيا';
+                const uGen = user.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+                const uSub = user.subAdmin || user.branch || 'هندسة كهرباء بني مزار';
+                return uSec === selSec && uGen === selGen && uSub === selSub;
+            });
+
+            if (matchingUsers.length === 0) {
+                usernameSelect.innerHTML = '<option value="" disabled selected>⚠️ لا يوجد مستخدمين مسجلين في هذا الفرع</option>';
+                usernameSelect.disabled = true;
+                usernameSelect.value = '';
+            } else {
+                usernameSelect.innerHTML = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>' +
+                    matchingUsers.map(u => {
+                        return `<option value="${u.username}">${u.fullName} ${u.isSuspended ? '⛔ (موقوف)' : ''}</option>`;
+                    }).join('');
+                usernameSelect.disabled = false;
+                usernameSelect.value = '';
+            }
+        };
+    }
+
+    // Step 4: When Username is chosen
     usernameSelect.onchange = () => {
         const val = usernameSelect.value;
         const u = state.users.find(usr => usr.username === val);
-        const affBoxEl = document.getElementById('login-user-affiliation');
-        const affTextEl = document.getElementById('login-user-affiliation-text');
-
         if (u && affBoxEl && affTextEl) {
-            const isGlobalAdmin = u.username === 'admin' || u.username === 'المدير' || u.role === 'admin' || u.role === 'supervisor' || u.sector === 'all';
-            if (isGlobalAdmin) {
-                affTextEl.textContent = 'إدارة عامة وشاملة (جميع القطاعات والفروع)';
-                affBoxEl.style.display = 'block';
-            } else {
-                const sec = u.sector || 'قطاع شمال المنيا';
-                const gen = u.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
-                const br = u.subAdmin || u.branch || 'هندسة كهرباء بني مزار';
-                affTextEl.textContent = `${sec} | ${gen} | ${br}`;
-                affBoxEl.style.display = 'block';
+            const sec = u.sector || sectorSelect.value;
+            const gen = u.generalAdmin || (genAdminSelect ? genAdminSelect.value : '');
+            const br = u.subAdmin || u.branch || (subAdminSelect ? subAdminSelect.value : '');
+            affTextEl.textContent = `${sec} | ${gen} | ${br}`;
+            affBoxEl.style.display = 'block';
 
-                // Automatically reflect user's sector, genAdmin, and subAdmin if currently set to 'all'
-                if (sectorSelect && sectorSelect.value === 'all' && sec) {
-                    sectorSelect.value = sec;
-                    updateGeneralAdminDropdown();
-                }
-                if (genAdminSelect && genAdminSelect.value === 'all' && gen) {
-                    genAdminSelect.value = gen;
-                    updateSubAdminDropdown();
-                }
-                if (subAdminSelect && subAdminSelect.value === 'all' && br) {
-                    subAdminSelect.value = br;
-                }
+            if (passwordInput) {
+                passwordInput.focus();
             }
-        } else if (affBoxEl) {
-            affBoxEl.style.display = 'none';
         }
     };
 };
 
-/**
- * Applies the logo size from settings to the UI via a CSS custom property.
- * @param size The logo size percentage (e.g., 100).
- */
 const applyLogoSize = (size: number) => {
     const multiplier = size / 100;
     document.documentElement.style.setProperty('--logo-size-multiplier', String(multiplier));
@@ -18875,6 +19059,295 @@ const renderJudicialCollectionSection = () => {
         showToast('تم حفظ إعدادات الشركة والتقارير بنجاح.');
     };
 
+
+// =========================================================================
+// صفحة إدارة الهيكل الإداري والقطاعات والإدارات الفرعية (Org Hierarchy Page)
+// =========================================================================
+const renderOrgHierarchySection = () => {
+    const container = document.getElementById('org-hierarchy-tree-container');
+    if (!container) return;
+
+    const struct = getActiveOrgStructure();
+    const sectors = Object.keys(struct);
+
+    let totalGenAdmins = 0;
+    let totalSubAdmins = 0;
+    sectors.forEach(s => {
+        const gaKeys = Object.keys(struct[s] || {});
+        totalGenAdmins += gaKeys.length;
+        gaKeys.forEach(ga => {
+            totalSubAdmins += (struct[s][ga] || []).length;
+        });
+    });
+
+    const statSec = document.getElementById('org-stat-sectors');
+    const statGen = document.getElementById('org-stat-genadmins');
+    const statSub = document.getElementById('org-stat-subadmins');
+    if (statSec) statSec.textContent = String(sectors.length);
+    if (statGen) statGen.textContent = String(totalGenAdmins);
+    if (statSub) statSub.textContent = String(totalSubAdmins);
+
+    const searchInput = document.getElementById('org-hierarchy-search') as HTMLInputElement | null;
+    const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+    container.innerHTML = '';
+
+    if (sectors.length === 0) {
+        container.innerHTML = `
+            <div class="card" style="padding: 40px; text-align: center; color: var(--text-color-muted);">
+                <div style="font-size: 3rem; margin-bottom: 10px;">🌐</div>
+                <h4>لا توجد قطاعات مسجلة حالياً</h4>
+                <p>يمكنك البدء بإضافة قطاع جديد من خلال زر "إضافة قطاع جديد" أعلاه.</p>
+            </div>
+        `;
+        return;
+    }
+
+    sectors.forEach(sectorName => {
+        const genAdmins = struct[sectorName] || {};
+        const genAdminKeys = Object.keys(genAdmins);
+        const sectorUsersCount = (state.users || []).filter(u => u.sector === sectorName).length;
+
+        if (searchTerm) {
+            const matchesSector = sectorName.toLowerCase().includes(searchTerm);
+            const matchesGen = genAdminKeys.some(g => g.toLowerCase().includes(searchTerm));
+            const matchesSub = genAdminKeys.some(g => (genAdmins[g] || []).some(b => b.toLowerCase().includes(searchTerm)));
+            if (!matchesSector && !matchesGen && !matchesSub) return;
+        }
+
+        const sectorCard = document.createElement('div');
+        sectorCard.className = 'org-sector-card';
+
+        let genAdminsHtml = '';
+        if (genAdminKeys.length === 0) {
+            genAdminsHtml = `
+                <div style="padding: 15px; text-align: center; color: var(--text-color-muted); font-size: 0.9rem;">
+                    لا توجد إدارات عامة مسجلة في هذا القطاع بعد. اضغط على "إضافة إدارة عامة" لإضافتها.
+                </div>
+            `;
+        } else {
+            genAdminKeys.forEach(genName => {
+                const branches = genAdmins[genName] || [];
+                const genUsersCount = (state.users || []).filter(u => u.sector === sectorName && u.generalAdmin === genName).length;
+
+                let branchesHtml = '';
+                if (branches.length === 0) {
+                    branchesHtml = `<span style="font-size: 0.82rem; color: var(--text-color-muted);">لا توجد فروع/هندسات مسجلة</span>`;
+                } else {
+                    branchesHtml = branches.map(bName => {
+                        const branchUsersCount = (state.users || []).filter(u => u.sector === sectorName && u.generalAdmin === genName && (u.subAdmin === bName || u.branch === bName)).length;
+                        return `
+                            <div class="org-branch-chip">
+                                <span>🏛️ ${bName}</span>
+                                <span class="badge" style="background: #e2e8f0; color: #1e293b; font-size: 0.72rem; padding: 2px 6px;">👥 ${branchUsersCount}</span>
+                                <button type="button" class="org-action-btn" onclick="window.handleEditOrgItem('subadmin', '${sectorName}', '${genName}', '${bName}')" title="تعديل اسم الفرع" style="background:#e0e7ff; color:#3730a3;">✏️</button>
+                                <button type="button" class="org-action-btn" onclick="window.handleDeleteOrgItem('subadmin', '${sectorName}', '${genName}', '${bName}')" title="حذف الفرع" style="background:#fee2e2; color:#dc2626;">🗑️</button>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                genAdminsHtml += `
+                    <div class="org-genadmin-box">
+                        <div class="org-genadmin-header">
+                            <div class="org-genadmin-title">
+                                <span>🏢 ${genName}</span>
+                                <span class="badge" style="background: #ecfdf5; color: #047857; font-size: 0.75rem; border: 1px solid #a7f3d0;">${branches.length} هندسة/فرع</span>
+                                <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 0.75rem;">👥 ${genUsersCount} مستخدم</span>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" class="btn btn-sm" onclick="window.handleOpenAddSubAdminModal('${sectorName}', '${genName}')" style="background: #d97706; color:#fff; padding: 2px 8px; font-size: 0.8rem;">➕ فرع</button>
+                                <button type="button" class="btn btn-sm" onclick="window.handleEditOrgItem('genadmin', '${sectorName}', '${genName}', '')" style="background: #e0e7ff; color:#3730a3; padding: 2px 8px; font-size: 0.8rem;">✏️ تعديل</button>
+                                <button type="button" class="btn btn-sm" onclick="window.handleDeleteOrgItem('genadmin', '${sectorName}', '${genName}', '')" style="background: #fee2e2; color:#dc2626; padding: 2px 8px; font-size: 0.8rem;">🗑️ حذف</button>
+                            </div>
+                        </div>
+                        <div class="org-branches-grid">
+                            ${branchesHtml}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        sectorCard.innerHTML = `
+            <div class="org-sector-header">
+                <div class="org-sector-title">
+                    <span>🌐 ${sectorName}</span>
+                    <span class="badge" style="background: #eff6ff; color: #1d4ed8; font-size: 0.8rem; border: 1px solid #bfdbfe;">${genAdminKeys.length} إدارة عامة</span>
+                    <span class="badge" style="background: #f8fafc; color: #334155; font-size: 0.8rem;">👥 ${sectorUsersCount} مستخدم</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-sm" onclick="window.handleOpenAddGenAdminModal('${sectorName}')" style="background: #059669; color: #fff; padding: 4px 10px; font-size: 0.82rem;">➕ إدارة عامة</button>
+                    <button type="button" class="btn btn-sm" onclick="window.handleEditOrgItem('sector', '${sectorName}', '', '')" style="background: #e0e7ff; color: #3730a3; padding: 4px 10px; font-size: 0.82rem;">✏️ تعديل القطاع</button>
+                    <button type="button" class="btn btn-sm" onclick="window.handleDeleteOrgItem('sector', '${sectorName}', '', '')" style="background: #fee2e2; color: #dc2626; padding: 4px 10px; font-size: 0.82rem;">🗑️ حذف</button>
+                </div>
+            </div>
+            <div class="org-genadmin-container">
+                ${genAdminsHtml}
+            </div>
+        `;
+
+        container.appendChild(sectorCard);
+    });
+};
+
+// إتاحة دوال النوافذ المنبثقة على window للربط السلس
+(window as any).handleOpenAddGenAdminModal = (targetSector?: string) => {
+    const modal = document.getElementById('modal-org-add-genadmin');
+    const secSelect = document.getElementById('genadmin-target-sector-select') as HTMLSelectElement | null;
+    const nameInput = document.getElementById('new-genadmin-name-input') as HTMLInputElement | null;
+    if (!modal || !secSelect) return;
+
+    const sectors = getAvailableSectors();
+    secSelect.innerHTML = sectors.map(s => `<option value="${s}" ${targetSector === s ? 'selected' : ''}>${s}</option>`).join('');
+    if (targetSector) secSelect.value = targetSector;
+    if (nameInput) nameInput.value = '';
+    modal.style.display = 'flex';
+};
+
+(window as any).handleOpenAddSubAdminModal = (targetSector?: string, targetGenAdmin?: string) => {
+    const modal = document.getElementById('modal-org-add-subadmin');
+    const secSelect = document.getElementById('subadmin-target-sector-select') as HTMLSelectElement | null;
+    const genSelect = document.getElementById('subadmin-target-genadmin-select') as HTMLSelectElement | null;
+    const nameInput = document.getElementById('new-subadmin-name-input') as HTMLInputElement | null;
+    if (!modal || !secSelect || !genSelect) return;
+
+    const sectors = getAvailableSectors();
+    secSelect.innerHTML = sectors.map(s => `<option value="${s}" ${targetSector === s ? 'selected' : ''}>${s}</option>`).join('');
+    if (targetSector) secSelect.value = targetSector;
+
+    const updateGens = () => {
+        const curSec = secSelect.value;
+        const gens = getGeneralAdminsForSector(curSec);
+        genSelect.innerHTML = gens.map(g => `<option value="${g}" ${targetGenAdmin === g ? 'selected' : ''}>${g}</option>`).join('');
+        if (targetGenAdmin && gens.includes(targetGenAdmin)) genSelect.value = targetGenAdmin;
+    };
+    updateGens();
+    secSelect.onchange = updateGens;
+
+    if (nameInput) nameInput.value = '';
+    modal.style.display = 'flex';
+};
+
+(window as any).handleEditOrgItem = (type: 'sector' | 'genadmin' | 'subadmin', sector: string, genAdmin: string, oldName: string) => {
+    const modal = document.getElementById('modal-org-edit-item');
+    const title = document.getElementById('org-edit-modal-title');
+    const label = document.getElementById('org-edit-input-label');
+    const input = document.getElementById('org-edit-name-input') as HTMLInputElement | null;
+    const typeInp = document.getElementById('org-edit-type') as HTMLInputElement | null;
+    const secInp = document.getElementById('org-edit-sector') as HTMLInputElement | null;
+    const genInp = document.getElementById('org-edit-genadmin') as HTMLInputElement | null;
+    const oldInp = document.getElementById('org-edit-oldname') as HTMLInputElement | null;
+
+    if (!modal || !title || !label || !input || !typeInp || !secInp || !genInp || !oldInp) return;
+
+    typeInp.value = type;
+    secInp.value = sector;
+    genInp.value = genAdmin;
+    oldInp.value = type === 'sector' ? sector : (type === 'genadmin' ? genAdmin : oldName);
+    input.value = oldInp.value;
+
+    if (type === 'sector') {
+        title.textContent = '✏️ تعديل اسم القطاع';
+        label.textContent = 'اسم القطاع الجديد:';
+    } else if (type === 'genadmin') {
+        title.textContent = '✏️ تعديل اسم الإدارة العامة';
+        label.textContent = `اسم الإدارة العامة الجديدة (${sector}):`;
+    } else {
+        title.textContent = '✏️ تعديل اسم الفرع / الهندسة';
+        label.textContent = `اسم الفرع / الهندسة الجديد (${genAdmin}):`;
+    }
+
+    modal.style.display = 'flex';
+    input.focus();
+};
+
+(window as any).handleDeleteOrgItem = (type: 'sector' | 'genadmin' | 'subadmin', sector: string, genAdmin: string, name: string) => {
+    if (type === 'sector') {
+        deleteSectorFromOrg(sector);
+    } else if (type === 'genadmin') {
+        deleteGeneralAdminFromOrg(sector, genAdmin);
+    } else {
+        deleteSubAdminFromOrg(sector, genAdmin, name);
+    }
+};
+
+const setupOrgHierarchyEvents = () => {
+    document.getElementById('btn-open-add-sector-modal')?.addEventListener('click', () => {
+        const modal = document.getElementById('modal-org-add-sector');
+        const input = document.getElementById('new-sector-name-input') as HTMLInputElement | null;
+        if (input) input.value = '';
+        if (modal) modal.style.display = 'flex';
+    });
+
+    document.getElementById('btn-open-add-genadmin-modal')?.addEventListener('click', () => {
+        (window as any).handleOpenAddGenAdminModal();
+    });
+
+    document.getElementById('btn-open-add-subadmin-modal')?.addEventListener('click', () => {
+        (window as any).handleOpenAddSubAdminModal();
+    });
+
+    document.getElementById('org-hierarchy-search')?.addEventListener('input', () => {
+        renderOrgHierarchySection();
+    });
+
+    document.getElementById('btn-save-new-sector')?.addEventListener('click', () => {
+        const input = document.getElementById('new-sector-name-input') as HTMLInputElement | null;
+        if (!input) return;
+        if (addSectorToOrg(input.value)) {
+            document.getElementById('modal-org-add-sector')!.style.display = 'none';
+        }
+    });
+
+    document.getElementById('btn-save-new-genadmin')?.addEventListener('click', () => {
+        const secSelect = document.getElementById('genadmin-target-sector-select') as HTMLSelectElement | null;
+        const input = document.getElementById('new-genadmin-name-input') as HTMLInputElement | null;
+        if (!secSelect || !input) return;
+        if (addGeneralAdminToOrg(secSelect.value, input.value)) {
+            document.getElementById('modal-org-add-genadmin')!.style.display = 'none';
+        }
+    });
+
+    document.getElementById('btn-save-new-subadmin')?.addEventListener('click', () => {
+        const secSelect = document.getElementById('subadmin-target-sector-select') as HTMLSelectElement | null;
+        const genSelect = document.getElementById('subadmin-target-genadmin-select') as HTMLSelectElement | null;
+        const input = document.getElementById('new-subadmin-name-input') as HTMLInputElement | null;
+        if (!secSelect || !genSelect || !input) return;
+        if (addSubAdminToOrg(secSelect.value, genSelect.value, input.value)) {
+            document.getElementById('modal-org-add-subadmin')!.style.display = 'none';
+        }
+    });
+
+    document.getElementById('btn-save-org-edit')?.addEventListener('click', () => {
+        const typeInp = document.getElementById('org-edit-type') as HTMLInputElement | null;
+        const secInp = document.getElementById('org-edit-sector') as HTMLInputElement | null;
+        const genInp = document.getElementById('org-edit-genadmin') as HTMLInputElement | null;
+        const oldInp = document.getElementById('org-edit-oldname') as HTMLInputElement | null;
+        const newInp = document.getElementById('org-edit-name-input') as HTMLInputElement | null;
+
+        if (!typeInp || !secInp || !genInp || !oldInp || !newInp) return;
+        const type = typeInp.value;
+        let success = false;
+        if (type === 'sector') {
+            success = renameSectorInOrg(oldInp.value, newInp.value);
+        } else if (type === 'genadmin') {
+            success = renameGeneralAdminInOrg(secInp.value, oldInp.value, newInp.value);
+        } else if (type === 'subadmin') {
+            success = renameSubAdminInOrg(secInp.value, genInp.value, oldInp.value, newInp.value);
+        }
+        if (success) {
+            document.getElementById('modal-org-edit-item')!.style.display = 'none';
+        }
+    });
+
+    document.querySelectorAll('#modal-org-add-sector .close-modal, #modal-org-add-genadmin .close-modal, #modal-org-add-subadmin .close-modal, #modal-org-edit-item .close-modal').forEach(btn => {
+        btn.addEventListener('click', () => {
+            (btn.closest('.modal') as HTMLElement).style.display = 'none';
+        });
+    });
+};
+
     // --- إدارة المستخدمين ---
     const renderUserManagementSection = () => {
         const tableBody = document.querySelector('#users-table tbody');
@@ -20905,6 +21378,8 @@ const renderJudicialCollectionSection = () => {
             renderReportsSection();
         } else if (targetId === 'user-management') {
             renderUserManagementSection();
+        } else if (targetId === 'org-hierarchy-management') {
+            renderOrgHierarchySection();
         } else if (targetId === 'activity-log') {
             renderActivityLogSection();
         } else if (targetId === 'permissions') {
@@ -22905,6 +23380,7 @@ const initMobileAdaptation = () => {
         setupLiquidationSection();
         addSidebarArrows();
         setupEventListeners();
+        setupOrgHierarchyEvents();
         updateFavicon('normal');
         // Ensure sidebar categories are all collapsed on app start
         document.querySelectorAll('.nav-category details').forEach(d => (d as HTMLDetailsElement).open = false);
