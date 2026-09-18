@@ -683,7 +683,13 @@ const getDynamicReceiptHeader = (userOrCollector?: string) => {
         br = 'هندسة كهرباء بني مزار';
     }
 
-    let cleanCity = br.replace(/هندسة\s*كهرباء/g, '').replace(/فرع/g, '').trim();
+    let cleanCity = br
+        .replace(/هندسة\s*كهرباء/g, '')
+        .replace(/هندسة/g, '')
+        .replace(/فرع\s*إيرادات/g, '')
+        .replace(/فرع/g, '')
+        .replace(/^\d+[\s\-_]*/g, '')
+        .trim();
     if (!cleanCity) cleanCity = br;
     const revBranch = `فرع إيرادات ${cleanCity}`;
     const branchLine = `${br} - ${revBranch}`;
@@ -4377,7 +4383,8 @@ const handlePrintJudicialControlDetails = () => {
                 .company-info { text-align: right; flex: 1; }
                 .company-info h2 { font-size: 14pt; font-weight: 800; color: #0f172a; margin: 0 0 3px 0; }
                 .company-info .sector-line { font-size: 11pt; font-weight: 700; color: #1e40af; margin-bottom: 2px; }
-                .company-info .branch-line { font-size: 10.5pt; font-weight: 600; color: #065f46; margin-bottom: 4px; }
+                .company-info .branch-line { font-size: 10.5pt; font-weight: 700; color: #065f46; margin-bottom: 2px; }
+                .company-info .rev-branch-line { font-size: 10pt; font-weight: 600; color: #065f46; margin-bottom: 4px; }
                 .receipt-title {
                     display: inline-block;
                     background: #0f172a;
@@ -4474,7 +4481,8 @@ const handlePrintJudicialControlDetails = () => {
                     <div class="company-info">
                         <h2>${headerInfo.company}</h2>
                         <div class="sector-line">${headerInfo.sector}</div>
-                        <div class="branch-line">${headerInfo.branchLine}</div>
+                        <div class="branch-line">${headerInfo.branchName}</div>
+                        <div class="rev-branch-line">${headerInfo.revenueBranch}</div>
                         <div><span class="receipt-title">${title}</span></div>
                     </div>
                     <div class="logo-container">
@@ -4644,9 +4652,14 @@ const handlePrintJudicialControlDetails = () => {
                     margin: 0 0 2px 0;
                 }
                 .branch-title {
+                    font-size: 10px;
+                    font-weight: 800;
+                    margin: 0 0 2px 0;
+                }
+                .rev-branch-title {
                     font-size: 9.5px;
-                    font-weight: 600;
-                    margin: 0 0 4px 0;
+                    font-weight: 700;
+                    margin: 0 0 3px 0;
                 }
                 .badge-title {
                     display: inline-block;
@@ -4817,7 +4830,8 @@ const handlePrintJudicialControlDetails = () => {
                 <div class="header-box">
                     <div class="company-title">${headerInfo.company}</div>
                     <div class="sector-title">${headerInfo.sector}</div>
-                    <div class="branch-title">${headerInfo.branchLine}</div>
+                    <div class="branch-title">${headerInfo.branchName}</div>
+                    <div class="rev-branch-title">${headerInfo.revenueBranch}</div>
                     <div><span class="badge-title">إيصال سداد نقدية (نسخة المواطن)</span></div>
                     <div class="category-box">نوع التحصيل: مقابل زينات</div>
                 </div>
@@ -6395,7 +6409,8 @@ const handlePrintJudicialControlDetails = () => {
                     .receipt-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 14px; gap: 10px; }
                     .company-info h2 { margin: 0 0 3px 0; font-size: 15pt; color: #0f172a; font-weight: 800; }
                     .company-info .sector-line { font-size: 11pt; color: #1e40af; font-weight: 700; margin-bottom: 2px; }
-                    .company-info .branch-line { font-size: 10.5pt; color: #065f46; font-weight: 600; margin-bottom: 3px; }
+                    .company-info .branch-line { font-size: 10.5pt; color: #065f46; font-weight: 700; margin-bottom: 2px; }
+                    .company-info .rev-branch-line { font-size: 10pt; color: #065f46; font-weight: 600; margin-bottom: 3px; }
                     .company-info .dept-line { font-size: 8.5pt; color: #64748b; }
                     .logo-box img { max-height: 70px; max-width: 90px; object-fit: contain; }
                     .receipt-title-box { text-align: center; margin-bottom: 10px; }
@@ -6434,7 +6449,8 @@ const handlePrintJudicialControlDetails = () => {
                         <div class="company-info">
                             <h2>${headerInfo.company}</h2>
                             <div class="sector-line">${headerInfo.sector}</div>
-                            <div class="branch-line">${headerInfo.branchLine}</div>
+                            <div class="branch-line">${headerInfo.branchName}</div>
+                            <div class="rev-branch-line">${headerInfo.revenueBranch}</div>
                             <div class="dept-line">إدارة الخزينة والمتحصلات النقدية</div>
                         </div>
                         <div class="logo-box">
