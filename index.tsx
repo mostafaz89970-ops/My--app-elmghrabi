@@ -19565,6 +19565,158 @@ const handlePrintJudicialControlDetails = () => {
         }
     };
 
+    const isAccountingRecordComplete = (record: Record<string, any>): boolean => {
+        if (!record) return false;
+        const regNo = String(record['registration-number'] || record.registrationNumber || '').trim();
+        const hasMeter = Boolean(
+            String(record['meter-number'] || record.meterNumber || '').trim() ||
+            (Array.isArray(record['meter-numbers']) && record['meter-numbers'].some((n: string) => n && String(n).trim())) ||
+            (Array.isArray(record['meter-details']) && record['meter-details'].some((m: any) => m && m.number && String(m.number).trim()))
+        );
+        const hasDates = Boolean(
+            String(record['inspection-completion-date'] || record.inspectionCompletionDate || '').trim() ||
+            String(record['issue-date'] || record.issueDate || '').trim()
+        );
+
+        // يعتبر السجل مكتملاً إذا كان يحتوي على رقم القيد بشهادة التركيب والعدادات أو تاريخ الإتمام
+        return Boolean(regNo && (hasMeter || hasDates));
+    };
+
+    const PREVIOUS_ACCOUNTING_INPUT_FIELDS = [
+        'client-name', 'address', 'card-number', 'order-number', 'inspection-receipt', 'mobile',
+        'owner-name', 'east-boundary', 'west-boundary', 'north-boundary', 'south-boundary'
+    ];
+
+    const PREVIOUS_ACCOUNTING_SELECT_FIELDS = [
+        'client-status', 'location-type'
+    ];
+
+    const COMPLETION_ACCOUNTING_INPUT_FIELDS = [
+        'model-number', 'registration-number', 'issue-date', 'inspection-completion-date'
+    ];
+
+    const setAccountingInputLock = (inputId: string, lock: boolean) => {
+        const input = document.getElementById(inputId) as HTMLInputElement | HTMLTextAreaElement | null;
+        if (!input) return;
+        input.readOnly = lock;
+        if (lock) {
+            input.style.backgroundColor = '#f1f5f9';
+            input.style.cursor = 'not-allowed';
+            input.style.borderColor = '#cbd5e1';
+            input.setAttribute('title', 'تم جلب هذا الحقل من البيانات السابقة ومحمي من التعديل');
+        } else {
+            input.style.backgroundColor = '';
+            input.style.cursor = '';
+            input.style.borderColor = '';
+            input.removeAttribute('title');
+        }
+    };
+
+    const setAccountingSelectLock = (selectId: string, lock: boolean) => {
+        const select = document.getElementById(selectId) as HTMLSelectElement | null;
+        if (!select) return;
+        if (lock) {
+            select.style.pointerEvents = 'none';
+            select.style.backgroundColor = '#f1f5f9';
+            select.style.cursor = 'not-allowed';
+            select.style.borderColor = '#cbd5e1';
+            select.tabIndex = -1;
+            select.setAttribute('title', 'تم جلب هذا الحقل من البيانات السابقة ومحمي من التعديل');
+        } else {
+            select.style.pointerEvents = '';
+            select.style.backgroundColor = '';
+            select.style.cursor = '';
+            select.style.borderColor = '';
+            select.removeAttribute('tabIndex');
+            select.removeAttribute('title');
+        }
+    };
+
+    const lockAccountingPreviousFields = () => {
+        PREVIOUS_ACCOUNTING_INPUT_FIELDS.forEach(id => setAccountingInputLock(`accounting-${id}`, true));
+        PREVIOUS_ACCOUNTING_SELECT_FIELDS.forEach(id => setAccountingSelectLock(`accounting-${id}`, true));
+
+        COMPLETION_ACCOUNTING_INPUT_FIELDS.forEach(id => setAccountingInputLock(`accounting-${id}`, false));
+        setAccountingSelectLock('accounting-meter-count', false);
+
+        document.querySelectorAll('#accounting-meter-numbers-container input').forEach(inp => {
+            const el = inp as HTMLInputElement;
+            el.readOnly = false;
+            el.style.backgroundColor = '';
+            el.style.cursor = '';
+            el.style.borderColor = '';
+            el.removeAttribute('title');
+        });
+        document.querySelectorAll('#accounting-meter-numbers-container select').forEach(sel => {
+            const el = sel as HTMLSelectElement;
+            el.style.pointerEvents = '';
+            el.style.backgroundColor = '';
+            el.style.cursor = '';
+            el.style.borderColor = '';
+            el.removeAttribute('tabIndex');
+            el.removeAttribute('title');
+        });
+
+        ['model-image', 'certificate-image', 'inspection-image'].forEach(imgId => {
+            const fileInput = document.getElementById(`accounting-${imgId}`) as HTMLInputElement | null;
+            if (fileInput) {
+                fileInput.disabled = false;
+                fileInput.style.pointerEvents = '';
+            }
+        });
+
+        const submitBtn = document.querySelector('#accounting-registration-form button[type="submit"]') as HTMLButtonElement | null;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.style.display = 'inline-flex';
+        }
+    };
+
+    const lockAllAccountingFormFields = (isLocked: boolean) => {
+        PREVIOUS_ACCOUNTING_INPUT_FIELDS.forEach(id => setAccountingInputLock(`accounting-${id}`, isLocked));
+        PREVIOUS_ACCOUNTING_SELECT_FIELDS.forEach(id => setAccountingSelectLock(`accounting-${id}`, isLocked));
+        COMPLETION_ACCOUNTING_INPUT_FIELDS.forEach(id => setAccountingInputLock(`accounting-${id}`, isLocked));
+        setAccountingSelectLock('accounting-meter-count', isLocked);
+
+        document.querySelectorAll('#accounting-meter-numbers-container input').forEach(inp => {
+            const el = inp as HTMLInputElement;
+            el.readOnly = isLocked;
+            el.style.backgroundColor = isLocked ? '#f1f5f9' : '';
+            el.style.cursor = isLocked ? 'not-allowed' : '';
+            el.style.borderColor = isLocked ? '#cbd5e1' : '';
+            if (isLocked) el.setAttribute('title', 'الطلب مكتمل ومحمي من التعديل');
+            else el.removeAttribute('title');
+        });
+        document.querySelectorAll('#accounting-meter-numbers-container select').forEach(sel => {
+            const el = sel as HTMLSelectElement;
+            el.style.pointerEvents = isLocked ? 'none' : '';
+            el.style.backgroundColor = isLocked ? '#f1f5f9' : '';
+            el.style.cursor = isLocked ? 'not-allowed' : '';
+            el.style.borderColor = isLocked ? '#cbd5e1' : '';
+            if (isLocked) {
+                el.tabIndex = -1;
+                el.setAttribute('title', 'الطلب مكتمل ومحمي من التعديل');
+            } else {
+                el.removeAttribute('tabIndex');
+                el.removeAttribute('title');
+            }
+        });
+
+        ['model-image', 'certificate-image', 'inspection-image'].forEach(imgId => {
+            const fileInput = document.getElementById(`accounting-${imgId}`) as HTMLInputElement | null;
+            if (fileInput) {
+                fileInput.disabled = isLocked;
+                fileInput.style.pointerEvents = isLocked ? 'none' : '';
+            }
+        });
+
+        const submitBtn = document.querySelector('#accounting-registration-form button[type="submit"]') as HTMLButtonElement | null;
+        if (submitBtn) {
+            submitBtn.disabled = isLocked;
+            submitBtn.style.display = isLocked ? 'none' : 'inline-flex';
+        }
+    };
+
     const printAccountingImage = (src: string, title: string) => {
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
@@ -20839,6 +20991,7 @@ const handlePrintJudicialControlDetails = () => {
         const resetForm = () => {
             const form = document.getElementById('accounting-registration-form') as HTMLFormElement | null;
             form?.reset();
+            lockAllAccountingFormFields(false);
             const meterCount = document.getElementById('accounting-meter-count') as HTMLSelectElement | null;
             if (meterCount) meterCount.value = '1';
             renderMeterNumberInputs(1, [], []);
@@ -20856,6 +21009,8 @@ const handlePrintJudicialControlDetails = () => {
             if (regInput) regInput.style.borderColor = '';
             const regMsg = document.getElementById('accounting-reg-duplicate-msg');
             if (regMsg) { regMsg.style.display = 'none'; regMsg.innerHTML = ''; }
+            const lookupMsg = document.getElementById('accounting-lookup-msg');
+            if (lookupMsg) lookupMsg.innerHTML = '';
         };
 
         const renderSavedAccountingRecords = () => {
@@ -20868,22 +21023,32 @@ const handlePrintJudicialControlDetails = () => {
                 return;
             }
 
-            container.innerHTML = records.map((record) => `
-            <tr>
-                <td>${record['client-name'] || '-'}</td>
-                <td>${record.address || '-'}</td>
-                <td>${record['order-number'] || '-'}</td>
-                <td>${record['meter-number'] || '-'}</td>
-                <td>${record['registration-number'] || '-'}</td>
-                <td>
-                    <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-                        <button type="button" class="btn btn-primary btn-print-accounting-record" data-id="${record.id}" title="طباعة بيانات طلب الخدمة" style="padding: 5px 12px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة 🖨️</button>
-                        ${hasButtonPermission('edit_button') ? `<button type="button" class="btn secondary btn-edit-accounting-record" data-id="${record.id}">تعديل</button>` : ''}
-                        ${hasButtonPermission('delete_button') ? `<button type="button" class="btn btn-delete btn-delete-accounting-record" data-id="${record.id}">حذف</button>` : ''}
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+            container.innerHTML = records.map((record) => {
+                const isComplete = isAccountingRecordComplete(record);
+                const statusBadge = isComplete
+                    ? `<span style="background: #dcfce7; color: #166534; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600;">مكتمل ✓</span>`
+                    : `<span style="background: #fef3c7; color: #92400e; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600;">قيد الاستكمال ⏳</span>`;
+                return `
+                <tr>
+                    <td>${record['client-name'] || '-'}</td>
+                    <td>${record.address || '-'}</td>
+                    <td>${record['order-number'] || '-'}</td>
+                    <td>${record['meter-number'] || '-'}</td>
+                    <td>${record['registration-number'] || '-'} ${statusBadge}</td>
+                    <td>
+                        <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-primary btn-print-accounting-record" data-id="${record.id}" title="طباعة بيانات طلب الخدمة" style="padding: 5px 12px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة 🖨️</button>
+                            ${hasButtonPermission('edit_button') ? (
+                                isComplete
+                                    ? `<button type="button" class="btn secondary btn-edit-accounting-record" data-id="${record.id}" title="عرض السجل (مكتمل ومحمي)">عرض 👁️</button>`
+                                    : `<button type="button" class="btn secondary btn-edit-accounting-record" data-id="${record.id}" title="استكمال البيانات" style="background: #e0f2fe; color: #0284c7; border-color: #38bdf8;">استكمال ✍️</button>`
+                            ) : ''}
+                            ${hasButtonPermission('delete_button') ? `<button type="button" class="btn btn-delete btn-delete-accounting-record" data-id="${record.id}">حذف</button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+            }).join('');
         };
 
         const form = document.getElementById('accounting-registration-form') as HTMLFormElement | null;
@@ -20958,6 +21123,17 @@ const handlePrintJudicialControlDetails = () => {
             });
 
             if (foundInAccounting) {
+                const isComplete = isAccountingRecordComplete(foundInAccounting);
+                if (isComplete) {
+                    populateForm(foundInAccounting);
+                    lockAllAccountingFormFields(true);
+                    if (lookupMsg) {
+                        lookupMsg.innerHTML = `<span style="color: #dc2626; font-weight: 700;">⚠️ تم جلب السجل: <strong>${foundInAccounting['client-name'] || ''}</strong> (طلب: ${foundInAccounting['order-number'] || '-'}). هذا الطلب مكتمل بالفعل ومحمي من التعديل.</span>`;
+                    }
+                    showToast('تم جلب بيانات الطلب. البيانات مكتملة بالفعل ولا يمكن تعديلها.', 'warning');
+                    return;
+                }
+
                 if (!hasButtonPermission('edit_button')) {
                     showToast('عفواً، ليس لديك صلاحية تعديل السجلات المحفوظة.', 'error');
                     if (lookupMsg) {
@@ -20966,10 +21142,11 @@ const handlePrintJudicialControlDetails = () => {
                     return;
                 }
                 populateForm(foundInAccounting);
+                lockAccountingPreviousFields();
                 if (lookupMsg) {
-                    lookupMsg.innerHTML = `<span style="color: #16a34a; font-weight: 700;">✓ تم جلب بيانات السجل المسجل مسبقاً: <strong>${foundInAccounting['client-name'] || ''}</strong> (طلب رقم: ${foundInAccounting['order-number'] || '-'})</span>`;
+                    lookupMsg.innerHTML = `<span style="color: #16a34a; font-weight: 700;">✓ تم جلب بيانات الطلب لاستكماله: <strong>${foundInAccounting['client-name'] || ''}</strong> (طلب رقم: ${foundInAccounting['order-number'] || '-'}). تم قفل الحقول السابقة لحمايتها من التعديل.</span>`;
                 }
-                showToast('تم جلب بيانات الطلب بنجاح. يمكنك استكمال أو تعديل البيانات.', 'success');
+                showToast('تم جلب بيانات الطلب بنجاح. تم قفل الحقول السابقة ويمكنك استكمال باقي البيانات.', 'info');
                 return;
             }
 
@@ -21023,10 +21200,20 @@ const handlePrintJudicialControlDetails = () => {
 
                 populateForm(mappedRecord);
                 const sourceLabel = foundInMukayasa ? 'المقايسات والمعاينات' : (foundInPending ? 'الطلبات الواردة' : 'المشتركين');
-                if (lookupMsg) {
-                    lookupMsg.innerHTML = `<span style="color: #16a34a; font-weight: 700;">✓ تم جلب بيانات المعاينة من (${sourceLabel}): <strong>${mappedRecord['client-name']}</strong> (طلب: ${mappedRecord['order-number']})</span>`;
+                const isComplete = isAccountingRecordComplete(mappedRecord);
+                if (isComplete) {
+                    lockAllAccountingFormFields(true);
+                    if (lookupMsg) {
+                        lookupMsg.innerHTML = `<span style="color: #dc2626; font-weight: 700;">⚠️ تم جلب بيانات الطلب من (${sourceLabel}): <strong>${mappedRecord['client-name']}</strong>. البيانات مكتملة بالفعل ومحمية من التعديل.</span>`;
+                    }
+                    showToast('تم جلب بيانات الطلب. البيانات مكتملة بالفعل ولا يمكن تعديلها.', 'warning');
+                } else {
+                    lockAccountingPreviousFields();
+                    if (lookupMsg) {
+                        lookupMsg.innerHTML = `<span style="color: #16a34a; font-weight: 700;">✓ تم جلب بيانات المعاينة من (${sourceLabel}) لاستكمالها: <strong>${mappedRecord['client-name']}</strong> (طلب: ${mappedRecord['order-number']}). تم قفل الحقول السابقة لحمايتها من التعديل.</span>`;
+                    }
+                    showToast('تم جلب بيانات الطلب بنجاح لاستكماله! تم قفل الحقول السابقة لحمايتها من التعديل.', 'success');
                 }
-                showToast('تم جلب بيانات الطلب بنجاح! يمكنك استكمال البيانات بعد المعاينة وحفظها.', 'success');
                 return;
             }
 
@@ -21079,7 +21266,21 @@ const handlePrintJudicialControlDetails = () => {
                 const records = getAccountingRequests();
                 const targetRecord = records.find(rec => Number(rec.id) === id);
                 if (targetRecord) {
+                    const isComplete = isAccountingRecordComplete(targetRecord);
                     populateForm(targetRecord);
+                    if (isComplete) {
+                        lockAllAccountingFormFields(true);
+                        if (lookupMsg) {
+                            lookupMsg.innerHTML = `<span style="color: #dc2626; font-weight: 700;">⚠️ تم عرض بيانات السجل: <strong>${targetRecord['client-name'] || ''}</strong>. هذا الطلب مكتمل ومحمي من التعديل.</span>`;
+                        }
+                        showToast('هذا السجل مكتمل بالكامل ومحمي من التعديل (عرض فقط).', 'warning');
+                    } else {
+                        lockAccountingPreviousFields();
+                        if (lookupMsg) {
+                            lookupMsg.innerHTML = `<span style="color: #16a34a; font-weight: 700;">✓ تم جلب بيانات الطلب لاستكماله: <strong>${targetRecord['client-name'] || ''}</strong>. تم قفل الحقول السابقة لحمايتها من التعديل.</span>`;
+                        }
+                        showToast('تم فتح السجل لاستكمال البيانات. الحقول السابقة مقفولة.', 'info');
+                    }
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
                 return;
@@ -21147,6 +21348,13 @@ const handlePrintJudicialControlDetails = () => {
             }
 
             const recordIdValue = (document.getElementById('accounting-record-id') as HTMLInputElement | null)?.value;
+            if (recordIdValue) {
+                const existing = getAccountingRequests().find(rec => String(rec.id) === recordIdValue);
+                if (existing && isAccountingRecordComplete(existing)) {
+                    showToast('عفواً، لا يمكن تعديل هذا الطلب نظراً لاكتمال بياناته مسبقاً وهو محمي من التعديل.', 'error');
+                    return;
+                }
+            }
             if (recordIdValue && !hasButtonPermission('edit_button')) {
                 showToast('عفواً، ليس لديك صلاحية تعديل السجلات.', 'error');
                 return;
@@ -21297,13 +21505,18 @@ const handlePrintJudicialControlDetails = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            ${filteredRecords.map(record => `
+                            ${filteredRecords.map(record => {
+                                const isComplete = isAccountingRecordComplete(record);
+                                const statusBadge = isComplete
+                                    ? `<span style="background: #dcfce7; color: #166534; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600;">مكتمل ✓</span>`
+                                    : `<span style="background: #fef3c7; color: #92400e; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600;">قيد الاستكمال ⏳</span>`;
+                                return `
                                 <tr>
                                     <td>${record['client-name'] || '-'}</td>
                                     <td>${record.address || '-'}</td>
                                     <td>${record['order-number'] || '-'}</td>
                                     <td>${record['meter-number'] || '-'}</td>
-                                    <td>${record['registration-number'] || '-'}</td>
+                                    <td>${record['registration-number'] || '-'} ${statusBadge}</td>
                                     <td><span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: 600; font-size: 12px;">${record.subAdmin || record.branch || record.branchName || 'هندسة كهرباء بني مزار'}</span></td>
                                     <td>${record.savedAt ? new Date(record.savedAt).toLocaleString('ar-EG') : '-'}</td>
                                     <td>
@@ -21311,12 +21524,17 @@ const handlePrintJudicialControlDetails = () => {
                                             <button type="button" class="action-btn view btn-view-accounting-record" data-id="${record.id}" title="عرض"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
                                             <button type="button" class="action-btn print btn-print-accounting-record" data-id="${record.id}" title="طباعة"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></button>
                                             <button type="button" class="action-btn transfer btn-transfer-accounting-record" data-id="${record.id}" title="تحويل للإدارة المختصة" style="background: #f0fdf4; border-color: #16a34a; color: #15803d;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></button>
-                                            ${hasButtonPermission('edit_button') ? `<button type="button" class="action-btn edit btn-edit-accounting-record" data-id="${record.id}" title="تعديل"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>` : ''}
+                                            ${hasButtonPermission('edit_button') ? (
+                                                isComplete
+                                                    ? `<button type="button" class="action-btn edit btn-edit-accounting-record" data-id="${record.id}" title="عرض السجل (مكتمل ومحمي)"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>`
+                                                    : `<button type="button" class="action-btn edit btn-edit-accounting-record" data-id="${record.id}" title="استكمال البيانات"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>`
+                                            ) : ''}
                                             ${hasButtonPermission('delete_button') ? `<button type="button" class="action-btn delete btn-delete-accounting-record" data-id="${record.id}" title="حذف"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>` : ''}
                                         </div>
                                     </td>
                                 </tr>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>
@@ -21488,6 +21706,7 @@ const handlePrintJudicialControlDetails = () => {
                     const record = getAccountingRequests().find(item => Number(item.id) === id);
                     if (!record) return;
 
+                    const isComplete = isAccountingRecordComplete(record);
                     renderAccountingRegistrationSection();
                     setTimeout(() => {
                         const fieldIds = [
@@ -21538,7 +21757,22 @@ const handlePrintJudicialControlDetails = () => {
 
                         const cancelBtn = document.getElementById('accounting-cancel-edit');
                         if (cancelBtn) cancelBtn.classList.remove('hidden');
-                    }, 0);
+
+                        const lookupMsgEl = document.getElementById('accounting-lookup-msg');
+                        if (isComplete) {
+                            lockAllAccountingFormFields(true);
+                            if (lookupMsgEl) {
+                                lookupMsgEl.innerHTML = `<span style="color: #dc2626; font-weight: 700;">⚠️ تم عرض بيانات السجل: <strong>${record['client-name'] || ''}</strong>. هذا الطلب مكتمل بالكامل ومحمي من التعديل (عرض فقط).</span>`;
+                            }
+                            showToast('هذا السجل مكتمل بالكامل ومحمي من التعديل (عرض فقط).', 'warning');
+                        } else {
+                            lockAccountingPreviousFields();
+                            if (lookupMsgEl) {
+                                lookupMsgEl.innerHTML = `<span style="color: #16a34a; font-weight: 700;">✓ تم فتح السجل لاستكمال البيانات: <strong>${record['client-name'] || ''}</strong>. تم قفل الحقول السابقة لحمايتها من التعديل.</span>`;
+                            }
+                            showToast('تم فتح السجل لاستكمال البيانات. الحقول السابقة مقفولة.', 'info');
+                        }
+                    }, 50);
                     return;
                 }
 
