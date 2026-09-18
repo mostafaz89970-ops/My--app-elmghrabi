@@ -737,6 +737,36 @@ const matchesCurrentScope = (item: any): boolean => {
     return true;
 };
 
+// دالة التوليد التلقائي لأرقام إيصالات الخزينة بتسلسل تصاعدي ذكي
+const generateNextTreasuryReceiptNumber = (prefix: string = 'خز'): string => {
+    let maxNum = 0;
+    const currentYear = new Date().getFullYear();
+    const regex = /(\d+)/g;
+
+    const inspectReceipt = (rStr?: string) => {
+        if (!rStr) return;
+        const matches = rStr.match(regex);
+        if (matches && matches.length > 0) {
+            const lastMatch = parseInt(matches[matches.length - 1], 10);
+            if (!isNaN(lastMatch) && lastMatch > maxNum && lastMatch < 9999999) {
+                maxNum = lastMatch;
+            }
+        }
+    };
+
+    (state.judicialControl || []).forEach((item: any) => {
+        (item.payments || []).forEach((p: any) => inspectReceipt(p.receiptNumber));
+    });
+    (state.zinatCollection || []).forEach((item: any) => {
+        (item.payments || []).forEach((p: any) => inspectReceipt(p.receiptNumber));
+    });
+    (state.treasuryTransactions || []).forEach((t: any) => inspectReceipt(t.receiptNumber));
+    (state.treasurySettlements || []).forEach((s: any) => inspectReceipt(s.receiptNumber));
+
+    const nextNum = maxNum + 1;
+    return `${prefix}-${currentYear}-${String(nextNum).padStart(4, '0')}`;
+};
+
 const stampItemWithScope = (item: any): any => {
     if (!item) return item;
     const scope = getCurrentDataScope();
@@ -3913,6 +3943,8 @@ const renderJudicialCollectionSection = () => {
     };
 
     // Expose function to window for the onclick handler in HTML string
+
+
     (window as any).openPaymentModal = async (id: number): Promise<void> => {
         const item = state.judicialControl.find(i => i.id === id);
         if (!item) return;
@@ -3929,27 +3961,28 @@ const renderJudicialCollectionSection = () => {
                 return;
             }
 
-            const receiptNumber = prompt(`أدخل رقم الإيصال للمبلغ ${payVal.toLocaleString()} ج.م:`);
-            if (!receiptNumber || receiptNumber.trim() === '') {
-                showToast('رقم الإيصال مطلوب. تم إلغاء العملية.', 'error');
-                return;
-            }
+            const autoSeq = generateNextTreasuryReceiptNumber('خز');
+            const receiptInput = prompt(`رقم إيصال التحصيل من الخزينة (تسلسل تلقائي، يمكنك تغييره أو تأكيده):`, autoSeq);
+            const receiptNumber = (receiptInput && receiptInput.trim() !== '') ? receiptInput.trim() : autoSeq;
 
             if (!item.payments) item.payments = [];
             item.payments.push({
                 amount: payVal,
                 receiptNumber: receiptNumber,
                 date: new Date().toLocaleDateString('en-GB'),
+                time: new Date().toLocaleTimeString('ar-EG'),
                 collectedBy: loggedInUser?.fullName ?? 'غير معروف',
+                collectorUsername: loggedInUser?.username ?? '',
+                treasuryStatus: 'معلقة'
             });
 
-            logActivity('تحصيل مبلغ', `تم تحصيل مبلغ ${payVal} ج.م (إيصال: ${receiptNumber}) من المخالف ${item.subscriberName}`);
+            logActivity('تحصيل مبلغ ضبطية', `تم تحصيل مبلغ ${payVal} ج.م (إيصال: ${receiptNumber}) من المخالف ${item.subscriberName} - معلقة بالخزينة لحين التوريد والتصفية`);
             if (await saveState()) {
                 renderJudicialCollectionSection();
                 renderTreasuryDashboard();
                 renderTreasuryUserSettlements();
                 renderTreasuryTransactionsLog();
-                showToast('تم تسجيل الدفع وتحديث الخزينة تلقائياً بنجاح.');
+                showToast(`تم تحصيل ${payVal.toLocaleString()} ج.م بنجاح برقم إيصال (${receiptNumber}) وتسميعها في الخزينة كعهدة معلقة للمحصل لحين التوريد والتصفية.`, 'success');
             } else {
                 item.payments.pop(); // Revert if save failed
             }
@@ -4464,27 +4497,28 @@ const renderJudicialCollectionSection = () => {
                 return;
             }
 
-            const receiptNumber = prompt(`أدخل رقم الإيصال للمبلغ ${payVal.toLocaleString()} ج.م:`);
-            if (!receiptNumber || receiptNumber.trim() === '') {
-                showToast('رقم الإيصال مطلوب. تم إلغاء العملية.', 'error');
-                return;
-            }
+            const autoSeq = generateNextTreasuryReceiptNumber('خز');
+            const receiptInput = prompt(`رقم إيصال التحصيل من الخزينة (تسلسل تلقائي، يمكنك تغييره أو تأكيده):`, autoSeq);
+            const receiptNumber = (receiptInput && receiptInput.trim() !== '') ? receiptInput.trim() : autoSeq;
 
             if (!item.payments) item.payments = [];
             item.payments.push({
                 amount: payVal,
                 receiptNumber: receiptNumber,
                 date: new Date().toLocaleDateString('en-GB'),
+                time: new Date().toLocaleTimeString('ar-EG'),
                 collectedBy: loggedInUser?.fullName ?? 'غير معروف',
+                collectorUsername: loggedInUser?.username ?? '',
+                treasuryStatus: 'معلقة'
             });
 
-            logActivity('تحصيل زينات', `تم تحصيل مبلغ ${payVal} ج.م (إيصال: ${receiptNumber}) من ${item.requesterName}`);
+            logActivity('تحصيل زينات', `تم تحصيل مبلغ ${payVal} ج.م (إيصال: ${receiptNumber}) من ${item.requesterName} - معلقة بالخزينة لحين التوريد والتصفية`);
             if (await saveState()) {
                 renderZinatCollectionSection();
                 renderTreasuryDashboard();
                 renderTreasuryUserSettlements();
                 renderTreasuryTransactionsLog();
-                showToast('تم تسجيل الدفع وتحديث الخزينة تلقائياً بنجاح.');
+                showToast(`تم تحصيل ${payVal.toLocaleString()} ج.م بنجاح برقم إيصال (${receiptNumber}) وتسميعها في الخزينة كعهدة معلقة للمحصل لحين التوريد والتصفية.`, 'success');
             } else {
                 item.payments.pop(); // Revert if save failed
             }
@@ -4619,8 +4653,8 @@ const renderJudicialCollectionSection = () => {
     async function handleTreasuryResetSubmit(event: Event) {
         event.preventDefault();
         const wordInp = document.getElementById('reset-confirm-word') as HTMLInputElement | null;
-        if (!wordInp || wordInp.value.trim() !== 'تصفير') {
-            showToast('يرجى كتابة كلمة "تصفير" بشكل صحيح لتأكيد العملية.', 'error');
+        if (!wordInp || wordInp.value.trim() !== '13@1991') {
+            showToast('كلمة المرور غير صحيحة! يرجى إدخال كلمة مرور تصفير الخزينة (13@1991).', 'error');
             return;
         }
 
@@ -5053,19 +5087,35 @@ const renderJudicialCollectionSection = () => {
         // Combine all transactions into one master log
         const list: any[] = [];
 
+        // Helper to check user settlement status for a given collector and date
+        const isCollectorSettled = (collectorName: string, collectorUser: string, pDate: string): boolean => {
+            const user = state.users.find(u => u.username === collectorUser || u.fullName === collectorName);
+            if (!user) return false;
+            const summary = calculateUserCustodySummary(user, pDate);
+            return summary.status === 'settled';
+        };
+
         // 1. Zinat collections
         (state.zinatCollection || []).filter(matchesCurrentScope).forEach((item: any) => {
             (item.payments || []).forEach((p: any, pIdx: number) => {
+                const pDateNorm = normalizeDateStr(p.date);
+                const colName = p.collectedBy || item.technician || 'غير معروف';
+                const colUser = p.collectorUsername || '';
+                const settled = p.treasuryStatus === 'تم التوريد والتصفية بالخزينة' || isCollectorSettled(colName, colUser, pDateNorm);
+
                 list.push({
                     id: `zinat-${item.id}-${pIdx}`,
                     type: 'zinat',
                     typeName: 'تحصيل زينات',
-                    date: normalizeDateStr(p.date),
+                    date: pDateNorm,
                     time: p.time || '',
-                    collector: p.collectedBy || item.technician || 'غير معروف',
+                    collector: colName,
+                    collectorUsername: colUser,
                     party: item.requesterName || 'مواطن / مشترك',
                     amount: Number(p.amount) || 0,
                     receiptNumber: p.receiptNumber || '-',
+                    isSettled: settled,
+                    treasuryStatus: settled ? 'تم التوريد والتصفية بالخزينة ✔️' : 'معلقة طرف المحصل (قيد التوريد) ⏳',
                     notes: item.notes || ''
                 });
             });
@@ -5074,16 +5124,24 @@ const renderJudicialCollectionSection = () => {
         // 2. Judicial collections
         (state.judicialControl || []).filter(matchesCurrentScope).forEach((item: any) => {
             (item.payments || []).forEach((p: any, pIdx: number) => {
+                const pDateNorm = normalizeDateStr(p.date);
+                const colName = p.collectedBy || 'غير معروف';
+                const colUser = p.collectorUsername || '';
+                const settled = p.treasuryStatus === 'تم التوريد والتصفية بالخزينة' || isCollectorSettled(colName, colUser, pDateNorm);
+
                 list.push({
                     id: `judicial-${item.id}-${pIdx}`,
                     type: 'judicial',
                     typeName: 'تحصيل ضبطية قضائية',
-                    date: normalizeDateStr(p.date),
+                    date: pDateNorm,
                     time: p.time || '',
-                    collector: p.collectedBy || 'غير معروف',
+                    collector: colName,
+                    collectorUsername: colUser,
                     party: item.subscriberName || 'مخالف',
                     amount: Number(p.amount) || 0,
                     receiptNumber: p.receiptNumber || '-',
+                    isSettled: settled,
+                    treasuryStatus: settled ? 'تم التوريد والتصفية بالخزينة ✔️' : 'معلقة طرف المحصل (قيد التوريد) ⏳',
                     notes: item.notes || ''
                 });
             });
@@ -5147,7 +5205,7 @@ const renderJudicialCollectionSection = () => {
         tbody.innerHTML = '';
 
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:20px;">لا توجد حركات مطابقة لمعايير البحث.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:20px;">لا توجد حركات مطابقة لمعايير البحث.</td></tr>';
             return;
         }
 
@@ -5158,6 +5216,17 @@ const renderJudicialCollectionSection = () => {
             if (item.type === 'settlement') typeColor = '#10b981';
             if (item.type === 'manual_deposit') typeColor = '#059669';
 
+            let statusBadgeHtml = '';
+            if (item.type === 'settlement') {
+                statusBadgeHtml = '<span class="badge" style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-weight:700; padding:4px 8px; border-radius:6px;">تم التوريد والتصفية بالخزينة ✔️</span>';
+            } else if (item.type === 'manual_deposit') {
+                statusBadgeHtml = '<span class="badge" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; font-weight:700; padding:4px 8px; border-radius:6px;">إيداع نقدي مباشر بالخزينة 📥</span>';
+            } else {
+                statusBadgeHtml = item.isSettled
+                    ? '<span class="badge" style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-weight:700; padding:4px 8px; border-radius:6px;">تم التوريد والتصفية بالخزينة ✔️</span>'
+                    : '<span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-weight:700; padding:4px 8px; border-radius:6px;">معلقة طرف المحصل (قيد التوريد) ⏳</span>';
+            }
+
             tr.innerHTML = `
                 <td><b>${item.receiptNumber}</b></td>
                 <td>${item.date} ${item.time ? `<small style="color:#64748b;">(${item.time})</small>` : ''}</td>
@@ -5165,6 +5234,7 @@ const renderJudicialCollectionSection = () => {
                 <td>${item.collector}</td>
                 <td>${item.party}</td>
                 <td style="font-weight:bold; color:#0f172a; font-family:monospace;">${Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م</td>
+                <td>${statusBadgeHtml}</td>
                 <td style="font-size:0.85rem; color:#64748b;">${item.notes || '-'}</td>
                 <td>
                     <button class="btn btn-sm secondary" onclick="window.printSingleTreasuryReceipt('${item.receiptNumber}', '${item.typeName}', ${item.amount}, '${item.collector}', '${item.party}', '${item.date}')" title="طباعة إيصال">إيصال 🖨️</button>
@@ -5196,9 +5266,8 @@ const renderJudicialCollectionSection = () => {
         paidInput.value = summary.remaining.toString();
         paidInput.max = summary.remaining.toString();
 
-        const randSeq = Math.floor(1000 + Math.random() * 9000);
         const receiptInput = document.getElementById('settle-receipt-no') as HTMLInputElement;
-        receiptInput.value = `TR-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randSeq}`;
+        receiptInput.value = generateNextTreasuryReceiptNumber('خز-تصفية');
 
         const notesInput = document.getElementById('settle-notes') as HTMLTextAreaElement;
         notesInput.value = `تصفية عهدة يومية عن تاريخ ${activeTreasuryDateFilter}`;
@@ -21052,9 +21121,8 @@ const renderJudicialCollectionSection = () => {
         document.getElementById('treasury-open-deposit-btn')?.addEventListener('click', () => {
             const modal = document.getElementById('modal-treasury-deposit');
             if (modal) {
-                const randSeq = Math.floor(1000 + Math.random() * 9000);
                 const rcpt = document.getElementById('deposit-receipt-no') as HTMLInputElement | null;
-                if (rcpt) rcpt.value = `DEP-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randSeq}`;
+                if (rcpt) rcpt.value = generateNextTreasuryReceiptNumber('خز-إيداع');
                 modal.style.display = 'flex';
             }
         });
