@@ -18854,10 +18854,10 @@ const printAccountingRecordDetails = (record) => {
                 <!-- 6. Official Signatures -->
                 <div class="signatures-container">
                     <div class="sign-box">
-                        <div>توقيع مقدم الطلب / العميل</div>
-                        <div style="font-size: 10px; color: #64748b;">(إقرار بصحة كافة البيانات)</div>
+                        <div>الفني القائم بالمعاينة</div>
+                        <div style="font-size: 10px; color: #64748b;">(المعاينة الميدانية والفحص الفني)</div>
                         <div class="sign-line"></div>
-                        <div style="margin-top: 4px; font-size: 11px;">الاسم: ${clientName}</div>
+                        <div style="margin-top: 4px; font-size: 11px;">الاسم: ${record.technicianName || '....................'}</div>
                     </div>
                     <div class="sign-box">
                         <div>الموظف المختص / مدخل البيانات</div>
@@ -18866,8 +18866,8 @@ const printAccountingRecordDetails = (record) => {
                         <div style="margin-top: 4px; font-size: 11px;">الاسم: ${record.createdBy || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || '....................'}</div>
                     </div>
                     <div class="sign-box">
-                        <div>اعتماد رئيس القسم / مدير الهندسة</div>
-                        <div style="font-size: 10px; color: #64748b;">(خاتم الشعار الرسمي)</div>
+                        <div>اعتماد رئيس الإيرادات</div>
+                        <div style="font-size: 10px; color: #64748b;">(خاتم الشعار والاعتماد)</div>
                         <div class="sign-line"></div>
                         <div style="margin-top: 4px; font-size: 11px;">التوقيع: ....................</div>
                     </div>
@@ -20349,6 +20349,21 @@ const printServiceRequestExactDocument = (record) => {
 
         <div class="footer-divider"></div>
         <div class="footer-note">* بيانات البطاقة هى بيانات بطاقة مقدم الطلب</div>
+
+        <div style="margin-top: 35px; display: flex; justify-content: space-between; text-align: center; font-size: 15px; font-weight: bold;">
+            <div style="min-width: 170px;">
+                <div>الفني القائم بالمعاينة</div>
+                <div style="margin-top: 25px;">..............................</div>
+            </div>
+            <div style="min-width: 170px;">
+                <div>الموظف المختص</div>
+                <div style="margin-top: 25px;">..............................</div>
+            </div>
+            <div style="min-width: 170px;">
+                <div>اعتماد رئيس الإيرادات</div>
+                <div style="margin-top: 25px;">..............................</div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -20560,6 +20575,22 @@ const renderAccountingSubscriptionsSection = () => {
                     <!-- الفاصل السفلي -->
                     <div style="border-bottom: 2px solid #000; margin: 25px 0 10px 0;"></div>
                     <div style="font-size: 14.5px; font-weight: bold; color: #000;">* بيانات البطاقة هى بيانات بطاقة مقدم الطلب</div>
+
+                    <!-- التوقيعات الرسمية -->
+                    <div style="margin-top: 30px; display: flex; justify-content: space-between; text-align: center; font-size: 15px; font-weight: bold;">
+                        <div style="min-width: 170px;">
+                            <div>الفني القائم بالمعاينة</div>
+                            <div style="margin-top: 25px;">..............................</div>
+                        </div>
+                        <div style="min-width: 170px;">
+                            <div>الموظف المختص</div>
+                            <div style="margin-top: 25px;">..............................</div>
+                        </div>
+                        <div style="min-width: 170px;">
+                            <div>اعتماد رئيس الإيرادات</div>
+                            <div style="margin-top: 25px;">..............................</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
