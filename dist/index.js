@@ -513,6 +513,30 @@ const getDynamicReceiptHeader = (userOrCollector) => {
         branchLine: branchLine
     };
 };
+const normalizeDateStr = (d) => {
+    if (!d)
+        return '';
+    if (typeof d !== 'string')
+        d = String(d);
+    d = d.replace(/[٠-٩]/g, (ch) => '٠١٢٣٤٥٦٧٨٩'.indexOf(ch).toString()).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d))
+        return d;
+    const parts = d.split(/[/\-.]/);
+    if (parts.length === 3) {
+        if (parts[0].length === 4) {
+            return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+        }
+        else if (parts[2].length === 4) {
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+    }
+    const parsed = new Date(d);
+    if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().slice(0, 10);
+    }
+    return d;
+};
+window.normalizeDateStr = normalizeDateStr;
 /**
  * لافتة منبثقة أنيقة ومميزة لتأكيد عمليات الإضافة والتعديل والحذف في الهيكل الإداري
  */
@@ -1346,11 +1370,12 @@ const loadState = async () => {
             delete mergedState.settings.signatures;
         }
         const keysThatShouldBeArrays = [
-            'meters', 'subscribers', 'users', 'activityLog', 'judicialControl', 'lostMeterMemos', 'zinatCollection', 'mukayasat', 'transformers', 'debts'
+            'meters', 'subscribers', 'users', 'activityLog', 'judicialControl', 'lostMeterMemos', 'zinatCollection', 'mukayasat', 'transformers', 'debts',
+            'treasuryTransactions', 'treasurySettlements', 'transformerLoads', 'pendingRequests', 'mukayasatAccountSystemSaved', 'cleaningFeeExceptions'
         ];
-        for (const key of keysThatShouldBeArrays) { // Add 'transformers' to this list
+        for (const key of keysThatShouldBeArrays) {
             if (!Array.isArray(mergedState[key])) {
-                mergedState[key] = defaultState[key];
+                mergedState[key] = defaultState[key] || [];
             }
         }
         const settingKeysThatShouldBeArrays = [
@@ -3720,6 +3745,64 @@ const handlePrintJudicialControlDetails = () => {
 // Helper function for printing HTML content with robust iframe fallback for Electron / blocked popups
 const executePrintHtmlContent = (htmlContent) => {
     var _a;
+    try {
+        const oldFrame = document.getElementById('app-print-execution-frame');
+        if (oldFrame) {
+            try {
+                oldFrame.remove();
+            }
+            catch (e) { }
+        }
+        const iframe = document.createElement('iframe');
+        iframe.id = 'app-print-execution-frame';
+        iframe.style.position = 'fixed';
+        iframe.style.top = '-10000px';
+        iframe.style.left = '-10000px';
+        iframe.style.width = '1000px';
+        iframe.style.height = '1000px';
+        iframe.style.border = '0';
+        iframe.style.opacity = '0.01';
+        iframe.style.pointerEvents = 'none';
+        document.body.appendChild(iframe);
+        const doc = iframe.contentDocument || ((_a = iframe.contentWindow) === null || _a === void 0 ? void 0 : _a.document);
+        if (doc) {
+            doc.open();
+            doc.write(htmlContent);
+            doc.close();
+            let printed = false;
+            const triggerPrint = () => {
+                var _a, _b;
+                if (printed)
+                    return;
+                printed = true;
+                try {
+                    (_a = iframe.contentWindow) === null || _a === void 0 ? void 0 : _a.focus();
+                    (_b = iframe.contentWindow) === null || _b === void 0 ? void 0 : _b.print();
+                }
+                catch (err) {
+                    console.warn('Iframe print error, falling back to popup:', err);
+                    popupPrint(htmlContent);
+                }
+                setTimeout(() => {
+                    try {
+                        iframe.remove();
+                    }
+                    catch (e) { }
+                }, 5000);
+            };
+            if (iframe.contentWindow) {
+                iframe.contentWindow.onload = () => setTimeout(triggerPrint, 250);
+            }
+            setTimeout(triggerPrint, 600);
+            return;
+        }
+    }
+    catch (err) {
+        console.warn('Iframe print failed to setup:', err);
+    }
+    popupPrint(htmlContent);
+};
+const popupPrint = (htmlContent) => {
     let printWin = null;
     try {
         printWin = window.open('', '_blank');
@@ -3733,46 +3816,299 @@ const executePrintHtmlContent = (htmlContent) => {
             printWin.document.write(htmlContent);
             printWin.document.close();
             setTimeout(() => {
-                printWin.focus();
-                printWin.print();
-                printWin.close();
+                try {
+                    printWin.focus();
+                    printWin.addEventListener('afterprint', () => {
+                        try {
+                            printWin.close();
+                        }
+                        catch (e) { }
+                    });
+                    printWin.print();
+                }
+                catch (e) {
+                    console.error('Popup print execution error:', e);
+                }
             }, 500);
             return;
         }
         catch (err) {
-            console.warn('Direct popup print failed, using iframe fallback', err);
+            console.warn('Popup print write error:', err);
         }
     }
-    // Invisible iframe fallback (works 100% in Electron, browsers with popup blocker enabled, etc.)
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.visibility = 'hidden';
-    document.body.appendChild(iframe);
-    const doc = iframe.contentDocument || ((_a = iframe.contentWindow) === null || _a === void 0 ? void 0 : _a.document);
-    if (doc) {
-        doc.open();
-        doc.write(htmlContent);
-        doc.close();
-        setTimeout(() => {
-            var _a, _b;
-            (_a = iframe.contentWindow) === null || _a === void 0 ? void 0 : _a.focus();
-            (_b = iframe.contentWindow) === null || _b === void 0 ? void 0 : _b.print();
-            setTimeout(() => {
-                try {
-                    document.body.removeChild(iframe);
-                }
-                catch (e) { }
-            }, 1500);
-        }, 500);
+    showToast('تعذر فتح نافذة الطباعة. يرجى التأكد من السماح بالنوافذ المنبثقة.', 'error');
+};
+window.executePrintHtmlContent = executePrintHtmlContent;
+// Expose function to window for printing receipts (judicial & zinat)
+window.printCollectionReceipt = (id, type = 'zinat') => {
+    let item;
+    let title = '';
+    if (type === 'judicial') {
+        item = (state.judicialControl || []).find(i => String(i.id) === String(id) || Number(i.id) === Number(id));
+        title = 'إيصال تحصيل مبالغ ومصالحات الضبطية القضائية';
     }
     else {
-        showToast('تعذر فتح الطباعة. يرجى التحقق من إعدادات الطابعة.', 'error');
+        item = (state.zinatCollection || []).find(i => (id != null && (String(i.id) === String(id) || Number(i.id) === Number(id))) ||
+            (i.requesterName && String(i.requesterName).trim() === String(id).trim()));
+        title = 'إيصال تحصيل رسوم وتصاريح زينات';
     }
+    if (!item) {
+        showToast('تعذر العثور على بيانات السجل للطباعة', 'error');
+        return;
+    }
+    const total = Number(type === 'judicial' ? (item.reconciliationAmount || item.amount) : item.amount) || 0;
+    const paymentsList = Array.isArray(item.payments) ? item.payments : [];
+    const paid = paymentsList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const remaining = Math.max(0, total - paid);
+    // Determine collector
+    let collectorName = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول التحصيل والخزينة';
+    if (paymentsList.length > 0) {
+        const lastPayment = paymentsList[paymentsList.length - 1];
+        if (lastPayment.collectedBy)
+            collectorName = lastPayment.collectedBy;
+    }
+    const headerInfo = getDynamicReceiptHeader(collectorName);
+    const printDate = new Date().toLocaleDateString('ar-EG');
+    const printTime = new Date().toLocaleTimeString('ar-EG');
+    // Check if settled in treasury
+    let isSettled = false;
+    if (paymentsList.length > 0) {
+        const lastP = paymentsList[paymentsList.length - 1];
+        if (lastP.treasuryStatus === 'تم التوريد والتصفية بالخزينة' || lastP.treasuryStatus === 'تم التوريد' || lastP.treasuryStatus === 'مصفى' || lastP.isSettled) {
+            isSettled = true;
+        }
+    }
+    if (!isSettled && (state.treasurySettlements || []).length > 0) {
+        isSettled = (state.treasurySettlements || []).some((s) => {
+            const matchCollector = s.collectorName === collectorName || s.collectorUsername === (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.username) || s.username === (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.username);
+            return matchCollector && paymentsList.some((p) => normalizeDateStr(p.date) === normalizeDateStr(s.settlementDate) || (p.receiptNumber && p.receiptNumber === s.receiptNumber));
+        });
+    }
+    const logoSrc = state.settings.companyLogo;
+    const logoHTML = logoSrc ? `<img src="${logoSrc}" alt="Logo" style="max-height: 80px; max-width: 95px; object-fit: contain;">` : '';
+    let paymentHistoryHTML = '';
+    if (paymentsList.length > 0) {
+        paymentHistoryHTML = `
+            <div style="margin-top: 16px;">
+                <h4 style="text-align: right; margin: 0 0 6px 0; font-size: 11pt; color: #1e293b; font-weight: bold;">سجل وحركات الدفعات:</h4>
+                <table style="width: 100%; border-collapse: collapse; font-size: 10pt; text-align: center;">
+                    <thead>
+                        <tr style="background-color: #f1f5f9; color: #334155;">
+                            <th style="border: 1px solid #cbd5e1; padding: 6px;">المبلغ</th>
+                            <th style="border: 1px solid #cbd5e1; padding: 6px;">رقم الإيصال</th>
+                            <th style="border: 1px solid #cbd5e1; padding: 6px;">التاريخ</th>
+                            <th style="border: 1px solid #cbd5e1; padding: 6px;">المحصل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${paymentsList.map((p) => `
+                            <tr>
+                                <td style="border: 1px solid #cbd5e1; padding: 5px; font-weight: bold; color: #15803d;">${(Number(p.amount) || 0).toLocaleString()} ج.م</td>
+                                <td style="border: 1px solid #cbd5e1; padding: 5px; font-family: monospace; font-weight: bold;">${p.receiptNumber || '-'}</td>
+                                <td style="border: 1px solid #cbd5e1; padding: 5px;">${p.date || '-'} ${p.time || ''}</td>
+                                <td style="border: 1px solid #cbd5e1; padding: 5px;">${p.collectedBy || '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            `;
+    }
+    const subscriberOrRequester = item.subscriberName || item.requesterName || 'غير محدد';
+    const addressText = item.address || '-';
+    const mobileText = item.mobile || '';
+    const notesText = item.notes || '';
+    const receiptHTML = `
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>${title} - ${subscriberOrRequester}</title>
+            <style>
+                @page { size: auto; margin: 10mm; }
+                * { box-sizing: border-box; }
+                body {
+                    font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: #fff;
+                    color: #0f172a;
+                    margin: 0;
+                    padding: 15px;
+                    direction: rtl;
+                }
+                .receipt-container {
+                    max-width: 600px;
+                    margin: 0 auto;
+                    border: 2px solid #0f172a;
+                    border-radius: 12px;
+                    padding: 20px;
+                    background: #ffffff;
+                }
+                .header-container {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 12px;
+                    border-bottom: 2px solid #0f172a;
+                    padding-bottom: 10px;
+                }
+                .company-info { text-align: right; flex: 1; }
+                .company-info h2 { font-size: 14pt; font-weight: 800; color: #0f172a; margin: 0 0 3px 0; }
+                .company-info .sector-line { font-size: 11pt; font-weight: 700; color: #1e40af; margin-bottom: 2px; }
+                .company-info .branch-line { font-size: 10.5pt; font-weight: 600; color: #065f46; margin-bottom: 4px; }
+                .receipt-title {
+                    display: inline-block;
+                    background: #0f172a;
+                    color: #ffffff;
+                    padding: 4px 16px;
+                    border-radius: 20px;
+                    font-size: 11.5pt;
+                    font-weight: 800;
+                    margin-top: 4px;
+                }
+                .logo-container { text-align: left; margin-right: 15px; }
+                .settlement-badge {
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    font-weight: 800;
+                    font-size: 11pt;
+                    text-align: center;
+                    margin: 12px 0;
+                }
+                .settled-yes {
+                    background: #f0fdf4;
+                    border: 2px solid #22c55e;
+                    color: #15803d;
+                }
+                .settled-no {
+                    background: #fef2f2;
+                    border: 2px solid #ef4444;
+                    color: #b91c1c;
+                }
+                .meta {
+                    font-size: 9.5pt;
+                    color: #64748b;
+                    margin-bottom: 12px;
+                    display: flex;
+                    justify-content: space-between;
+                    border-bottom: 1px dashed #cbd5e1;
+                    padding-bottom: 6px;
+                }
+                .details-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 14px;
+                }
+                .details-table td {
+                    padding: 7px 10px;
+                    border-bottom: 1px solid #e2e8f0;
+                    font-size: 10.5pt;
+                }
+                .details-table td.label {
+                    font-weight: 700;
+                    color: #475569;
+                    width: 32%;
+                    background: #f8fafc;
+                }
+                .details-table td.val {
+                    font-weight: 600;
+                    color: #0f172a;
+                }
+                .total-row {
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 13pt;
+                    font-weight: 900;
+                    margin-top: 10px;
+                    border-top: 2px solid #0f172a;
+                    padding-top: 8px;
+                    background: #f8fafc;
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                }
+                .footer-info {
+                    margin-top: 22px;
+                    border-top: 1px solid #cbd5e1;
+                    padding-top: 12px;
+                    font-size: 10pt;
+                }
+                .signatures {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 16px;
+                    padding: 0 20px;
+                }
+                .sign-box { text-align: center; }
+                .sign-title { font-weight: bold; margin-bottom: 30px; }
+                @media print {
+                    body { padding: 0 !important; background: #fff !important; }
+                    .receipt-container { border: 2px solid #000 !important; max-width: 100% !important; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="receipt-container">
+                <div class="header-container">
+                    <div class="company-info">
+                        <h2>${headerInfo.company}</h2>
+                        <div class="sector-line">${headerInfo.sector}</div>
+                        <div class="branch-line">${headerInfo.branchLine}</div>
+                        <div><span class="receipt-title">${title}</span></div>
+                    </div>
+                    <div class="logo-container">
+                        ${logoHTML}
+                    </div>
+                </div>
+
+                <div class="settlement-badge ${isSettled ? 'settled-yes' : 'settled-no'}">
+                    ${isSettled
+        ? '✔️ تم التوريد والتصفية بالخزينة العامة رسمياً'
+        : '⚠️ تنبيه رسمي: هذا الإيصال معلق طرف المحصل (غير مصفى بالخزينة حتى الآن - قيد التوريد والتصفية)'}
+                </div>
+
+                <div class="meta">
+                    <span>تاريخ الطباعة: <strong>${printDate}</strong> - ${printTime}</span>
+                    <span>المستخدم القائم بالطباعة: <strong>${(loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'النظام'}</strong></span>
+                </div>
+
+                <table class="details-table">
+                    <tr><td class="label">اسم المواطن / المشترك:</td><td class="val"><strong>${subscriberOrRequester}</strong></td></tr>
+                    <tr><td class="label">العنوان / المنطقة:</td><td class="val">${addressText}</td></tr>
+                    ${mobileText ? `<tr><td class="label">رقم الموبايل:</td><td class="val">${mobileText}</td></tr>` : ''}
+                    ${item.technician ? `<tr><td class="label">الفني المسؤول:</td><td class="val">${item.technician}</td></tr>` : ''}
+                    ${item.requestDate ? `<tr><td class="label">تاريخ الطلب / الإجراء:</td><td class="val">${item.requestDate}</td></tr>` : ''}
+                    <tr><td class="label">المبلغ المطلوب إجمالاً:</td><td class="val" style="font-weight: bold;">${total.toLocaleString()} ج.م</td></tr>
+                    <tr><td class="label">المبلغ المسدد حتى الآن:</td><td class="val" style="color: #15803d; font-weight: bold;">${paid.toLocaleString()} ج.م</td></tr>
+                    <tr><td class="label">حالة التوريد للخزينة:</td><td class="val">${isSettled ? '<span style="color:#15803d; font-weight:bold;">✔️ مصفى بالخزينة العامة</span>' : '<span style="color:#dc2626; font-weight:bold;">⏳ معلق طرف المحصل (قيد التصفية)</span>'}</td></tr>
+                    ${notesText ? `<tr><td class="label">ملاحظات:</td><td class="val">${notesText}</td></tr>` : ''}
+                </table>
+
+                <div class="total-row">
+                    <span>المبلغ المتبقي:</span>
+                    <span style="color: ${remaining > 0 ? '#dc2626' : '#15803d'};">${remaining.toLocaleString()} ج.م</span>
+                </div>
+
+                ${paymentHistoryHTML}
+
+                <div class="footer-info">
+                    <div class="signatures">
+                        <div class="sign-box">
+                            <div class="sign-title">المحصل / المسؤول</div>
+                            <div>${collectorName}</div>
+                            <div style="margin-top: 20px;">التوقيع: .....................</div>
+                        </div>
+                        <div class="sign-box">
+                            <div class="sign-title">مسؤول الخزينة العامة</div>
+                            <div>اعتماد وتصفية الخزينة</div>
+                            <div style="margin-top: 20px;">الختم / التوقيع: .....................</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        `;
+    executePrintHtmlContent(receiptHTML);
 };
 // --- قسم التحصيل ---
 const renderJudicialCollectionSection = () => {
@@ -4055,276 +4391,6 @@ const renderJudicialCollectionSection = () => {
         renderJudicialControlSection();
         showToast('تم تسجيل تركيب العداد بنجاح.');
     };
-    // Expose function to window for printing receipts
-    window.printCollectionReceipt = (id, type = 'zinat') => {
-        let item;
-        let title = '';
-        if (type === 'judicial') {
-            item = (state.judicialControl || []).find(i => String(i.id) === String(id) || Number(i.id) === Number(id));
-            title = 'إيصال تحصيل مبالغ ومصالحات الضبطية القضائية';
-        }
-        else {
-            item = (state.zinatCollection || []).find(i => String(i.id) === String(id) || Number(i.id) === Number(id));
-            title = 'إيصال تحصيل رسوم وتصاريح زينات';
-        }
-        if (!item) {
-            showToast('تعذر العثور على بيانات السجل للطباعة', 'error');
-            return;
-        }
-        const total = Number(type === 'judicial' ? (item.reconciliationAmount || item.amount) : item.amount) || 0;
-        const paymentsList = Array.isArray(item.payments) ? item.payments : [];
-        const paid = paymentsList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-        const remaining = Math.max(0, total - paid);
-        // Determine collector
-        let collectorName = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول التحصيل والخزينة';
-        if (paymentsList.length > 0) {
-            const lastPayment = paymentsList[paymentsList.length - 1];
-            if (lastPayment.collectedBy)
-                collectorName = lastPayment.collectedBy;
-        }
-        const headerInfo = getDynamicReceiptHeader(collectorName);
-        const printDate = new Date().toLocaleDateString('ar-EG');
-        const printTime = new Date().toLocaleTimeString('ar-EG');
-        // Check if settled in treasury
-        let isSettled = false;
-        if (paymentsList.length > 0) {
-            const lastP = paymentsList[paymentsList.length - 1];
-            if (lastP.treasuryStatus === 'تم التوريد' || lastP.treasuryStatus === 'مصفى' || lastP.isSettled) {
-                isSettled = true;
-            }
-        }
-        if (!isSettled && (state.treasurySettlements || []).length > 0) {
-            isSettled = (state.treasurySettlements || []).some((s) => {
-                const matchCollector = s.collectorName === collectorName || s.username === (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.username);
-                return matchCollector && paymentsList.some((p) => p.date === s.settlementDate || p.receiptNumber === s.receiptNumber);
-            });
-        }
-        const logoSrc = state.settings.companyLogo;
-        const logoHTML = logoSrc ? `<img src="${logoSrc}" alt="Logo" style="max-height: 80px; max-width: 95px; object-fit: contain;">` : '';
-        let paymentHistoryHTML = '';
-        if (paymentsList.length > 0) {
-            paymentHistoryHTML = `
-            <div style="margin-top: 16px;">
-                <h4 style="text-align: right; margin: 0 0 6px 0; font-size: 11pt; color: #1e293b; font-weight: bold;">سجل وحركات الدفعات:</h4>
-                <table style="width: 100%; border-collapse: collapse; font-size: 10pt; text-align: center;">
-                    <thead>
-                        <tr style="background-color: #f1f5f9; color: #334155;">
-                            <th style="border: 1px solid #cbd5e1; padding: 6px;">المبلغ</th>
-                            <th style="border: 1px solid #cbd5e1; padding: 6px;">رقم الإيصال</th>
-                            <th style="border: 1px solid #cbd5e1; padding: 6px;">التاريخ</th>
-                            <th style="border: 1px solid #cbd5e1; padding: 6px;">المحصل</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${paymentsList.map((p) => `
-                            <tr>
-                                <td style="border: 1px solid #cbd5e1; padding: 5px; font-weight: bold; color: #15803d;">${(Number(p.amount) || 0).toLocaleString()} ج.م</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 5px; font-family: monospace; font-weight: bold;">${p.receiptNumber || '-'}</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 5px;">${p.date || '-'} ${p.time || ''}</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 5px;">${p.collectedBy || '-'}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-            `;
-        }
-        const subscriberOrRequester = item.subscriberName || item.requesterName || 'غير محدد';
-        const addressText = item.address || '-';
-        const mobileText = item.mobile || '';
-        const notesText = item.notes || '';
-        const receiptHTML = `
-        <!DOCTYPE html>
-        <html lang="ar" dir="rtl">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>${title} - ${subscriberOrRequester}</title>
-            <style>
-                @page { size: auto; margin: 10mm; }
-                * { box-sizing: border-box; }
-                body {
-                    font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    background: #fff;
-                    color: #0f172a;
-                    margin: 0;
-                    padding: 15px;
-                    direction: rtl;
-                }
-                .receipt-container {
-                    max-width: 600px;
-                    margin: 0 auto;
-                    border: 2px solid #0f172a;
-                    border-radius: 12px;
-                    padding: 20px;
-                    background: #ffffff;
-                }
-                .header-container {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 12px;
-                    border-bottom: 2px solid #0f172a;
-                    padding-bottom: 10px;
-                }
-                .company-info { text-align: right; flex: 1; }
-                .company-info h2 { font-size: 14pt; font-weight: 800; color: #0f172a; margin: 0 0 3px 0; }
-                .company-info .sector-line { font-size: 11pt; font-weight: 700; color: #1e40af; margin-bottom: 2px; }
-                .company-info .branch-line { font-size: 10.5pt; font-weight: 600; color: #065f46; margin-bottom: 4px; }
-                .receipt-title {
-                    display: inline-block;
-                    background: #0f172a;
-                    color: #ffffff;
-                    padding: 4px 16px;
-                    border-radius: 20px;
-                    font-size: 11.5pt;
-                    font-weight: 800;
-                    margin-top: 4px;
-                }
-                .logo-container { text-align: left; margin-right: 15px; }
-                .settlement-badge {
-                    padding: 8px 12px;
-                    border-radius: 8px;
-                    font-weight: 800;
-                    font-size: 11pt;
-                    text-align: center;
-                    margin: 12px 0;
-                }
-                .settled-yes {
-                    background: #f0fdf4;
-                    border: 2px solid #22c55e;
-                    color: #15803d;
-                }
-                .settled-no {
-                    background: #fef2f2;
-                    border: 2px solid #ef4444;
-                    color: #b91c1c;
-                }
-                .meta {
-                    font-size: 9.5pt;
-                    color: #64748b;
-                    margin-bottom: 12px;
-                    display: flex;
-                    justify-content: space-between;
-                    border-bottom: 1px dashed #cbd5e1;
-                    padding-bottom: 6px;
-                }
-                .details-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-bottom: 14px;
-                }
-                .details-table td {
-                    padding: 7px 10px;
-                    border-bottom: 1px solid #e2e8f0;
-                    font-size: 10.5pt;
-                }
-                .details-table td.label {
-                    font-weight: 700;
-                    color: #475569;
-                    width: 32%;
-                    background: #f8fafc;
-                }
-                .details-table td.val {
-                    font-weight: 600;
-                    color: #0f172a;
-                }
-                .total-row {
-                    display: flex;
-                    justify-content: space-between;
-                    font-size: 13pt;
-                    font-weight: 900;
-                    margin-top: 10px;
-                    border-top: 2px solid #0f172a;
-                    padding-top: 8px;
-                    background: #f8fafc;
-                    padding: 8px 12px;
-                    border-radius: 6px;
-                }
-                .footer-info {
-                    margin-top: 22px;
-                    border-top: 1px solid #cbd5e1;
-                    padding-top: 12px;
-                    font-size: 10pt;
-                }
-                .signatures {
-                    display: flex;
-                    justify-content: space-between;
-                    margin-top: 16px;
-                    padding: 0 20px;
-                }
-                .sign-box { text-align: center; }
-                .sign-title { font-weight: bold; margin-bottom: 30px; }
-                @media print {
-                    body { padding: 0 !important; background: #fff !important; }
-                    .receipt-container { border: 2px solid #000 !important; max-width: 100% !important; }
-                }
-            </style>
-        </head>
-        <body>
-            <div class="receipt-container">
-                <div class="header-container">
-                    <div class="company-info">
-                        <h2>${headerInfo.company}</h2>
-                        <div class="sector-line">${headerInfo.sector}</div>
-                        <div class="branch-line">${headerInfo.branchLine}</div>
-                        <div><span class="receipt-title">${title}</span></div>
-                    </div>
-                    <div class="logo-container">
-                        ${logoHTML}
-                    </div>
-                </div>
-
-                <div class="settlement-badge ${isSettled ? 'settled-yes' : 'settled-no'}">
-                    ${isSettled
-            ? '✔️ تم التوريد والتصفية بالخزينة العامة رسمياً'
-            : '⚠️ تنبيه رسمي: هذا الإيصال معلق طرف المحصل (غير مصفى بالخزينة حتى الآن - قيد التوريد والتصفية)'}
-                </div>
-
-                <div class="meta">
-                    <span>تاريخ الطباعة: <strong>${printDate}</strong> - ${printTime}</span>
-                    <span>المستخدم القائم بالطباعة: <strong>${(loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'النظام'}</strong></span>
-                </div>
-
-                <table class="details-table">
-                    <tr><td class="label">اسم المواطن / المشترك:</td><td class="val"><strong>${subscriberOrRequester}</strong></td></tr>
-                    <tr><td class="label">العنوان / المنطقة:</td><td class="val">${addressText}</td></tr>
-                    ${mobileText ? `<tr><td class="label">رقم الموبايل:</td><td class="val">${mobileText}</td></tr>` : ''}
-                    ${item.technician ? `<tr><td class="label">الفني المسؤول:</td><td class="val">${item.technician}</td></tr>` : ''}
-                    ${item.requestDate ? `<tr><td class="label">تاريخ الطلب / الإجراء:</td><td class="val">${item.requestDate}</td></tr>` : ''}
-                    <tr><td class="label">المبلغ المطلوب إجمالاً:</td><td class="val" style="font-weight: bold;">${total.toLocaleString()} ج.م</td></tr>
-                    <tr><td class="label">المبلغ المسدد حتى الآن:</td><td class="val" style="color: #15803d; font-weight: bold;">${paid.toLocaleString()} ج.م</td></tr>
-                    <tr><td class="label">حالة التوريد للخزينة:</td><td class="val">${isSettled ? '<span style="color:#15803d; font-weight:bold;">✔️ مصفى بالخزينة العامة</span>' : '<span style="color:#dc2626; font-weight:bold;">⏳ معلق طرف المحصل (قيد التصفية)</span>'}</td></tr>
-                    ${notesText ? `<tr><td class="label">ملاحظات:</td><td class="val">${notesText}</td></tr>` : ''}
-                </table>
-
-                <div class="total-row">
-                    <span>المبلغ المتبقي:</span>
-                    <span style="color: ${remaining > 0 ? '#dc2626' : '#15803d'};">${remaining.toLocaleString()} ج.م</span>
-                </div>
-
-                ${paymentHistoryHTML}
-
-                <div class="footer-info">
-                    <div class="signatures">
-                        <div class="sign-box">
-                            <div class="sign-title">المحصل / المسؤول</div>
-                            <div>${collectorName}</div>
-                            <div style="margin-top: 20px;">التوقيع: .....................</div>
-                        </div>
-                        <div class="sign-box">
-                            <div class="sign-title">مسؤول الخزينة العامة</div>
-                            <div>اعتماد وتصفية الخزينة</div>
-                            <div style="margin-top: 20px;">الختم / التوقيع: .....................</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
-        `;
-        executePrintHtmlContent(receiptHTML);
-    };
     // Expose function to window for printing expired practices
     window.printExpiredPractices = () => {
         const filterForm = document.getElementById('judicial-control-filter-form');
@@ -4513,16 +4579,24 @@ const renderZinatCollectionSection = () => {
                 const pDateNorm = normalizeDateStr(p.date);
                 const colName = p.collectedBy || item.technician || 'غير معروف';
                 const colUser = p.collectorUsername || '';
-                const user = state.users.find(u => u.username === colUser || u.fullName === colName);
+                // 1. فحص مباشر في سجل تصفيات الخزينة
+                const settledInTreasury = (state.treasurySettlements || []).some((s) => {
+                    const matchCollector = (colUser && s.collectorUsername === colUser) ||
+                        (colName && s.collectorName === colName) ||
+                        (colName && s.collectorUsername === colName);
+                    const matchDate = !pDateNorm || normalizeDateStr(s.settlementDate) === pDateNorm;
+                    return matchCollector && matchDate;
+                });
+                if (settledInTreasury)
+                    return true;
+                // 2. فحص ملخص عهدة المحصل
+                const user = (state.users || []).find(u => (colUser && u.username === colUser) || (colName && u.fullName === colName) || (colName && u.username === colName));
                 if (user) {
                     const summary = calculateUserCustodySummary(user, pDateNorm);
                     if (summary.status === 'settled')
                         return true;
                 }
-                return (state.treasurySettlements || []).some((s) => {
-                    const matchCollector = s.collectorName === colName || s.collectorUsername === colUser;
-                    return (s.receiptNumber && s.receiptNumber === p.receiptNumber) || (matchCollector && normalizeDateStr(s.settlementDate) === pDateNorm);
-                });
+                return false;
             });
             if (isItemSettled) {
                 treasuryBadge = '<span class="status-badge bg-success" style="font-weight:bold; background-color:#dcfce7; color:#15803d; border:1px solid #86efac;">تم التوريد بالخزينة</span>';
@@ -4551,7 +4625,7 @@ const renderZinatCollectionSection = () => {
             <td>${treasuryBadge}</td>
             <td class="actions-cell">
                 ${!isFullyPaid ? (isAdmin ? `<button class="btn btn-edit-details" onclick="window.openZinatPaymentModal(${item.id})">تحصيل</button>` : '') : ''}
-                <button class="btn btn-print-receipt" style="margin-right: 5px; padding: 4px 8px; cursor: pointer;" onclick="window.printCollectionReceipt('${item.id}', 'zinat')" title="طباعة إيصال التحصيل"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></button>
+                <button class="btn btn-print-receipt" style="margin-right: 5px; padding: 4px 8px; cursor: pointer;" onclick="window.printCollectionReceipt('${item.id || item.requesterName}', 'zinat')" title="طباعة إيصال التحصيل"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg></button>
                 ${isAdmin && hasButtonPermission('delete_button') ? `<button class="btn btn-delete" onclick="window.deleteZinatRecord(${item.id})">حذف</button>` : ''}
             </td>
         `;
@@ -4811,15 +4885,52 @@ async function handleTreasuryResetSubmit(event) {
     }
     const scope = ((_a = document.querySelector('input[name="reset-scope"]:checked')) === null || _a === void 0 ? void 0 : _a.value) || 'today';
     if (scope === 'today') {
-        const targetDate = activeTreasuryDateFilter;
+        const targetDate = normalizeDateStr(activeTreasuryDateFilter);
         state.treasurySettlements = (state.treasurySettlements || []).filter((s) => normalizeDateStr(s.settlementDate) !== targetDate);
         state.treasuryTransactions = (state.treasuryTransactions || []).filter((t) => normalizeDateStr(t.date) !== targetDate);
-        logActivity('تصفير الخزينة', `تم تصفير حركات وتصفيات الخزينة لتاريخ (${targetDate}) بواسطة ${loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName}`);
-        showToast(`تم تصفير حركات وتوريدات الخزينة لتاريخ ${targetDate} بنجاح.`, 'success');
+        // إعادة ضبط حالة الدفعات لهذا اليوم
+        (state.zinatCollection || []).forEach((item) => {
+            (item.payments || []).forEach((p) => {
+                if (normalizeDateStr(p.date) === targetDate || normalizeDateStr(p.settlementDate) === targetDate) {
+                    p.treasuryStatus = 'معلقة';
+                    p.isSettled = false;
+                    delete p.settlementReceiptNumber;
+                    delete p.settlementDate;
+                }
+            });
+        });
+        (state.judicialControl || []).forEach((item) => {
+            (item.payments || []).forEach((p) => {
+                if (normalizeDateStr(p.date) === targetDate || normalizeDateStr(p.settlementDate) === targetDate) {
+                    p.treasuryStatus = 'معلقة';
+                    p.isSettled = false;
+                    delete p.settlementReceiptNumber;
+                    delete p.settlementDate;
+                }
+            });
+        });
+        logActivity('تصفير الخزينة', `تم تصفير حركات وتصفيات الخزينة لتاريخ (${activeTreasuryDateFilter}) بواسطة ${loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName}`);
+        showToast(`تم تصفير حركات وتوريدات الخزينة لتاريخ ${activeTreasuryDateFilter} بنجاح.`, 'success');
     }
     else {
         state.treasurySettlements = [];
         state.treasuryTransactions = [];
+        (state.zinatCollection || []).forEach((item) => {
+            (item.payments || []).forEach((p) => {
+                p.treasuryStatus = 'معلقة';
+                p.isSettled = false;
+                delete p.settlementReceiptNumber;
+                delete p.settlementDate;
+            });
+        });
+        (state.judicialControl || []).forEach((item) => {
+            (item.payments || []).forEach((p) => {
+                p.treasuryStatus = 'معلقة';
+                p.isSettled = false;
+                delete p.settlementReceiptNumber;
+                delete p.settlementDate;
+            });
+        });
         logActivity('تصفير شامل للخزينة', `تم تصفير شامل وكامل لجميع حركات وتصفيات الخزينة بواسطة ${loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName}`);
         showToast('تم التصفير الشامل لجميع حركات وتصفيات الخزينة بنجاح.', 'success');
     }
@@ -4897,29 +5008,6 @@ function tafqeetNumber(num) {
         result += ' و' + convertChunk(fractionPart) + ' قرشاً';
     }
     return result;
-}
-function normalizeDateStr(d) {
-    if (!d)
-        return '';
-    if (typeof d !== 'string')
-        d = String(d);
-    d = d.replace(/[٠-٩]/g, (ch) => '٠١٢٣٤٥٦٧٨٩'.indexOf(ch).toString()).trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(d))
-        return d;
-    const parts = d.split(/[/\-.]/);
-    if (parts.length === 3) {
-        if (parts[0].length === 4) {
-            return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-        }
-        else if (parts[2].length === 4) {
-            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-        }
-    }
-    const parsed = new Date(d);
-    if (!isNaN(parsed.getTime())) {
-        return parsed.toISOString().slice(0, 10);
-    }
-    return d;
 }
 const calculateUserCustodySummary = (targetUser, dateFilter) => {
     const username = targetUser.username;
@@ -5624,6 +5712,33 @@ const handleTreasurySettlementSubmit = async (event) => {
         state.treasurySettlements = [];
     stampItemWithScope(newSettlement);
     state.treasurySettlements.push(newSettlement);
+    // تحديث مباشر لحالة السداد والتوريد في دفعات الزينات لتسميع فوري لا يقبل اللبس
+    const targetDateNorm = (activeTreasuryDateFilter && activeTreasuryDateFilter !== 'all') ? normalizeDateStr(activeTreasuryDateFilter) : null;
+    (state.zinatCollection || []).forEach((item) => {
+        (item.payments || []).forEach((p) => {
+            const matchesUser = p.collectedBy === user.fullName || p.collectedBy === user.username || p.collectorUsername === user.username;
+            const matchesDate = !targetDateNorm || normalizeDateStr(p.date) === targetDateNorm;
+            if (matchesUser && matchesDate) {
+                p.treasuryStatus = 'تم التوريد والتصفية بالخزينة';
+                p.isSettled = true;
+                p.settlementDate = activeTreasuryDateFilter;
+                p.settlementReceiptNumber = receiptNumber;
+            }
+        });
+    });
+    // وتحديث مباشر لحالة السداد والتوريد في دفعات الضبطية القضائية
+    (state.judicialControl || []).forEach((item) => {
+        (item.payments || []).forEach((p) => {
+            const matchesUser = p.collectedBy === user.fullName || p.collectedBy === user.username || p.collectorUsername === user.username;
+            const matchesDate = !targetDateNorm || normalizeDateStr(p.date) === targetDateNorm;
+            if (matchesUser && matchesDate) {
+                p.treasuryStatus = 'تم التوريد والتصفية بالخزينة';
+                p.isSettled = true;
+                p.settlementDate = activeTreasuryDateFilter;
+                p.settlementReceiptNumber = receiptNumber;
+            }
+        });
+    });
     if (autoUnsuspend && user.isSuspended) {
         user.isSuspended = false;
         user.suspendReason = '';
@@ -22310,7 +22425,7 @@ class CloudSyncManager {
                 'meters', 'subscribers', 'mukayasat', 'mukayasatAccountSystemSaved',
                 'lostMeterMemos', 'transformers', 'transformerLoads', 'pendingRequests',
                 'judicialControl', 'zinatCollection', 'activityLog', 'debts', 'debtTypes', 'fees',
-                'cleaningFeeExceptions'
+                'cleaningFeeExceptions', 'treasuryTransactions', 'treasurySettlements'
             ];
             for (const key of entityKeys) {
                 if (Array.isArray(remoteState[key])) {
@@ -22378,6 +22493,20 @@ class CloudSyncManager {
             if (!activeSection)
                 return;
             const targetId = activeSection.id;
+            if (targetId === 'collection-zinat') {
+                renderZinatCollectionSection();
+                return;
+            }
+            if (targetId === 'collection-judicial') {
+                renderJudicialCollectionSection();
+                return;
+            }
+            if (targetId === 'treasury-dashboard' || targetId === 'treasury-management') {
+                renderTreasuryDashboard();
+                renderTreasuryUserSettlements();
+                renderTreasuryTransactionsLog();
+                return;
+            }
             const targetLink = document.querySelector(`.sidebar-nav .nav-link[data-target="${targetId}"]`);
             if (targetLink && targetId !== 'meter-registration' && !targetId.startsWith('accounting-')) {
                 targetLink.click();
