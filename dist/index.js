@@ -4827,8 +4827,8 @@ window.printZinatThermalReceipt = async (id, forceSelectModal = false) => {
             <title>إيصال زينات مواطن - ${item.requesterName}</title>
             <style>
                 @page {
-                    size: ${isBig ? '80mm' : '58mm'} auto;
-                    margin: 0;
+                    size: ${isBig ? '80mm 250mm' : '58mm 200mm'} !important;
+                    margin: 0mm !important;
                 }
                 * {
                     box-sizing: border-box !important;
@@ -5036,17 +5036,26 @@ window.printZinatThermalReceipt = async (id, forceSelectModal = false) => {
                     padding-bottom: 4px;
                 }
                 @media print {
+                    @page {
+                        size: ${isBig ? '80mm 250mm' : '58mm 200mm'} !important;
+                        margin: 0mm !important;
+                    }
                     html, body {
-                        width: 100% !important;
+                        width: ${isBig ? '80mm' : '58mm'} !important;
+                        max-width: ${isBig ? '80mm' : '58mm'} !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
                     }
                     .thermal-wrapper {
                         width: ${wrapWidth} !important;
                         max-width: ${wrapWidth} !important;
                         margin: 0 auto !important;
-                        padding: 1mm !important;
+                        padding: 0.5mm !important;
                         overflow: hidden !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
                     }
                 }
             </style>
