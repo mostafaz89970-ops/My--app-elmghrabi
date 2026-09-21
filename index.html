@@ -2878,6 +2878,18 @@
                 <form id="transformer-form" class="form-grid" novalidate>
                     <input type="hidden" id="transformer-id">
                     <div class="input-group">
+                        <label for="transformer-sector">القطاع</label>
+                        <select id="transformer-sector"></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="transformer-genadmin">الإدارة العامة</label>
+                        <select id="transformer-genadmin"></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="transformer-branch">الإدارة الفرعية / الهندسة</label>
+                        <select id="transformer-branch"></select>
+                    </div>
+                    <div class="input-group">
                         <label for="councilName">اسم المجلس</label>
                         <select id="councilName"></select>
                     </div>
@@ -2955,21 +2967,36 @@
                 </button>
             </div>
             <div class="form-container">
-                <div class="multi-filter-container">
+                <div class="multi-filter-container" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;">
                     <input type="text" id="filter-transformer-name" class="table-filter" placeholder="بحث باسم المحول...">
                     <input type="text" id="filter-transformer-chassis" class="table-filter" placeholder="بحث بالشاسية...">
-                    <button id="print-transformers-list-btn" class="btn secondary">طباعة</button>
+                    <select id="filter-transformer-sector" class="table-filter" style="min-width: 130px;"></select>
+                    <select id="filter-transformer-genadmin" class="table-filter" style="min-width: 150px;"></select>
+                    <select id="filter-transformer-branch" class="table-filter" style="min-width: 150px;"></select>
+                    <select id="filter-transformer-council" class="table-filter" style="min-width: 130px;"></select>
+                </div>
+                <div class="table-actions-toolbar" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px;">
+                    <button type="button" id="transfer-selected-transformers-btn" class="btn" style="background-color: #0284c7; color: #fff;" data-button-permission="transfer_transformers">🔄 تحويل لإدارة أخرى</button>
+                    <button type="button" id="delete-scope-transformers-btn" class="btn btn-delete" style="background-color: #b91c1c; color: #fff;" data-button-permission="bulk_delete_transformers_scope">🗑️ حذف مجلس / إدارة</button>
+                    <button type="button" id="delete-selected-transformers-btn" class="btn btn-delete" style="background-color: #dc2626; color: #fff;" data-button-permission="delete_button">حذف المحدد</button>
+                    <button type="button" id="export-transformers-excel-btn" class="btn" style="background-color: #059669; color: #fff;" data-button-permission="export_transformers_excel">📊 تصدير إكسيل</button>
+                    <button type="button" id="import-transformers-excel-trigger" class="btn" style="background-color: #d97706; color: #fff;" data-button-permission="import_transformers_excel">📥 استيراد إكسيل</button>
+                    <input type="file" id="transformers-excel-upload" accept=".xlsx,.xls,.csv" style="display: none;">
+                    <button type="button" id="print-transformers-list-btn" class="btn secondary" data-button-permission="print_list_button">🖨️ طباعة</button>
                 </div>
                 <div class="responsive-table">
                     <table id="transformers-table">
                         <thead>
                             <tr>
                                 <th><input type="checkbox" id="select-all-transformers"></th>
+                                <th>القطاع</th>
+                                <th>الإدارة العامة</th>
+                                <th>الإدارة الفرعية</th>
                                 <th>المجلس</th>
                                 <th>اسم المحول</th>
                                 <th>العنوان</th>
                                 <th>النوع</th>
-                                <th>القدرة</th>
+                                <th>القدرة (ك.ف.أ)</th>
                                 <th>شاسية العداد</th>
                                 <th>رقم الشريحة</th>
                                 <th>قدرة محولات التيار</th>
@@ -6536,6 +6563,74 @@
                 <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
                     <button type="button" class="btn secondary close-modal" style="padding: 8px 18px; border-radius: 8px;">إلغاء</button>
                     <button type="button" class="btn primary" id="btn-save-org-edit" style="padding: 8px 20px; border-radius: 8px; background: #2563eb; color: #fff; font-weight: 600;">حفظ التعديل</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Transfer Transformers -->
+        <div id="modal-transfer-transformers" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+            <div class="modal-content" style="background: #ffffff; border-radius: 14px; max-width: 520px; width: 92%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); overflow: hidden; padding: 24px; position: relative;">
+                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 14px; margin-bottom: 20px;">
+                    <h4 style="margin: 0; font-size: 1.15rem; color: #0369a1; font-weight: 700;">🔄 تحويل المحولات لإدارة أخرى</h4>
+                    <button type="button" class="close-modal" style="background: transparent; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: #64748b;">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 0 0 20px 0; display: flex; flex-direction: column; gap: 14px;">
+                    <div id="transfer-transformers-count-info" style="font-weight: 600; color: #334155; padding: 10px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;"></div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="transfer-target-sector" style="font-weight: 600; margin-bottom: 6px; display: block; color: #334155;">القطاع الجديد</label>
+                        <select id="transfer-target-sector" class="form-control" style="width: 100%; padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px;"></select>
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="transfer-target-genadmin" style="font-weight: 600; margin-bottom: 6px; display: block; color: #334155;">الإدارة العامة الجديدة</label>
+                        <select id="transfer-target-genadmin" class="form-control" style="width: 100%; padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px;"></select>
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="transfer-target-branch" style="font-weight: 600; margin-bottom: 6px; display: block; color: #334155;">الإدارة الفرعية / الهندسة الجديدة</label>
+                        <select id="transfer-target-branch" class="form-control" style="width: 100%; padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px;"></select>
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="transfer-target-council" style="font-weight: 600; margin-bottom: 6px; display: block; color: #334155;">المجلس القروي (اختياري)</label>
+                        <select id="transfer-target-council" class="form-control" style="width: 100%; padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px;"></select>
+                    </div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <button type="button" class="btn secondary close-modal" style="padding: 8px 18px; border-radius: 8px;">إلغاء</button>
+                    <button type="button" class="btn primary" id="btn-confirm-transfer-transformers" style="padding: 8px 20px; border-radius: 8px; background: #0284c7; color: #fff; font-weight: 600;">تأكيد التحويل</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Bulk Delete Transformers by Scope -->
+        <div id="modal-bulk-delete-transformers" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+            <div class="modal-content" style="background: #ffffff; border-radius: 14px; max-width: 520px; width: 92%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); overflow: hidden; padding: 24px; position: relative;">
+                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 14px; margin-bottom: 20px;">
+                    <h4 style="margin: 0; font-size: 1.15rem; color: #b91c1c; font-weight: 700;">⚠️ حذف محولات مجلس قروي أو إدارة بالكامل</h4>
+                    <button type="button" class="close-modal" style="background: transparent; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: #64748b;">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 0 0 20px 0; display: flex; flex-direction: column; gap: 14px;">
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; color: #991b1b; font-size: 0.9rem; line-height: 1.5;">
+                        تنبيه: هذا الإجراء سيقوم بحذف جميع المحولات التابعة للمجلس أو الإدارة المحددة بشكل نهائي.
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label style="font-weight: 600; margin-bottom: 6px; display: block; color: #334155;">نوع الحذف المجمّع</label>
+                        <div style="display: flex; gap: 20px; align-items: center;">
+                            <label><input type="radio" name="delete-scope-type" value="council" checked> حذف مجلس قروي كامل</label>
+                            <label><input type="radio" name="delete-scope-type" value="branch"> حذف إدارة فرعية كاملة</label>
+                        </div>
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label for="delete-scope-branch-select" style="font-weight: 600; margin-bottom: 6px; display: block; color: #334155;">الإدارة الفرعية / الهندسة</label>
+                        <select id="delete-scope-branch-select" class="form-control" style="width: 100%; padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px;"></select>
+                    </div>
+                    <div class="input-group" id="delete-scope-council-group" style="margin-bottom: 0;">
+                        <label for="delete-scope-council-select" style="font-weight: 600; margin-bottom: 6px; display: block; color: #334155;">المجلس القروي المراد حذف محولاته</label>
+                        <select id="delete-scope-council-select" class="form-control" style="width: 100%; padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px;"></select>
+                    </div>
+                    <div id="delete-scope-count-info" style="font-weight: 600; color: #b91c1c; padding: 10px; background: #fff1f2; border-radius: 8px; border: 1px solid #ffe4e6;"></div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <button type="button" class="btn secondary close-modal" style="padding: 8px 18px; border-radius: 8px;">إلغاء</button>
+                    <button type="button" class="btn btn-delete" id="btn-confirm-delete-scope-transformers" style="padding: 8px 20px; border-radius: 8px; background: #dc2626; color: #fff; font-weight: 600;">تأكيد الحذف النهائي</button>
                 </div>
             </div>
         </div>

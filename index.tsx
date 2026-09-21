@@ -130,6 +130,7 @@ interface AppSettings {
     collectionSignatures: string[];
     mukayasatSignatures: string[];
     councilNames: string[]; // For Transformer Management
+    branchCouncils?: { [branch: string]: string[] }; // New: Council names per branch administration
     transformerTypes: string[]; // New: For Transformer Management
     currentTransformerCapacities: string[]; // For Transformer Management
     faultyMeterSignatures: string[];
@@ -329,6 +330,12 @@ let state = {
         collectionSignatures: [] as string[],
         mukayasatSignatures: [] as string[],
         councilNames: [' مجلس قروي بني صامت', 'العدوة', 'مطاي', 'سمالوط'], // Default council names
+        branchCouncils: {
+            'هندسة كهرباء بني مزار': ['مجلس قروي بني علي', 'مجلس قروي صندفا', 'مجلس قروي القيس', 'مجلس قروي شلقام', 'مجلس قروي بني صامت', 'مجلس قروي أبو جرج'],
+            'هندسة كهرباء مغاغة': ['مجلس قروي أبا الوقف', 'مجلس قروي برطباط', 'مجلس قروي شم البحرية', 'مجلس قروي ميانة', 'مجلس قروي طنبدي'],
+            'هندسة كهرباء العدوة': ['مجلس قروي بني وركان', 'مجلس قروي صفانية', 'مجلس قروي عطف حيدر', 'مجلس قروي البسقلون'],
+            'هندسة كهرباء مطاي': ['مجلس قروي بردنوها', 'مجلس قروي حلوة', 'مجلس قروي منبال', 'مجلس قروي أبو عزيز']
+        } as Record<string, string[]>,
         transformerTypes: ['كشك', 'غرفة', 'عامود', 'سورتية'], // Default transformer types
         currentTransformerCapacities: ['200/5', '400/5', '500/5', '600/5'], // Default CT capacities
         faultyMeterSignatures: [] as string[],
@@ -450,6 +457,10 @@ let state = {
             'print_list_button': { name: 'زر طباعة القوائم', roles: ['admin', 'supervisor', 'reports'] },
             'bulk_delete_subscribers': { name: 'زر الحذف المتعدد (جميع المشتركين)', roles: ['admin'] },
             'bulk_edit_subscribers': { name: 'قسم التعديلات الجماعية أعلى جدول المشتركين', roles: ['admin', 'supervisor'] },
+            'export_transformers_excel': { name: 'زر تصدير إكسيل للمحولات', roles: ['admin', 'supervisor', 'reports'] },
+            'import_transformers_excel': { name: 'زر استيراد إكسيل للمحولات', roles: ['admin'] },
+            'transfer_transformers': { name: 'زر تحويل المحولات لإدارة أخرى', roles: ['admin', 'supervisor'] },
+            'bulk_delete_transformers_scope': { name: 'زر حذف محولات مجلس كامل أو إدارة كاملة', roles: ['admin'] },
         },
         reportPermissions: {
             'all-meters': { name: 'تقرير جميع العدادات', roles: ['admin', 'supervisor', 'reports'] },
@@ -646,6 +657,14 @@ const getSubAdmins = (selectedSector: string, selectedGeneralAdmin: string): str
         }
     });
     return Array.from(list);
+};
+
+const getCouncilsForBranch = (branchName?: string): string[] => {
+    const b = (branchName || (loggedInUser?.subAdmin || loggedInUser?.branch || '')).trim();
+    if (b && state.settings && state.settings.branchCouncils && Array.isArray(state.settings.branchCouncils[b]) && state.settings.branchCouncils[b].length > 0) {
+        return state.settings.branchCouncils[b];
+    }
+    return (state.settings && state.settings.councilNames) ? state.settings.councilNames : [];
 };
 
 // عمليات إدارة الهيكل الإداري (إضافة، تعديل، حذف)
@@ -1733,6 +1752,19 @@ const loadState = async () => {
         }
         if (mergedState._deletedIds.transformers && mergedState._deletedIds.transformers.length > 0) {
             mergedState.transformers = (mergedState.transformers || []).filter((t: any) => !mergedState._deletedIds.transformers.includes(t.id));
+        }
+
+        if (!mergedState.settings.branchCouncils || typeof mergedState.settings.branchCouncils !== 'object') {
+            mergedState.settings.branchCouncils = JSON.parse(JSON.stringify(defaultState.settings.branchCouncils || {}));
+        }
+
+        if (Array.isArray(mergedState.transformers)) {
+            mergedState.transformers.forEach((t: any) => {
+                if (!t.sector) t.sector = 'قطاع شمال المنيا';
+                if (!t.generalAdmin) t.generalAdmin = 'الإدارة العامة لهندسات شمال المنيا';
+                if (!t.subAdmin) t.subAdmin = t.branch || 'هندسة كهرباء بني مزار';
+                if (!t.branch) t.branch = t.subAdmin;
+            });
         }
 
         if (Array.isArray(mergedState.users)) {
@@ -9571,8 +9603,48 @@ const handlePrintJudicialControlDetails = () => {
         const formTitle = document.getElementById('transformer-form-title')!;
         const transformerIdInput = document.getElementById('transformer-id') as HTMLInputElement;
 
-        // Populate dropdowns
-        populateSelect(document.getElementById('councilName') as HTMLSelectElement, state.settings.councilNames, 'اختر المجلس...');
+        // Administrative Hierarchy Dropdowns
+        const sectorSelect = document.getElementById('transformer-sector') as HTMLSelectElement | null;
+        const genAdminSelect = document.getElementById('transformer-genadmin') as HTMLSelectElement | null;
+        const branchSelect = document.getElementById('transformer-branch') as HTMLSelectElement | null;
+        const councilSelect = document.getElementById('councilName') as HTMLSelectElement | null;
+
+        const availableSectors = getAvailableSectors();
+        if (sectorSelect) {
+            populateSelect(sectorSelect, availableSectors);
+        }
+
+        const updateGenAdmins = (selectedSec: string) => {
+            if (!genAdminSelect) return;
+            const gas = getGeneralAdminsForSector(selectedSec);
+            populateSelect(genAdminSelect, gas);
+            updateBranches(selectedSec, genAdminSelect.value);
+        };
+
+        const updateBranches = (selectedSec: string, selectedGen: string) => {
+            if (!branchSelect) return;
+            const branches = getSubAdmins(selectedSec, selectedGen);
+            populateSelect(branchSelect, branches);
+            updateCouncils(branchSelect.value);
+        };
+
+        const updateCouncils = (selectedBranch: string) => {
+            if (!councilSelect) return;
+            const councils = getCouncilsForBranch(selectedBranch);
+            populateSelect(councilSelect, councils, 'اختر المجلس...');
+        };
+
+        if (sectorSelect) {
+            sectorSelect.onchange = () => updateGenAdmins(sectorSelect.value);
+        }
+        if (genAdminSelect) {
+            genAdminSelect.onchange = () => updateBranches(sectorSelect?.value || '', genAdminSelect.value);
+        }
+        if (branchSelect) {
+            branchSelect.onchange = () => updateCouncils(branchSelect.value);
+        }
+
+        // Populate other dropdowns
         populateSelect(document.getElementById('transformerType') as HTMLSelectElement, state.settings.transformerTypes, 'اختر النوع...');
         populateSelect(document.getElementById('transformerAddress') as HTMLSelectElement, state.settings.addresses, 'اختر العنوان...');
         populateSelect(document.getElementById('currentTransformerCapacity') as HTMLSelectElement, state.settings.currentTransformerCapacities, 'اختر القدرة...');
@@ -9582,7 +9654,16 @@ const handlePrintJudicialControlDetails = () => {
             if (transformer) {
                 formTitle.textContent = 'تعديل بيانات المحول';
                 transformerIdInput.value = String(transformer.id);
-                (document.getElementById('councilName') as HTMLSelectElement).value = transformer.councilName || '';
+
+                if (sectorSelect && transformer.sector) sectorSelect.value = transformer.sector;
+                updateGenAdmins(sectorSelect?.value || availableSectors[0]);
+                if (genAdminSelect && transformer.generalAdmin) genAdminSelect.value = transformer.generalAdmin;
+                updateBranches(sectorSelect?.value || '', genAdminSelect?.value || '');
+                const currentBranch = transformer.subAdmin || transformer.branch || '';
+                if (branchSelect && currentBranch) branchSelect.value = currentBranch;
+                updateCouncils(branchSelect?.value || currentBranch);
+
+                if (councilSelect) councilSelect.value = transformer.councilName || '';
                 (document.getElementById('transformerName') as HTMLInputElement).value = transformer.transformerName || '';
                 (document.getElementById('transformerAddress') as HTMLSelectElement).value = transformer.transformerAddress || '';
                 (document.getElementById('transformerType') as HTMLSelectElement).value = transformer.transformerType || '';
@@ -9594,6 +9675,16 @@ const handlePrintJudicialControlDetails = () => {
         } else {
             formTitle.textContent = 'تسجيل محول جديد';
             transformerIdInput.value = '';
+
+            const defaultSector = loggedInUser?.sector && loggedInUser.sector !== 'all' ? loggedInUser.sector : availableSectors[0];
+            if (sectorSelect) sectorSelect.value = defaultSector;
+            updateGenAdmins(defaultSector);
+            const defaultGen = loggedInUser?.generalAdmin && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : (genAdminSelect?.value || '');
+            if (genAdminSelect && defaultGen) genAdminSelect.value = defaultGen;
+            updateBranches(sectorSelect?.value || '', genAdminSelect?.value || '');
+            const defaultBranch = loggedInUser?.subAdmin && loggedInUser.subAdmin !== 'all' ? loggedInUser.subAdmin : (loggedInUser?.branch || branchSelect?.value || '');
+            if (branchSelect && defaultBranch) branchSelect.value = defaultBranch;
+            updateCouncils(branchSelect?.value || defaultBranch);
         }
 
         document.querySelectorAll('.content-section.active').forEach(s => s.classList.remove('active'));
@@ -9616,8 +9707,17 @@ const handlePrintJudicialControlDetails = () => {
         }
         const id = idInput.value ? parseInt(idInput.value, 10) : Date.now();
 
+        const chosenSector = (document.getElementById('transformer-sector') as HTMLSelectElement)?.value || loggedInUser?.sector || 'قطاع شمال المنيا';
+        const chosenGenAdmin = (document.getElementById('transformer-genadmin') as HTMLSelectElement)?.value || loggedInUser?.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+        const chosenBranch = (document.getElementById('transformer-branch') as HTMLSelectElement)?.value || loggedInUser?.subAdmin || loggedInUser?.branch || 'هندسة كهرباء بني مزار';
+
         const newTransformer: DataItem = {
             id: id,
+            sector: chosenSector,
+            generalAdmin: chosenGenAdmin,
+            subAdmin: chosenBranch,
+            branch: chosenBranch,
+            branchName: chosenBranch,
             councilName: (document.getElementById('councilName') as HTMLSelectElement).value,
             transformerName: (document.getElementById('transformerName') as HTMLInputElement).value,
             transformerAddress: (document.getElementById('transformerAddress') as HTMLSelectElement).value,
@@ -9646,33 +9746,139 @@ const handlePrintJudicialControlDetails = () => {
         }
     };
 
+    let transformerListFiltersInitialized = false;
+    const initTransformerListFilters = () => {
+        const sectorFilter = document.getElementById('filter-transformer-sector') as HTMLSelectElement | null;
+        const genAdminFilter = document.getElementById('filter-transformer-genadmin') as HTMLSelectElement | null;
+        const branchFilter = document.getElementById('filter-transformer-branch') as HTMLSelectElement | null;
+        const councilFilter = document.getElementById('filter-transformer-council') as HTMLSelectElement | null;
+
+        if (!sectorFilter || !genAdminFilter || !branchFilter || !councilFilter) return;
+
+        const populateGenAdminsFilter = (sec: string) => {
+            const gas = sec && sec !== 'all' ? getGeneralAdminsForSector(sec) : getGeneralAdminsForSector('all');
+            populateSelect(genAdminFilter, gas, 'جميع الإدارات العامة');
+            populateBranchesFilter(sec, genAdminFilter.value);
+        };
+
+        const populateBranchesFilter = (sec: string, ga: string) => {
+            const branches = getSubAdmins(sec || 'all', ga || 'all');
+            populateSelect(branchFilter, branches, 'جميع الفروع / الهندسات');
+            populateCouncilsFilter(branchFilter.value);
+        };
+
+        const populateCouncilsFilter = (br: string) => {
+            const councils = br && br !== 'all' ? getCouncilsForBranch(br) : (state.settings.councilNames || []);
+            populateSelect(councilFilter, councils, 'جميع المجالس');
+        };
+
+        const sectors = getAvailableSectors();
+        populateSelect(sectorFilter, sectors, 'جميع القطاعات');
+        populateGenAdminsFilter(sectorFilter.value);
+
+        sectorFilter.onchange = () => {
+            populateGenAdminsFilter(sectorFilter.value);
+            renderTransformerListSection();
+        };
+        genAdminFilter.onchange = () => {
+            populateBranchesFilter(sectorFilter.value, genAdminFilter.value);
+            renderTransformerListSection();
+        };
+        branchFilter.onchange = () => {
+            populateCouncilsFilter(branchFilter.value);
+            renderTransformerListSection();
+        };
+        councilFilter.onchange = () => {
+            renderTransformerListSection();
+        };
+
+        // If logged-in user is not admin and has a specific branch scope, lock filters to their branch
+        if (!isSystemAdmin(loggedInUser) && loggedInUser?.branch && loggedInUser.branch !== 'all') {
+            if (loggedInUser.sector && loggedInUser.sector !== 'all') {
+                sectorFilter.value = loggedInUser.sector;
+                sectorFilter.disabled = true;
+                populateGenAdminsFilter(sectorFilter.value);
+            }
+            if (loggedInUser.generalAdmin && loggedInUser.generalAdmin !== 'all') {
+                genAdminFilter.value = loggedInUser.generalAdmin;
+                genAdminFilter.disabled = true;
+                populateBranchesFilter(sectorFilter.value, genAdminFilter.value);
+            }
+            const userBr = loggedInUser.subAdmin || loggedInUser.branch;
+            branchFilter.value = userBr;
+            branchFilter.disabled = true;
+            populateCouncilsFilter(userBr);
+        }
+
+        transformerListFiltersInitialized = true;
+    };
+
     const renderTransformerListSection = () => {
         const table = document.getElementById('transformers-table');
         const tbody = table?.querySelector('tbody');
         if (!tbody) return;
-        console.log('Rendering transformer list. Current state.transformers:', state.transformers); // Added log
+
+        if (!transformerListFiltersInitialized) {
+            initTransformerListFilters();
+        }
+
+        // Apply permissions to toolbar buttons
+        const transferBtn = document.getElementById('transfer-selected-transformers-btn');
+        if (transferBtn) transferBtn.style.display = hasButtonPermission('transfer_transformers') ? 'inline-flex' : 'none';
+
+        const deleteScopeBtn = document.getElementById('delete-scope-transformers-btn');
+        if (deleteScopeBtn) deleteScopeBtn.style.display = hasButtonPermission('bulk_delete_transformers_scope') ? 'inline-flex' : 'none';
+
+        const deleteSelectedBtn = document.getElementById('delete-selected-transformers-btn');
+        if (deleteSelectedBtn) deleteSelectedBtn.style.display = hasButtonPermission('delete_button') ? 'inline-flex' : 'none';
+
+        const exportBtn = document.getElementById('export-transformers-excel-btn');
+        if (exportBtn) exportBtn.style.display = hasButtonPermission('export_transformers_excel') ? 'inline-flex' : 'none';
+
+        const importBtn = document.getElementById('import-transformers-excel-trigger');
+        if (importBtn) importBtn.style.display = hasButtonPermission('import_transformers_excel') ? 'inline-flex' : 'none';
+
+        const printBtn = document.getElementById('print-transformers-list-btn');
+        if (printBtn) printBtn.style.display = hasButtonPermission('print_list_button') ? 'inline-flex' : 'none';
 
         const nameFilter = (document.getElementById('filter-transformer-name') as HTMLInputElement)?.value.toLowerCase() || '';
         const chassisFilter = (document.getElementById('filter-transformer-chassis') as HTMLInputElement)?.value.toLowerCase() || '';
+        const sectorFilter = (document.getElementById('filter-transformer-sector') as HTMLSelectElement)?.value || 'all';
+        const genAdminFilter = (document.getElementById('filter-transformer-genadmin') as HTMLSelectElement)?.value || 'all';
+        const branchFilter = (document.getElementById('filter-transformer-branch') as HTMLSelectElement)?.value || 'all';
+        const councilFilter = (document.getElementById('filter-transformer-council') as HTMLSelectElement)?.value || 'all';
 
-        const filtered = (state.transformers || []).filter(t =>
-            matchesCurrentScope(t) &&
-            (!nameFilter || (t.transformerName || '').toLowerCase().includes(nameFilter)) &&
-            (!chassisFilter || (t.smartMeterChassis || '').toLowerCase().includes(chassisFilter))
-        );
+        const filtered = (state.transformers || []).filter(t => {
+            if (!matchesCurrentScope(t)) return false;
+            if (nameFilter && !(t.transformerName || '').toLowerCase().includes(nameFilter)) return false;
+            if (chassisFilter && !(t.smartMeterChassis || '').toLowerCase().includes(chassisFilter)) return false;
+            if (sectorFilter && sectorFilter !== 'all' && (t.sector || '') !== sectorFilter) return false;
+            if (genAdminFilter && genAdminFilter !== 'all' && (t.generalAdmin || '') !== genAdminFilter) return false;
+            if (branchFilter && branchFilter !== 'all' && (t.subAdmin || t.branch || '') !== branchFilter) return false;
+            if (councilFilter && councilFilter !== 'all' && (t.councilName || '') !== councilFilter) return false;
+            return true;
+        });
 
         tbody.innerHTML = '';
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">لا توجد بيانات محولات مطابقة.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding: 20px; color: #64748b;">لا توجد بيانات محولات مطابقة للبحث أو الصلاحية الحالية.</td></tr>';
             return;
         }
+
+        const canView = hasButtonPermission('view_button');
+        const canTransfer = hasButtonPermission('transfer_transformers');
+        const canEdit = hasButtonPermission('edit_button');
+        const canDelete = hasButtonPermission('delete_button');
 
         filtered.forEach(item => {
             const row = document.createElement('tr');
             row.innerHTML = `
             <td><input type="checkbox" class="transformer-row-checkbox" value="${item.id}"></td>
+            <td><span style="font-size: 0.85rem; font-weight: 600; color: #475569;">${item.sector || '-'}</span></td>
+            <td><span style="font-size: 0.85rem; font-weight: 600; color: #0284c7;">${item.generalAdmin || '-'}</span></td>
+            <td><span style="display: inline-block; padding: 2px 6px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: 600; font-size: 11px;">${item.subAdmin || item.branch || '-'}</span></td>
             <td>${item.councilName || '-'}</td>
-            <td>${item.transformerName || '-'}</td>
+            <td style="font-weight: 600;">${item.transformerName || '-'}</td>
             <td>${item.transformerAddress || '-'}</td>
             <td>${item.transformerType || '-'}</td>
             <td>${item.transformerCapacityKVA || '-'}</td>
@@ -9681,14 +9887,13 @@ const handlePrintJudicialControlDetails = () => {
             <td>${item.currentTransformerCapacity || '-'}</td>
             <td class="actions-cell">
                 <div class="actions-inline">
-                    <button class="action-btn view" onclick="window.viewTransformer(${item.id})" title="عرض"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
-                    <button class="action-btn edit" onclick="window.editTransformer(${item.id})" title="تعديل"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                    <button class="action-btn delete" onclick="window.deleteTransformer(${item.id})" title="حذف"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+                    ${canView ? `<button class="action-btn view" onclick="window.viewTransformer(${item.id})" title="عرض"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>` : ''}
+                    ${canTransfer ? `<button class="action-btn transfer" onclick="window.openTransferTransformerModal(${item.id})" title="تحويل لإدارة أخرى" style="color: #0284c7;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></button>` : ''}
+                    ${canEdit ? `<button class="action-btn edit" onclick="window.editTransformer(${item.id})" title="تعديل"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>` : ''}
+                    ${canDelete ? `<button class="action-btn delete" onclick="window.deleteTransformer(${item.id})" title="حذف"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>` : ''}
                 </div>
             </td>
-        `;
-            if (!hasButtonPermission('edit_button')) row.querySelector('.edit')?.remove();
-            if (!hasButtonPermission('delete_button')) row.querySelector('.delete')?.remove();
+            `;
             tbody.appendChild(row);
         });
     };
@@ -10207,6 +10412,9 @@ const handlePrintJudicialControlDetails = () => {
         if (!item) return;
         showConfirmationDialog('تأكيد الحذف', `هل أنت متأكد من حذف بيانات المحول "${item.transformerName}"؟`, async () => {
             state.transformers = state.transformers.filter(t => t.id !== id);
+            if (!state._deletedIds) state._deletedIds = { meters: [], debts: [], users: [], transformers: [] };
+            if (!state._deletedIds.transformers) state._deletedIds.transformers = [];
+            state._deletedIds.transformers.push(id);
             await saveState();
             showToast('تم حذف المحول بنجاح.');
             renderTransformerListSection();
@@ -10226,6 +10434,9 @@ const handlePrintJudicialControlDetails = () => {
         const ids = selected.map(cb => parseInt(cb.value, 10));
         showConfirmationDialog('تأكيد الحذف المتعدد', `هل أنت متأكد من حذف عدد (${ids.length}) محول؟ لا يمكن التراجع عن هذا الإجراء.`, async () => {
             state.transformers = state.transformers.filter(t => !ids.includes(t.id));
+            if (!state._deletedIds) state._deletedIds = { meters: [], debts: [], users: [], transformers: [] };
+            if (!state._deletedIds.transformers) state._deletedIds.transformers = [];
+            state._deletedIds.transformers.push(...ids);
             logActivity('حذف متعدد محولات', `تم حذف ${ids.length} محول من القائمة.`);
             await saveState();
             showToast('تم حذف المحولات المحددة بنجاح.');
@@ -10234,8 +10445,331 @@ const handlePrintJudicialControlDetails = () => {
         });
     };
 
+    // --- Transfer Transformers Functionality ---
+    let pendingTransferTransformerIds: number[] = [];
+
+    const setupTransferModalCascades = () => {
+        const modalSec = document.getElementById('transfer-target-sector') as HTMLSelectElement | null;
+        const modalGen = document.getElementById('transfer-target-genadmin') as HTMLSelectElement | null;
+        const modalBranch = document.getElementById('transfer-target-branch') as HTMLSelectElement | null;
+        const modalCouncil = document.getElementById('transfer-target-council') as HTMLSelectElement | null;
+
+        if (!modalSec || !modalGen || !modalBranch || !modalCouncil) return;
+
+        const updateGen = (s: string) => {
+            const gas = getGeneralAdminsForSector(s);
+            populateSelect(modalGen, gas);
+            updateBranch(s, modalGen.value);
+        };
+        const updateBranch = (s: string, ga: string) => {
+            const branches = getSubAdmins(s, ga);
+            populateSelect(modalBranch, branches);
+            updateCouncils(modalBranch.value);
+        };
+        const updateCouncils = (br: string) => {
+            const councils = getCouncilsForBranch(br);
+            populateSelect(modalCouncil, councils, 'المجلس الحالي (بدون تغيير)');
+        };
+
+        modalSec.onchange = () => updateGen(modalSec.value);
+        modalGen.onchange = () => updateBranch(modalSec.value, modalGen.value);
+        modalBranch.onchange = () => updateCouncils(modalBranch.value);
+    };
+
+    const openTransferModalForIds = (ids: number[], label: string) => {
+        if (!hasButtonPermission('transfer_transformers')) {
+            showToast('ليس لديك صلاحية تحويل المحولات.', 'error');
+            return;
+        }
+        if (ids.length === 0) {
+            showToast('يرجى تحديد محول واحد على الأقل للتحويل.', 'error');
+            return;
+        }
+        pendingTransferTransformerIds = ids;
+
+        const modal = document.getElementById('modal-transfer-transformers');
+        const countInfo = document.getElementById('transfer-transformers-count-info');
+        const modalSec = document.getElementById('transfer-target-sector') as HTMLSelectElement | null;
+        const modalGen = document.getElementById('transfer-target-genadmin') as HTMLSelectElement | null;
+        const modalBranch = document.getElementById('transfer-target-branch') as HTMLSelectElement | null;
+        const modalCouncil = document.getElementById('transfer-target-council') as HTMLSelectElement | null;
+
+        if (!modal || !modalSec || !modalGen || !modalBranch || !modalCouncil) return;
+
+        if (countInfo) {
+            countInfo.textContent = `جاري تجهيز تحويل (${ids.length}) محول [${label}] إلى إدارة أخرى:`;
+        }
+
+        const sectors = getAvailableSectors();
+        populateSelect(modalSec, sectors);
+
+        setupTransferModalCascades();
+        if (sectors.length > 0) {
+            modalSec.value = sectors[0];
+            const gas = getGeneralAdminsForSector(sectors[0]);
+            populateSelect(modalGen, gas);
+            if (gas.length > 0) {
+                modalGen.value = gas[0];
+                const branches = getSubAdmins(sectors[0], gas[0]);
+                populateSelect(modalBranch, branches);
+                if (branches.length > 0) {
+                    modalBranch.value = branches[0];
+                    populateSelect(modalCouncil, getCouncilsForBranch(branches[0]), 'المجلس الحالي (بدون تغيير)');
+                }
+            }
+        }
+
+        modal.style.display = 'flex';
+    };
+
+    (window as any).openTransferTransformerModal = (id: number) => {
+        const item = state.transformers.find(t => t.id === id);
+        const name = item?.transformerName || `محول #${id}`;
+        openTransferModalForIds([id], name);
+    };
+
+    const handleOpenTransferSelectedTransformersModal = () => {
+        const selected = Array.from(document.querySelectorAll('.transformer-row-checkbox:checked')) as HTMLInputElement[];
+        if (selected.length === 0) {
+            showToast('يرجى تحديد محول واحد على الأقل من الجدول.', 'warning');
+            return;
+        }
+        const ids = selected.map(cb => parseInt(cb.value, 10));
+        openTransferModalForIds(ids, `عدد ${ids.length} محول`);
+    };
+
+    const handleConfirmTransferTransformers = async () => {
+        if (pendingTransferTransformerIds.length === 0) return;
+        const targetSec = (document.getElementById('transfer-target-sector') as HTMLSelectElement)?.value || '';
+        const targetGen = (document.getElementById('transfer-target-genadmin') as HTMLSelectElement)?.value || '';
+        const targetBranch = (document.getElementById('transfer-target-branch') as HTMLSelectElement)?.value || '';
+        const targetCouncil = (document.getElementById('transfer-target-council') as HTMLSelectElement)?.value || '';
+
+        if (!targetBranch) {
+            showToast('يرجى اختيار الإدارة المستهدفة للتحويل.', 'error');
+            return;
+        }
+
+        let transferredCount = 0;
+        state.transformers.forEach(t => {
+            if (pendingTransferTransformerIds.includes(t.id)) {
+                t.sector = targetSec;
+                t.generalAdmin = targetGen;
+                t.subAdmin = targetBranch;
+                t.branch = targetBranch;
+                t.branchName = targetBranch;
+                if (targetCouncil && targetCouncil !== '') {
+                    t.councilName = targetCouncil;
+                }
+                transferredCount++;
+            }
+        });
+
+        logActivity('تحويل محولات', `تم تحويل ${transferredCount} محول إلى: ${targetBranch} (${targetGen} - ${targetSec})`);
+        await saveState();
+        showToast(`تم تحويل ${transferredCount} محول بنجاح إلى ${targetBranch}.`);
+
+        const modal = document.getElementById('modal-transfer-transformers');
+        if (modal) modal.style.display = 'none';
+        pendingTransferTransformerIds = [];
+        const selectAllCb = document.getElementById('select-all-transformers') as HTMLInputElement | null;
+        if (selectAllCb) selectAllCb.checked = false;
+        renderTransformerListSection();
+    };
+
+    // --- Bulk Delete Scope (Council or Branch) ---
+    const updateBulkDeleteScopeInfo = () => {
+        const branchSelect = document.getElementById('delete-scope-branch-select') as HTMLSelectElement | null;
+        const councilSelect = document.getElementById('delete-scope-council-select') as HTMLSelectElement | null;
+        const councilGroup = document.getElementById('delete-scope-council-group');
+        const countInfo = document.getElementById('delete-scope-count-info');
+        const isCouncil = (document.querySelector('input[name="delete-scope-type"]:checked') as HTMLInputElement)?.value === 'council';
+
+        if (councilGroup) {
+            councilGroup.style.display = isCouncil ? 'block' : 'none';
+        }
+
+        const chosenBranch = branchSelect?.value || '';
+        const chosenCouncil = councilSelect?.value || '';
+
+        let matchCount = 0;
+        if (isCouncil) {
+            matchCount = (state.transformers || []).filter(t =>
+                (t.subAdmin === chosenBranch || t.branch === chosenBranch) &&
+                t.councilName === chosenCouncil
+            ).length;
+            if (countInfo) {
+                countInfo.textContent = `عدد المحولات التابعة لمجلس "${chosenCouncil || 'غير محدد'}" في "${chosenBranch}": (${matchCount}) محول`;
+            }
+        } else {
+            matchCount = (state.transformers || []).filter(t =>
+                (t.subAdmin === chosenBranch || t.branch === chosenBranch)
+            ).length;
+            if (countInfo) {
+                countInfo.textContent = `إجمالي عدد المحولات التابعة لإدارة "${chosenBranch || 'غير محدد'}": (${matchCount}) محول`;
+            }
+        }
+    };
+
+    const handleOpenBulkDeleteScopeModal = () => {
+        if (!hasButtonPermission('bulk_delete_transformers_scope')) {
+            showToast('ليس لديك صلاحية حذف محولات مجلس أو إدارة كاملة.', 'error');
+            return;
+        }
+        const modal = document.getElementById('modal-bulk-delete-transformers');
+        const branchSelect = document.getElementById('delete-scope-branch-select') as HTMLSelectElement | null;
+        const councilSelect = document.getElementById('delete-scope-council-select') as HTMLSelectElement | null;
+        if (!modal || !branchSelect || !councilSelect) return;
+
+        const allBranches = getSubAdmins('all', 'all');
+        populateSelect(branchSelect, allBranches);
+
+        const updateCouncils = () => {
+            const councils = getCouncilsForBranch(branchSelect.value);
+            populateSelect(councilSelect, councils);
+            updateBulkDeleteScopeInfo();
+        };
+
+        branchSelect.onchange = updateCouncils;
+        councilSelect.onchange = updateBulkDeleteScopeInfo;
+        document.querySelectorAll('input[name="delete-scope-type"]').forEach(r => {
+            (r as HTMLInputElement).onchange = updateBulkDeleteScopeInfo;
+        });
+
+        if (allBranches.length > 0) {
+            branchSelect.value = allBranches[0];
+            updateCouncils();
+        }
+
+        modal.style.display = 'flex';
+    };
+
+    const handleConfirmBulkDeleteScopeTransformers = async () => {
+        if (!hasButtonPermission('bulk_delete_transformers_scope')) {
+            showToast('ليس لديك صلاحية حذف محولات مجلس أو إدارة كاملة.', 'error');
+            return;
+        }
+        const branchSelect = document.getElementById('delete-scope-branch-select') as HTMLSelectElement | null;
+        const councilSelect = document.getElementById('delete-scope-council-select') as HTMLSelectElement | null;
+        const isCouncil = (document.querySelector('input[name="delete-scope-type"]:checked') as HTMLInputElement)?.value === 'council';
+
+        const chosenBranch = branchSelect?.value || '';
+        const chosenCouncil = councilSelect?.value || '';
+
+        if (!chosenBranch) {
+            showToast('يرجى اختيار الإدارة.', 'error');
+            return;
+        }
+
+        let targetIds: number[] = [];
+        let desc = '';
+
+        if (isCouncil) {
+            if (!chosenCouncil) {
+                showToast('يرجى اختيار المجلس القروي.', 'error');
+                return;
+            }
+            targetIds = (state.transformers || []).filter(t =>
+                (t.subAdmin === chosenBranch || t.branch === chosenBranch) &&
+                t.councilName === chosenCouncil
+            ).map(t => t.id);
+            desc = `جميع محولات مجلس "${chosenCouncil}" في إدارة "${chosenBranch}"`;
+        } else {
+            targetIds = (state.transformers || []).filter(t =>
+                (t.subAdmin === chosenBranch || t.branch === chosenBranch)
+            ).map(t => t.id);
+            desc = `جميع محولات إدارة "${chosenBranch}" بالكامل`;
+        }
+
+        if (targetIds.length === 0) {
+            showToast('لا توجد أي محولات مطابقة لحذفها.', 'info');
+            return;
+        }
+
+        showConfirmationDialog('تأكيد الحذف الشامل والنهائي', `تحذير هام: هل أنت متأكد تماماً من رغبتك في حذف ${desc}؟ إجمالي العدد المستهدف للحذف هو (${targetIds.length}) محول. لا يمكن التراجع عن هذا الإجراء!`, async () => {
+            state.transformers = (state.transformers || []).filter(t => !targetIds.includes(t.id));
+            if (!state._deletedIds) state._deletedIds = { meters: [], debts: [], users: [], transformers: [] };
+            if (!state._deletedIds.transformers) state._deletedIds.transformers = [];
+            state._deletedIds.transformers.push(...targetIds);
+
+            logActivity('حذف مجمّع محولات', `تم حذف ${targetIds.length} محول من: ${desc}`);
+            await saveState();
+            showToast(`تم حذف ${targetIds.length} محول بنجاح.`);
+
+            const modal = document.getElementById('modal-bulk-delete-transformers');
+            if (modal) modal.style.display = 'none';
+            renderTransformerListSection();
+        });
+    };
+
+    // --- Excel Export Functionality ---
+    const handleExportTransformersExcel = async () => {
+        if (!hasButtonPermission('export_transformers_excel')) {
+            showToast('ليس لديك صلاحية تصدير إكسيل للمحولات.', 'error');
+            return;
+        }
+        try {
+            await ensureSheetJSLoaded();
+
+            const nameFilter = (document.getElementById('filter-transformer-name') as HTMLInputElement)?.value.toLowerCase() || '';
+            const chassisFilter = (document.getElementById('filter-transformer-chassis') as HTMLInputElement)?.value.toLowerCase() || '';
+            const sectorFilter = (document.getElementById('filter-transformer-sector') as HTMLSelectElement)?.value || 'all';
+            const genAdminFilter = (document.getElementById('filter-transformer-genadmin') as HTMLSelectElement)?.value || 'all';
+            const branchFilter = (document.getElementById('filter-transformer-branch') as HTMLSelectElement)?.value || 'all';
+            const councilFilter = (document.getElementById('filter-transformer-council') as HTMLSelectElement)?.value || 'all';
+
+            const dataToExport = (state.transformers || []).filter(t => {
+                if (!matchesCurrentScope(t)) return false;
+                if (nameFilter && !(t.transformerName || '').toLowerCase().includes(nameFilter)) return false;
+                if (chassisFilter && !(t.smartMeterChassis || '').toLowerCase().includes(chassisFilter)) return false;
+                if (sectorFilter && sectorFilter !== 'all' && (t.sector || '') !== sectorFilter) return false;
+                if (genAdminFilter && genAdminFilter !== 'all' && (t.generalAdmin || '') !== genAdminFilter) return false;
+                if (branchFilter && branchFilter !== 'all' && (t.subAdmin || t.branch || '') !== branchFilter) return false;
+                if (councilFilter && councilFilter !== 'all' && (t.councilName || '') !== councilFilter) return false;
+                return true;
+            });
+
+            if (dataToExport.length === 0) {
+                showToast('لا توجد بيانات محولات لتصديرها.', 'info');
+                return;
+            }
+
+            const exportRows = dataToExport.map((t, idx) => ({
+                'م': idx + 1,
+                'القطاع': t.sector || '-',
+                'الإدارة العامة': t.generalAdmin || '-',
+                'الإدارة الفرعية': t.subAdmin || t.branch || '-',
+                'المجلس': t.councilName || '-',
+                'اسم المحول': t.transformerName || '-',
+                'العنوان': t.transformerAddress || '-',
+                'نوع المحول': t.transformerType || '-',
+                'القدرة (ك.ف.أ)': t.transformerCapacityKVA || '',
+                'شاسية العداد': t.smartMeterChassis || '-',
+                'رقم الشريحة': t.simCardNumber || '-',
+                'قدرة محولات التيار': t.currentTransformerCapacity || '-'
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(exportRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'قائمة المحولات');
+            const todayStr = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(workbook, `قائمة_المحولات_${todayStr}.xlsx`);
+            logActivity('تصدير محولات', `تم تصدير ${exportRows.length} محول إلى ملف إكسيل`);
+            showToast(`تم تصدير ${exportRows.length} محول بنجاح.`);
+        } catch (err) {
+            console.error('Error exporting transformers excel:', err);
+            showToast('حدث خطأ أثناء تصدير ملف الإكسيل.', 'error');
+        }
+    };
+
+    // --- Excel Import Functionality ---
     const handleImportTransformersExcel = async (event: Event) => {
-        const file = (event.target as HTMLInputElement).files?.[0];
+        if (!hasButtonPermission('import_transformers_excel')) {
+            showToast('ليس لديك صلاحية استيراد إكسيل للمحولات.', 'error');
+            return;
+        }
+        const fileInput = event.target as HTMLInputElement;
+        const file = fileInput.files?.[0];
         if (!file) return;
         try {
             await ensureSheetJSLoaded();
@@ -10246,12 +10780,22 @@ const handlePrintJudicialControlDetails = () => {
                 const jsonData: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
                 const transformerExcelHeaderMap: { [key: string]: keyof DataItem } = {
+                    'القطاع': 'sector',
+                    'قطاع': 'sector',
+                    'الإدارة العامة': 'generalAdmin',
+                    'الادارة العامة': 'generalAdmin',
+                    'الإدارة الفرعية': 'subAdmin',
+                    'الادارة الفرعية': 'subAdmin',
+                    'الهندسة': 'subAdmin',
+                    'الفرع': 'subAdmin',
                     'اسم المجلس': 'councilName',
                     'المجلس': 'councilName',
                     'اسم المحول': 'transformerName',
                     'الكشك': 'transformerName',
                     'اسم المحول / الكشك': 'transformerName',
                     'العنوان': 'transformerAddress',
+                    'النوع': 'transformerType',
+                    'نوع المحول': 'transformerType',
                     'قدرة المحول': 'transformerCapacityKVA',
                     'القدرة': 'transformerCapacityKVA',
                     'شاسية العداد': 'smartMeterChassis',
@@ -10262,6 +10806,10 @@ const handlePrintJudicialControlDetails = () => {
                 };
 
                 const timestamp = Date.now();
+                const defaultSector = loggedInUser?.sector || 'قطاع شمال المنيا';
+                const defaultGen = loggedInUser?.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
+                const defaultBranch = loggedInUser?.subAdmin || loggedInUser?.branch || 'هندسة كهرباء بني مزار';
+
                 const mappedData = jsonData.map((row, index) => {
                     const item: DataItem = { id: timestamp + index };
                     Object.keys(row).forEach(key => {
@@ -10272,11 +10820,27 @@ const handlePrintJudicialControlDetails = () => {
                             (item as any)[mappedKey] = val;
                         }
                     });
+                    if (!item.sector) item.sector = defaultSector;
+                    if (!item.generalAdmin) item.generalAdmin = defaultGen;
+                    if (!item.subAdmin) item.subAdmin = item.branch || defaultBranch;
+                    item.branch = item.subAdmin;
+                    item.branchName = item.subAdmin;
+
+                    // Automatically add new council to branch if not present
+                    if (item.councilName && item.subAdmin) {
+                        if (!state.settings.branchCouncils) state.settings.branchCouncils = {};
+                        if (!state.settings.branchCouncils[item.subAdmin]) state.settings.branchCouncils[item.subAdmin] = [];
+                        if (!state.settings.branchCouncils[item.subAdmin].includes(item.councilName)) {
+                            state.settings.branchCouncils[item.subAdmin].push(item.councilName);
+                        }
+                    }
+
                     return item;
                 }).filter(item => item.transformerName);
 
                 if (mappedData.length === 0) {
                     showToast('لم يتم العثور على بيانات محولات صالحة في الملف.', 'error');
+                    fileInput.value = '';
                     return;
                 }
 
@@ -10299,10 +10863,12 @@ const handlePrintJudicialControlDetails = () => {
                 logActivity('استيراد محولات', `تم استيراد ${mappedData.length} محول (إضافة: ${addedCount}، تحديث: ${updatedCount})`);
                 await saveState();
                 showToast(`تم الاستيراد بنجاح: ${addedCount} جديد، ${updatedCount} تم تحديثه.`);
+                fileInput.value = '';
                 renderTransformerListSection();
             };
             reader.readAsArrayBuffer(file);
         } catch (err) {
+            fileInput.value = '';
             showToast('فشل في استيراد ملف الإكسل. تأكد من الصيغة.', 'error');
         }
     };
@@ -22995,6 +23561,103 @@ const handlePrintJudicialControlDetails = () => {
 
 
 
+    const renderBranchCouncilsInSettings = () => {
+        const branchSelect = document.getElementById('council-settings-branch-select') as HTMLSelectElement | null;
+        const listEl = document.getElementById('councilNames-branch-list');
+        if (!branchSelect || !listEl) return;
+
+        const allBranches = getSubAdmins('all', 'all');
+        if (branchSelect.options.length === 0) {
+            allBranches.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b;
+                opt.textContent = b;
+                branchSelect.appendChild(opt);
+            });
+            const userBr = loggedInUser?.subAdmin || loggedInUser?.branch;
+            if (userBr && allBranches.includes(userBr)) {
+                branchSelect.value = userBr;
+            } else if (allBranches.length > 0) {
+                branchSelect.value = allBranches[0];
+            }
+            branchSelect.onchange = () => renderBranchCouncilsInSettings();
+        }
+
+        const activeBranch = branchSelect.value;
+        if (!state.settings.branchCouncils) state.settings.branchCouncils = {};
+        if (!state.settings.branchCouncils[activeBranch]) {
+            state.settings.branchCouncils[activeBranch] = [];
+        }
+
+        const councils = state.settings.branchCouncils[activeBranch] || [];
+        listEl.innerHTML = '';
+
+        if (councils.length === 0) {
+            listEl.innerHTML = '<li class="empty-list-placeholder" style="color: #64748b; padding: 10px;">لا توجد مجالس قروية مسجلة لهذه الإدارة. يمكنك إضافة مجلس من النموذج أدناه.</li>';
+        } else {
+            councils.forEach((cName, idx) => {
+                const li = document.createElement('li');
+                li.style.display = 'flex';
+                li.style.justifyContent = 'space-between';
+                li.style.alignItems = 'center';
+                li.style.padding = '8px 12px';
+                li.style.borderBottom = '1px solid #f1f5f9';
+
+                const span = document.createElement('span');
+                span.textContent = cName;
+                span.style.fontWeight = '500';
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'btn btn-delete';
+                delBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+                delBtn.title = 'حذف المجلس من هذه الإدارة';
+                delBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showConfirmationDialog('تأكيد حذف المجلس', `هل أنت متأكد من حذف مجلس "${cName}" من إدارة "${activeBranch}"؟`, async () => {
+                        state.settings.branchCouncils![activeBranch].splice(idx, 1);
+                        await saveState();
+                        renderBranchCouncilsInSettings();
+                        showToast(`تم حذف مجلس "${cName}" بنجاح.`);
+                    });
+                };
+
+                li.appendChild(span);
+                li.appendChild(delBtn);
+                listEl.appendChild(li);
+            });
+        }
+
+        const addBtn = document.getElementById('btn-add-council-to-branch');
+        if (addBtn) {
+            addBtn.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const input = document.getElementById('new-councilNames-input') as HTMLInputElement | null;
+                if (!input) return;
+                const cVal = input.value.trim();
+                if (!cVal) {
+                    showToast('يرجى إدخال اسم المجلس القروي.', 'error');
+                    return;
+                }
+                if (!state.settings.branchCouncils) state.settings.branchCouncils = {};
+                if (!state.settings.branchCouncils[activeBranch]) state.settings.branchCouncils[activeBranch] = [];
+                if (state.settings.branchCouncils[activeBranch].includes(cVal)) {
+                    showToast('هذا المجلس مسجل بالفعل لهذه الإدارة.', 'warning');
+                    return;
+                }
+                state.settings.branchCouncils[activeBranch].push(cVal);
+                if (!state.settings.councilNames.includes(cVal)) {
+                    state.settings.councilNames.push(cVal);
+                }
+                await saveState();
+                input.value = '';
+                renderBranchCouncilsInSettings();
+                showToast(`تمت إضافة مجلس "${cVal}" إلى ${activeBranch} بنجاح.`);
+            };
+        }
+    };
+
     let settingsSectionRendered = false;
     const renderSettingsSection = (force = true) => {
         if (!force && settingsSectionRendered) return;
@@ -23018,21 +23681,38 @@ const handlePrintJudicialControlDetails = () => {
                         case 'mukayasatSignatures': title = 'توقيعات المعاينات'; break;
                         case 'faultyMeterSignatures': title = 'توقيعات العدادات المرفوعة أعطال'; break;
                         case 'meterSupplyCompanies': title = 'شركات توريد العدادات'; break;
-                        case 'councilNames': title = 'أسماء المجالس القروية'; break;
+                        case 'councilNames': title = 'أسماء المجالس القروية لكل إدارة فرعية'; break;
                     }
 
-                    div.innerHTML = `
-                    <h4>${title}</h4>
-                    <ul></ul>
-                    <div class="add-item-form">
-                        <input type="text" id="new-${key}-input" placeholder="${key === 'councilNames' ? 'اسم مجلس قروي جديد...' : 'توقيع جديد...'}">
-                        <button class="btn" data-list="${key}">إضافة</button>
-                    </div>
-                `;
+                    if (key === 'councilNames') {
+                        div.innerHTML = `
+                        <h4>${title}</h4>
+                        <div style="margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <label for="council-settings-branch-select" style="font-weight: 600; color: #1e293b;">اختر الإدارة الفرعية / الهندسة:</label>
+                            <select id="council-settings-branch-select" style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #cbd5e1; font-weight: 500; min-width: 220px;"></select>
+                        </div>
+                        <ul id="councilNames-branch-list" class="managed-list"></ul>
+                        <div class="add-item-form">
+                            <input type="text" id="new-councilNames-input" placeholder="اسم مجلس قروي جديد لهذه الإدارة...">
+                            <button type="button" class="btn" id="btn-add-council-to-branch">إضافة للمجلس</button>
+                        </div>
+                    `;
+                    } else {
+                        div.innerHTML = `
+                        <h4>${title}</h4>
+                        <ul></ul>
+                        <div class="add-item-form">
+                            <input type="text" id="new-${key}-input" placeholder="توقيع جديد...">
+                            <button class="btn" data-list="${key}">إضافة</button>
+                        </div>
+                    `;
+                    }
                     referenceContainer.parentElement?.insertBefore(div, referenceContainer.nextSibling);
                 }
             });
         }
+
+        renderBranchCouncilsInSettings();
 
         // Inject Error Codes Management
         if (!document.getElementById('error-codes-management-container')) {
@@ -23099,12 +23779,12 @@ const handlePrintJudicialControlDetails = () => {
             referenceContainer?.parentElement?.appendChild(div);
         }
         // Add new list keys for transformer management
-        const listKeys: (SettingsListKey | 'roles')[] = ['roles', 'technicians', 'technicalEngineers', 'headEngineers', 'addresses', 'placeDescriptions', 'councilNames', 'transformerTypes', 'currentTransformerCapacities', 'subscriptionTypes', 'meterTypes', 'errorCodeMeterTypes', 'meterCapacities', 'activityTypes', 'repairStatuses', 'removalReasons', 'replacementSignatures', 'generalSignatures', 'cardStatuses', 'memoTypes', 'judicialSignatures', 'collectionSignatures', 'mukayasatSignatures', 'faultyMeterSignatures', 'meterSupplyCompanies'];
+        const listKeys: (SettingsListKey | 'roles')[] = ['roles', 'technicians', 'technicalEngineers', 'headEngineers', 'addresses', 'placeDescriptions', 'transformerTypes', 'currentTransformerCapacities', 'subscriptionTypes', 'meterTypes', 'errorCodeMeterTypes', 'meterCapacities', 'activityTypes', 'repairStatuses', 'removalReasons', 'replacementSignatures', 'generalSignatures', 'cardStatuses', 'memoTypes', 'judicialSignatures', 'collectionSignatures', 'mukayasatSignatures', 'faultyMeterSignatures', 'meterSupplyCompanies'];
 
         listKeys.forEach(key => renderManagedList(key));
 
         // ربط أزرار القوائم بعد كل عملية إعادة رسم لضمان عملها للعناصر الديناميكية
-        (['addresses', 'meterSupplyCompanies', 'councilNames', 'meterTypes'] as const).forEach(listKey => {
+        (['addresses', 'meterSupplyCompanies', 'meterTypes'] as const).forEach(listKey => {
             const listContainer = document.getElementById(`${listKey}-list-container`);
             if (!listContainer) return;
 
@@ -26187,9 +26867,22 @@ const setupOrgHierarchyEvents = () => {
             element?.addEventListener('input', calculateTransformerLoadAutoValues);
         });
         document.getElementById('print-transformers-list-btn')?.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
+        document.getElementById('export-transformers-excel-btn')?.addEventListener('click', handleExportTransformersExcel);
         document.getElementById('import-transformers-excel-trigger')?.addEventListener('click', () => document.getElementById('transformers-excel-upload')?.click());
         document.getElementById('transformers-excel-upload')?.addEventListener('change', handleImportTransformersExcel);
+        document.getElementById('transfer-selected-transformers-btn')?.addEventListener('click', handleOpenTransferSelectedTransformersModal);
+        document.getElementById('btn-confirm-transfer-transformers')?.addEventListener('click', handleConfirmTransferTransformers);
+        document.getElementById('delete-scope-transformers-btn')?.addEventListener('click', handleOpenBulkDeleteScopeModal);
+        document.getElementById('btn-confirm-delete-scope-transformers')?.addEventListener('click', handleConfirmBulkDeleteScopeTransformers);
         document.getElementById('delete-selected-transformers-btn')?.addEventListener('click', handleDeleteSelectedTransformers);
+
+        // Close modal buttons for transformer transfer and bulk delete modals
+        document.querySelectorAll('#modal-transfer-transformers .close-modal, #modal-bulk-delete-transformers .close-modal').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const modal = (e.target as HTMLElement).closest('.modal') as HTMLElement | null;
+                if (modal) modal.style.display = 'none';
+            });
+        });
 
         // Transformer List Filters
         ['filter-transformer-name', 'filter-transformer-chassis'].forEach(id => {

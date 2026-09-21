@@ -157,6 +157,12 @@ let state = {
         collectionSignatures: [],
         mukayasatSignatures: [],
         councilNames: [' مجلس قروي بني صامت', 'العدوة', 'مطاي', 'سمالوط'], // Default council names
+        branchCouncils: {
+            'هندسة كهرباء بني مزار': ['مجلس قروي بني علي', 'مجلس قروي صندفا', 'مجلس قروي القيس', 'مجلس قروي شلقام', 'مجلس قروي بني صامت', 'مجلس قروي أبو جرج'],
+            'هندسة كهرباء مغاغة': ['مجلس قروي أبا الوقف', 'مجلس قروي برطباط', 'مجلس قروي شم البحرية', 'مجلس قروي ميانة', 'مجلس قروي طنبدي'],
+            'هندسة كهرباء العدوة': ['مجلس قروي بني وركان', 'مجلس قروي صفانية', 'مجلس قروي عطف حيدر', 'مجلس قروي البسقلون'],
+            'هندسة كهرباء مطاي': ['مجلس قروي بردنوها', 'مجلس قروي حلوة', 'مجلس قروي منبال', 'مجلس قروي أبو عزيز']
+        },
         transformerTypes: ['كشك', 'غرفة', 'عامود', 'سورتية'], // Default transformer types
         currentTransformerCapacities: ['200/5', '400/5', '500/5', '600/5'], // Default CT capacities
         faultyMeterSignatures: [],
@@ -278,6 +284,10 @@ let state = {
             'print_list_button': { name: 'زر طباعة القوائم', roles: ['admin', 'supervisor', 'reports'] },
             'bulk_delete_subscribers': { name: 'زر الحذف المتعدد (جميع المشتركين)', roles: ['admin'] },
             'bulk_edit_subscribers': { name: 'قسم التعديلات الجماعية أعلى جدول المشتركين', roles: ['admin', 'supervisor'] },
+            'export_transformers_excel': { name: 'زر تصدير إكسيل للمحولات', roles: ['admin', 'supervisor', 'reports'] },
+            'import_transformers_excel': { name: 'زر استيراد إكسيل للمحولات', roles: ['admin'] },
+            'transfer_transformers': { name: 'زر تحويل المحولات لإدارة أخرى', roles: ['admin', 'supervisor'] },
+            'bulk_delete_transformers_scope': { name: 'زر حذف محولات مجلس كامل أو إدارة كاملة', roles: ['admin'] },
         },
         reportPermissions: {
             'all-meters': { name: 'تقرير جميع العدادات', roles: ['admin', 'supervisor', 'reports'] },
@@ -464,6 +474,13 @@ const getSubAdmins = (selectedSector, selectedGeneralAdmin) => {
         }
     });
     return Array.from(list);
+};
+const getCouncilsForBranch = (branchName) => {
+    const b = (branchName || ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) || '')).trim();
+    if (b && state.settings && state.settings.branchCouncils && Array.isArray(state.settings.branchCouncils[b]) && state.settings.branchCouncils[b].length > 0) {
+        return state.settings.branchCouncils[b];
+    }
+    return (state.settings && state.settings.councilNames) ? state.settings.councilNames : [];
 };
 // عمليات إدارة الهيكل الإداري (إضافة، تعديل، حذف)
 // دالة التحقق مما إذا كان المستخدم مديراً للنظام
@@ -1556,6 +1573,21 @@ const loadState = async () => {
         }
         if (mergedState._deletedIds.transformers && mergedState._deletedIds.transformers.length > 0) {
             mergedState.transformers = (mergedState.transformers || []).filter((t) => !mergedState._deletedIds.transformers.includes(t.id));
+        }
+        if (!mergedState.settings.branchCouncils || typeof mergedState.settings.branchCouncils !== 'object') {
+            mergedState.settings.branchCouncils = JSON.parse(JSON.stringify(defaultState.settings.branchCouncils || {}));
+        }
+        if (Array.isArray(mergedState.transformers)) {
+            mergedState.transformers.forEach((t) => {
+                if (!t.sector)
+                    t.sector = 'قطاع شمال المنيا';
+                if (!t.generalAdmin)
+                    t.generalAdmin = 'الإدارة العامة لهندسات شمال المنيا';
+                if (!t.subAdmin)
+                    t.subAdmin = t.branch || 'هندسة كهرباء بني مزار';
+                if (!t.branch)
+                    t.branch = t.subAdmin;
+            });
         }
         if (Array.isArray(mergedState.users)) {
             mergedState.users = mergedState.users.filter((u) => u && typeof u === 'object' && u.username && u.password && u.fullName);
@@ -8956,8 +8988,45 @@ const renderTransformerRegistrationForm = (transformerId) => {
         saveBtn.style.display = 'block';
     const formTitle = document.getElementById('transformer-form-title');
     const transformerIdInput = document.getElementById('transformer-id');
-    // Populate dropdowns
-    populateSelect(document.getElementById('councilName'), state.settings.councilNames, 'اختر المجلس...');
+    // Administrative Hierarchy Dropdowns
+    const sectorSelect = document.getElementById('transformer-sector');
+    const genAdminSelect = document.getElementById('transformer-genadmin');
+    const branchSelect = document.getElementById('transformer-branch');
+    const councilSelect = document.getElementById('councilName');
+    const availableSectors = getAvailableSectors();
+    if (sectorSelect) {
+        populateSelect(sectorSelect, availableSectors);
+    }
+    const updateGenAdmins = (selectedSec) => {
+        if (!genAdminSelect)
+            return;
+        const gas = getGeneralAdminsForSector(selectedSec);
+        populateSelect(genAdminSelect, gas);
+        updateBranches(selectedSec, genAdminSelect.value);
+    };
+    const updateBranches = (selectedSec, selectedGen) => {
+        if (!branchSelect)
+            return;
+        const branches = getSubAdmins(selectedSec, selectedGen);
+        populateSelect(branchSelect, branches);
+        updateCouncils(branchSelect.value);
+    };
+    const updateCouncils = (selectedBranch) => {
+        if (!councilSelect)
+            return;
+        const councils = getCouncilsForBranch(selectedBranch);
+        populateSelect(councilSelect, councils, 'اختر المجلس...');
+    };
+    if (sectorSelect) {
+        sectorSelect.onchange = () => updateGenAdmins(sectorSelect.value);
+    }
+    if (genAdminSelect) {
+        genAdminSelect.onchange = () => updateBranches((sectorSelect === null || sectorSelect === void 0 ? void 0 : sectorSelect.value) || '', genAdminSelect.value);
+    }
+    if (branchSelect) {
+        branchSelect.onchange = () => updateCouncils(branchSelect.value);
+    }
+    // Populate other dropdowns
     populateSelect(document.getElementById('transformerType'), state.settings.transformerTypes, 'اختر النوع...');
     populateSelect(document.getElementById('transformerAddress'), state.settings.addresses, 'اختر العنوان...');
     populateSelect(document.getElementById('currentTransformerCapacity'), state.settings.currentTransformerCapacities, 'اختر القدرة...');
@@ -8966,7 +9035,18 @@ const renderTransformerRegistrationForm = (transformerId) => {
         if (transformer) {
             formTitle.textContent = 'تعديل بيانات المحول';
             transformerIdInput.value = String(transformer.id);
-            document.getElementById('councilName').value = transformer.councilName || '';
+            if (sectorSelect && transformer.sector)
+                sectorSelect.value = transformer.sector;
+            updateGenAdmins((sectorSelect === null || sectorSelect === void 0 ? void 0 : sectorSelect.value) || availableSectors[0]);
+            if (genAdminSelect && transformer.generalAdmin)
+                genAdminSelect.value = transformer.generalAdmin;
+            updateBranches((sectorSelect === null || sectorSelect === void 0 ? void 0 : sectorSelect.value) || '', (genAdminSelect === null || genAdminSelect === void 0 ? void 0 : genAdminSelect.value) || '');
+            const currentBranch = transformer.subAdmin || transformer.branch || '';
+            if (branchSelect && currentBranch)
+                branchSelect.value = currentBranch;
+            updateCouncils((branchSelect === null || branchSelect === void 0 ? void 0 : branchSelect.value) || currentBranch);
+            if (councilSelect)
+                councilSelect.value = transformer.councilName || '';
             document.getElementById('transformerName').value = transformer.transformerName || '';
             document.getElementById('transformerAddress').value = transformer.transformerAddress || '';
             document.getElementById('transformerType').value = transformer.transformerType || '';
@@ -8979,12 +9059,25 @@ const renderTransformerRegistrationForm = (transformerId) => {
     else {
         formTitle.textContent = 'تسجيل محول جديد';
         transformerIdInput.value = '';
+        const defaultSector = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector) && loggedInUser.sector !== 'all' ? loggedInUser.sector : availableSectors[0];
+        if (sectorSelect)
+            sectorSelect.value = defaultSector;
+        updateGenAdmins(defaultSector);
+        const defaultGen = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.generalAdmin) && loggedInUser.generalAdmin !== 'all' ? loggedInUser.generalAdmin : ((genAdminSelect === null || genAdminSelect === void 0 ? void 0 : genAdminSelect.value) || '');
+        if (genAdminSelect && defaultGen)
+            genAdminSelect.value = defaultGen;
+        updateBranches((sectorSelect === null || sectorSelect === void 0 ? void 0 : sectorSelect.value) || '', (genAdminSelect === null || genAdminSelect === void 0 ? void 0 : genAdminSelect.value) || '');
+        const defaultBranch = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) && loggedInUser.subAdmin !== 'all' ? loggedInUser.subAdmin : ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) || (branchSelect === null || branchSelect === void 0 ? void 0 : branchSelect.value) || '');
+        if (branchSelect && defaultBranch)
+            branchSelect.value = defaultBranch;
+        updateCouncils((branchSelect === null || branchSelect === void 0 ? void 0 : branchSelect.value) || defaultBranch);
     }
     document.querySelectorAll('.content-section.active').forEach(s => s.classList.remove('active'));
     (_a = document.getElementById('transformer-registration')) === null || _a === void 0 ? void 0 : _a.classList.add('active');
     setPageTitle('تسجيل محول');
 };
 const handleTransformerRegistrationSubmit = async (event) => {
+    var _a, _b, _c;
     event.preventDefault();
     const form = event.target;
     if (!validateForm(form)) {
@@ -8997,8 +9090,16 @@ const handleTransformerRegistrationSubmit = async (event) => {
         return;
     }
     const id = idInput.value ? parseInt(idInput.value, 10) : Date.now();
+    const chosenSector = ((_a = document.getElementById('transformer-sector')) === null || _a === void 0 ? void 0 : _a.value) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector) || 'قطاع شمال المنيا';
+    const chosenGenAdmin = ((_b = document.getElementById('transformer-genadmin')) === null || _b === void 0 ? void 0 : _b.value) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.generalAdmin) || 'الإدارة العامة لهندسات شمال المنيا';
+    const chosenBranch = ((_c = document.getElementById('transformer-branch')) === null || _c === void 0 ? void 0 : _c.value) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) || 'هندسة كهرباء بني مزار';
     const newTransformer = {
         id: id,
+        sector: chosenSector,
+        generalAdmin: chosenGenAdmin,
+        subAdmin: chosenBranch,
+        branch: chosenBranch,
+        branchName: chosenBranch,
         councilName: document.getElementById('councilName').value,
         transformerName: document.getElementById('transformerName').value,
         transformerAddress: document.getElementById('transformerAddress').value,
@@ -9027,30 +9128,134 @@ const handleTransformerRegistrationSubmit = async (event) => {
         renderTransformerListSection(); // تحديث قائمة المحولات في الخلفية
     }
 };
+let transformerListFiltersInitialized = false;
+const initTransformerListFilters = () => {
+    const sectorFilter = document.getElementById('filter-transformer-sector');
+    const genAdminFilter = document.getElementById('filter-transformer-genadmin');
+    const branchFilter = document.getElementById('filter-transformer-branch');
+    const councilFilter = document.getElementById('filter-transformer-council');
+    if (!sectorFilter || !genAdminFilter || !branchFilter || !councilFilter)
+        return;
+    const populateGenAdminsFilter = (sec) => {
+        const gas = sec && sec !== 'all' ? getGeneralAdminsForSector(sec) : getGeneralAdminsForSector('all');
+        populateSelect(genAdminFilter, gas, 'جميع الإدارات العامة');
+        populateBranchesFilter(sec, genAdminFilter.value);
+    };
+    const populateBranchesFilter = (sec, ga) => {
+        const branches = getSubAdmins(sec || 'all', ga || 'all');
+        populateSelect(branchFilter, branches, 'جميع الفروع / الهندسات');
+        populateCouncilsFilter(branchFilter.value);
+    };
+    const populateCouncilsFilter = (br) => {
+        const councils = br && br !== 'all' ? getCouncilsForBranch(br) : (state.settings.councilNames || []);
+        populateSelect(councilFilter, councils, 'جميع المجالس');
+    };
+    const sectors = getAvailableSectors();
+    populateSelect(sectorFilter, sectors, 'جميع القطاعات');
+    populateGenAdminsFilter(sectorFilter.value);
+    sectorFilter.onchange = () => {
+        populateGenAdminsFilter(sectorFilter.value);
+        renderTransformerListSection();
+    };
+    genAdminFilter.onchange = () => {
+        populateBranchesFilter(sectorFilter.value, genAdminFilter.value);
+        renderTransformerListSection();
+    };
+    branchFilter.onchange = () => {
+        populateCouncilsFilter(branchFilter.value);
+        renderTransformerListSection();
+    };
+    councilFilter.onchange = () => {
+        renderTransformerListSection();
+    };
+    // If logged-in user is not admin and has a specific branch scope, lock filters to their branch
+    if (!isSystemAdmin(loggedInUser) && (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) && loggedInUser.branch !== 'all') {
+        if (loggedInUser.sector && loggedInUser.sector !== 'all') {
+            sectorFilter.value = loggedInUser.sector;
+            sectorFilter.disabled = true;
+            populateGenAdminsFilter(sectorFilter.value);
+        }
+        if (loggedInUser.generalAdmin && loggedInUser.generalAdmin !== 'all') {
+            genAdminFilter.value = loggedInUser.generalAdmin;
+            genAdminFilter.disabled = true;
+            populateBranchesFilter(sectorFilter.value, genAdminFilter.value);
+        }
+        const userBr = loggedInUser.subAdmin || loggedInUser.branch;
+        branchFilter.value = userBr;
+        branchFilter.disabled = true;
+        populateCouncilsFilter(userBr);
+    }
+    transformerListFiltersInitialized = true;
+};
 const renderTransformerListSection = () => {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f;
     const table = document.getElementById('transformers-table');
     const tbody = table === null || table === void 0 ? void 0 : table.querySelector('tbody');
     if (!tbody)
         return;
-    console.log('Rendering transformer list. Current state.transformers:', state.transformers); // Added log
+    if (!transformerListFiltersInitialized) {
+        initTransformerListFilters();
+    }
+    // Apply permissions to toolbar buttons
+    const transferBtn = document.getElementById('transfer-selected-transformers-btn');
+    if (transferBtn)
+        transferBtn.style.display = hasButtonPermission('transfer_transformers') ? 'inline-flex' : 'none';
+    const deleteScopeBtn = document.getElementById('delete-scope-transformers-btn');
+    if (deleteScopeBtn)
+        deleteScopeBtn.style.display = hasButtonPermission('bulk_delete_transformers_scope') ? 'inline-flex' : 'none';
+    const deleteSelectedBtn = document.getElementById('delete-selected-transformers-btn');
+    if (deleteSelectedBtn)
+        deleteSelectedBtn.style.display = hasButtonPermission('delete_button') ? 'inline-flex' : 'none';
+    const exportBtn = document.getElementById('export-transformers-excel-btn');
+    if (exportBtn)
+        exportBtn.style.display = hasButtonPermission('export_transformers_excel') ? 'inline-flex' : 'none';
+    const importBtn = document.getElementById('import-transformers-excel-trigger');
+    if (importBtn)
+        importBtn.style.display = hasButtonPermission('import_transformers_excel') ? 'inline-flex' : 'none';
+    const printBtn = document.getElementById('print-transformers-list-btn');
+    if (printBtn)
+        printBtn.style.display = hasButtonPermission('print_list_button') ? 'inline-flex' : 'none';
     const nameFilter = ((_a = document.getElementById('filter-transformer-name')) === null || _a === void 0 ? void 0 : _a.value.toLowerCase()) || '';
     const chassisFilter = ((_b = document.getElementById('filter-transformer-chassis')) === null || _b === void 0 ? void 0 : _b.value.toLowerCase()) || '';
-    const filtered = (state.transformers || []).filter(t => matchesCurrentScope(t) &&
-        (!nameFilter || (t.transformerName || '').toLowerCase().includes(nameFilter)) &&
-        (!chassisFilter || (t.smartMeterChassis || '').toLowerCase().includes(chassisFilter)));
+    const sectorFilter = ((_c = document.getElementById('filter-transformer-sector')) === null || _c === void 0 ? void 0 : _c.value) || 'all';
+    const genAdminFilter = ((_d = document.getElementById('filter-transformer-genadmin')) === null || _d === void 0 ? void 0 : _d.value) || 'all';
+    const branchFilter = ((_e = document.getElementById('filter-transformer-branch')) === null || _e === void 0 ? void 0 : _e.value) || 'all';
+    const councilFilter = ((_f = document.getElementById('filter-transformer-council')) === null || _f === void 0 ? void 0 : _f.value) || 'all';
+    const filtered = (state.transformers || []).filter(t => {
+        if (!matchesCurrentScope(t))
+            return false;
+        if (nameFilter && !(t.transformerName || '').toLowerCase().includes(nameFilter))
+            return false;
+        if (chassisFilter && !(t.smartMeterChassis || '').toLowerCase().includes(chassisFilter))
+            return false;
+        if (sectorFilter && sectorFilter !== 'all' && (t.sector || '') !== sectorFilter)
+            return false;
+        if (genAdminFilter && genAdminFilter !== 'all' && (t.generalAdmin || '') !== genAdminFilter)
+            return false;
+        if (branchFilter && branchFilter !== 'all' && (t.subAdmin || t.branch || '') !== branchFilter)
+            return false;
+        if (councilFilter && councilFilter !== 'all' && (t.councilName || '') !== councilFilter)
+            return false;
+        return true;
+    });
     tbody.innerHTML = '';
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">لا توجد بيانات محولات مطابقة.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding: 20px; color: #64748b;">لا توجد بيانات محولات مطابقة للبحث أو الصلاحية الحالية.</td></tr>';
         return;
     }
+    const canView = hasButtonPermission('view_button');
+    const canTransfer = hasButtonPermission('transfer_transformers');
+    const canEdit = hasButtonPermission('edit_button');
+    const canDelete = hasButtonPermission('delete_button');
     filtered.forEach(item => {
-        var _a, _b;
         const row = document.createElement('tr');
         row.innerHTML = `
             <td><input type="checkbox" class="transformer-row-checkbox" value="${item.id}"></td>
+            <td><span style="font-size: 0.85rem; font-weight: 600; color: #475569;">${item.sector || '-'}</span></td>
+            <td><span style="font-size: 0.85rem; font-weight: 600; color: #0284c7;">${item.generalAdmin || '-'}</span></td>
+            <td><span style="display: inline-block; padding: 2px 6px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: 600; font-size: 11px;">${item.subAdmin || item.branch || '-'}</span></td>
             <td>${item.councilName || '-'}</td>
-            <td>${item.transformerName || '-'}</td>
+            <td style="font-weight: 600;">${item.transformerName || '-'}</td>
             <td>${item.transformerAddress || '-'}</td>
             <td>${item.transformerType || '-'}</td>
             <td>${item.transformerCapacityKVA || '-'}</td>
@@ -9059,16 +9264,13 @@ const renderTransformerListSection = () => {
             <td>${item.currentTransformerCapacity || '-'}</td>
             <td class="actions-cell">
                 <div class="actions-inline">
-                    <button class="action-btn view" onclick="window.viewTransformer(${item.id})" title="عرض"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
-                    <button class="action-btn edit" onclick="window.editTransformer(${item.id})" title="تعديل"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                    <button class="action-btn delete" onclick="window.deleteTransformer(${item.id})" title="حذف"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+                    ${canView ? `<button class="action-btn view" onclick="window.viewTransformer(${item.id})" title="عرض"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>` : ''}
+                    ${canTransfer ? `<button class="action-btn transfer" onclick="window.openTransferTransformerModal(${item.id})" title="تحويل لإدارة أخرى" style="color: #0284c7;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></button>` : ''}
+                    ${canEdit ? `<button class="action-btn edit" onclick="window.editTransformer(${item.id})" title="تعديل"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>` : ''}
+                    ${canDelete ? `<button class="action-btn delete" onclick="window.deleteTransformer(${item.id})" title="حذف"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>` : ''}
                 </div>
             </td>
-        `;
-        if (!hasButtonPermission('edit_button'))
-            (_a = row.querySelector('.edit')) === null || _a === void 0 ? void 0 : _a.remove();
-        if (!hasButtonPermission('delete_button'))
-            (_b = row.querySelector('.delete')) === null || _b === void 0 ? void 0 : _b.remove();
+            `;
         tbody.appendChild(row);
     });
 };
@@ -9558,6 +9760,11 @@ window.deleteTransformer = (id) => {
         return;
     showConfirmationDialog('تأكيد الحذف', `هل أنت متأكد من حذف بيانات المحول "${item.transformerName}"؟`, async () => {
         state.transformers = state.transformers.filter(t => t.id !== id);
+        if (!state._deletedIds)
+            state._deletedIds = { meters: [], debts: [], users: [], transformers: [] };
+        if (!state._deletedIds.transformers)
+            state._deletedIds.transformers = [];
+        state._deletedIds.transformers.push(id);
         await saveState();
         showToast('تم حذف المحول بنجاح.');
         renderTransformerListSection();
@@ -9576,6 +9783,11 @@ const handleDeleteSelectedTransformers = async () => {
     const ids = selected.map(cb => parseInt(cb.value, 10));
     showConfirmationDialog('تأكيد الحذف المتعدد', `هل أنت متأكد من حذف عدد (${ids.length}) محول؟ لا يمكن التراجع عن هذا الإجراء.`, async () => {
         state.transformers = state.transformers.filter(t => !ids.includes(t.id));
+        if (!state._deletedIds)
+            state._deletedIds = { meters: [], debts: [], users: [], transformers: [] };
+        if (!state._deletedIds.transformers)
+            state._deletedIds.transformers = [];
+        state._deletedIds.transformers.push(...ids);
         logActivity('حذف متعدد محولات', `تم حذف ${ids.length} محول من القائمة.`);
         await saveState();
         showToast('تم حذف المحولات المحددة بنجاح.');
@@ -9583,9 +9795,303 @@ const handleDeleteSelectedTransformers = async () => {
         document.getElementById('select-all-transformers').checked = false;
     });
 };
+// --- Transfer Transformers Functionality ---
+let pendingTransferTransformerIds = [];
+const setupTransferModalCascades = () => {
+    const modalSec = document.getElementById('transfer-target-sector');
+    const modalGen = document.getElementById('transfer-target-genadmin');
+    const modalBranch = document.getElementById('transfer-target-branch');
+    const modalCouncil = document.getElementById('transfer-target-council');
+    if (!modalSec || !modalGen || !modalBranch || !modalCouncil)
+        return;
+    const updateGen = (s) => {
+        const gas = getGeneralAdminsForSector(s);
+        populateSelect(modalGen, gas);
+        updateBranch(s, modalGen.value);
+    };
+    const updateBranch = (s, ga) => {
+        const branches = getSubAdmins(s, ga);
+        populateSelect(modalBranch, branches);
+        updateCouncils(modalBranch.value);
+    };
+    const updateCouncils = (br) => {
+        const councils = getCouncilsForBranch(br);
+        populateSelect(modalCouncil, councils, 'المجلس الحالي (بدون تغيير)');
+    };
+    modalSec.onchange = () => updateGen(modalSec.value);
+    modalGen.onchange = () => updateBranch(modalSec.value, modalGen.value);
+    modalBranch.onchange = () => updateCouncils(modalBranch.value);
+};
+const openTransferModalForIds = (ids, label) => {
+    if (!hasButtonPermission('transfer_transformers')) {
+        showToast('ليس لديك صلاحية تحويل المحولات.', 'error');
+        return;
+    }
+    if (ids.length === 0) {
+        showToast('يرجى تحديد محول واحد على الأقل للتحويل.', 'error');
+        return;
+    }
+    pendingTransferTransformerIds = ids;
+    const modal = document.getElementById('modal-transfer-transformers');
+    const countInfo = document.getElementById('transfer-transformers-count-info');
+    const modalSec = document.getElementById('transfer-target-sector');
+    const modalGen = document.getElementById('transfer-target-genadmin');
+    const modalBranch = document.getElementById('transfer-target-branch');
+    const modalCouncil = document.getElementById('transfer-target-council');
+    if (!modal || !modalSec || !modalGen || !modalBranch || !modalCouncil)
+        return;
+    if (countInfo) {
+        countInfo.textContent = `جاري تجهيز تحويل (${ids.length}) محول [${label}] إلى إدارة أخرى:`;
+    }
+    const sectors = getAvailableSectors();
+    populateSelect(modalSec, sectors);
+    setupTransferModalCascades();
+    if (sectors.length > 0) {
+        modalSec.value = sectors[0];
+        const gas = getGeneralAdminsForSector(sectors[0]);
+        populateSelect(modalGen, gas);
+        if (gas.length > 0) {
+            modalGen.value = gas[0];
+            const branches = getSubAdmins(sectors[0], gas[0]);
+            populateSelect(modalBranch, branches);
+            if (branches.length > 0) {
+                modalBranch.value = branches[0];
+                populateSelect(modalCouncil, getCouncilsForBranch(branches[0]), 'المجلس الحالي (بدون تغيير)');
+            }
+        }
+    }
+    modal.style.display = 'flex';
+};
+window.openTransferTransformerModal = (id) => {
+    const item = state.transformers.find(t => t.id === id);
+    const name = (item === null || item === void 0 ? void 0 : item.transformerName) || `محول #${id}`;
+    openTransferModalForIds([id], name);
+};
+const handleOpenTransferSelectedTransformersModal = () => {
+    const selected = Array.from(document.querySelectorAll('.transformer-row-checkbox:checked'));
+    if (selected.length === 0) {
+        showToast('يرجى تحديد محول واحد على الأقل من الجدول.', 'warning');
+        return;
+    }
+    const ids = selected.map(cb => parseInt(cb.value, 10));
+    openTransferModalForIds(ids, `عدد ${ids.length} محول`);
+};
+const handleConfirmTransferTransformers = async () => {
+    var _a, _b, _c, _d;
+    if (pendingTransferTransformerIds.length === 0)
+        return;
+    const targetSec = ((_a = document.getElementById('transfer-target-sector')) === null || _a === void 0 ? void 0 : _a.value) || '';
+    const targetGen = ((_b = document.getElementById('transfer-target-genadmin')) === null || _b === void 0 ? void 0 : _b.value) || '';
+    const targetBranch = ((_c = document.getElementById('transfer-target-branch')) === null || _c === void 0 ? void 0 : _c.value) || '';
+    const targetCouncil = ((_d = document.getElementById('transfer-target-council')) === null || _d === void 0 ? void 0 : _d.value) || '';
+    if (!targetBranch) {
+        showToast('يرجى اختيار الإدارة المستهدفة للتحويل.', 'error');
+        return;
+    }
+    let transferredCount = 0;
+    state.transformers.forEach(t => {
+        if (pendingTransferTransformerIds.includes(t.id)) {
+            t.sector = targetSec;
+            t.generalAdmin = targetGen;
+            t.subAdmin = targetBranch;
+            t.branch = targetBranch;
+            t.branchName = targetBranch;
+            if (targetCouncil && targetCouncil !== '') {
+                t.councilName = targetCouncil;
+            }
+            transferredCount++;
+        }
+    });
+    logActivity('تحويل محولات', `تم تحويل ${transferredCount} محول إلى: ${targetBranch} (${targetGen} - ${targetSec})`);
+    await saveState();
+    showToast(`تم تحويل ${transferredCount} محول بنجاح إلى ${targetBranch}.`);
+    const modal = document.getElementById('modal-transfer-transformers');
+    if (modal)
+        modal.style.display = 'none';
+    pendingTransferTransformerIds = [];
+    const selectAllCb = document.getElementById('select-all-transformers');
+    if (selectAllCb)
+        selectAllCb.checked = false;
+    renderTransformerListSection();
+};
+// --- Bulk Delete Scope (Council or Branch) ---
+const updateBulkDeleteScopeInfo = () => {
+    var _a;
+    const branchSelect = document.getElementById('delete-scope-branch-select');
+    const councilSelect = document.getElementById('delete-scope-council-select');
+    const councilGroup = document.getElementById('delete-scope-council-group');
+    const countInfo = document.getElementById('delete-scope-count-info');
+    const isCouncil = ((_a = document.querySelector('input[name="delete-scope-type"]:checked')) === null || _a === void 0 ? void 0 : _a.value) === 'council';
+    if (councilGroup) {
+        councilGroup.style.display = isCouncil ? 'block' : 'none';
+    }
+    const chosenBranch = (branchSelect === null || branchSelect === void 0 ? void 0 : branchSelect.value) || '';
+    const chosenCouncil = (councilSelect === null || councilSelect === void 0 ? void 0 : councilSelect.value) || '';
+    let matchCount = 0;
+    if (isCouncil) {
+        matchCount = (state.transformers || []).filter(t => (t.subAdmin === chosenBranch || t.branch === chosenBranch) &&
+            t.councilName === chosenCouncil).length;
+        if (countInfo) {
+            countInfo.textContent = `عدد المحولات التابعة لمجلس "${chosenCouncil || 'غير محدد'}" في "${chosenBranch}": (${matchCount}) محول`;
+        }
+    }
+    else {
+        matchCount = (state.transformers || []).filter(t => (t.subAdmin === chosenBranch || t.branch === chosenBranch)).length;
+        if (countInfo) {
+            countInfo.textContent = `إجمالي عدد المحولات التابعة لإدارة "${chosenBranch || 'غير محدد'}": (${matchCount}) محول`;
+        }
+    }
+};
+const handleOpenBulkDeleteScopeModal = () => {
+    if (!hasButtonPermission('bulk_delete_transformers_scope')) {
+        showToast('ليس لديك صلاحية حذف محولات مجلس أو إدارة كاملة.', 'error');
+        return;
+    }
+    const modal = document.getElementById('modal-bulk-delete-transformers');
+    const branchSelect = document.getElementById('delete-scope-branch-select');
+    const councilSelect = document.getElementById('delete-scope-council-select');
+    if (!modal || !branchSelect || !councilSelect)
+        return;
+    const allBranches = getSubAdmins('all', 'all');
+    populateSelect(branchSelect, allBranches);
+    const updateCouncils = () => {
+        const councils = getCouncilsForBranch(branchSelect.value);
+        populateSelect(councilSelect, councils);
+        updateBulkDeleteScopeInfo();
+    };
+    branchSelect.onchange = updateCouncils;
+    councilSelect.onchange = updateBulkDeleteScopeInfo;
+    document.querySelectorAll('input[name="delete-scope-type"]').forEach(r => {
+        r.onchange = updateBulkDeleteScopeInfo;
+    });
+    if (allBranches.length > 0) {
+        branchSelect.value = allBranches[0];
+        updateCouncils();
+    }
+    modal.style.display = 'flex';
+};
+const handleConfirmBulkDeleteScopeTransformers = async () => {
+    var _a;
+    if (!hasButtonPermission('bulk_delete_transformers_scope')) {
+        showToast('ليس لديك صلاحية حذف محولات مجلس أو إدارة كاملة.', 'error');
+        return;
+    }
+    const branchSelect = document.getElementById('delete-scope-branch-select');
+    const councilSelect = document.getElementById('delete-scope-council-select');
+    const isCouncil = ((_a = document.querySelector('input[name="delete-scope-type"]:checked')) === null || _a === void 0 ? void 0 : _a.value) === 'council';
+    const chosenBranch = (branchSelect === null || branchSelect === void 0 ? void 0 : branchSelect.value) || '';
+    const chosenCouncil = (councilSelect === null || councilSelect === void 0 ? void 0 : councilSelect.value) || '';
+    if (!chosenBranch) {
+        showToast('يرجى اختيار الإدارة.', 'error');
+        return;
+    }
+    let targetIds = [];
+    let desc = '';
+    if (isCouncil) {
+        if (!chosenCouncil) {
+            showToast('يرجى اختيار المجلس القروي.', 'error');
+            return;
+        }
+        targetIds = (state.transformers || []).filter(t => (t.subAdmin === chosenBranch || t.branch === chosenBranch) &&
+            t.councilName === chosenCouncil).map(t => t.id);
+        desc = `جميع محولات مجلس "${chosenCouncil}" في إدارة "${chosenBranch}"`;
+    }
+    else {
+        targetIds = (state.transformers || []).filter(t => (t.subAdmin === chosenBranch || t.branch === chosenBranch)).map(t => t.id);
+        desc = `جميع محولات إدارة "${chosenBranch}" بالكامل`;
+    }
+    if (targetIds.length === 0) {
+        showToast('لا توجد أي محولات مطابقة لحذفها.', 'info');
+        return;
+    }
+    showConfirmationDialog('تأكيد الحذف الشامل والنهائي', `تحذير هام: هل أنت متأكد تماماً من رغبتك في حذف ${desc}؟ إجمالي العدد المستهدف للحذف هو (${targetIds.length}) محول. لا يمكن التراجع عن هذا الإجراء!`, async () => {
+        state.transformers = (state.transformers || []).filter(t => !targetIds.includes(t.id));
+        if (!state._deletedIds)
+            state._deletedIds = { meters: [], debts: [], users: [], transformers: [] };
+        if (!state._deletedIds.transformers)
+            state._deletedIds.transformers = [];
+        state._deletedIds.transformers.push(...targetIds);
+        logActivity('حذف مجمّع محولات', `تم حذف ${targetIds.length} محول من: ${desc}`);
+        await saveState();
+        showToast(`تم حذف ${targetIds.length} محول بنجاح.`);
+        const modal = document.getElementById('modal-bulk-delete-transformers');
+        if (modal)
+            modal.style.display = 'none';
+        renderTransformerListSection();
+    });
+};
+// --- Excel Export Functionality ---
+const handleExportTransformersExcel = async () => {
+    var _a, _b, _c, _d, _e, _f;
+    if (!hasButtonPermission('export_transformers_excel')) {
+        showToast('ليس لديك صلاحية تصدير إكسيل للمحولات.', 'error');
+        return;
+    }
+    try {
+        await ensureSheetJSLoaded();
+        const nameFilter = ((_a = document.getElementById('filter-transformer-name')) === null || _a === void 0 ? void 0 : _a.value.toLowerCase()) || '';
+        const chassisFilter = ((_b = document.getElementById('filter-transformer-chassis')) === null || _b === void 0 ? void 0 : _b.value.toLowerCase()) || '';
+        const sectorFilter = ((_c = document.getElementById('filter-transformer-sector')) === null || _c === void 0 ? void 0 : _c.value) || 'all';
+        const genAdminFilter = ((_d = document.getElementById('filter-transformer-genadmin')) === null || _d === void 0 ? void 0 : _d.value) || 'all';
+        const branchFilter = ((_e = document.getElementById('filter-transformer-branch')) === null || _e === void 0 ? void 0 : _e.value) || 'all';
+        const councilFilter = ((_f = document.getElementById('filter-transformer-council')) === null || _f === void 0 ? void 0 : _f.value) || 'all';
+        const dataToExport = (state.transformers || []).filter(t => {
+            if (!matchesCurrentScope(t))
+                return false;
+            if (nameFilter && !(t.transformerName || '').toLowerCase().includes(nameFilter))
+                return false;
+            if (chassisFilter && !(t.smartMeterChassis || '').toLowerCase().includes(chassisFilter))
+                return false;
+            if (sectorFilter && sectorFilter !== 'all' && (t.sector || '') !== sectorFilter)
+                return false;
+            if (genAdminFilter && genAdminFilter !== 'all' && (t.generalAdmin || '') !== genAdminFilter)
+                return false;
+            if (branchFilter && branchFilter !== 'all' && (t.subAdmin || t.branch || '') !== branchFilter)
+                return false;
+            if (councilFilter && councilFilter !== 'all' && (t.councilName || '') !== councilFilter)
+                return false;
+            return true;
+        });
+        if (dataToExport.length === 0) {
+            showToast('لا توجد بيانات محولات لتصديرها.', 'info');
+            return;
+        }
+        const exportRows = dataToExport.map((t, idx) => ({
+            'م': idx + 1,
+            'القطاع': t.sector || '-',
+            'الإدارة العامة': t.generalAdmin || '-',
+            'الإدارة الفرعية': t.subAdmin || t.branch || '-',
+            'المجلس': t.councilName || '-',
+            'اسم المحول': t.transformerName || '-',
+            'العنوان': t.transformerAddress || '-',
+            'نوع المحول': t.transformerType || '-',
+            'القدرة (ك.ف.أ)': t.transformerCapacityKVA || '',
+            'شاسية العداد': t.smartMeterChassis || '-',
+            'رقم الشريحة': t.simCardNumber || '-',
+            'قدرة محولات التيار': t.currentTransformerCapacity || '-'
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(exportRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'قائمة المحولات');
+        const todayStr = new Date().toISOString().split('T')[0];
+        XLSX.writeFile(workbook, `قائمة_المحولات_${todayStr}.xlsx`);
+        logActivity('تصدير محولات', `تم تصدير ${exportRows.length} محول إلى ملف إكسيل`);
+        showToast(`تم تصدير ${exportRows.length} محول بنجاح.`);
+    }
+    catch (err) {
+        console.error('Error exporting transformers excel:', err);
+        showToast('حدث خطأ أثناء تصدير ملف الإكسيل.', 'error');
+    }
+};
+// --- Excel Import Functionality ---
 const handleImportTransformersExcel = async (event) => {
     var _a;
-    const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
+    if (!hasButtonPermission('import_transformers_excel')) {
+        showToast('ليس لديك صلاحية استيراد إكسيل للمحولات.', 'error');
+        return;
+    }
+    const fileInput = event.target;
+    const file = (_a = fileInput.files) === null || _a === void 0 ? void 0 : _a[0];
     if (!file)
         return;
     try {
@@ -9597,12 +10103,22 @@ const handleImportTransformersExcel = async (event) => {
             const workbook = XLSX.read(data, { type: 'array' });
             const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
             const transformerExcelHeaderMap = {
+                'القطاع': 'sector',
+                'قطاع': 'sector',
+                'الإدارة العامة': 'generalAdmin',
+                'الادارة العامة': 'generalAdmin',
+                'الإدارة الفرعية': 'subAdmin',
+                'الادارة الفرعية': 'subAdmin',
+                'الهندسة': 'subAdmin',
+                'الفرع': 'subAdmin',
                 'اسم المجلس': 'councilName',
                 'المجلس': 'councilName',
                 'اسم المحول': 'transformerName',
                 'الكشك': 'transformerName',
                 'اسم المحول / الكشك': 'transformerName',
                 'العنوان': 'transformerAddress',
+                'النوع': 'transformerType',
+                'نوع المحول': 'transformerType',
                 'قدرة المحول': 'transformerCapacityKVA',
                 'القدرة': 'transformerCapacityKVA',
                 'شاسية العداد': 'smartMeterChassis',
@@ -9612,6 +10128,9 @@ const handleImportTransformersExcel = async (event) => {
                 'التيار': 'currentTransformerCapacity'
             };
             const timestamp = Date.now();
+            const defaultSector = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.sector) || 'قطاع شمال المنيا';
+            const defaultGen = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.generalAdmin) || 'الإدارة العامة لهندسات شمال المنيا';
+            const defaultBranch = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch) || 'هندسة كهرباء بني مزار';
             const mappedData = jsonData.map((row, index) => {
                 const item = { id: timestamp + index };
                 Object.keys(row).forEach(key => {
@@ -9623,10 +10142,29 @@ const handleImportTransformersExcel = async (event) => {
                         item[mappedKey] = val;
                     }
                 });
+                if (!item.sector)
+                    item.sector = defaultSector;
+                if (!item.generalAdmin)
+                    item.generalAdmin = defaultGen;
+                if (!item.subAdmin)
+                    item.subAdmin = item.branch || defaultBranch;
+                item.branch = item.subAdmin;
+                item.branchName = item.subAdmin;
+                // Automatically add new council to branch if not present
+                if (item.councilName && item.subAdmin) {
+                    if (!state.settings.branchCouncils)
+                        state.settings.branchCouncils = {};
+                    if (!state.settings.branchCouncils[item.subAdmin])
+                        state.settings.branchCouncils[item.subAdmin] = [];
+                    if (!state.settings.branchCouncils[item.subAdmin].includes(item.councilName)) {
+                        state.settings.branchCouncils[item.subAdmin].push(item.councilName);
+                    }
+                }
                 return item;
             }).filter(item => item.transformerName);
             if (mappedData.length === 0) {
                 showToast('لم يتم العثور على بيانات محولات صالحة في الملف.', 'error');
+                fileInput.value = '';
                 return;
             }
             let addedCount = 0;
@@ -9645,11 +10183,13 @@ const handleImportTransformersExcel = async (event) => {
             logActivity('استيراد محولات', `تم استيراد ${mappedData.length} محول (إضافة: ${addedCount}، تحديث: ${updatedCount})`);
             await saveState();
             showToast(`تم الاستيراد بنجاح: ${addedCount} جديد، ${updatedCount} تم تحديثه.`);
+            fileInput.value = '';
             renderTransformerListSection();
         };
         reader.readAsArrayBuffer(file);
     }
     catch (err) {
+        fileInput.value = '';
         showToast('فشل في استيراد ملف الإكسل. تأكد من الصيغة.', 'error');
     }
 };
@@ -21826,6 +22366,101 @@ const renderAccountingSubscriptionsSection = () => {
         }
     });
 };
+const renderBranchCouncilsInSettings = () => {
+    const branchSelect = document.getElementById('council-settings-branch-select');
+    const listEl = document.getElementById('councilNames-branch-list');
+    if (!branchSelect || !listEl)
+        return;
+    const allBranches = getSubAdmins('all', 'all');
+    if (branchSelect.options.length === 0) {
+        allBranches.forEach(b => {
+            const opt = document.createElement('option');
+            opt.value = b;
+            opt.textContent = b;
+            branchSelect.appendChild(opt);
+        });
+        const userBr = (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.subAdmin) || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.branch);
+        if (userBr && allBranches.includes(userBr)) {
+            branchSelect.value = userBr;
+        }
+        else if (allBranches.length > 0) {
+            branchSelect.value = allBranches[0];
+        }
+        branchSelect.onchange = () => renderBranchCouncilsInSettings();
+    }
+    const activeBranch = branchSelect.value;
+    if (!state.settings.branchCouncils)
+        state.settings.branchCouncils = {};
+    if (!state.settings.branchCouncils[activeBranch]) {
+        state.settings.branchCouncils[activeBranch] = [];
+    }
+    const councils = state.settings.branchCouncils[activeBranch] || [];
+    listEl.innerHTML = '';
+    if (councils.length === 0) {
+        listEl.innerHTML = '<li class="empty-list-placeholder" style="color: #64748b; padding: 10px;">لا توجد مجالس قروية مسجلة لهذه الإدارة. يمكنك إضافة مجلس من النموذج أدناه.</li>';
+    }
+    else {
+        councils.forEach((cName, idx) => {
+            const li = document.createElement('li');
+            li.style.display = 'flex';
+            li.style.justifyContent = 'space-between';
+            li.style.alignItems = 'center';
+            li.style.padding = '8px 12px';
+            li.style.borderBottom = '1px solid #f1f5f9';
+            const span = document.createElement('span');
+            span.textContent = cName;
+            span.style.fontWeight = '500';
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn btn-delete';
+            delBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+            delBtn.title = 'حذف المجلس من هذه الإدارة';
+            delBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showConfirmationDialog('تأكيد حذف المجلس', `هل أنت متأكد من حذف مجلس "${cName}" من إدارة "${activeBranch}"؟`, async () => {
+                    state.settings.branchCouncils[activeBranch].splice(idx, 1);
+                    await saveState();
+                    renderBranchCouncilsInSettings();
+                    showToast(`تم حذف مجلس "${cName}" بنجاح.`);
+                });
+            };
+            li.appendChild(span);
+            li.appendChild(delBtn);
+            listEl.appendChild(li);
+        });
+    }
+    const addBtn = document.getElementById('btn-add-council-to-branch');
+    if (addBtn) {
+        addBtn.onclick = async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const input = document.getElementById('new-councilNames-input');
+            if (!input)
+                return;
+            const cVal = input.value.trim();
+            if (!cVal) {
+                showToast('يرجى إدخال اسم المجلس القروي.', 'error');
+                return;
+            }
+            if (!state.settings.branchCouncils)
+                state.settings.branchCouncils = {};
+            if (!state.settings.branchCouncils[activeBranch])
+                state.settings.branchCouncils[activeBranch] = [];
+            if (state.settings.branchCouncils[activeBranch].includes(cVal)) {
+                showToast('هذا المجلس مسجل بالفعل لهذه الإدارة.', 'warning');
+                return;
+            }
+            state.settings.branchCouncils[activeBranch].push(cVal);
+            if (!state.settings.councilNames.includes(cVal)) {
+                state.settings.councilNames.push(cVal);
+            }
+            await saveState();
+            input.value = '';
+            renderBranchCouncilsInSettings();
+            showToast(`تمت إضافة مجلس "${cVal}" إلى ${activeBranch} بنجاح.`);
+        };
+    }
+};
 let settingsSectionRendered = false;
 const renderSettingsSection = (force = true) => {
     var _a, _b;
@@ -21861,21 +22496,38 @@ const renderSettingsSection = (force = true) => {
                         title = 'شركات توريد العدادات';
                         break;
                     case 'councilNames':
-                        title = 'أسماء المجالس القروية';
+                        title = 'أسماء المجالس القروية لكل إدارة فرعية';
                         break;
                 }
-                div.innerHTML = `
-                    <h4>${title}</h4>
-                    <ul></ul>
-                    <div class="add-item-form">
-                        <input type="text" id="new-${key}-input" placeholder="${key === 'councilNames' ? 'اسم مجلس قروي جديد...' : 'توقيع جديد...'}">
-                        <button class="btn" data-list="${key}">إضافة</button>
-                    </div>
-                `;
+                if (key === 'councilNames') {
+                    div.innerHTML = `
+                        <h4>${title}</h4>
+                        <div style="margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <label for="council-settings-branch-select" style="font-weight: 600; color: #1e293b;">اختر الإدارة الفرعية / الهندسة:</label>
+                            <select id="council-settings-branch-select" style="padding: 6px 12px; border-radius: 6px; border: 1.5px solid #cbd5e1; font-weight: 500; min-width: 220px;"></select>
+                        </div>
+                        <ul id="councilNames-branch-list" class="managed-list"></ul>
+                        <div class="add-item-form">
+                            <input type="text" id="new-councilNames-input" placeholder="اسم مجلس قروي جديد لهذه الإدارة...">
+                            <button type="button" class="btn" id="btn-add-council-to-branch">إضافة للمجلس</button>
+                        </div>
+                    `;
+                }
+                else {
+                    div.innerHTML = `
+                        <h4>${title}</h4>
+                        <ul></ul>
+                        <div class="add-item-form">
+                            <input type="text" id="new-${key}-input" placeholder="توقيع جديد...">
+                            <button class="btn" data-list="${key}">إضافة</button>
+                        </div>
+                    `;
+                }
                 (_a = referenceContainer.parentElement) === null || _a === void 0 ? void 0 : _a.insertBefore(div, referenceContainer.nextSibling);
             }
         });
     }
+    renderBranchCouncilsInSettings();
     // Inject Error Codes Management
     if (!document.getElementById('error-codes-management-container')) {
         const div = document.createElement('div');
@@ -21940,10 +22592,10 @@ const renderSettingsSection = (force = true) => {
         (_b = referenceContainer === null || referenceContainer === void 0 ? void 0 : referenceContainer.parentElement) === null || _b === void 0 ? void 0 : _b.appendChild(div);
     }
     // Add new list keys for transformer management
-    const listKeys = ['roles', 'technicians', 'technicalEngineers', 'headEngineers', 'addresses', 'placeDescriptions', 'councilNames', 'transformerTypes', 'currentTransformerCapacities', 'subscriptionTypes', 'meterTypes', 'errorCodeMeterTypes', 'meterCapacities', 'activityTypes', 'repairStatuses', 'removalReasons', 'replacementSignatures', 'generalSignatures', 'cardStatuses', 'memoTypes', 'judicialSignatures', 'collectionSignatures', 'mukayasatSignatures', 'faultyMeterSignatures', 'meterSupplyCompanies'];
+    const listKeys = ['roles', 'technicians', 'technicalEngineers', 'headEngineers', 'addresses', 'placeDescriptions', 'transformerTypes', 'currentTransformerCapacities', 'subscriptionTypes', 'meterTypes', 'errorCodeMeterTypes', 'meterCapacities', 'activityTypes', 'repairStatuses', 'removalReasons', 'replacementSignatures', 'generalSignatures', 'cardStatuses', 'memoTypes', 'judicialSignatures', 'collectionSignatures', 'mukayasatSignatures', 'faultyMeterSignatures', 'meterSupplyCompanies'];
     listKeys.forEach(key => renderManagedList(key));
     // ربط أزرار القوائم بعد كل عملية إعادة رسم لضمان عملها للعناصر الديناميكية
-    ['addresses', 'meterSupplyCompanies', 'councilNames', 'meterTypes'].forEach(listKey => {
+    ['addresses', 'meterSupplyCompanies', 'meterTypes'].forEach(listKey => {
         const listContainer = document.getElementById(`${listKey}-list-container`);
         if (!listContainer)
             return;
@@ -24612,7 +25264,7 @@ function handleNavigation(event) {
  * Sets up all the event listeners for the application.
  */
 const setupEventListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119, _120;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119, _120, _121, _122, _123, _124, _125;
     // Welcome Screen Listeners
     (_a = document.getElementById('start-new-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', handleStartNew);
     (_b = document.getElementById('import-from-welcome-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleImportFromWelcome);
@@ -24837,26 +25489,39 @@ const setupEventListeners = () => {
         element === null || element === void 0 ? void 0 : element.addEventListener('input', calculateTransformerLoadAutoValues);
     });
     (_17 = document.getElementById('print-transformers-list-btn')) === null || _17 === void 0 ? void 0 : _17.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
-    (_18 = document.getElementById('import-transformers-excel-trigger')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_19 = document.getElementById('transformers-excel-upload')) === null || _19 === void 0 ? void 0 : _19.addEventListener('change', handleImportTransformersExcel);
-    (_20 = document.getElementById('delete-selected-transformers-btn')) === null || _20 === void 0 ? void 0 : _20.addEventListener('click', handleDeleteSelectedTransformers);
+    (_18 = document.getElementById('export-transformers-excel-btn')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', handleExportTransformersExcel);
+    (_19 = document.getElementById('import-transformers-excel-trigger')) === null || _19 === void 0 ? void 0 : _19.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_20 = document.getElementById('transformers-excel-upload')) === null || _20 === void 0 ? void 0 : _20.addEventListener('change', handleImportTransformersExcel);
+    (_21 = document.getElementById('transfer-selected-transformers-btn')) === null || _21 === void 0 ? void 0 : _21.addEventListener('click', handleOpenTransferSelectedTransformersModal);
+    (_22 = document.getElementById('btn-confirm-transfer-transformers')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', handleConfirmTransferTransformers);
+    (_23 = document.getElementById('delete-scope-transformers-btn')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', handleOpenBulkDeleteScopeModal);
+    (_24 = document.getElementById('btn-confirm-delete-scope-transformers')) === null || _24 === void 0 ? void 0 : _24.addEventListener('click', handleConfirmBulkDeleteScopeTransformers);
+    (_25 = document.getElementById('delete-selected-transformers-btn')) === null || _25 === void 0 ? void 0 : _25.addEventListener('click', handleDeleteSelectedTransformers);
+    // Close modal buttons for transformer transfer and bulk delete modals
+    document.querySelectorAll('#modal-transfer-transformers .close-modal, #modal-bulk-delete-transformers .close-modal').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const modal = e.target.closest('.modal');
+            if (modal)
+                modal.style.display = 'none';
+        });
+    });
     // Transformer List Filters
     ['filter-transformer-name', 'filter-transformer-chassis'].forEach(id => {
         var _a;
         (_a = document.getElementById(id)) === null || _a === void 0 ? void 0 : _a.addEventListener('input', () => renderTransformerListSection());
     });
-    (_21 = document.getElementById('select-all-transformers')) === null || _21 === void 0 ? void 0 : _21.addEventListener('change', (e) => {
+    (_26 = document.getElementById('select-all-transformers')) === null || _26 === void 0 ? void 0 : _26.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
         document.querySelectorAll('.transformer-row-checkbox').forEach(cb => cb.checked = isChecked);
     });
-    (_22 = document.getElementById('print-installation-details-btn')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', handlePrintInstallationDetails);
-    (_23 = document.getElementById('clear-mukayasa-form-btn')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', handleClearMukayasaForm);
+    (_27 = document.getElementById('print-installation-details-btn')) === null || _27 === void 0 ? void 0 : _27.addEventListener('click', handlePrintInstallationDetails);
+    (_28 = document.getElementById('clear-mukayasa-form-btn')) === null || _28 === void 0 ? void 0 : _28.addEventListener('click', handleClearMukayasaForm);
     // Judicial Control Listeners
-    (_24 = document.getElementById('print-judicial-control-btn')) === null || _24 === void 0 ? void 0 : _24.addEventListener('click', handlePrintJudicialControlDetails);
-    (_25 = document.getElementById('judicial-control-form')) === null || _25 === void 0 ? void 0 : _25.addEventListener('submit', handleJudicialControlFormSubmit);
+    (_29 = document.getElementById('print-judicial-control-btn')) === null || _29 === void 0 ? void 0 : _29.addEventListener('click', handlePrintJudicialControlDetails);
+    (_30 = document.getElementById('judicial-control-form')) === null || _30 === void 0 ? void 0 : _30.addEventListener('submit', handleJudicialControlFormSubmit);
     // Judicial Control Filter Listeners
-    (_26 = document.getElementById('add-zinat-btn')) === null || _26 === void 0 ? void 0 : _26.addEventListener('click', openZinatForm);
-    (_27 = document.getElementById('zinat-form')) === null || _27 === void 0 ? void 0 : _27.addEventListener('submit', handleZinatFormSubmit);
+    (_31 = document.getElementById('add-zinat-btn')) === null || _31 === void 0 ? void 0 : _31.addEventListener('click', openZinatForm);
+    (_32 = document.getElementById('zinat-form')) === null || _32 === void 0 ? void 0 : _32.addEventListener('submit', handleZinatFormSubmit);
     const zinatFilterForm = document.getElementById('zinat-collection-filter-form');
     zinatFilterForm === null || zinatFilterForm === void 0 ? void 0 : zinatFilterForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -24866,12 +25531,12 @@ const setupEventListeners = () => {
         setTimeout(() => renderZinatCollectionSection(), 0);
     });
     // Print List Buttons
-    (_28 = document.getElementById('print-lost-memos-list-btn')) === null || _28 === void 0 ? void 0 : _28.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
-    (_29 = document.getElementById('print-judicial-control-list-btn')) === null || _29 === void 0 ? void 0 : _29.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
-    (_30 = document.getElementById('print-collection-judicial-btn')) === null || _30 === void 0 ? void 0 : _30.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
-    (_31 = document.getElementById('print-collection-zinat-btn')) === null || _31 === void 0 ? void 0 : _31.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
+    (_33 = document.getElementById('print-lost-memos-list-btn')) === null || _33 === void 0 ? void 0 : _33.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
+    (_34 = document.getElementById('print-judicial-control-list-btn')) === null || _34 === void 0 ? void 0 : _34.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
+    (_35 = document.getElementById('print-collection-judicial-btn')) === null || _35 === void 0 ? void 0 : _35.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
+    (_36 = document.getElementById('print-collection-zinat-btn')) === null || _36 === void 0 ? void 0 : _36.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
     // Judicial Collection Filter Listener
-    (_32 = document.getElementById('judicial-collection-filter-form')) === null || _32 === void 0 ? void 0 : _32.addEventListener('input', () => {
+    (_37 = document.getElementById('judicial-collection-filter-form')) === null || _37 === void 0 ? void 0 : _37.addEventListener('input', () => {
         renderJudicialCollectionSection();
     });
     // Judicial Control Filter Listeners
@@ -24888,9 +25553,9 @@ const setupEventListeners = () => {
         setTimeout(() => applyAndRenderJudicialControlList(), 0); // Use timeout to allow form to reset first
     });
     // Lost Memo Listeners
-    (_33 = document.getElementById('add-lost-memo-btn')) === null || _33 === void 0 ? void 0 : _33.addEventListener('click', () => openLostMemoForm());
-    (_34 = document.getElementById('lost-memo-form')) === null || _34 === void 0 ? void 0 : _34.addEventListener('submit', handleLostMemoFormSubmit);
-    (_35 = document.getElementById('print-lost-memo-btn')) === null || _35 === void 0 ? void 0 : _35.addEventListener('click', handlePrintLostMemo);
+    (_38 = document.getElementById('add-lost-memo-btn')) === null || _38 === void 0 ? void 0 : _38.addEventListener('click', () => openLostMemoForm());
+    (_39 = document.getElementById('lost-memo-form')) === null || _39 === void 0 ? void 0 : _39.addEventListener('submit', handleLostMemoFormSubmit);
+    (_40 = document.getElementById('print-lost-memo-btn')) === null || _40 === void 0 ? void 0 : _40.addEventListener('click', handlePrintLostMemo);
     const mukSearchForm = document.getElementById('mukayasat-search-form');
     mukSearchForm === null || mukSearchForm === void 0 ? void 0 : mukSearchForm.addEventListener('submit', handleMukayasatSearch);
     if (mukSearchForm) {
@@ -24902,7 +25567,7 @@ const setupEventListeners = () => {
             handleGoBack();
         }
     });
-    (_36 = document.getElementById('meters-table-filter')) === null || _36 === void 0 ? void 0 : _36.addEventListener('input', (e) => {
+    (_41 = document.getElementById('meters-table-filter')) === null || _41 === void 0 ? void 0 : _41.addEventListener('input', (e) => {
         const filterValue = e.target.value.toLowerCase();
         const table = document.getElementById('meters-table');
         filterTable(table, filterValue);
@@ -24930,10 +25595,10 @@ const setupEventListeners = () => {
             });
         }
     });
-    (_37 = document.getElementById('btn-search-subscribers-all')) === null || _37 === void 0 ? void 0 : _37.addEventListener('click', handleAllSubscribersSearch);
-    (_38 = document.getElementById('btn-reset-subscribers-all')) === null || _38 === void 0 ? void 0 : _38.addEventListener('click', handleResetAllSubscribersSearch);
-    (_39 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _39 === void 0 ? void 0 : _39.addEventListener('click', handleDeleteSelectedSubscribersAll);
-    (_40 = document.getElementById('subscriberType')) === null || _40 === void 0 ? void 0 : _40.addEventListener('change', (e) => {
+    (_42 = document.getElementById('btn-search-subscribers-all')) === null || _42 === void 0 ? void 0 : _42.addEventListener('click', handleAllSubscribersSearch);
+    (_43 = document.getElementById('btn-reset-subscribers-all')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', handleResetAllSubscribersSearch);
+    (_44 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', handleDeleteSelectedSubscribersAll);
+    (_45 = document.getElementById('subscriberType')) === null || _45 === void 0 ? void 0 : _45.addEventListener('change', (e) => {
         var _a;
         const select = e.target;
         const isSearchMode = !((_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.contains('hidden'));
@@ -24952,59 +25617,59 @@ const setupEventListeners = () => {
         updateMeterFormVisibility();
     });
     // Subscriber Statement Listener (الاستعلام عن مشترك)
-    (_41 = document.getElementById('subscriber-statement-form')) === null || _41 === void 0 ? void 0 : _41.addEventListener('submit', (e) => {
+    (_46 = document.getElementById('subscriber-statement-form')) === null || _46 === void 0 ? void 0 : _46.addEventListener('submit', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
-    (_42 = document.getElementById('statement-search-btn')) === null || _42 === void 0 ? void 0 : _42.addEventListener('click', (e) => {
+    (_47 = document.getElementById('statement-search-btn')) === null || _47 === void 0 ? void 0 : _47.addEventListener('click', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
     // قراءة الكارت الذكي
-    (_43 = document.getElementById('statement-read-card-btn')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', (e) => {
+    (_48 = document.getElementById('statement-read-card-btn')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadSmartCard();
     });
-    (_44 = document.getElementById('smart-card-close-btn')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', () => {
+    (_49 = document.getElementById('smart-card-close-btn')) === null || _49 === void 0 ? void 0 : _49.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_45 = document.getElementById('smart-card-close-x-btn')) === null || _45 === void 0 ? void 0 : _45.addEventListener('click', () => {
+    (_50 = document.getElementById('smart-card-close-x-btn')) === null || _50 === void 0 ? void 0 : _50.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_46 = document.getElementById('smart-card-search-now-btn')) === null || _46 === void 0 ? void 0 : _46.addEventListener('click', () => {
+    (_51 = document.getElementById('smart-card-search-now-btn')) === null || _51 === void 0 ? void 0 : _51.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
         handleSubscriberStatementSearch();
     });
     // كروت التحكم (Control Cards Event Listeners)
-    (_47 = document.getElementById('btn-read-control-card')) === null || _47 === void 0 ? void 0 : _47.addEventListener('click', (e) => {
+    (_52 = document.getElementById('btn-read-control-card')) === null || _52 === void 0 ? void 0 : _52.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadControlCard();
     });
-    (_48 = document.getElementById('btn-renew-control-card')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', (e) => {
+    (_53 = document.getElementById('btn-renew-control-card')) === null || _53 === void 0 ? void 0 : _53.addEventListener('click', (e) => {
         e.preventDefault();
         handleRenewControlCard();
     });
-    (_49 = document.getElementById('btn-print-control-card')) === null || _49 === void 0 ? void 0 : _49.addEventListener('click', (e) => {
+    (_54 = document.getElementById('btn-print-control-card')) === null || _54 === void 0 ? void 0 : _54.addEventListener('click', (e) => {
         e.preventDefault();
         handlePrintControlCardReport();
     });
-    (_50 = document.getElementById('control-card-meter-details-close')) === null || _50 === void 0 ? void 0 : _50.addEventListener('click', () => {
+    (_55 = document.getElementById('control-card-meter-details-close')) === null || _55 === void 0 ? void 0 : _55.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_51 = document.getElementById('control-card-meter-details-close-x')) === null || _51 === void 0 ? void 0 : _51.addEventListener('click', () => {
+    (_56 = document.getElementById('control-card-meter-details-close-x')) === null || _56 === void 0 ? void 0 : _56.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_52 = document.getElementById('ctrl-meters-filter')) === null || _52 === void 0 ? void 0 : _52.addEventListener('input', (e) => {
+    (_57 = document.getElementById('ctrl-meters-filter')) === null || _57 === void 0 ? void 0 : _57.addEventListener('input', (e) => {
         const term = e.target.value.trim().toLowerCase();
         const rows = document.querySelectorAll('#control-card-meters-tbody tr');
         rows.forEach(r => {
@@ -25013,15 +25678,15 @@ const setupEventListeners = () => {
             r.style.display = text.includes(term) ? '' : 'none';
         });
     });
-    (_53 = document.getElementById('issue-control-card-form')) === null || _53 === void 0 ? void 0 : _53.addEventListener('submit', (e) => {
+    (_58 = document.getElementById('issue-control-card-form')) === null || _58 === void 0 ? void 0 : _58.addEventListener('submit', (e) => {
         e.preventDefault();
         handleIssueControlCard(e);
     });
-    (_54 = document.getElementById('issue-meter-company')) === null || _54 === void 0 ? void 0 : _54.addEventListener('change', (e) => {
+    (_59 = document.getElementById('issue-meter-company')) === null || _59 === void 0 ? void 0 : _59.addEventListener('change', (e) => {
         const val = e.target.value;
         handleCompanyChange(val);
     });
-    (_55 = document.getElementById('issue-technician')) === null || _55 === void 0 ? void 0 : _55.addEventListener('change', (e) => {
+    (_60 = document.getElementById('issue-technician')) === null || _60 === void 0 ? void 0 : _60.addEventListener('change', (e) => {
         const sel = e.target;
         const opt = sel.options[sel.selectedIndex];
         const codeInput = document.getElementById('issue-tech-code');
@@ -25029,7 +25694,7 @@ const setupEventListeners = () => {
             codeInput.value = (opt === null || opt === void 0 ? void 0 : opt.getAttribute('data-code')) || '';
         }
     });
-    (_56 = document.getElementById('issue-control-op-type')) === null || _56 === void 0 ? void 0 : _56.addEventListener('change', (e) => {
+    (_61 = document.getElementById('issue-control-op-type')) === null || _61 === void 0 ? void 0 : _61.addEventListener('change', (e) => {
         const val = e.target.value;
         const tampersWrap = document.getElementById('container-tampers');
         const manualDateWrap = document.getElementById('container-manual-date');
@@ -25038,7 +25703,7 @@ const setupEventListeners = () => {
         if (manualDateWrap)
             manualDateWrap.style.display = val === '0' ? 'block' : 'none';
     });
-    (_57 = document.getElementById('issue-control-type-meter')) === null || _57 === void 0 ? void 0 : _57.addEventListener('change', (e) => {
+    (_62 = document.getElementById('issue-control-type-meter')) === null || _62 === void 0 ? void 0 : _62.addEventListener('change', (e) => {
         const val = e.target.value;
         const singleWrap = document.getElementById('container-single-meter');
         const multiWrap = document.getElementById('container-multi-meters');
@@ -25050,7 +25715,7 @@ const setupEventListeners = () => {
         if (countWrap)
             countWrap.style.display = val === '2' ? 'block' : 'none';
     });
-    (_58 = document.getElementById('btn-add-meter-to-list')) === null || _58 === void 0 ? void 0 : _58.addEventListener('click', () => {
+    (_63 = document.getElementById('btn-add-meter-to-list')) === null || _63 === void 0 ? void 0 : _63.addEventListener('click', () => {
         const inp = document.getElementById('issue-multi-meter-input');
         const val = (inp === null || inp === void 0 ? void 0 : inp.value.trim()) || '';
         if (!val)
@@ -25064,16 +25729,16 @@ const setupEventListeners = () => {
             inp.value = '';
         renderIssuedMetersTags();
     });
-    (_59 = document.getElementById('issue-is-manual-date')) === null || _59 === void 0 ? void 0 : _59.addEventListener('change', (e) => {
+    (_64 = document.getElementById('issue-is-manual-date')) === null || _64 === void 0 ? void 0 : _64.addEventListener('change', (e) => {
         const wrap = document.getElementById('manual-date-picker-wrap');
         if (wrap)
             wrap.style.display = e.target.checked ? 'block' : 'none';
     });
-    (_60 = document.getElementById('btn-issue-card-reset')) === null || _60 === void 0 ? void 0 : _60.addEventListener('click', () => {
+    (_65 = document.getElementById('btn-issue-card-reset')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', () => {
         issuedMetersList = [];
         renderIssuedMetersTags();
     });
-    (_61 = document.getElementById('btn-close-issued-dialog')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', () => {
+    (_66 = document.getElementById('btn-close-issued-dialog')) === null || _66 === void 0 ? void 0 : _66.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -25082,7 +25747,7 @@ const setupEventListeners = () => {
                 dlg.style.display = 'none';
         }
     });
-    (_62 = document.getElementById('btn-read-issued-card-now')) === null || _62 === void 0 ? void 0 : _62.addEventListener('click', () => {
+    (_67 = document.getElementById('btn-read-issued-card-now')) === null || _67 === void 0 ? void 0 : _67.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -25117,40 +25782,40 @@ const setupEventListeners = () => {
         });
     });
     // Customer Management Listeners
-    (_63 = document.getElementById('cm-filters-form')) === null || _63 === void 0 ? void 0 : _63.addEventListener('submit', (e) => {
+    (_68 = document.getElementById('cm-filters-form')) === null || _68 === void 0 ? void 0 : _68.addEventListener('submit', (e) => {
         e.preventDefault();
         loadCustomers(1);
     });
-    (_64 = document.getElementById('btn-cm-reset')) === null || _64 === void 0 ? void 0 : _64.addEventListener('click', () => {
+    (_69 = document.getElementById('btn-cm-reset')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', () => {
         const form = document.getElementById('cm-filters-form');
         if (form)
             form.reset();
         loadCustomers(1);
     });
-    (_65 = document.getElementById('btn-cm-refresh')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', () => {
+    (_70 = document.getElementById('btn-cm-refresh')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', () => {
         loadCustomers(customerState.page);
     });
-    (_66 = document.getElementById('btn-cm-card-search')) === null || _66 === void 0 ? void 0 : _66.addEventListener('click', () => {
+    (_71 = document.getElementById('btn-cm-card-search')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', () => {
         handleCustomerCardSearch();
     });
-    (_67 = document.getElementById('cm-page-size')) === null || _67 === void 0 ? void 0 : _67.addEventListener('change', (e) => {
+    (_72 = document.getElementById('cm-page-size')) === null || _72 === void 0 ? void 0 : _72.addEventListener('change', (e) => {
         customerState.pageSize = Number(e.target.value) || 10;
         loadCustomers(1);
     });
-    (_68 = document.getElementById('cm-btn-first')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', () => {
+    (_73 = document.getElementById('cm-btn-first')) === null || _73 === void 0 ? void 0 : _73.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(1);
     });
-    (_69 = document.getElementById('cm-btn-prev')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', () => {
+    (_74 = document.getElementById('cm-btn-prev')) === null || _74 === void 0 ? void 0 : _74.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(customerState.page - 1);
     });
-    (_70 = document.getElementById('cm-btn-next')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', () => {
+    (_75 = document.getElementById('cm-btn-next')) === null || _75 === void 0 ? void 0 : _75.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(customerState.page + 1);
     });
-    (_71 = document.getElementById('cm-btn-last')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', () => {
+    (_76 = document.getElementById('cm-btn-last')) === null || _76 === void 0 ? void 0 : _76.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(totalPages);
@@ -25271,10 +25936,10 @@ const setupEventListeners = () => {
             }
         }
     });
-    (_72 = document.getElementById('save-details-btn')) === null || _72 === void 0 ? void 0 : _72.addEventListener('click', handleSaveDetails);
-    (_73 = document.getElementById('delete-subscriber-btn')) === null || _73 === void 0 ? void 0 : _73.addEventListener('click', handleDeleteSubscriber);
-    (_74 = document.getElementById('details-meterType')) === null || _74 === void 0 ? void 0 : _74.addEventListener('change', () => updateMeterFormVisibility('details-'));
-    (_75 = document.getElementById('details-subscriberType')) === null || _75 === void 0 ? void 0 : _75.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_77 = document.getElementById('save-details-btn')) === null || _77 === void 0 ? void 0 : _77.addEventListener('click', handleSaveDetails);
+    (_78 = document.getElementById('delete-subscriber-btn')) === null || _78 === void 0 ? void 0 : _78.addEventListener('click', handleDeleteSubscriber);
+    (_79 = document.getElementById('details-meterType')) === null || _79 === void 0 ? void 0 : _79.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_80 = document.getElementById('details-subscriberType')) === null || _80 === void 0 ? void 0 : _80.addEventListener('change', () => updateMeterFormVisibility('details-'));
     document.body.addEventListener('click', (event) => {
         const target = event.target;
         if (target.id === 'delete-selected-meters') {
@@ -25287,13 +25952,13 @@ const setupEventListeners = () => {
             checkboxes.forEach(checkbox => checkbox.checked = selectAllCheckbox.checked);
         }
     });
-    (_76 = document.getElementById('select-all-meters')) === null || _76 === void 0 ? void 0 : _76.addEventListener('click', (event) => {
+    (_81 = document.getElementById('select-all-meters')) === null || _81 === void 0 ? void 0 : _81.addEventListener('click', (event) => {
         const isChecked = event.target.checked;
         document.querySelectorAll('#meters-table tbody input[type="checkbox"].select-row').forEach((checkbox) => {
             checkbox.checked = isChecked;
         });
     });
-    (_77 = document.getElementById('btn-delete-by-status')) === null || _77 === void 0 ? void 0 : _77.addEventListener('click', () => {
+    (_82 = document.getElementById('btn-delete-by-status')) === null || _82 === void 0 ? void 0 : _82.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         const select = document.getElementById('delete-status-select');
         if (dialog && select) {
@@ -25302,12 +25967,12 @@ const setupEventListeners = () => {
             dialog.hidden = false;
         }
     });
-    (_78 = document.getElementById('delete-by-status-cancel')) === null || _78 === void 0 ? void 0 : _78.addEventListener('click', () => {
+    (_83 = document.getElementById('delete-by-status-cancel')) === null || _83 === void 0 ? void 0 : _83.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         if (dialog)
             dialog.hidden = true;
     });
-    (_79 = document.getElementById('delete-by-status-confirm')) === null || _79 === void 0 ? void 0 : _79.addEventListener('click', () => {
+    (_84 = document.getElementById('delete-by-status-confirm')) === null || _84 === void 0 ? void 0 : _84.addEventListener('click', () => {
         const select = document.getElementById('delete-status-select');
         const status = select.value;
         if (!status) {
@@ -25340,13 +26005,13 @@ const setupEventListeners = () => {
         showConfirmationDialog('تأكيد الحذف الجماعي', `هل أنت متأكد من حذف جميع المشتركين (${count}) الذين حالتهم "${status}"؟ لا يمكن التراجع عن هذا الإجراء.`, onConfirm);
     });
     // Repaired Meters Listeners
-    (_80 = document.getElementById('repair-search-form')) === null || _80 === void 0 ? void 0 : _80.addEventListener('submit', handleFaultyMeterSearch);
-    (_81 = document.getElementById('repair-form')) === null || _81 === void 0 ? void 0 : _81.addEventListener('submit', handleRepairFormSubmit);
-    (_82 = document.getElementById('repairStatus')) === null || _82 === void 0 ? void 0 : _82.addEventListener('change', updateRepairFormVisibility);
+    (_85 = document.getElementById('repair-search-form')) === null || _85 === void 0 ? void 0 : _85.addEventListener('submit', handleFaultyMeterSearch);
+    (_86 = document.getElementById('repair-form')) === null || _86 === void 0 ? void 0 : _86.addEventListener('submit', handleRepairFormSubmit);
+    (_87 = document.getElementById('repairStatus')) === null || _87 === void 0 ? void 0 : _87.addEventListener('change', updateRepairFormVisibility);
     // Reports Listeners
-    (_83 = document.getElementById('report-type')) === null || _83 === void 0 ? void 0 : _83.addEventListener('change', updateReportFilters);
-    (_84 = document.getElementById('report-generation-form')) === null || _84 === void 0 ? void 0 : _84.addEventListener('submit', handleGenerateReport);
-    (_85 = document.getElementById('print-report-btn')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', handlePrintReport);
+    (_88 = document.getElementById('report-type')) === null || _88 === void 0 ? void 0 : _88.addEventListener('change', updateReportFilters);
+    (_89 = document.getElementById('report-generation-form')) === null || _89 === void 0 ? void 0 : _89.addEventListener('submit', handleGenerateReport);
+    (_90 = document.getElementById('print-report-btn')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', handlePrintReport);
     // Custom multiselect listener
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.multiselect-btn');
@@ -25397,11 +26062,11 @@ const setupEventListeners = () => {
         }
     });
     // Activity Log Listener
-    (_86 = document.getElementById('print-activity-log-btn')) === null || _86 === void 0 ? void 0 : _86.addEventListener('click', handlePrintActivityLog);
+    (_91 = document.getElementById('print-activity-log-btn')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', handlePrintActivityLog);
     // User Management Listeners
-    (_87 = document.getElementById('user-form')) === null || _87 === void 0 ? void 0 : _87.addEventListener('submit', handleUserFormSubmit);
+    (_92 = document.getElementById('user-form')) === null || _92 === void 0 ? void 0 : _92.addEventListener('submit', handleUserFormSubmit);
     // Permissions Listeners (delegated inside render function)
-    (_88 = document.getElementById('permissions')) === null || _88 === void 0 ? void 0 : _88.addEventListener('change', (event) => {
+    (_93 = document.getElementById('permissions')) === null || _93 === void 0 ? void 0 : _93.addEventListener('change', (event) => {
         const target = event.target;
         if (!target.matches('input[type="checkbox"]'))
             return;
@@ -25415,32 +26080,32 @@ const setupEventListeners = () => {
             handlePermissionChange(event);
     });
     // Settings Listeners
-    (_89 = document.getElementById('export-backup-btn')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', handleExportBackup);
-    (_90 = document.getElementById('import-backup-btn')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', () => handleImportBackup());
-    (_91 = document.getElementById('export-csv-btn')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', handleExportCSV);
-    (_92 = document.getElementById('save-report-settings-btn')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', handleSaveReportSettings);
-    (_93 = document.getElementById('form-lifting-unit-delivery')) === null || _93 === void 0 ? void 0 : _93.addEventListener('submit', handleLiftingDeliverySubmit);
-    (_94 = document.getElementById('btn-cancel-lifting-delivery')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', handleCancelLiftingDelivery);
-    (_95 = document.getElementById('save-company-report-settings-btn')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', handleSaveCompanyReportSettings);
+    (_94 = document.getElementById('export-backup-btn')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', handleExportBackup);
+    (_95 = document.getElementById('import-backup-btn')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', () => handleImportBackup());
+    (_96 = document.getElementById('export-csv-btn')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', handleExportCSV);
+    (_97 = document.getElementById('save-report-settings-btn')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', handleSaveReportSettings);
+    (_98 = document.getElementById('form-lifting-unit-delivery')) === null || _98 === void 0 ? void 0 : _98.addEventListener('submit', handleLiftingDeliverySubmit);
+    (_99 = document.getElementById('btn-cancel-lifting-delivery')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', handleCancelLiftingDelivery);
+    (_100 = document.getElementById('save-company-report-settings-btn')) === null || _100 === void 0 ? void 0 : _100.addEventListener('click', handleSaveCompanyReportSettings);
     // مستمعات أحداث الطلبات قيد الانتظار
-    (_96 = document.getElementById('add-area-dialog-confirm-btn')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', confirmAddPendingArea);
-    (_97 = document.getElementById('add-area-dialog-cancel-btn')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', hideAddPendingAreaDialog);
-    (_98 = document.getElementById('add-pending-area-dialog')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', (event) => {
+    (_101 = document.getElementById('add-area-dialog-confirm-btn')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', confirmAddPendingArea);
+    (_102 = document.getElementById('add-area-dialog-cancel-btn')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', hideAddPendingAreaDialog);
+    (_103 = document.getElementById('add-pending-area-dialog')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', (event) => {
         if (event.target === document.getElementById('add-pending-area-dialog')) {
             hideAddPendingAreaDialog();
         }
     });
-    (_99 = document.getElementById('import-pending-excel-trigger-btn')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_100 = document.getElementById('pending-excel-upload')) === null || _100 === void 0 ? void 0 : _100.addEventListener('change', handleImportPendingExcel);
-    (_101 = document.getElementById('print-pending-requests-btn')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', handlePrintPendingRequests);
-    (_102 = document.getElementById('export-pending-excel-btn')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', handleExportPendingRequestsToExcel);
+    (_104 = document.getElementById('import-pending-excel-trigger-btn')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_105 = document.getElementById('pending-excel-upload')) === null || _105 === void 0 ? void 0 : _105.addEventListener('change', handleImportPendingExcel);
+    (_106 = document.getElementById('print-pending-requests-btn')) === null || _106 === void 0 ? void 0 : _106.addEventListener('click', handlePrintPendingRequests);
+    (_107 = document.getElementById('export-pending-excel-btn')) === null || _107 === void 0 ? void 0 : _107.addEventListener('click', handleExportPendingRequestsToExcel);
     // ربط أزرار العمليات الجماعية في صفحة الانتظار
-    (_103 = document.getElementById('assign-pending-requests-btn')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', handleAssignSelectedPendingRequests);
-    (_104 = document.getElementById('move-to-mukayasat-btn')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', handleMovePendingToMukayasat);
-    (_105 = document.getElementById('mark-pending-inspected-btn')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', handleMarkSelectedPendingInspected);
-    (_106 = document.getElementById('print-pending-inspection-btn')) === null || _106 === void 0 ? void 0 : _106.addEventListener('click', handlePrintSelectedPendingInspections);
-    (_107 = document.getElementById('delete-selected-pending-btn')) === null || _107 === void 0 ? void 0 : _107.addEventListener('click', handleDeleteSelectedPendingRequests);
-    (_108 = document.getElementById('add-pending-address-tab-btn')) === null || _108 === void 0 ? void 0 : _108.addEventListener('click', handleAddNewPendingAddressTab);
+    (_108 = document.getElementById('assign-pending-requests-btn')) === null || _108 === void 0 ? void 0 : _108.addEventListener('click', handleAssignSelectedPendingRequests);
+    (_109 = document.getElementById('move-to-mukayasat-btn')) === null || _109 === void 0 ? void 0 : _109.addEventListener('click', handleMovePendingToMukayasat);
+    (_110 = document.getElementById('mark-pending-inspected-btn')) === null || _110 === void 0 ? void 0 : _110.addEventListener('click', handleMarkSelectedPendingInspected);
+    (_111 = document.getElementById('print-pending-inspection-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', handlePrintSelectedPendingInspections);
+    (_112 = document.getElementById('delete-selected-pending-btn')) === null || _112 === void 0 ? void 0 : _112.addEventListener('click', handleDeleteSelectedPendingRequests);
+    (_113 = document.getElementById('add-pending-address-tab-btn')) === null || _113 === void 0 ? void 0 : _113.addEventListener('click', handleAddNewPendingAddressTab);
     const pendingFilters = document.getElementById('pending-filters');
     if (pendingFilters) {
         const resetPending = () => { currentPendingPage = 1; pendingSelectedRequests = []; renderPendingRequestsSection(); };
@@ -25680,7 +26345,7 @@ const setupEventListeners = () => {
         });
     }
     // Company Logo Settings Listeners
-    (_109 = document.getElementById('developer-image-password-cancel')) === null || _109 === void 0 ? void 0 : _109.addEventListener('click', () => {
+    (_114 = document.getElementById('developer-image-password-cancel')) === null || _114 === void 0 ? void 0 : _114.addEventListener('click', () => {
         const dialog = document.getElementById('developer-image-password-dialog');
         const input = document.getElementById('developer-image-password');
         dialog === null || dialog === void 0 ? void 0 : dialog.setAttribute('hidden', '');
@@ -25688,7 +26353,7 @@ const setupEventListeners = () => {
             input.value = '';
         developerImagePasswordCallback = null;
     });
-    (_110 = document.getElementById('developer-image-password-confirm')) === null || _110 === void 0 ? void 0 : _110.addEventListener('click', () => {
+    (_115 = document.getElementById('developer-image-password-confirm')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', () => {
         const input = document.getElementById('developer-image-password');
         const error = document.getElementById('developer-image-password-error');
         const dialog = document.getElementById('developer-image-password-dialog');
@@ -25704,18 +26369,18 @@ const setupEventListeners = () => {
         input.value = '';
         callback === null || callback === void 0 ? void 0 : callback();
     });
-    (_111 = document.getElementById('upload-logo-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', () => {
+    (_116 = document.getElementById('upload-logo-btn')) === null || _116 === void 0 ? void 0 : _116.addEventListener('click', () => {
         var _a;
         (_a = document.getElementById('logo-upload-input')) === null || _a === void 0 ? void 0 : _a.click();
     });
-    (_112 = document.getElementById('remove-logo-btn')) === null || _112 === void 0 ? void 0 : _112.addEventListener('click', () => {
+    (_117 = document.getElementById('remove-logo-btn')) === null || _117 === void 0 ? void 0 : _117.addEventListener('click', () => {
         state.settings.companyLogo = null;
         saveState();
         updateUI();
         renderSettingsSection(); // To update the preview
         showToast('تمت إزالة الشعار بنجاح.');
     });
-    (_113 = document.getElementById('logo-upload-input')) === null || _113 === void 0 ? void 0 : _113.addEventListener('change', (event) => {
+    (_118 = document.getElementById('logo-upload-input')) === null || _118 === void 0 ? void 0 : _118.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -25739,10 +26404,10 @@ const setupEventListeners = () => {
         };
         reader.readAsDataURL(file);
     });
-    (_114 = document.getElementById('upload-developer-image-btn')) === null || _114 === void 0 ? void 0 : _114.addEventListener('click', () => {
+    (_119 = document.getElementById('upload-developer-image-btn')) === null || _119 === void 0 ? void 0 : _119.addEventListener('click', () => {
         requestDeveloperImagePassword(() => { var _a; return (_a = document.getElementById('developer-image-upload-input')) === null || _a === void 0 ? void 0 : _a.click(); });
     });
-    (_115 = document.getElementById('remove-developer-image-btn')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', () => {
+    (_120 = document.getElementById('remove-developer-image-btn')) === null || _120 === void 0 ? void 0 : _120.addEventListener('click', () => {
         requestDeveloperImagePassword(() => {
             state.settings.developerImage = null;
             saveState();
@@ -25751,7 +26416,7 @@ const setupEventListeners = () => {
             showToast('تمت إزالة صورة المطور بنجاح.');
         });
     });
-    (_116 = document.getElementById('developer-image-upload-input')) === null || _116 === void 0 ? void 0 : _116.addEventListener('change', (event) => {
+    (_121 = document.getElementById('developer-image-upload-input')) === null || _121 === void 0 ? void 0 : _121.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -25772,7 +26437,7 @@ const setupEventListeners = () => {
         reader.onerror = () => showToast('حدث خطأ أثناء قراءة صورة المطور.', 'error');
         reader.readAsDataURL(file);
     });
-    (_117 = document.getElementById('logo-size-slider')) === null || _117 === void 0 ? void 0 : _117.addEventListener('input', (event) => {
+    (_122 = document.getElementById('logo-size-slider')) === null || _122 === void 0 ? void 0 : _122.addEventListener('input', (event) => {
         const slider = event.target;
         const newSize = parseInt(slider.value, 10);
         const valueDisplay = document.getElementById('logo-size-value');
@@ -25794,12 +26459,12 @@ const setupEventListeners = () => {
             <button class="btn btn-delete" id="btn-delete-selected-addresses" style="padding: 4px 8px; font-size: 0.8rem;">حذف المحدد</button>
         `;
         addressContainer.insertBefore(bulkActions, addressContainer.querySelector('ul'));
-        (_118 = document.getElementById('btn-select-all-addresses')) === null || _118 === void 0 ? void 0 : _118.addEventListener('click', () => {
+        (_123 = document.getElementById('btn-select-all-addresses')) === null || _123 === void 0 ? void 0 : _123.addEventListener('click', () => {
             const cbs = document.querySelectorAll('.address-bulk-checkbox');
             const allSelected = Array.from(cbs).every(cb => cb.checked);
             cbs.forEach(cb => cb.checked = !allSelected);
         });
-        (_119 = document.getElementById('btn-delete-selected-addresses')) === null || _119 === void 0 ? void 0 : _119.addEventListener('click', () => {
+        (_124 = document.getElementById('btn-delete-selected-addresses')) === null || _124 === void 0 ? void 0 : _124.addEventListener('click', () => {
             const selected = Array.from(document.querySelectorAll('.address-bulk-checkbox:checked'));
             if (selected.length === 0)
                 return showToast('يرجى تحديد عناوين أولاً', 'error');
@@ -25869,7 +26534,7 @@ const setupEventListeners = () => {
         }, { passive: true });
     };
     initMobileAdaptation();
-    (_120 = document.getElementById('sidebar-toggle')) === null || _120 === void 0 ? void 0 : _120.addEventListener('click', () => {
+    (_125 = document.getElementById('sidebar-toggle')) === null || _125 === void 0 ? void 0 : _125.addEventListener('click', () => {
         document.body.classList.toggle('sidebar-collapsed');
     });
     // Accordion behavior for sidebar categories: when one <details> opens, close the others
