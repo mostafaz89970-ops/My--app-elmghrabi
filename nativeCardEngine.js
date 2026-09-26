@@ -1069,7 +1069,36 @@ async function getCustomerMeterMovements(term) {
     };
 }
 
+
+// --- Direct MEEDCO Live Methods ---
+async function loginMeedco(credentials = {}) {
+    const unifiedClient = require('./unifiedCardClient');
+    if (unifiedClient && typeof unifiedClient.loginMeedcoLive === 'function') {
+        return await unifiedClient.loginMeedcoLive(credentials);
+    }
+    return { success: false, message: 'خدمة الربط الحي غير مهيأة' };
+}
+
+async function getMeedcoStatus() {
+    const unifiedClient = require('./unifiedCardClient');
+    if (unifiedClient && typeof unifiedClient.getMeedcoStatus === 'function') {
+        return await unifiedClient.getMeedcoStatus();
+    }
+    return { connected: false, message: 'خدمة الربط غير متاحة' };
+}
+
+async function getMeedcoHierarchy(sectorId = null, publicAdminId = null) {
+    const unifiedClient = require('./unifiedCardClient');
+    if (unifiedClient && typeof unifiedClient.getMeedcoHierarchyLive === 'function') {
+        return await unifiedClient.getMeedcoHierarchyLive(sectorId, publicAdminId);
+    }
+    return { success: false, message: 'تعذر جلب البيانات الهيكلية' };
+}
+
 module.exports = {
+    loginMeedco,
+    getMeedcoStatus,
+    getMeedcoHierarchy,
     getCustomerMeterMovements,
     getReaderStatus,
     readSmartCard,

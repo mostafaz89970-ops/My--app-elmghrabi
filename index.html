@@ -1102,6 +1102,12 @@
             <h3 id="header-company-name">ELMAGHRABI</h3>
         </div>
         <div class="header-actions" style="margin-right: auto; padding-left: 1rem; display: flex; align-items: center; gap: 10px;">
+            <!-- زر حالة وبوابة الاتصال الحي بالمنظومة المركزية MEEDCO -->
+            <button id="btn-meedco-gateway" class="btn btn-sm" style="display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; border: 1px solid #10b981; background: #ecfdf5; color: #065f46; cursor: pointer; transition: all 0.2s;" title="بوابة الربط الحي بالمنظومة المركزية MEEDCO">
+                <span id="meedco-status-dot" style="width: 10px; height: 10px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+                <span id="meedco-status-text">المنظومة المركزية: متصل</span>
+            </button>
+
             <!-- أداة تبديل نطاق الفروع والقطاعات للأدمن والمديرين -->
             <div id="admin-scope-container" style="display: none; align-items: center; gap: 6px; background: rgba(241, 245, 249, 0.95); padding: 4px 10px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                 <span style="font-size: 0.82rem; font-weight: bold; color: #1e293b; display: flex; align-items: center; gap: 4px;">
@@ -7464,6 +7470,82 @@
             </div>
         </div>
     </div>
+
+
+  <!-- نافذة بوابة الاتصال المباشر بالمنظومة المركزية MEEDCO -->
+  <div id="modal-meedco-gateway" class="modal-overlay hidden" style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); z-index: 99999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div class="modal-content" style="background: #ffffff; border-radius: 14px; width: 540px; max-width: 95vw; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1); overflow: hidden; border: 1px solid #e2e8f0; text-align: right; direction: rtl;">
+      <div style="background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #ffffff; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.5rem;">⚡</span>
+          <div>
+            <h3 style="margin: 0; font-size: 1.15rem; font-weight: bold; color: #fff;">بوابة الربط الحي بالمنظومة المركزية (MEEDCO)</h3>
+            <p style="margin: 0; font-size: 0.8rem; opacity: 0.9; color: #e2e8f0;">تشغيل المنظومة وجلب البيانات والكروت فعلياً دون الحاجة لفتح المنظومة الأساسية</p>
+          </div>
+        </div>
+        <button id="close-meedco-gateway-btn" type="button" style="background: transparent; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+      </div>
+      
+      <form id="form-meedco-gateway" style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+        <div id="meedco-gateway-alert" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: bold;"></div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label style="display: block; font-size: 0.82rem; font-weight: bold; margin-bottom: 4px; color: #334155;">القطاع</label>
+            <select id="meedco-gw-sector" class="form-control" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem;">
+              <option value="">جارٍ تحميل القطاعات...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label style="display: block; font-size: 0.82rem; font-weight: bold; margin-bottom: 4px; color: #334155;">الإدارة العامة</label>
+            <select id="meedco-gw-public-admin" class="form-control" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem;">
+              <option value="">اختر القطاع أولاً</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label style="display: block; font-size: 0.82rem; font-weight: bold; margin-bottom: 4px; color: #334155;">الإدارة الفرعية / الهندسة</label>
+            <select id="meedco-gw-sub-admin" class="form-control" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem;">
+              <option value="">اختر الإدارة العامة أولاً</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label style="display: block; font-size: 0.82rem; font-weight: bold; margin-bottom: 4px; color: #334155;">مركز الشحن</label>
+            <select id="meedco-gw-recharge-center" class="form-control" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem;">
+              <option value="">اختر الإدارة العامة أولاً</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label style="display: block; font-size: 0.82rem; font-weight: bold; margin-bottom: 4px; color: #334155;">اسم المستخدم (حساب المنظومة المركزية)</label>
+          <input type="text" id="meedco-gw-username" class="form-control" value="سناء عبدالستار عبدالعزيز" required style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.9rem;" placeholder="اسم المستخدم بالشركة">
+        </div>
+
+        <div class="form-group">
+          <label style="display: block; font-size: 0.82rem; font-weight: bold; margin-bottom: 4px; color: #334155;">كلمة المرور</label>
+          <input type="password" id="meedco-gw-password" class="form-control" required style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.9rem;" placeholder="كلمة مرور حساب الشركة">
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: #1e293b; font-weight: 500;">
+            <input type="checkbox" id="meedco-gw-remember" checked style="width: 16px; height: 16px; cursor: pointer;">
+            <span>حفظ بيانات الاتصال وتجديد الجلسة تلقائياً في الخلفية (تشغيل مستقل 100%)</span>
+          </label>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+          <button type="button" id="btn-cancel-meedco-gateway" class="btn btn-secondary" style="padding: 8px 16px; border-radius: 6px; background: #e2e8f0; color: #334155; border: none; cursor: pointer;">إلغاء</button>
+          <button type="submit" id="btn-submit-meedco-gateway" class="btn btn-primary" style="padding: 8px 24px; border-radius: 6px; display: flex; align-items: center; gap: 6px; background: #2563eb; color: #fff; border: none; cursor: pointer; font-weight: bold;">
+            <span id="meedco-gw-submit-spinner" style="display: none;">⏳</span>
+            <span>تسجيل الدخول والربط الحي ⚡</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
 </body>
 </html>

@@ -28425,6 +28425,7 @@ const initApp = async () => {
     addSidebarArrows();
     setupEventListeners();
     setupOrgHierarchyEvents();
+    initMeedcoGateway();
     updateFavicon('normal');
     // Ensure sidebar categories are all collapsed on app start
     document.querySelectorAll('.nav-category details').forEach(d => d.open = false);
@@ -29486,3 +29487,242 @@ const initTechniciansSectionListeners = () => {
     (_t = document.getElementById('btn-print-tech-audit-report')) === null || _t === void 0 ? void 0 : _t.addEventListener('click', () => printPermissionsAuditReport());
     (_u = document.getElementById('btn-print-audit-table')) === null || _u === void 0 ? void 0 : _u.addEventListener('click', () => printPermissionsAuditReport());
 };
+// ============================================================================
+// MEEDCO Direct Live Gateway - تشغيل المنظومة وجلب البيانات فعلياً دون فتح المتصفح
+// ============================================================================
+function initMeedcoGateway() {
+    const btn = document.getElementById('btn-meedco-gateway');
+    const modal = document.getElementById('modal-meedco-gateway');
+    const closeBtn = document.getElementById('close-meedco-gateway-btn');
+    const cancelBtn = document.getElementById('btn-cancel-meedco-gateway');
+    const form = document.getElementById('form-meedco-gateway');
+    const dot = document.getElementById('meedco-status-dot');
+    const statusText = document.getElementById('meedco-status-text');
+    const alertBox = document.getElementById('meedco-gateway-alert');
+    const spinner = document.getElementById('meedco-gw-submit-spinner');
+    const sectorSelect = document.getElementById('meedco-gw-sector');
+    const publicAdminSelect = document.getElementById('meedco-gw-public-admin');
+    const subAdminSelect = document.getElementById('meedco-gw-sub-admin');
+    const rechargeCenterSelect = document.getElementById('meedco-gw-recharge-center');
+    const usernameInput = document.getElementById('meedco-gw-username');
+    const passwordInput = document.getElementById('meedco-gw-password');
+    const rememberCheckbox = document.getElementById('meedco-gw-remember');
+    const updateStatusUI = (st) => {
+        if (st && st.connected) {
+            if (dot)
+                dot.style.background = '#10b981';
+            if (statusText)
+                statusText.textContent = `المنظومة المركزية: متصل (${st.user || 'نشط'})`;
+            if (btn) {
+                btn.style.borderColor = '#10b981';
+                btn.style.background = '#ecfdf5';
+                btn.style.color = '#065f46';
+                btn.title = `متصل بالمنظومة المركزية - المشغل: ${st.user} (${st.rechargeCenterName || ''})`;
+            }
+        }
+        else {
+            if (dot)
+                dot.style.background = '#ef4444';
+            if (statusText)
+                statusText.textContent = 'المنظومة المركزية: غير متصل (اضغط للربط)';
+            if (btn) {
+                btn.style.borderColor = '#ef4444';
+                btn.style.background = '#fef2f2';
+                btn.style.color = '#991b1b';
+                btn.title = 'اضغط لفتح بوابة تسجيل الدخول المباشر للمنظومة المركزية MEEDCO';
+            }
+        }
+    };
+    const fetchStatus = async () => {
+        try {
+            const res = await fetch('http://127.0.0.1:5002/api/meedco/status').then(r => r.json()).catch(() => null);
+            if (res) {
+                updateStatusUI(res);
+                if (res.config && usernameInput && res.config.username) {
+                    usernameInput.value = res.config.username;
+                }
+            }
+        }
+        catch (e) { }
+    };
+    const loadHierarchy = async () => {
+        try {
+            const sRes = await fetch('http://127.0.0.1:5002/api/meedco/hierarchy').then(r => r.json()).catch(() => null);
+            if (sRes && sRes.data && sectorSelect) {
+                sectorSelect.innerHTML = '<option value="">-- اختر القطاع --</option>';
+                sRes.data.forEach((s) => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = s.name;
+                    sectorSelect.appendChild(opt);
+                });
+                const defaultSector = sRes.data.find((s) => String(s.name).includes('المنيا شمال')) || sRes.data[0];
+                if (defaultSector) {
+                    sectorSelect.value = defaultSector.id;
+                    await loadPublicAdmins(defaultSector.id);
+                }
+            }
+        }
+        catch (e) { }
+    };
+    const loadPublicAdmins = async (sectorId) => {
+        if (!publicAdminSelect)
+            return;
+        publicAdminSelect.innerHTML = '<option value="">جارٍ التحميل...</option>';
+        try {
+            const pRes = await fetch(`http://127.0.0.1:5002/api/meedco/hierarchy?sectorId=${encodeURIComponent(sectorId)}`).then(r => r.json()).catch(() => null);
+            if (pRes && pRes.data) {
+                publicAdminSelect.innerHTML = '<option value="">-- اختر الإدارة العامة --</option>';
+                pRes.data.forEach((p) => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = p.name;
+                    publicAdminSelect.appendChild(opt);
+                });
+                const defaultAdmin = pRes.data.find((p) => String(p.name).includes('بنى مزار') || String(p.name).includes('بني مزار')) || pRes.data[0];
+                if (defaultAdmin) {
+                    publicAdminSelect.value = defaultAdmin.id;
+                    await loadSubsAndCenters(defaultAdmin.id);
+                }
+            }
+        }
+        catch (e) {
+            publicAdminSelect.innerHTML = '<option value="">تعذر تحميل الإدارات</option>';
+        }
+    };
+    const loadSubsAndCenters = async (publicAdminId) => {
+        if (!subAdminSelect || !rechargeCenterSelect)
+            return;
+        subAdminSelect.innerHTML = '<option value="">جارٍ التحميل...</option>';
+        rechargeCenterSelect.innerHTML = '<option value="">جارٍ التحميل...</option>';
+        try {
+            const res = await fetch(`http://127.0.0.1:5002/api/meedco/hierarchy?publicAdminId=${encodeURIComponent(publicAdminId)}`).then(r => r.json()).catch(() => null);
+            if (res) {
+                if (res.subAdmins) {
+                    subAdminSelect.innerHTML = '';
+                    res.subAdmins.forEach((sa) => {
+                        const opt = document.createElement('option');
+                        opt.value = sa.id;
+                        opt.textContent = sa.name;
+                        subAdminSelect.appendChild(opt);
+                    });
+                }
+                if (res.rechargeCenters) {
+                    rechargeCenterSelect.innerHTML = '';
+                    res.rechargeCenters.forEach((rc) => {
+                        const opt = document.createElement('option');
+                        opt.value = rc.id;
+                        opt.textContent = rc.name;
+                        rechargeCenterSelect.appendChild(opt);
+                    });
+                }
+            }
+        }
+        catch (e) {
+            subAdminSelect.innerHTML = '<option value="">تعذر التحميل</option>';
+            rechargeCenterSelect.innerHTML = '<option value="">تعذر التحميل</option>';
+        }
+    };
+    sectorSelect === null || sectorSelect === void 0 ? void 0 : sectorSelect.addEventListener('change', () => {
+        if (sectorSelect.value)
+            loadPublicAdmins(sectorSelect.value);
+    });
+    publicAdminSelect === null || publicAdminSelect === void 0 ? void 0 : publicAdminSelect.addEventListener('change', () => {
+        if (publicAdminSelect.value)
+            loadSubsAndCenters(publicAdminSelect.value);
+    });
+    const openModal = () => {
+        if (alertBox)
+            alertBox.style.display = 'none';
+        modal === null || modal === void 0 ? void 0 : modal.classList.remove('hidden');
+        if (sectorSelect && sectorSelect.children.length <= 1) {
+            loadHierarchy();
+        }
+    };
+    const closeModal = () => {
+        modal === null || modal === void 0 ? void 0 : modal.classList.add('hidden');
+    };
+    btn === null || btn === void 0 ? void 0 : btn.addEventListener('click', openModal);
+    closeBtn === null || closeBtn === void 0 ? void 0 : closeBtn.addEventListener('click', closeModal);
+    cancelBtn === null || cancelBtn === void 0 ? void 0 : cancelBtn.addEventListener('click', closeModal);
+    form === null || form === void 0 ? void 0 : form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = (usernameInput === null || usernameInput === void 0 ? void 0 : usernameInput.value.trim()) || '';
+        const password = (passwordInput === null || passwordInput === void 0 ? void 0 : passwordInput.value) || '';
+        const sectorId = (sectorSelect === null || sectorSelect === void 0 ? void 0 : sectorSelect.value) || '';
+        const publicAdminId = (publicAdminSelect === null || publicAdminSelect === void 0 ? void 0 : publicAdminSelect.value) || '';
+        const subAdminId = (subAdminSelect === null || subAdminSelect === void 0 ? void 0 : subAdminSelect.value) || '';
+        const rechargeCenterId = (rechargeCenterSelect === null || rechargeCenterSelect === void 0 ? void 0 : rechargeCenterSelect.value) || '';
+        const remember = rememberCheckbox ? rememberCheckbox.checked : true;
+        if (!username || !password) {
+            if (alertBox) {
+                alertBox.style.display = 'block';
+                alertBox.style.background = '#fef2f2';
+                alertBox.style.color = '#991b1b';
+                alertBox.textContent = 'يرجى إدخال اسم المستخدم وكلمة المرور للمنظومة المركزية';
+            }
+            return;
+        }
+        if (spinner)
+            spinner.style.display = 'inline-block';
+        if (alertBox) {
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#eff6ff';
+            alertBox.style.color = '#1e40af';
+            alertBox.textContent = 'جارٍ الاتصال المباشر والتحقق من حساب المنظومة المركزية MEEDCO...';
+        }
+        try {
+            const res = await fetch('http://127.0.0.1:5002/api/meedco/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username,
+                    password,
+                    sectorId,
+                    publicAdminId,
+                    subAdminId,
+                    rechargeCenterId,
+                    remember
+                })
+            }).then(r => r.json()).catch(err => ({ success: false, message: err.message }));
+            if (res && res.success) {
+                if (alertBox) {
+                    alertBox.style.display = 'block';
+                    alertBox.style.background = '#ecfdf5';
+                    alertBox.style.color = '#065f46';
+                    alertBox.textContent = '✓ ' + (res.message || 'تم الاتصال بالمنظومة المركزية بنجاح!');
+                }
+                showToast('تم الاتصال بالمنظومة المركزية بنجاح! جميع العمليات الآن تعمل فعلياً.', 'success');
+                await fetchStatus();
+                setTimeout(() => {
+                    closeModal();
+                    if (passwordInput)
+                        passwordInput.value = '';
+                }, 1000);
+            }
+            else {
+                if (alertBox) {
+                    alertBox.style.display = 'block';
+                    alertBox.style.background = '#fef2f2';
+                    alertBox.style.color = '#991b1b';
+                    alertBox.textContent = '✕ ' + ((res === null || res === void 0 ? void 0 : res.message) || 'فشل الاتصال بالمنظومة المركزية. تأكد من صحة البيانات.');
+                }
+                showToast((res === null || res === void 0 ? void 0 : res.message) || 'فشل الاتصال بالمنظومة المركزية', 'error');
+            }
+        }
+        catch (err) {
+            if (alertBox) {
+                alertBox.style.display = 'block';
+                alertBox.style.background = '#fef2f2';
+                alertBox.style.color = '#991b1b';
+                alertBox.textContent = 'تعذر الاتصال بخادم المنظومة: ' + err.message;
+            }
+        }
+        finally {
+            if (spinner)
+                spinner.style.display = 'none';
+        }
+    });
+    fetchStatus();
+    setInterval(fetchStatus, 60000);
+}

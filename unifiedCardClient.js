@@ -11,6 +11,243 @@ let cachedAuthToken = null;
 let cachedUcsToken = null;
 let lastUcsTokenTime = 0;
 
+
+// --- Direct MEEDCO Live Authentication & Auto-Renewal ---
+const meedcoConfigPath = path.join(__dirname, 'meedco_config.json');
+
+function getMeedcoConfig() {
+    try {
+        if (fs.existsSync(meedcoConfigPath)) {
+            return JSON.parse(fs.readFileSync(meedcoConfigPath, 'utf8'));
+        }
+    } catch (e) {}
+    return {
+        saved: true,
+        username: "سناء عبدالستار عبدالعزيز",
+        password: "",
+        sectorId: "4dc7b305-c91d-41a0-81e4-9ace5c160c1d",
+        sectorName: "4  -->  المنيا شمال",
+        publicAdminId: "22d29793-5055-4068-8fcd-6eb0f74f78c6",
+        publicAdminName: "526  -->  بنى مزار شرق",
+        subAdminId: "e294958c-cdf8-4c72-8a3d-16d71bde5cde",
+        subAdminName: "526  -->  بنى مزار شرق",
+        rechargeCenterId: "3c2d391a-a917-42d7-834a-02a68b8648e2",
+        rechargeCenterName: "مركز شحن بنى مزار شرق",
+        lastLogin: null
+    };
+}
+
+function saveMeedcoConfig(cfg) {
+    try {
+        fs.writeFileSync(meedcoConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+    } catch (e) {}
+}
+
+async function loginMeedcoLive(credentials = {}) {
+    const cfg = getMeedcoConfig();
+    const username = (credentials.username !== undefined ? credentials.username : cfg.username) || "سناء عبدالستار عبدالعزيز";
+    const password = (credentials.password !== undefined ? credentials.password : cfg.password) || "";
+    const sectorId = credentials.sectorId || cfg.sectorId || "4dc7b305-c91d-41a0-81e4-9ace5c160c1d";
+    const publicAdministrationId = credentials.publicAdminId || credentials.publicAdministrationId || cfg.publicAdminId || "22d29793-5055-4068-8fcd-6eb0f74f78c6";
+    const subAdministrationId = credentials.subAdminId || credentials.subAdministrationId || cfg.subAdminId || "e294958c-cdf8-4c72-8a3d-16d71bde5cde";
+    const rechargeCenterId = credentials.rechargeCenterId || cfg.rechargeCenterId || "3c2d391a-a917-42d7-834a-02a68b8648e2";
+
+    if (!username || !password) {
+        return { success: false, message: 'يرجى إدخال اسم المستخدم وكلمة المرور للمنظومة المركزية MEEDCO' };
+    }
+
+    const payload = JSON.stringify({
+        subAdministrationId,
+        publicAdministrationId,
+        rechargeCenterId,
+        sectorId,
+        username,
+        password,
+        IPAddress: '127.0.0.1'
+    });
+
+    return new Promise((resolve) => {
+        const req = https.request({
+            hostname: MEEDCO_API_HOST,
+            port: 443,
+            path: '/Accounts/login',
+            method: 'POST',
+            rejectUnauthorized: false,
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Content-Length': Buffer.byteLength(payload),
+                'Origin': MEEDCO_APP_ORIGIN,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+            }
+        }, (res) => {
+            let body = '';
+            res.on('data', chunk => body += chunk);
+            res.on('end', async () => {
+                try {
+                    const parsed = JSON.parse(body);
+                    if (parsed && parsed.data && parsed.data.token) {
+                        cachedAuthToken = parsed.data.token;
+                        cachedUcsToken = null; // force fresh UCS token
+                        fs.writeFileSync(path.join(__dirname, '.session_token'), cachedAuthToken, 'utf8');
+                        
+                        cfg.saved = credentials.remember !== false;
+                        cfg.username = username;
+                        if (credentials.remember !== false) {
+                            cfg.password = password;
+                        }
+                        cfg.sectorId = sectorId;
+                        cfg.publicAdminId = publicAdministrationId;
+                        cfg.subAdminId = subAdministrationId;
+                        cfg.rechargeCenterId = rechargeCenterId;
+                        cfg.lastLogin = new Date().toISOString();
+                        cfg.userName = parsed.data.userName || username;
+                        saveMeedcoConfig(cfg);
+
+                        try {
+                            await getUcsToken(true);
+                        } catch (uErr) {}
+
+                        resolve({
+                            success: true,
+                            message: 'تم تسجيل الدخول للمنظومة المركزية MEEDCO وتفعيل الربط الحي بنجاح.',
+                            data: {
+                                token: parsed.data.token,
+                                user: username,
+                                validTo: parsed.data.tokenValidTo
+                            }
+                        });
+                    } else {
+                        resolve({
+                            success: false,
+                            message: parsed.message || 'فشل تسجيل الدخول للمنظومة المركزية. تأكد من صحة البيانات.'
+                        });
+                    }
+                } catch (e) {
+                    resolve({
+                        success: false,
+                        message: 'استجابة غير متوقعة من خادم المنظومة: ' + e.message
+                    });
+                }
+            });
+        });
+
+        req.on('error', (err) => {
+            resolve({ success: false, message: 'تعذر الاتصال بخادم المنظومة المركزية: ' + err.message });
+        });
+        req.setTimeout(12000, () => {
+            req.destroy();
+            resolve({ success: false, message: 'انتهت مهلة الاتصال بالخادم المركزي' });
+        });
+
+        req.write(payload);
+        req.end();
+    });
+}
+
+let isReloggingIn = false;
+async function ensureValidSession(force = false) {
+    if (isReloggingIn) return cachedAuthToken;
+    const cfg = getMeedcoConfig();
+    if (force || !cachedAuthToken) {
+        if (cfg.password && cfg.username) {
+            isReloggingIn = true;
+            try {
+                const res = await loginMeedcoLive();
+                if (res.success) {
+                    return cachedAuthToken;
+                }
+            } finally {
+                isReloggingIn = false;
+            }
+        }
+    }
+    return cachedAuthToken || getActiveAuthToken();
+}
+
+async function getMeedcoStatus() {
+    const cfg = getMeedcoConfig();
+    const token = getActiveAuthToken();
+    let isLiveValid = false;
+    let userInfo = cfg.username || 'غير محدد';
+    let validTo = cfg.lastLogin || null;
+
+    if (token) {
+        try {
+            const parts = token.split('.');
+            if (parts.length === 3) {
+                const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+                userInfo = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || cfg.username;
+                const exp = payload.exp ? new Date(payload.exp * 1000) : null;
+                isLiveValid = exp ? (Date.now() < exp.getTime()) : true;
+                validTo = exp ? exp.toISOString() : null;
+            }
+        } catch (e) {}
+    }
+
+    return {
+        connected: Boolean(token && isLiveValid),
+        user: userInfo,
+        sectorName: cfg.sectorName || 'المنيا شمال',
+        subAdminName: cfg.subAdminName || 'بنى مزار شرق',
+        rechargeCenterName: cfg.rechargeCenterName || 'مركز شحن بنى مزار شرق',
+        hasSavedCredentials: Boolean(cfg.password),
+        validTo: validTo,
+        config: {
+            username: cfg.username,
+            sectorId: cfg.sectorId,
+            publicAdminId: cfg.publicAdminId,
+            subAdminId: cfg.subAdminId,
+            rechargeCenterId: cfg.rechargeCenterId
+        }
+    };
+}
+
+async function getMeedcoHierarchyLive(sectorId = null, publicAdminId = null) {
+    function apiGet(urlPath) {
+        return new Promise((resolve) => {
+            https.get({
+                hostname: MEEDCO_API_HOST,
+                port: 443,
+                path: urlPath,
+                rejectUnauthorized: false,
+                headers: { 'Origin': MEEDCO_APP_ORIGIN }
+            }, (res) => {
+                let d = '';
+                res.on('data', c => d += c);
+                res.on('end', () => {
+                    try { resolve(JSON.parse(d)); } catch (e) { resolve(null); }
+                });
+            }).on('error', () => resolve(null));
+        });
+    }
+
+    try {
+        if (!sectorId && !publicAdminId) {
+            const sRes = await apiGet('/sector/GetSectorsByTypeDropdown/1');
+            return { success: true, data: sRes?.data || [] };
+        }
+        if (sectorId && !publicAdminId) {
+            const pRes = await apiGet('/publicAdministration/getBySectorIdDropDown/' + encodeURIComponent(sectorId));
+            return { success: true, data: pRes?.data || [] };
+        }
+        if (publicAdminId) {
+            const [subRes, rcRes] = await Promise.all([
+                apiGet('/subAdministration/getByPublicAdministrationIdDropDown/' + encodeURIComponent(publicAdminId)),
+                apiGet('/PublicAdministration/GetRechargeCenter/' + encodeURIComponent(publicAdminId))
+            ]);
+            return {
+                success: true,
+                subAdmins: subRes?.data || [],
+                rechargeCenters: rcRes?.data || []
+            };
+        }
+    } catch (e) {
+        return { success: false, message: e.message };
+    }
+    return { success: false, message: 'معاملات غير صحيحة' };
+}
+
+
 // Cached last read control card info for fallback and continuity
 let lastKnownControlCard = {
     cardId: "00118924",
@@ -2076,6 +2313,11 @@ async function getCustomerMeterMovementsLive(param) {
 }
 
 module.exports = {
+    loginMeedcoLive,
+    getMeedcoStatus,
+    getMeedcoHierarchyLive,
+    ensureValidSession,
+    getMeedcoConfig,
     getCustomerMeterMovementsLive,
     getActiveAuthToken,
     getUcsToken,

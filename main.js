@@ -42,7 +42,7 @@ function createWindow() {
   mainWindow.webContents.session.clearCache();
 
   // تحميل ملف index.html الخاص بالتطبيق.
-  mainWindow.loadFile(path.join(__dirname, 'المنظومة الموحدة للعدادات.html'));
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
   // السماح بنوافذ الطباعة الداخلية وفتح الروابط الخارجية في المتصفح الافتراضي
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

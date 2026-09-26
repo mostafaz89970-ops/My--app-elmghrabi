@@ -337,6 +337,32 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            
+            // --- Direct MEEDCO Gateway Routes ---
+            if (pathname === '/api/meedco/status') {
+                const status = await nativeEngine.getMeedcoStatus();
+                res.writeHead(200);
+                res.end(JSON.stringify(status));
+                return;
+            }
+
+            if (pathname === '/api/meedco/login' && req.method === 'POST') {
+                const body = await getBody();
+                const result = await nativeEngine.loginMeedco(body);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            if (pathname === '/api/meedco/hierarchy') {
+                const sectorId = url.searchParams.get('sectorId');
+                const publicAdminId = url.searchParams.get('publicAdminId');
+                const result = await nativeEngine.getMeedcoHierarchy(sectorId, publicAdminId);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
             if (pathname === '/api/customers') {
                 const body = await getBody();
                 res.writeHead(200);
