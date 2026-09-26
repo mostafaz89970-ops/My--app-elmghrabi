@@ -13577,15 +13577,6 @@ const renderChargingCardSection = (customerId) => {
     }
     else {
         resetChargingCardUI();
-        const banner = document.getElementById('chg-status-banner');
-        if (banner) {
-            banner.style.display = 'block';
-            banner.style.backgroundColor = '#eff6ff';
-            banner.style.border = '1px solid #bfdbfe';
-            banner.style.color = '#1e40af';
-            banner.innerHTML = '💳 <strong>جاهز للشحن الذكي:</strong> يرجى وضع كارت المشترك على القارئ والضغط على <strong>"قراءة الكارت"</strong> لجلب البيانات والمديونيات تلقائياً من السيرفر.';
-        }
-        // Standby mode: waiting for card read
     }
 };
 // =========================================================================
@@ -13656,12 +13647,6 @@ const updateChargingCardFields = (cust, card, fin) => {
     if (amtInp && (!amtInp.value || Number(amtInp.value) === 0)) {
         amtInp.value = String(Math.max(50, minCharge));
     }
-    const mainContainer = document.getElementById('chg-main-details-container');
-    const standbyCard = document.getElementById('chg-reader-standby-card');
-    if (mainContainer)
-        mainContainer.style.display = 'block';
-    if (standbyCard)
-        standbyCard.style.display = 'none';
     calculateChargingNetAmount();
 };
 const resetChargingCardUI = () => {
@@ -13695,19 +13680,16 @@ const resetChargingCardUI = () => {
     setVal('field-charge-amount', '');
     setVal('field-total-deductions', '0.00');
     setVal('field-net-value', '0.00');
-    setVal('field-min-charge', '10.00');
+    setVal('field-min-charge', '0.00');
+    const netDisplay = document.getElementById('chg-net-amount-display');
+    if (netDisplay)
+        netDisplay.textContent = '0.00 ج.م';
     const delayCb = document.getElementById('field-debits-delay-cb');
     if (delayCb)
         delayCb.checked = false;
     const banner = document.getElementById('chg-status-banner');
     if (banner)
         banner.style.display = 'none';
-    const mainContainer = document.getElementById('chg-main-details-container');
-    const standbyCard = document.getElementById('chg-reader-standby-card');
-    if (mainContainer)
-        mainContainer.style.display = 'none';
-    if (standbyCard)
-        standbyCard.style.display = 'flex';
     const subSelect = document.getElementById('chg-subscriber-select');
     if (subSelect)
         subSelect.value = '';
@@ -14254,6 +14236,10 @@ const readChargingSmartCard = async () => {
 };
 const executeChargingProcess = async () => {
     if (!hasButtonPermission('charging_card_access')) {
+        if (!currentChargingCustomer) {
+            showToast('يرجى قراءة كارت المشترك أولاً لتعبئة البيانات وتنفيذ الشحن.', 'warning');
+            return;
+        }
         showToast('عفواً، ليس لديك صلاحية تنفيذ شحن الكروت (Elec.Permissions.Cards.Charges)', 'error');
         return;
     }
