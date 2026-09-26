@@ -4346,27 +4346,39 @@
                         <!-- 2x2 Grid of 4 colored cards -->
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1;">
                             <!-- Red Card: ديون -->
-                            <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 10px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                            <div id="card-trigger-debts" title="انقر لعرض تفاصيل الديون وتأجيل الأقساط" style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 10px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; transition: all 0.2s; position: relative;">
                                 <div id="stat-card-debts" style="font-size: 2rem; font-weight: 800; color: #e11d48; line-height: 1.1; margin-bottom: 4px;">0</div>
-                                <div style="font-size: 0.95rem; font-weight: 700; color: #9f1239;">ديون</div>
+                                <div style="font-size: 0.95rem; font-weight: 700; color: #9f1239; display: flex; align-items: center; gap: 4px;">
+                                    <span>ديون</span>
+                                    <span style="font-size: 0.75rem; background: rgba(225, 29, 72, 0.1); padding: 1px 4px; border-radius: 4px;">تفاصيل 🔍</span>
+                                </div>
                             </div>
 
                             <!-- Blue Card: رسوم -->
-                            <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                            <div id="card-trigger-fees" title="انقر لعرض تفاصيل الرسوم" style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; transition: all 0.2s;">
                                 <div id="stat-card-fees" style="font-size: 2rem; font-weight: 800; color: #0284c7; line-height: 1.1; margin-bottom: 4px;">0</div>
-                                <div style="font-size: 0.95rem; font-weight: 700; color: #0369a1;">رسوم</div>
+                                <div style="font-size: 0.95rem; font-weight: 700; color: #0369a1; display: flex; align-items: center; gap: 4px;">
+                                    <span>رسوم</span>
+                                    <span style="font-size: 0.75rem; background: rgba(2, 132, 199, 0.1); padding: 1px 4px; border-radius: 4px;">تفاصيل 🔍</span>
+                                </div>
                             </div>
 
                             <!-- Teal Card: غرامات -->
-                            <div style="background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 10px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                            <div id="card-trigger-fines" title="انقر لعرض تفاصيل الغرامات والمخالفات" style="background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 10px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; transition: all 0.2s;">
                                 <div id="stat-card-fines" style="font-size: 2rem; font-weight: 800; color: #0d9488; line-height: 1.1; margin-bottom: 4px;">0</div>
-                                <div style="font-size: 0.95rem; font-weight: 700; color: #0f766e;">غرامات</div>
+                                <div style="font-size: 0.95rem; font-weight: 700; color: #0f766e; display: flex; align-items: center; gap: 4px;">
+                                    <span>غرامات</span>
+                                    <span style="font-size: 0.75rem; background: rgba(13, 148, 136, 0.1); padding: 1px 4px; border-radius: 4px;">تفاصيل 🔍</span>
+                                </div>
                             </div>
 
                             <!-- Purple Card: الدفعات -->
-                            <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 10px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                            <div id="card-trigger-payments" title="انقر لعرض تفاصيل الدفعات والأرصدة الدائنة" style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 10px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; transition: all 0.2s;">
                                 <div id="stat-card-payments" style="font-size: 2rem; font-weight: 800; color: #9333ea; line-height: 1.1; margin-bottom: 4px;">0</div>
-                                <div style="font-size: 0.95rem; font-weight: 700; color: #7e22ce;">الدفعات</div>
+                                <div style="font-size: 0.95rem; font-weight: 700; color: #7e22ce; display: flex; align-items: center; gap: 4px;">
+                                    <span>الدفعات</span>
+                                    <span style="font-size: 0.75rem; background: rgba(147, 51, 234, 0.1); padding: 1px 4px; border-radius: 4px;">تفاصيل 🔍</span>
+                                </div>
                             </div>
                         </div>
 
@@ -4507,6 +4519,20 @@
                                 <div>
                                     <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 4px;">الحد الادنى للشحن</label>
                                     <input type="text" id="field-min-charge" readonly class="form-control" value="10.00" style="background: #f1f5f9; border: 1px solid #cbd5e1; font-weight: 600; color: #64748b; padding: 8px 10px; border-radius: 6px; width: 100%; text-align: center;" />
+                                </div>
+                            </div>
+
+                            <!-- MEEDCO Postponement Option & Actions -->
+                            <div id="container-debits-delay" style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;" data-button-permission="delay_charge_debts">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; font-weight: 700; color: #9f1239; font-size: 0.95rem;">
+                                    <input type="checkbox" id="field-debits-delay-cb" style="width: 18px; height: 18px; cursor: pointer; accent-color: #e11d48;" />
+                                    <span>تأجيل سداد الديون والغرامات لهذه الشحنة فقط</span>
+                                </label>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <button type="button" id="btn-open-installments-modal" class="btn btn-sm" style="background: #ffffff; color: #dc2626; border: 1px solid #fca5a5; font-size: 0.85rem; font-weight: 700; padding: 5px 14px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(220, 38, 38, 0.1);">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                        <span>جدولة وتأجيل الأقساط الشهرية ⏱️</span>
+                                    </button>
                                 </div>
                             </div>
 
@@ -5407,31 +5433,38 @@
             </div>
         </div>
 
-        <!-- Modal 3: نافذة تفاصيل ديون وأقساط المشترك أثناء الشحن -->
+        <!-- Modal 3: نافذة تفاصيل ديون وأقساط المشترك وتأجيل القسط (MEEDCO Delay Selected Charge Debt) -->
         <div id="modal-charging-debts-details" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10002; align-items: center; justify-content: center; padding: 20px;">
-            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 850px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
+            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 900px; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
+                <!-- Modal Header -->
                 <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #fff1f2;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <div style="background: #fee2e2; color: #dc2626; padding: 8px; border-radius: 8px; display: flex;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         </div>
                         <div>
-                            <h4 id="chg-modal-cust-name" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #9f1239;">بيان الديون والأقساط الشهرية للمشترك</h4>
-                            <small id="chg-modal-cust-sub" class="text-muted">بيان تفصيلي بجميع حسابات الديون والأقساط المستحقة قبل الشحن</small>
+                            <h4 id="chg-modal-cust-name" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #9f1239;">بيان الديون وتأجيل الأقساط الشهرية</h4>
+                            <small id="chg-modal-cust-sub" class="text-muted">نظام تأجيل وجدولة سداد الأقساط والمديونيات مطابق لمنظومة MEEDCO</small>
                         </div>
                     </div>
                     <button type="button" class="btn-close-modal" data-modal="modal-charging-debts-details" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
                 </div>
+
+                <!-- Modal Body -->
                 <div style="padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
                     <!-- Financial Alert Banner -->
                     <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                         <div>
-                            <span style="color: #991b1b; font-weight: 700;">إجمالي أصل الديون القائمة: </span>
-                            <span id="chg-modal-total-debts" style="font-size: 1.2rem; font-weight: 800; color: #dc2626; font-family: monospace;">0.00 ج.م</span>
+                            <span style="color: #991b1b; font-weight: 700;">إجمالي أصل الديون: </span>
+                            <span id="chg-modal-total-debts" style="font-size: 1.25rem; font-weight: 800; color: #dc2626; font-family: monospace;">0.00 ج.م</span>
                         </div>
                         <div>
-                            <span style="color: #075985; font-weight: 700;">القسط الشهري المستحق الخصم: </span>
-                            <span id="chg-modal-installment" style="font-size: 1.2rem; font-weight: 800; color: #0284c7; font-family: monospace;">0.00 ج.م</span>
+                            <span style="color: #075985; font-weight: 700;">القسط الشهري المستحق: </span>
+                            <span id="chg-modal-installment" style="font-size: 1.25rem; font-weight: 800; color: #0284c7; font-family: monospace;">0.00 ج.م</span>
+                        </div>
+                        <div>
+                            <span style="color: #166534; font-weight: 700;">حالة التأجيل: </span>
+                            <span id="chg-modal-delay-status" style="font-size: 0.95rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; background: #e0f2fe; color: #0369a1;">غير مؤجل</span>
                         </div>
                     </div>
 
@@ -5440,14 +5473,16 @@
                         <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: right;">
                             <thead>
                                 <tr style="background: #f8fafc; font-size: 0.85rem; color: #475569;">
-                                    <th style="padding: 10px;">نوع الدين</th>
+                                    <th style="padding: 10px; width: 40px; text-align: center;"><input type="checkbox" id="chg-select-all-debts" /></th>
+                                    <th style="padding: 10px;">نوع الدين / القسط</th>
                                     <th style="padding: 10px;">أصل الدين</th>
                                     <th style="padding: 10px;">المسدد</th>
                                     <th style="padding: 10px;">المتبقي</th>
-                                    <th style="padding: 10px;">القسط الشهري</th>
-                                    <th style="padding: 10px;">تاريخ الاستحقاق</th>
-                                    <th style="padding: 10px;">الحالة</th>
-                                    <th style="padding: 10px; text-align: center;">إجراء</th>
+                                    <th style="padding: 10px;">قيمة القسط</th>
+                                    <th style="padding: 10px;">تاريخ الاستحقاق الأصلي</th>
+                                    <th style="padding: 10px;">تاريخ التأجيل</th>
+                                    <th style="padding: 10px; text-align: center;">الحالة</th>
+                                    <th style="padding: 10px; text-align: center;">إجراء سريع</th>
                                 </tr>
                             </thead>
                             <tbody id="chg-modal-debts-tbody">
@@ -5455,9 +5490,122 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Postponement Configuration Section (MEEDCO Date & Reason) -->
+                    <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 18px; display: flex; flex-direction: column; gap: 12px;" data-button-permission="delay_charge_debts">
+                        <div style="font-weight: 800; font-size: 0.95rem; color: #1e293b; display: flex; align-items: center; justify-content: space-between;">
+                            <span>إعدادات تأجيل السداد (Postpone Installment Settings):</span>
+                            <span id="chg-max-delay-notice" style="font-size: 0.85rem; color: #64748b; font-weight: normal;">أقصى موعد مسموح للتأجيل: 6 أشهر</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 4px;">تاريخ الاستحقاق الجديد بعد التأجيل (New Due Date):</label>
+                                <input type="date" id="chg-delay-new-date" class="form-control" style="background: #ffffff; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; width: 100%; font-weight: 600;" />
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 4px;">سبب التأجيل / رقم الموافقة (Notes / Approval):</label>
+                                <input type="text" id="chg-delay-notes" class="form-control" placeholder="أدخل سبب أو إذن تأجيل القسط..." style="background: #ffffff; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; width: 100%; font-size: 0.9rem;" />
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap;">
+                            <button type="button" id="btn-apply-selected-debts-delay" class="btn" style="background: #dc2626; color: #ffffff; font-weight: 700; padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <span>تأكيد تأجيل الأقساط المحددة</span>
+                            </button>
+                            <button type="button" id="btn-delay-current-month-installment" class="btn" style="background: #f59e0b; color: #ffffff; font-weight: 700; padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <span>تأجيل قسط هذا الشهر كاملاً</span>
+                            </button>
+                            <button type="button" id="btn-reset-debts-delay" class="btn" style="background: #ffffff; color: #64748b; border: 1px solid #cbd5e1; font-weight: 600; padding: 8px 14px; border-radius: 6px; cursor: pointer;">
+                                <span>استعادة وسداد الأقساط (إلغاء التأجيل)</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Modal Footer -->
                 <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end; gap: 10px;">
                     <button type="button" class="btn secondary btn-close-modal" data-modal="modal-charging-debts-details">إغلاق</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: تفاصيل الرسوم (MEEDCO Fees Details) -->
+        <div id="modal-fees-details-meedco" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10002; align-items: center; justify-content: center; padding: 20px;">
+            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 650px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
+                <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f0f9ff;">
+                    <h4 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #0284c7;">بيان تفاصيل الرسوم الحكومية والنظافة</h4>
+                    <button type="button" class="btn-close-modal" data-modal="modal-fees-details-meedco" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
+                </div>
+                <div style="padding: 20px; overflow-y: auto;">
+                    <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+                        <thead>
+                            <tr style="background: #f8fafc; font-size: 0.85rem; color: #475569;">
+                                <th style="padding: 10px;">بند الرسم</th>
+                                <th style="padding: 10px;">القيمة (ج.م)</th>
+                                <th style="padding: 10px;">الجهة التابع لها</th>
+                            </tr>
+                        </thead>
+                        <tbody id="chg-modal-fees-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end;">
+                    <button type="button" class="btn secondary btn-close-modal" data-modal="modal-fees-details-meedco">إغلاق</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: تفاصيل الغرامات والمخالفات (MEEDCO Fines & Abuses) -->
+        <div id="modal-abuses-details-meedco" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10002; align-items: center; justify-content: center; padding: 20px;">
+            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 650px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
+                <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f0fdfa;">
+                    <h4 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #0d9488;">بيان تفاصيل الغرامات والتلاعبات وتفريغ العداد</h4>
+                    <button type="button" class="btn-close-modal" data-modal="modal-abuses-details-meedco" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
+                </div>
+                <div style="padding: 20px; overflow-y: auto;">
+                    <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+                        <thead>
+                            <tr style="background: #f8fafc; font-size: 0.85rem; color: #475569;">
+                                <th style="padding: 10px;">نوع المخالفة / التلاعب</th>
+                                <th style="padding: 10px;">المبلغ (ج.م)</th>
+                                <th style="padding: 10px;">تاريخ التسجيل</th>
+                            </tr>
+                        </thead>
+                        <tbody id="chg-modal-abuses-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end;">
+                    <button type="button" class="btn secondary btn-close-modal" data-modal="modal-abuses-details-meedco">إغلاق</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: تفاصيل الدفعات والأرصدة الدائنة (MEEDCO Credits) -->
+        <div id="modal-credits-details-meedco" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10002; align-items: center; justify-content: center; padding: 20px;">
+            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 650px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
+                <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #faf5ff;">
+                    <h4 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #9333ea;">بيان تفاصيل الدفعات والأرصدة الدائنة</h4>
+                    <button type="button" class="btn-close-modal" data-modal="modal-credits-details-meedco" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
+                </div>
+                <div style="padding: 20px; overflow-y: auto;">
+                    <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+                        <thead>
+                            <tr style="background: #f8fafc; font-size: 0.85rem; color: #475569;">
+                                <th style="padding: 10px;">نوع الدفعة الدائنة</th>
+                                <th style="padding: 10px;">المبلغ الدائن (ج.م)</th>
+                                <th style="padding: 10px;">تاريخ الإضافة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="chg-modal-credits-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end;">
+                    <button type="button" class="btn secondary btn-close-modal" data-modal="modal-credits-details-meedco">إغلاق</button>
                 </div>
             </div>
         </div>
