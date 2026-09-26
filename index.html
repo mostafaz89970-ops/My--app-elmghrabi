@@ -4520,7 +4520,27 @@
                 
 
                 <!-- Main Section: Left Panel (Deductions & Payments) + Right Panel (Subscriber & Meter Info) -->
-                <div style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                
+                <!-- Standby Reader Prompt Card (Shown until card is actually read) -->
+                <div id="chg-reader-standby-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4.5rem 2rem; background: #ffffff; border: 2px dashed #cbd5e1; border-radius: 14px; text-align: center; margin: 1.5rem 0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="width: 86px; height: 86px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 2.75rem; margin-bottom: 1.25rem; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.18);">
+                        💳
+                    </div>
+                    <h3 style="margin: 0 0 10px 0; font-size: 1.4rem; font-weight: 800; color: #0f172a;">في انتظار قراءة كارت المشترك الذكي</h3>
+                    <p style="margin: 0 0 1.75rem 0; color: #64748b; font-size: 0.95rem; max-width: 500px; line-height: 1.6;">
+                        لا تظهر بيانات المشترك أو المديونيات إلا بعد قراءة الكارت الفعلي من القارئ.<br>
+                        يرجى وضع كارت العداد في القارئ والضغط على الزر أدناه لجلب البيانات والمديونيات آلياً من السيرفر.
+                    </p>
+                    <button type="button" id="btn-chg-standby-read-card" class="btn" style="background: #f59e0b; color: #ffffff; font-weight: 700; font-size: 1.05rem; padding: 12px 32px; border-radius: 10px; border: none; cursor: pointer; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.35); transition: transform 0.15s ease;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                        <span>قراءة الكارت الآن</span>
+                    </button>
+                </div>
+
+                <!-- Main Charging Details Container (Hidden until card is read) -->
+                <div id="chg-main-details-container" style="display: none;">
+
+<div style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 1.5rem; flex-wrap: wrap;">
                     
                     <!-- Left Panel in RTL: خصومات ودفعات هذا الشهر (Cards) -->
                     <div style="width: 320px; min-width: 280px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; display: flex; flex-direction: column;">
@@ -4741,6 +4761,7 @@
 
                     </div>
                 </div>
+                </div><!-- /#chg-main-details-container -->
 
             </div>
         </section>

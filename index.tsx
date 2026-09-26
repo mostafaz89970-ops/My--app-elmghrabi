@@ -14401,8 +14401,7 @@ const handlePrintJudicialControlDetails = () => {
                 banner.style.color = '#1e40af';
                 banner.innerHTML = '💳 <strong>جاهز للشحن الذكي:</strong> يرجى وضع كارت المشترك على القارئ والضغط على <strong>"قراءة الكارت"</strong> لجلب البيانات والمديونيات تلقائياً من السيرفر.';
             }
-            // Auto read card if present on reader
-            readChargingSmartCard();
+            // Standby mode: waiting for card read
         }
     };
 
@@ -14496,6 +14495,11 @@ const handlePrintJudicialControlDetails = () => {
             amtInp.value = String(Math.max(50, minCharge));
         }
 
+        
+        const mainContainer = document.getElementById('chg-main-details-container');
+        const standbyCard = document.getElementById('chg-reader-standby-card');
+        if (mainContainer) mainContainer.style.display = 'block';
+        if (standbyCard) standbyCard.style.display = 'none';
         calculateChargingNetAmount();
     };
 
@@ -14539,6 +14543,11 @@ const handlePrintJudicialControlDetails = () => {
 
         const banner = document.getElementById('chg-status-banner');
         if (banner) banner.style.display = 'none';
+
+        const mainContainer = document.getElementById('chg-main-details-container');
+        const standbyCard = document.getElementById('chg-reader-standby-card');
+        if (mainContainer) mainContainer.style.display = 'none';
+        if (standbyCard) standbyCard.style.display = 'flex';
 
         const subSelect = document.getElementById('chg-subscriber-select') as HTMLSelectElement | null;
         if (subSelect) subSelect.value = '';
@@ -15271,6 +15280,7 @@ const handlePrintJudicialControlDetails = () => {
 
     const initChargingCardListeners = () => {
         document.getElementById('btn-chg-read-card')?.addEventListener('click', () => readChargingSmartCard());
+        document.getElementById('btn-chg-standby-read-card')?.addEventListener('click', () => readChargingSmartCard());
         document.getElementById('btn-chg-reset')?.addEventListener('click', () => resetChargingCardUI());
         document.getElementById('btn-chg-execute-charge')?.addEventListener('click', () => executeChargingProcess());
         document.getElementById('btn-chg-save')?.addEventListener('click', () => executeChargingProcess());
