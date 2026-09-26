@@ -14404,70 +14404,112 @@ const handlePrintJudicialControlDetails = () => {
         }
     };
 
+    const updateChargingCardFields = (cust: any, card: any, fin: any) => {
+        const setVal = (id: string, val: string | number | undefined | null) => {
+            const el = document.getElementById(id) as HTMLInputElement | null;
+            if (el) {
+                const s = val != null ? String(val) : '';
+                if ('value' in el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+                    el.value = s;
+                } else {
+                    el.textContent = s;
+                }
+            }
+        };
+
+        const debts = Number(fin?.debts || 0);
+        const fees = Number(fin?.fees || 0);
+        const fines = Number(fin?.abuses || card?.meterTotalDebit || 0);
+        const payments = Number(fin?.credits || 0);
+        const minCharge = Math.max(10, Number(fin?.minCharge || 10));
+
+        // 4 Stat cards
+        setVal('stat-card-debts', debts.toFixed(0));
+        setVal('stat-card-fees', fees.toFixed(0));
+        setVal('stat-card-fines', fines.toFixed(0));
+        setVal('stat-card-payments', payments.toFixed(0));
+
+        // Row 1
+        setVal('field-subscriber-number', cust?.code || cust?.id || '-');
+        setVal('field-subscriber-name', cust?.name || cust?.codySecondName || '-');
+        setVal('field-old-subscriber-code', cust?.oldCode || cust?.code || '-');
+        setVal('field-meter-type', cust?.meterCompanyName || cust?.meterType || 'السويدي');
+
+        // Row 2
+        setVal('field-meter-code', card?.meterCode || cust?.meterCode || cust?.meterNumber || '-');
+        setVal('field-meter-number', card?.meterNumber || cust?.meterNumber || card?.chassis || '-');
+        setVal('field-activity', cust?.activityName || cust?.activityType || 'منزلي كودي');
+        setVal('field-account-ref', cust?.accountNumberReferenceCustomer || cust?.accountRefM || cust?.accountRefH || '-');
+
+        // Row 3
+        const lastChg = card?.lastChargeAmount != null ? Number(card.lastChargeAmount) : (card?.lastCharge || 0);
+        const meterChg = card?.meterChargeAmount != null ? Number(card.meterChargeAmount) : (card?.remainingBalance != null ? Number(card.remainingBalance) : 0);
+        setVal('field-last-charge', lastChg.toFixed(0));
+        setVal('field-meter-charge', meterChg.toFixed(0));
+        setVal('field-total-system-charges', card?.totalSystemCharges || cust?.totalRecharge || '0');
+        setVal('field-total-meter-charges', card?.totalMeterCharges || '0');
+
+        const lastDate = card?.lastChargeDate || (cust?.lastChargeDate ? new Date(cust.lastChargeDate).toLocaleDateString('ar-EG') : 'اليوم');
+        setVal('field-card-in-meter-date', card?.cardInMeterDate || lastDate);
+
+        // Row 4
+        setVal('field-last-charge-date', lastDate);
+        const remainingBalance = card?.remainingBalance != null ? Number(card.remainingBalance) : (cust?.balance != null ? Number(cust.balance) : 0);
+        setVal('field-current-balance', remainingBalance.toFixed(2) + ' ج.م');
+        setVal('field-address', cust?.address || '-');
+
+        // Row 5
+        const slice = card?.slice ? ('الشريحة ' + card.slice) : (cust?.slice ? ('الشريحة ' + cust.slice) : 'الشريحة 1');
+        setVal('field-current-slice', slice);
+
+        // Financial strip
+        setVal('field-min-charge', minCharge.toFixed(2));
+        const totalDeductions = Math.max(0, debts + fees + fines - payments);
+        setVal('field-total-deductions', totalDeductions.toFixed(2));
+
+        const amtInp = document.getElementById('field-charge-amount') as HTMLInputElement | null;
+        if (amtInp && (!amtInp.value || Number(amtInp.value) === 0)) {
+            amtInp.value = String(Math.max(50, minCharge));
+        }
+
+        calculateChargingNetAmount();
+    };
+
     const resetChargingCardUI = () => {
         currentChargingCustomer = null;
         currentChargingFinancials = { debts: 0, fees: 0, credits: 0, abuses: 0, minCharge: 10 };
 
-        const custNameEl = document.getElementById('chg-cust-name');
-        const custCodeEl = document.getElementById('chg-cust-code');
-        const accRefEl = document.getElementById('chg-cust-account-ref');
-        const nationalIdEl = document.getElementById('chg-cust-national-id');
-        const activityEl = document.getElementById('chg-cust-activity');
-        const typeEl = document.getElementById('chg-cust-type');
-        const addressEl = document.getElementById('chg-cust-address');
-        const statusBadgeEl = document.getElementById('chg-cust-status-badge');
+        const setVal = (id: string, val: string) => {
+            const el = document.getElementById(id) as HTMLInputElement | null;
+            if (el) {
+                if ('value' in el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) el.value = val;
+                else el.textContent = val;
+            }
+        };
 
-        const meterNumEl = document.getElementById('chg-meter-number');
-        const meterCompEl = document.getElementById('chg-meter-company');
-        const meterSliceEl = document.getElementById('chg-meter-slice');
-        const meterSeqEl = document.getElementById('chg-meter-sequence');
-        const meterLastDateEl = document.getElementById('chg-meter-last-charge-date');
-        const meterStopStatusEl = document.getElementById('chg-meter-stop-status');
+        [
+            'field-subscriber-number', 'field-subscriber-name', 'field-old-subscriber-code', 'field-meter-type',
+            'field-meter-code', 'field-meter-number', 'field-activity', 'field-account-ref',
+            'field-last-charge', 'field-meter-charge', 'field-total-system-charges', 'field-total-meter-charges',
+            'field-card-in-meter-date', 'field-last-charge-date', 'field-current-balance', 'field-address',
+            'field-current-slice', 'field-charge-notes'
+        ].forEach(id => setVal(id, ''));
 
-        const balanceEl = document.getElementById('chg-balance-val');
-        const debtsEl = document.getElementById('chg-debts-val');
-        const feesEl = document.getElementById('chg-fees-val');
-        const abusesEl = document.getElementById('chg-abuses-val');
-        const creditsEl = document.getElementById('chg-credits-val');
-        const minChargeEl = document.getElementById('chg-min-val');
+        setVal('stat-card-debts', '0');
+        setVal('stat-card-fees', '0');
+        setVal('stat-card-fines', '0');
+        setVal('stat-card-payments', '0');
 
-        const rechargeAmtInp = document.getElementById('chg-recharge-amount') as HTMLInputElement | null;
-        const netAmtDisplay = document.getElementById('chg-net-amount-display');
+        setVal('field-charge-amount', '');
+        setVal('field-total-deductions', '0.00');
+        setVal('field-net-value', '0.00');
+        setVal('field-min-charge', '10.00');
+
         const banner = document.getElementById('chg-status-banner');
-
-        if (custNameEl) custNameEl.textContent = '-';
-        if (custCodeEl) custCodeEl.textContent = '-';
-        if (accRefEl) accRefEl.textContent = '-';
-        if (nationalIdEl) nationalIdEl.textContent = '-';
-        if (activityEl) activityEl.textContent = '-';
-        if (typeEl) typeEl.textContent = '-';
-        if (addressEl) addressEl.textContent = '-';
-        if (statusBadgeEl) {
-            statusBadgeEl.textContent = 'بانتظار القراءة';
-            statusBadgeEl.style.backgroundColor = '#e0f2fe';
-            statusBadgeEl.style.color = '#0369a1';
-        }
-
-        if (meterNumEl) meterNumEl.textContent = '-';
-        if (meterCompEl) meterCompEl.textContent = 'السويدي';
-        if (meterSliceEl) meterSliceEl.textContent = '-';
-        if (meterSeqEl) meterSeqEl.textContent = '-';
-        if (meterLastDateEl) meterLastDateEl.textContent = '-';
-        if (meterStopStatusEl) {
-            meterStopStatusEl.textContent = 'نشط (غير موقوف)';
-            meterStopStatusEl.style.color = '#16a34a';
-        }
-
-        if (balanceEl) balanceEl.textContent = '0.00 ج.م';
-        if (debtsEl) debtsEl.textContent = '0.00 ج.م';
-        if (feesEl) feesEl.textContent = '0.00 ج.م';
-        if (abusesEl) abusesEl.textContent = '0.00 ج.م';
-        if (creditsEl) creditsEl.textContent = '0.00 ج.م';
-        if (minChargeEl) minChargeEl.textContent = '10.00 ج.م';
-
-        if (rechargeAmtInp) rechargeAmtInp.value = '';
-        if (netAmtDisplay) netAmtDisplay.textContent = '0.00 ج.م';
         if (banner) banner.style.display = 'none';
+
+        const subSelect = document.getElementById('chg-subscriber-select') as HTMLSelectElement | null;
+        if (subSelect) subSelect.value = '';
     };
 
     const loadChargingCustomer = async (customerId: string) => {
@@ -14507,9 +14549,9 @@ const handlePrintJudicialControlDetails = () => {
                         chargeSequence: 1,
                         lastChargeDate: null,
                         isChargeStop: false,
-                        accountNumberReferenceCustomer: local.accountRefM || local.accountRefH || '-',
+                        accountNumberReferenceCustomer: (local as any).accountRefM || (local as any).accountRefH || '-',
                         nationalId: local.nationalId || '-',
-                        activityName: local.activityType || 'منزلي',
+                        activityName: (local as any).activityType || 'منزلي',
                         customerTypeName: 'أهالي',
                         address: local.address || '-'
                     };
@@ -14543,75 +14585,7 @@ const handlePrintJudicialControlDetails = () => {
                 monthlyInstallment: Number(fin.monthlyInstallment || 0)
             } as any;
 
-            // Populate Customer Data
-            const custNameEl = document.getElementById('chg-cust-name');
-            const custCodeEl = document.getElementById('chg-cust-code');
-            const accRefEl = document.getElementById('chg-cust-account-ref');
-            const nationalIdEl = document.getElementById('chg-cust-national-id');
-            const activityEl = document.getElementById('chg-cust-activity');
-            const typeEl = document.getElementById('chg-cust-type');
-            const addressEl = document.getElementById('chg-cust-address');
-            const statusBadgeEl = document.getElementById('chg-cust-status-badge');
-
-            if (custNameEl) custNameEl.textContent = cust.name || '-';
-            if (custCodeEl) custCodeEl.textContent = cust.code || '-';
-            if (accRefEl) accRefEl.textContent = cust.accountNumberReferenceCustomer || '-';
-            if (nationalIdEl) nationalIdEl.textContent = cust.nationalId || cust.identityNumber || '-';
-            if (activityEl) activityEl.textContent = cust.activityName || 'منزلي';
-            if (typeEl) typeEl.textContent = cust.customerTypeName || 'أهالي';
-            if (addressEl) addressEl.textContent = cust.address || '-';
-
-            if (statusBadgeEl) {
-                statusBadgeEl.textContent = cust.isChargeStop ? 'موقوف عن الشحن' : 'نشط للشحن';
-                statusBadgeEl.style.backgroundColor = cust.isChargeStop ? '#fee2e2' : '#dcfce7';
-                statusBadgeEl.style.color = cust.isChargeStop ? '#b91c1c' : '#15803d';
-            }
-
-            // Populate Meter Data
-            const meterNumEl = document.getElementById('chg-meter-number');
-            const meterCompEl = document.getElementById('chg-meter-company');
-            const meterSeqEl = document.getElementById('chg-meter-sequence');
-            const meterLastDateEl = document.getElementById('chg-meter-last-charge-date');
-            const meterStopStatusEl = document.getElementById('chg-meter-stop-status');
-
-            if (meterNumEl) meterNumEl.textContent = cust.meterNumber || '-';
-            if (meterCompEl) meterCompEl.textContent = cust.meterCompanyName || 'السويدي';
-            if (meterSeqEl) meterSeqEl.textContent = cust.chargeSequence ? String(cust.chargeSequence) : '1';
-            if (meterLastDateEl) meterLastDateEl.textContent = cust.lastChargeDate ? new Date(cust.lastChargeDate).toLocaleDateString('ar-EG') : 'لا يوجد شحن سابق';
-
-            if (meterStopStatusEl) {
-                meterStopStatusEl.textContent = cust.isChargeStop ? 'موقوف عن الشحن' : 'نشط (غير موقوف)';
-                meterStopStatusEl.style.color = cust.isChargeStop ? '#dc2626' : '#16a34a';
-            }
-
-            // Populate Financials
-            const debtsEl = document.getElementById('chg-debts-val');
-            const feesEl = document.getElementById('chg-fees-val');
-            const abusesEl = document.getElementById('chg-abuses-val');
-            const creditsEl = document.getElementById('chg-credits-val');
-            const minChargeEl = document.getElementById('chg-min-val');
-            const rechargeAmtInp = document.getElementById('chg-recharge-amount') as HTMLInputElement | null;
-
-            if (debtsEl) debtsEl.textContent = currentChargingFinancials.debts.toFixed(2) + ' ج.م';
-            const instEl = document.getElementById('chg-installment-val');
-            if (instEl) instEl.textContent = ((currentChargingFinancials as any).monthlyInstallment || 0).toFixed(2) + ' ج.م';
-            const lblInst = document.getElementById('chg-lbl-inst-amt');
-            if (lblInst) lblInst.textContent = ((currentChargingFinancials as any).monthlyInstallment || 0).toFixed(2);
-            const lblFull = document.getElementById('chg-lbl-full-amt');
-            if (lblFull) lblFull.textContent = currentChargingFinancials.debts.toFixed(2);
-            if (feesEl) feesEl.textContent = currentChargingFinancials.fees.toFixed(2) + ' ج.م';
-            if (abusesEl) abusesEl.textContent = currentChargingFinancials.abuses.toFixed(2) + ' ج.م';
-            if (creditsEl) creditsEl.textContent = currentChargingFinancials.credits.toFixed(2) + ' ج.م';
-            if (minChargeEl) minChargeEl.textContent = currentChargingFinancials.minCharge.toFixed(2) + ' ج.م';
-
-            if (rechargeAmtInp) {
-                rechargeAmtInp.min = String(currentChargingFinancials.minCharge);
-                if (!rechargeAmtInp.value) {
-                    rechargeAmtInp.value = String(Math.max(50, currentChargingFinancials.minCharge));
-                }
-            }
-
-            calculateChargingNetAmount();
+            updateChargingCardFields(cust, {}, currentChargingFinancials);
 
             if (banner) {
                 banner.style.backgroundColor = '#f0fdf4';
@@ -14619,7 +14593,7 @@ const handlePrintJudicialControlDetails = () => {
                 banner.style.border = '1px solid #bbf7d0';
                 banner.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span>تم جلب بيانات المشترك بنجاح (${cust.name}). يرجى وضع الكارت على القارئ والنقر على "تنفيذ الشحن".</span>
+                        <span>تم جلب بيانات المشترك بنجاح (${cust.name}). جاهز لتحديد المبلغ وحفظ الشحن.</span>
                         <span style="font-weight: bold; font-family: monospace;">الحد الأدنى: ${currentChargingFinancials.minCharge} ج.م</span>
                     </div>
                 `;
@@ -14636,22 +14610,21 @@ const handlePrintJudicialControlDetails = () => {
     };
 
     const calculateChargingNetAmount = () => {
-        const rechargeAmtInp = document.getElementById('chg-recharge-amount') as HTMLInputElement | null;
+        const rechargeAmtInp = (document.getElementById('field-charge-amount') || document.getElementById('chg-recharge-amount')) as HTMLInputElement | null;
         const delayDebtsCb = document.getElementById('chg-opt-delay-debts') as HTMLInputElement | null;
         const netAmtDisplay = document.getElementById('chg-net-amount-display');
+        const netField = document.getElementById('field-net-value') as HTMLInputElement | null;
+        const deductionsField = document.getElementById('field-total-deductions') as HTMLInputElement | null;
 
         const rechargeVal = Number(rechargeAmtInp?.value) || 0;
         const isDelay = Boolean(delayDebtsCb?.checked);
 
-        // Debt Deduction Mode: 'installment' | 'full' | 'delay'
         const debtModeInput = document.querySelector('input[name="chg-debt-mode"]:checked') as HTMLInputElement | null;
         const debtMode = isDelay ? 'delay' : (debtModeInput?.value || 'installment');
 
-        let debtsToDeduct = 0;
+        let debtsToDeduct = currentChargingFinancials.debts;
         if (debtMode === 'installment') {
             debtsToDeduct = (currentChargingFinancials as any).monthlyInstallment || Math.min(currentChargingFinancials.debts, 100);
-        } else if (debtMode === 'full') {
-            debtsToDeduct = currentChargingFinancials.debts;
         } else if (debtMode === 'delay') {
             debtsToDeduct = 0;
         }
@@ -14660,8 +14633,15 @@ const handlePrintJudicialControlDetails = () => {
         const abuses = currentChargingFinancials.abuses;
         const credits = currentChargingFinancials.credits;
 
-        const net = Math.max(0, rechargeVal + debtsToDeduct + fees + abuses - credits);
+        const totalDeductions = Math.max(0, debtsToDeduct + fees + abuses - credits);
+        const net = Math.max(0, rechargeVal - totalDeductions);
 
+        if (deductionsField) {
+            deductionsField.value = totalDeductions.toFixed(2);
+        }
+        if (netField) {
+            netField.value = net.toFixed(2);
+        }
         if (netAmtDisplay) {
             netAmtDisplay.textContent = net.toFixed(2) + ' ج.م';
         }
@@ -14736,62 +14716,7 @@ const handlePrintJudicialControlDetails = () => {
                 } as any;
             }
 
-            // Populate Customer Data UI
-            const custNameEl = document.getElementById('chg-cust-name');
-            const custCodeEl = document.getElementById('chg-cust-code');
-            const accRefEl = document.getElementById('chg-cust-account-ref');
-            const nationalIdEl = document.getElementById('chg-cust-national-id');
-            const activityEl = document.getElementById('chg-cust-activity');
-            const typeEl = document.getElementById('chg-cust-type');
-            const addressEl = document.getElementById('chg-cust-address');
-            const statusBadgeEl = document.getElementById('chg-cust-status-badge');
-
-            if (custNameEl) custNameEl.textContent = currentChargingCustomer?.name || cust.name || '-';
-            if (custCodeEl) custCodeEl.textContent = currentChargingCustomer?.code || cust.code || '-';
-            if (accRefEl) accRefEl.textContent = currentChargingCustomer?.accountNumberReferenceCustomer || '-';
-            if (nationalIdEl) nationalIdEl.textContent = currentChargingCustomer?.nationalId || '-';
-            if (activityEl) activityEl.textContent = currentChargingCustomer?.activityName || '-';
-            if (typeEl) typeEl.textContent = currentChargingCustomer?.customerTypeName || '-';
-            if (addressEl) addressEl.textContent = currentChargingCustomer?.address || '-';
-
-            if (statusBadgeEl) {
-                const isStop = currentChargingCustomer?.isChargeStop;
-                statusBadgeEl.textContent = isStop ? 'موقوف عن الشحن' : 'نشط للشحن';
-                statusBadgeEl.style.backgroundColor = isStop ? '#fee2e2' : '#dcfce7';
-                statusBadgeEl.style.color = isStop ? '#b91c1c' : '#15803d';
-            }
-
-            // Populate Meter & Financial Stats UI
-            const balanceEl = document.getElementById('chg-balance-val');
-            const meterSeqEl = document.getElementById('chg-meter-sequence');
-            const meterSliceEl = document.getElementById('chg-meter-slice');
-            const meterLastDateEl = document.getElementById('chg-meter-last-charge-date');
-            const meterNumEl = document.getElementById('chg-meter-number');
-            const meterCompEl = document.getElementById('chg-meter-company');
-            const debtsEl = document.getElementById('chg-debts-val');
-            const feesEl = document.getElementById('chg-fees-val');
-            const abusesEl = document.getElementById('chg-abuses-val');
-            const creditsEl = document.getElementById('chg-credits-val');
-            const minChargeEl = document.getElementById('chg-min-val');
-
-            if (balanceEl) balanceEl.textContent = remainingBalance.toFixed(2) + ' ج.م';
-            if (meterSeqEl) meterSeqEl.textContent = String(seqOnMeter);
-            if (meterSliceEl) meterSliceEl.textContent = String(slice);
-            if (meterLastDateEl) meterLastDateEl.textContent = String(lastDate);
-            if (meterNumEl && meterNumber) meterNumEl.textContent = meterNumber;
-            if (meterCompEl && currentChargingCustomer?.meterCompanyName) meterCompEl.textContent = currentChargingCustomer.meterCompanyName;
-
-            if (debtsEl) debtsEl.textContent = currentChargingFinancials.debts.toFixed(2) + ' ج.م';
-            const cardInstEl = document.getElementById('chg-installment-val');
-            if (cardInstEl) cardInstEl.textContent = ((currentChargingFinancials as any).monthlyInstallment || 0).toFixed(2) + ' ج.م';
-            const cardLblInst = document.getElementById('chg-lbl-inst-amt');
-            if (cardLblInst) cardLblInst.textContent = ((currentChargingFinancials as any).monthlyInstallment || 0).toFixed(2);
-            const cardLblFull = document.getElementById('chg-lbl-full-amt');
-            if (cardLblFull) cardLblFull.textContent = currentChargingFinancials.debts.toFixed(2);
-            if (feesEl) feesEl.textContent = currentChargingFinancials.fees.toFixed(2) + ' ج.م';
-            if (abusesEl) abusesEl.textContent = currentChargingFinancials.abuses.toFixed(2) + ' ج.م';
-            if (creditsEl) creditsEl.textContent = currentChargingFinancials.credits.toFixed(2) + ' ج.م';
-            if (minChargeEl) minChargeEl.textContent = currentChargingFinancials.minCharge.toFixed(2) + ' ج.م';
+            updateChargingCardFields(currentChargingCustomer || cust, card, currentChargingFinancials);
 
             // Sync with subscriber dropdown
             const selectEl = document.getElementById('chg-subscriber-select') as HTMLSelectElement | null;
@@ -14828,8 +14753,6 @@ const handlePrintJudicialControlDetails = () => {
                     saveState();
                 }
             }
-
-            calculateChargingNetAmount();
 
             if (banner) {
                 banner.style.display = 'block';
@@ -14870,8 +14793,8 @@ const handlePrintJudicialControlDetails = () => {
             return;
         }
 
-        const rechargeAmtInp = document.getElementById('chg-recharge-amount') as HTMLInputElement | null;
-        const paymentTypeSelect = document.getElementById('chg-payment-type') as HTMLSelectElement | null;
+        const rechargeAmtInp = (document.getElementById('field-charge-amount') || document.getElementById('chg-recharge-amount')) as HTMLInputElement | null;
+        const paymentTypeSelect = (document.getElementById('field-payment-method') || document.getElementById('chg-payment-type')) as HTMLSelectElement | null;
         const delayDebtsCb = document.getElementById('chg-opt-delay-debts') as HTMLInputElement | null;
         const fireChargeCb = document.getElementById('chg-opt-fire-charge') as HTMLInputElement | null;
         const timeAdaptCb = document.getElementById('chg-opt-time-adapt') as HTMLInputElement | null;
@@ -14889,19 +14812,19 @@ const handlePrintJudicialControlDetails = () => {
         const confirmMsg = `تأكيد عملية الشحن والكتابة على الكارت:
 المشترك: ${currentChargingCustomer.name}
 مبلغ الشحن: ${rechargeAmount.toFixed(2)} ج.م
-صافي المبلغ المطلوب تحصيله: ${netCollected.toFixed(2)} ج.م
+صافي القيمة: ${netCollected.toFixed(2)} ج.م
 
 هل تريد المتابعة والكتابة على الكارت الآن؟`;
 
         if (!confirm(confirmMsg)) return;
 
-        const execBtn = document.getElementById('btn-chg-execute-charge') as HTMLButtonElement | null;
+        const execBtn = (document.getElementById('btn-chg-save') || document.getElementById('btn-chg-execute-charge')) as HTMLButtonElement | null;
         const origBtnHtml = execBtn ? execBtn.innerHTML : '';
         if (execBtn) {
             execBtn.disabled = true;
             execBtn.innerHTML = `
-                <span style="display:inline-block; width:20px; height:20px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-left:8px;"></span>
-                <span>جاري الكتابة على الكارت وتأكيد الشحنة في MEEDCO...</span>
+                <span style="display:inline-block; width:18px; height:18px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-left:8px;"></span>
+                <span>جاري الكتابة على الكارت...</span>
             `;
         }
 
@@ -14928,10 +14851,10 @@ const handlePrintJudicialControlDetails = () => {
                 showToast('تمت كتابة الشحنة بنجاح على الكارت وحفظ الإيصال بالمنظومة!', 'success');
 
                 // Update balance on UI
-                const balanceEl = document.getElementById('chg-balance-val');
-                const curBal = parseFloat(balanceEl?.textContent || '0');
+                const balanceEl = document.getElementById('field-current-balance') as HTMLInputElement | null;
+                const curBal = parseFloat(balanceEl?.value || '0');
                 if (balanceEl) {
-                    balanceEl.textContent = (curBal + rechargeAmount).toFixed(2) + ' ج.م';
+                    balanceEl.value = (curBal + rechargeAmount).toFixed(2) + ' ج.م';
                 }
 
                 // Show Receipt Modal
@@ -14956,11 +14879,11 @@ const handlePrintJudicialControlDetails = () => {
                     saveState();
                     logActivity('شحن طاقة', `تم شحن العداد ${local.meterChassisNumber} بمبلغ ${rechargeAmount.toFixed(2)} ج.م للمشترك ${local.subscriberName}`);
                     
-                    showToast('تم شحن الطاقة بنجاح وتحديث رصيد المشترك في المنظومة المستقلة!', 'success');
+                    showToast('تم شحن الطاقة بنجاح وتحديث رصيد المشترك في المنظومة!', 'success');
 
-                    const balanceEl = document.getElementById('chg-balance-val');
+                    const balanceEl = document.getElementById('field-current-balance') as HTMLInputElement | null;
                     if (balanceEl) {
-                        balanceEl.textContent = (prevBal + rechargeAmount).toFixed(2) + ' ج.م';
+                        balanceEl.value = (prevBal + rechargeAmount).toFixed(2) + ' ج.م';
                     }
 
                     showChargingReceiptModal({
@@ -15021,8 +14944,12 @@ const handlePrintJudicialControlDetails = () => {
         document.getElementById('btn-chg-read-card')?.addEventListener('click', () => readChargingSmartCard());
         document.getElementById('btn-chg-reset')?.addEventListener('click', () => resetChargingCardUI());
         document.getElementById('btn-chg-execute-charge')?.addEventListener('click', () => executeChargingProcess());
+        document.getElementById('btn-chg-save')?.addEventListener('click', () => executeChargingProcess());
+        document.getElementById('btn-chg-cancel')?.addEventListener('click', () => resetChargingCardUI());
 
         document.getElementById('chg-recharge-amount')?.addEventListener('input', () => calculateChargingNetAmount());
+        document.getElementById('field-charge-amount')?.addEventListener('input', () => calculateChargingNetAmount());
+        document.getElementById('field-payment-method')?.addEventListener('change', () => calculateChargingNetAmount());
         document.getElementById('chg-opt-delay-debts')?.addEventListener('change', () => calculateChargingNetAmount());
         document.querySelectorAll('input[name="chg-debt-mode"]').forEach(radio => {
             radio.addEventListener('change', () => calculateChargingNetAmount());
@@ -15039,7 +14966,7 @@ const handlePrintJudicialControlDetails = () => {
         document.querySelectorAll('.chg-quick-amt').forEach(btn => {
             btn.addEventListener('click', () => {
                 const amt = btn.getAttribute('data-amount');
-                const inp = document.getElementById('chg-recharge-amount') as HTMLInputElement | null;
+                const inp = (document.getElementById('field-charge-amount') || document.getElementById('chg-recharge-amount')) as HTMLInputElement | null;
                 if (inp && amt) {
                     inp.value = amt;
                     calculateChargingNetAmount();
@@ -15059,6 +14986,9 @@ const handlePrintJudicialControlDetails = () => {
 
         document.getElementById('btn-chg-print-last')?.addEventListener('click', () => {
             if (currentChargingCustomer) {
+                const amtInp = (document.getElementById('field-charge-amount') || document.getElementById('chg-recharge-amount')) as HTMLInputElement | null;
+                const amt = Number(amtInp?.value) || 100;
+                const net = calculateChargingNetAmount();
                 showChargingReceiptModal({
                     id: 'RCP-' + Date.now().toString().slice(-6),
                     date: new Date().toLocaleString('ar-EG'),
@@ -15066,9 +14996,9 @@ const handlePrintJudicialControlDetails = () => {
                     customerCode: currentChargingCustomer.code,
                     meterNumber: currentChargingCustomer.meterNumber,
                     sequence: currentChargingCustomer.chargeSequence || '1',
-                    chargeAmount: '100.00',
-                    deductions: '0.00',
-                    netCollected: '100.00'
+                    chargeAmount: amt.toFixed(2),
+                    deductions: (amt - net).toFixed(2),
+                    netCollected: net.toFixed(2)
                 });
             } else {
                 showToast('يرجى تحديد المشترك أو قراءة الكارت أولاً لعرض آخر إيصال.');
