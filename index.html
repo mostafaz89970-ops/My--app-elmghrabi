@@ -4749,49 +4749,177 @@
             </div>
         </section>
 
-        <!-- Charging Receipt Modal (إيصال الشحن الرسمي) -->
-        <div id="chg-receipt-modal" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10001; align-items: center; justify-content: center; padding: 20px;">
-            <div style="background: #fff; width: 100%; max-width: 480px; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3); overflow: hidden; border: 1px solid #cbd5e1; display: flex; flex-direction: column;">
-                <div style="background: #166534; color: #fff; padding: 1.2rem; text-align: center;">
-                    <div style="display: inline-flex; background: rgba(255,255,255,0.2); padding: 8px; border-radius: 50%; margin-bottom: 8px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <!-- Charging Receipt Modal (إيصال الشحن الرسمي - مطابق تماماً لمنظومة MEEDCO) -->
+        <div id="chg-receipt-modal" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); z-index: 10001; align-items: center; justify-content: center; padding: 15px; overflow-y: auto;">
+            <div style="background: #ffffff; width: 100%; max-width: 680px; max-height: 94vh; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35); overflow: hidden; border: 1px solid #cbd5e1; display: flex; flex-direction: column;">
+                
+                <!-- Metronic / MEEDCO Header: الاسم: [اسم المشترك] -->
+                <div style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 1.1rem 1.4rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="background: #e0f2fe; color: #0369a1; padding: 8px; border-radius: 10px; display: flex;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
+                        <h3 id="example-modal-sizes-title-lg" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #0f172a;">
+                            الاسم: <span id="rcpt-header-name" style="color: #0284c7;">-</span>
+                        </h3>
                     </div>
-                    <h3 style="margin: 0; font-size: 1.3rem;">تمت كتابة الشحنة بنجاح!</h3>
-                    <small style="opacity: 0.9;">إيصال شحن عداد مسبق الدفع - شركة توزيع كهرباء مصر الوسطى</small>
+                    <button type="button" id="btn-chg-receipt-header-close" style="background: transparent; border: none; font-size: 1.5rem; line-height: 1; color: #64748b; cursor: pointer; padding: 4px 8px; border-radius: 6px;" title="إغلاق">&times;</button>
                 </div>
 
-                <div id="chg-receipt-print-area" style="padding: 1.5rem; font-family: 'Tajawal', sans-serif; font-size: 0.95rem; color: #0f172a; line-height: 1.6;">
-                    <div style="text-align: center; border-bottom: 1px dashed #94a3b8; padding-bottom: 10px; margin-bottom: 12px;">
-                        <div style="font-weight: bold; font-size: 1.05rem;">منظومة شحن العدادات المسبقة الدفع MEEDCO</div>
-                        <div style="font-size: 0.85rem; color: #64748b;">رقم الإيصال: <span id="rcpt-id" style="font-family: monospace; font-weight: bold;">-</span></div>
-                        <div style="font-size: 0.85rem; color: #64748b;">تاريخ العملية: <span id="rcpt-date">-</span></div>
+                <!-- Modal Body: قيمة الشحن الصافي + زري إيصال السداد وإيصال السداد الحراري -->
+                <div style="padding: 1.2rem 1.4rem; overflow-y: auto; flex: 1;">
+                    
+                    <!-- قيمة الشحن الصافي البارزة (مطابق للأصلي تماماً) -->
+                    <div style="text-align: center; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px dashed #16a34a; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;">
+                        <div style="font-size: 0.95rem; font-weight: 700; color: #166534; margin-bottom: 2px;">شركة توزيع كهرباء مصر الوسطى (MEEDCO)</div>
+                        <h2 style="margin: 0; font-size: 1.55rem; font-weight: 900; color: #15803d; letter-spacing: -0.5px;">
+                            قيمة الشحن الصافي : <span id="rcpt-header-net">0.00</span> ج.م
+                        </h2>
                     </div>
 
-                    <div style="display: flex; flex-direction: column; gap: 6px; border-bottom: 1px dashed #94a3b8; padding-bottom: 12px; margin-bottom: 12px;">
-                        <div style="display: flex; justify-content: space-between;"><span>اسم المشترك:</span> <strong id="rcpt-cust-name">-</strong></div>
-                        <div style="display: flex; justify-content: space-between;"><span>كود المشترك:</span> <span id="rcpt-cust-code" style="font-family: monospace; font-weight: bold;">-</span></div>
-                        <div style="display: flex; justify-content: space-between;"><span>رقم العداد:</span> <span id="rcpt-meter-num" style="font-family: monospace; font-weight: bold;">-</span></div>
-                        <div style="display: flex; justify-content: space-between;"><span>تتابع الشحن:</span> <span id="rcpt-seq">-</span></div>
+                    <!-- MEEDCO Action Buttons: إيصال السداد & إيصال السداد الحراري -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                        <button type="button" id="btn-print-standard-receipt" class="btn" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff; padding: 12px 14px; font-size: 1.05rem; font-weight: 800; border-radius: 10px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 10px -2px rgba(2, 132, 199, 0.4); transition: transform 0.1s ease, box-shadow 0.1s ease;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14h6"></path><path d="M9 18h6"></path><path d="M9 10h2"></path></svg>
+                            <span>إيصال السداد</span>
+                        </button>
+                        <button type="button" id="btn-print-thermal-receipt" class="btn" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: #ffffff; padding: 12px 14px; font-size: 1.05rem; font-weight: 800; border-radius: 10px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 10px -2px rgba(22, 163, 74, 0.4); transition: transform 0.1s ease, box-shadow 0.1s ease;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            <span>إيصال السداد الحراري</span>
+                        </button>
                     </div>
 
-                    <div style="display: flex; flex-direction: column; gap: 6px; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 12px;">
-                        <div style="display: flex; justify-content: space-between;"><span>مبلغ الشحن:</span> <strong id="rcpt-charge-amt">- ج.م</strong></div>
-                        <div style="display: flex; justify-content: space-between; color: #dc2626;"><span>الديون والرسوم المخصومة:</span> <span id="rcpt-deductions">- ج.م</span></div>
-                        <div style="display: flex; justify-content: space-between; font-size: 1.15rem; font-weight: bold; color: #166534; margin-top: 4px;"><span>المبلغ المحصل:</span> <span id="rcpt-net-collected">- ج.م</span></div>
+                    <!-- View Selector Tabs -->
+                    <div style="display: flex; gap: 8px; border-bottom: 2px solid #e2e8f0; margin-bottom: 12px; padding-bottom: 4px;">
+                        <button type="button" id="tab-btn-rcpt-standard" class="btn btn-sm" style="font-weight: 800; border-radius: 6px; padding: 6px 14px; background: #0284c7; color: #fff; border: none; cursor: pointer;">معاينة الإيصال الرسمي (A4)</button>
+                        <button type="button" id="tab-btn-rcpt-thermal" class="btn btn-sm" style="font-weight: 800; border-radius: 6px; padding: 6px 14px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; cursor: pointer;">معاينة الإيصال الحراري (POS)</button>
                     </div>
 
-                    <div style="text-align: center; font-size: 0.85rem; color: #64748b;">
-                        شكراً لتعاملكم معنا • يرجى إدخال الكارت في العداد فوراً لتفعيل الشحنة
+                    <!-- Receipt Preview Container -->
+                    <div id="chg-receipt-preview-container" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; max-height: 440px; overflow-y: auto;">
+                        
+                        <!-- Standard A4 Preview -->
+                        <div id="rcpt-view-standard" style="background: #ffffff; border: 2px solid #0f172a; border-radius: 8px; padding: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06); font-family: 'Tajawal', sans-serif; font-size: 0.92rem; color: #0f172a; line-height: 1.5;">
+                            
+                            <!-- Header -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 10px; gap: 10px;">
+                                <div style="text-align: right; flex: 1;">
+                                    <div style="font-weight: 900; font-size: 1.05rem; color: #0f172a;" id="rcpt-comp-title">شركة توزيع كهرباء مصر الوسطى</div>
+                                    <div style="font-size: 0.85rem; font-weight: 700; color: #1e40af;" id="rcpt-sector-title">قطاع توزيع كهرباء بني سويف</div>
+                                    <div style="font-size: 0.8rem; font-weight: 700; color: #065f46;" id="rcpt-branch-title">هندسة توزيع كهرباء غرب</div>
+                                    <div style="font-size: 0.78rem; color: #64748b;">منظومة الشحن الموحد MEEDCO</div>
+                                </div>
+                                <div style="text-align: center; flex: 1;">
+                                    <div style="display: inline-block; background: #0f172a; color: #fff; padding: 4px 14px; border-radius: 20px; font-weight: 900; font-size: 0.95rem; margin-bottom: 4px;">إيصال سداد شحن عداد</div>
+                                    <div style="font-size: 0.75rem; color: #475569; font-weight: bold;">(كارت مسبق الدفع)</div>
+                                    <!-- Barcode representation -->
+                                    <div id="rcpt-barcode-container" style="margin-top: 4px; display: flex; justify-content: center;"></div>
+                                </div>
+                                <div style="text-align: left; flex: 1; font-size: 0.8rem;">
+                                    <div>رقم الإيصال: <strong id="rcpt-id" style="font-family: monospace; font-size: 0.9rem; color: #0369a1;">-</strong></div>
+                                    <div>تاريخ السداد: <span id="rcpt-date" style="font-weight: 700;">-</span></div>
+                                    <div>طريقة الدفع: <span id="rcpt-pay-method" style="font-weight: 700;">نقدي</span></div>
+                                    <div>المحصل: <span id="rcpt-collector" style="font-weight: 700;">-</span></div>
+                                </div>
+                            </div>
+
+                            <!-- Customer & Meter Grid -->
+                            <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.88rem;">
+                                <div><span style="color: #64748b;">اسم المشترك:</span> <strong id="rcpt-cust-name" style="color: #0f172a;">-</strong></div>
+                                <div><span style="color: #64748b;">كود المشترك:</span> <strong id="rcpt-cust-code" style="font-family: monospace;">-</strong></div>
+                                <div><span style="color: #64748b;">رقم شاسية العداد:</span> <strong id="rcpt-meter-num" style="font-family: monospace;">-</strong></div>
+                                <div><span style="color: #64748b;">مرجع الحساب:</span> <span id="rcpt-account-ref" style="font-family: monospace; font-weight: 700;">-</span></div>
+                                <div><span style="color: #64748b;">الشريحة الحالية:</span> <span id="rcpt-slice" style="font-weight: 700; color: #b45309;">-</span></div>
+                                <div><span style="color: #64748b;">تتابع الشحن:</span> <span id="rcpt-seq" style="font-weight: 700;">-</span></div>
+                                <div style="grid-column: span 2;"><span style="color: #64748b;">العنوان:</span> <span id="rcpt-cust-addr">-</span></div>
+                            </div>
+
+                            <!-- Financial Breakdown Table -->
+                            <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 0.88rem; text-align: right;">
+                                <thead>
+                                    <tr style="background: #e2e8f0; color: #1e293b; font-weight: 800;">
+                                        <th style="padding: 6px 8px; border: 1px solid #cbd5e1;">البيان المالي للشحنة</th>
+                                        <th style="padding: 6px 8px; border: 1px solid #cbd5e1; width: 140px; text-align: center;">المبلغ (ج.م)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="padding: 5px 8px; border: 1px solid #e2e8f0; font-weight: 700;">مبلغ الشحن المطلوب (الإجمالي)</td>
+                                        <td style="padding: 5px 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: 800; font-family: monospace;" id="rcpt-charge-amt">-</td>
+                                    </tr>
+                                    <tr id="rcpt-row-fees" style="color: #64748b;">
+                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0;">رسوم خدمة عملاء ودمغات ومصروفات</td>
+                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0; text-align: center; font-family: monospace;" id="rcpt-fees-amt">0.00</td>
+                                    </tr>
+                                    <tr id="rcpt-row-cleaning" style="color: #64748b;">
+                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0;">رسوم نظافة مقررة</td>
+                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0; text-align: center; font-family: monospace;" id="rcpt-cleaning-amt">0.00</td>
+                                    </tr>
+                                    <tr id="rcpt-row-debts" style="color: #dc2626;">
+                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0;">أقساط ومديونيات مستحقة مخصومة</td>
+                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700; font-family: monospace;" id="rcpt-debts-amt">0.00</td>
+                                    </tr>
+                                    <tr style="background: #fef2f2; color: #b91c1c; font-weight: 800;">
+                                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1;">إجمالي الخصومات والاستقطاعات</td>
+                                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace;" id="rcpt-deductions">-</td>
+                                    </tr>
+                                    <tr style="background: #f0fdf4; color: #166534; font-size: 1rem; font-weight: 900;">
+                                        <td style="padding: 7px 8px; border: 2px solid #16a34a;">صافي الرصيد المضاف للكارت والعداد</td>
+                                        <td style="padding: 7px 8px; border: 2px solid #16a34a; text-align: center; font-family: monospace; font-size: 1.1rem;" id="rcpt-net-credited">-</td>
+                                    </tr>
+                                    <tr style="background: #f8fafc; font-weight: 800;">
+                                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">المبلغ المسدد نقداً المحصل من المشترك</td>
+                                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace;" id="rcpt-net-collected">-</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- Tafqeet -->
+                            <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; font-weight: 800; font-size: 0.88rem; color: #1e293b;">
+                                فقط وقدره: <span id="rcpt-tafqeet-text" style="color: #0369a1;">-</span>
+                            </div>
+
+                            <!-- Footer & QR -->
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px dashed #94a3b8; padding-top: 8px;">
+                                <div style="font-size: 0.76rem; color: #475569; max-width: 60%;">
+                                    <div style="font-weight: 700; color: #b45309; margin-bottom: 2px;">⚠️ تنبيه: يرجى وضع الكارت في العداد فوراً لتفريغ الشحنة والتأكد من ظهور الرصيد.</div>
+                                    <div>هذا الإيصال مستخرج آلياً ومعتمد من منظومة الشحن الموحد لشركة توزيع كهرباء مصر الوسطى.</div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 15px;">
+                                    <div id="rcpt-qr-code" style="background: #fff; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px; display: inline-flex;"></div>
+                                    <div style="text-align: center; font-size: 0.8rem; font-weight: 700;">
+                                        <div>توقيع المحصل</div>
+                                        <div style="margin-top: 18px; border-bottom: 1px dotted #000; width: 80px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Thermal Receipt Preview (Hidden by default, toggled via tab) -->
+                        <div id="rcpt-view-thermal" style="display: none; background: #ffffff; border: 2px dashed #000000; max-width: 340px; margin: 0 auto; padding: 12px; font-family: 'Tajawal', monospace, sans-serif; font-size: 0.86rem; color: #000000; line-height: 1.4;">
+                            <!-- Thermal Content will be mirrored dynamically -->
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- Modal Footer -->
+                <div style="background: #f8fafc; padding: 1rem 1.4rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" id="btn-chg-receipt-close" class="btn secondary" style="background: #e2e8f0; color: #334155; border: none; padding: 8px 18px; font-weight: 700; border-radius: 8px; cursor: pointer;">إلغاء</button>
+                    
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button type="button" id="btn-chg-receipt-thermal-cfg" class="btn btn-sm" style="background: #f1f5f9; color: #0369a1; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 700;" title="إعدادات طابعة الفواتير الحرارية VTC / POS">
+                            ⚙️ إعدادات الطابعة
+                        </button>
+                        <button type="button" id="btn-chg-receipt-print" class="btn primary" style="background: #0284c7; color: #fff; border: none; padding: 8px 18px; font-weight: 800; border-radius: 8px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            <span>طباعة فورية</span>
+                        </button>
                     </div>
                 </div>
 
-                <div style="background: #f8fafc; padding: 1rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between;">
-                    <button type="button" id="btn-chg-receipt-close" class="btn secondary">إغلاق</button>
-                    <button type="button" id="btn-chg-receipt-print" class="btn primary" style="background: #0284c7; display: flex; align-items: center; gap: 6px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                        <span>طباعة الإيصال</span>
-                    </button>
-                </div>
             </div>
         </div>
 

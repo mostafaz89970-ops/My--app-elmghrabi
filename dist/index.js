@@ -14229,6 +14229,7 @@ const readChargingSmartCard = async () => {
     }
 };
 const executeChargingProcess = async () => {
+    var _a, _b, _c, _d;
     if (!hasButtonPermission('charging_card_access')) {
         if (!currentChargingCustomer) {
             showToast('يرجى قراءة كارت المشترك أولاً لتعبئة البيانات وتنفيذ الشحن.', 'warning');
@@ -14313,16 +14314,35 @@ const executeChargingProcess = async () => {
         }
         logActivity('شحن كارت مشترك', `تم شحن كارت العداد ${currentChargingCustomer.meterNumber} بمبلغ ${rechargeAmount.toFixed(2)} ج.م للمشترك ${currentChargingCustomer.name}`);
         // Show Receipt Modal
+        const amtInp = (document.getElementById('field-charge-amount') || document.getElementById('chg-recharge-amount'));
+        const grossCharge = Number(amtInp === null || amtInp === void 0 ? void 0 : amtInp.value) || rechargeAmount;
+        const cleaningFee = Number((_a = document.getElementById('chg-financial-cleaning')) === null || _a === void 0 ? void 0 : _a.value) || 0;
+        const debtsAmt = Number((_b = document.getElementById('field-total-debts')) === null || _b === void 0 ? void 0 : _b.value) || ((currentChargingFinancials === null || currentChargingFinancials === void 0 ? void 0 : currentChargingFinancials.debts) || 0);
+        const feesAmt = Number((_c = document.getElementById('chg-financial-fees')) === null || _c === void 0 ? void 0 : _c.value) || ((currentChargingFinancials === null || currentChargingFinancials === void 0 ? void 0 : currentChargingFinancials.fees) || 0);
+        const paySel = document.getElementById('field-payment-method');
+        const payMethod = ((_d = paySel === null || paySel === void 0 ? void 0 : paySel.options[paySel.selectedIndex]) === null || _d === void 0 ? void 0 : _d.text) || 'نقدي';
         showChargingReceiptModal({
-            id: (writeRes === null || writeRes === void 0 ? void 0 : writeRes.chargeId) || ('RCP-' + Date.now().toString().slice(-6)),
-            date: new Date().toLocaleString('ar-EG'),
+            id: (writeRes === null || writeRes === void 0 ? void 0 : writeRes.chargeId) || ('CHG-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000)),
+            date: new Date().toLocaleDateString('ar-EG'),
+            time: new Date().toLocaleTimeString('ar-EG'),
             customerName: currentChargingCustomer.name,
             customerCode: currentChargingCustomer.code,
             meterNumber: currentChargingCustomer.meterNumber,
+            accountReference: currentChargingCustomer.accountNumberReferenceCustomer || '-',
+            address: currentChargingCustomer.address || '-',
+            nationalId: currentChargingCustomer.nationalId || '-',
+            slice: currentChargingCustomer.consumptionSlice || 'الشريحة الأولى',
+            activityName: currentChargingCustomer.activityName || 'منزلي كودي',
             sequence: String((Number(currentChargingCustomer.chargeSequence) || 1) + 1),
-            chargeAmount: rechargeAmount.toFixed(2),
-            deductions: (rechargeAmount - netCollected).toFixed(2),
-            netCollected: netCollected.toFixed(2)
+            chargeAmount: grossCharge.toFixed(2),
+            fees: feesAmt,
+            cleaningFee: cleaningFee,
+            debtsDeducted: debtsAmt,
+            deductions: (grossCharge - rechargeAmount + (rechargeAmount - netCollected)).toFixed(2),
+            netCredited: rechargeAmount.toFixed(2),
+            netCollected: netCollected.toFixed(2),
+            paymentMethod: payMethod,
+            collectorName: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الشحن'
         });
     }
     catch (err) {
@@ -14336,6 +14356,366 @@ const executeChargingProcess = async () => {
         }
     }
 };
+let currentChargingReceiptData = null;
+let lastChargingReceiptData = null;
+const renderReceiptBarcodeSVG = (text) => {
+    let pattern = '';
+    const clean = String(text || 'CHG-1001').replace(/[^a-zA-Z0-9-]/g, '');
+    for (let i = 0; i < clean.length; i++) {
+        const charCode = clean.charCodeAt(i);
+        const w1 = (charCode % 3) + 1;
+        const w2 = ((charCode >> 1) % 2) + 1;
+        const w3 = ((charCode >> 2) % 3) + 1;
+        pattern += `<rect x="${i * 9}" y="0" width="${w1}" height="28" fill="#000"/>`;
+        pattern += `<rect x="${i * 9 + w1 + w2}" y="0" width="${w3}" height="28" fill="#000"/>`;
+    }
+    const totalW = Math.max(120, clean.length * 9 + 10);
+    return `<svg width="${totalW}" height="30" viewBox="0 0 ${totalW} 30" xmlns="http://www.w3.org/2000/svg" style="display:block; margin:0 auto;">${pattern}</svg>`;
+};
+const renderReceiptQRCodeSVG = (dataStr, size = 95) => {
+    const enc = encodeURIComponent(dataStr);
+    return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=2&data=${enc}" width="${size}" height="${size}" alt="QR" style="display:block; border-radius:4px; image-rendering:pixelated;" onerror="this.outerHTML='<div style=\\'border:1.5px solid #000; width:${size}px; height:${size}px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:9px; font-weight:bold; background:#fff; text-align:center; padding:2px;\\'>MEEDCO<br>QR VERIFIED<br>✓</div>'"/>`;
+};
+const generateStandardChargingReceiptHTML = (data) => {
+    const headerInfo = getDynamicReceiptHeader(data.collectorName);
+    const logoSrc = state.settings.companyLogo;
+    const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 65px; max-width: 85px; object-fit: contain;">` : '';
+    const tafqeet = data.tafqeet || tafqeetNumber(Number(data.netCollected) || Number(data.chargeAmount) || 0);
+    const barcodeHTML = renderReceiptBarcodeSVG(data.id);
+    const qrString = `MEEDCO|CHG:${data.id}|CODE:${data.customerCode}|METER:${data.meterNumber}|NET:${data.netCredited || data.chargeAmount}|COLLECTED:${data.netCollected}|DATE:${data.date}`;
+    const qrHTML = renderReceiptQRCodeSVG(qrString, 95);
+    return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إيصال سداد شحن عداد مسبق الدفع - ${data.id}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 portrait; margin: 8mm; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Tajawal', sans-serif; background: #fff; color: #0f172a; margin: 0; padding: 15px; font-size: 13px; line-height: 1.5; }
+        .receipt-card { max-width: 740px; margin: 0 auto; border: 2.5px solid #0f172a; border-radius: 12px; padding: 20px; background: #fff; position: relative; }
+        .watermark { position: absolute; top: 52%; left: 50%; transform: translate(-50%, -50%) rotate(-25deg); font-size: 42pt; color: rgba(2, 132, 199, 0.04); font-weight: 900; pointer-events: none; white-space: nowrap; user-select: none; z-index: 0; }
+        .header-grid { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 12px; position: relative; z-index: 1; }
+        .comp-info { flex: 1.2; text-align: right; }
+        .comp-info h2 { margin: 0 0 2px 0; font-size: 16px; font-weight: 900; color: #0f172a; }
+        .comp-info .sub-line { font-size: 12.5px; font-weight: 800; color: #1e40af; margin-bottom: 2px; }
+        .comp-info .branch-line { font-size: 12px; font-weight: 700; color: #065f46; margin-bottom: 2px; }
+        .comp-info .mini-line { font-size: 11px; color: #64748b; font-weight: 600; }
+        .center-title { flex: 1; text-align: center; }
+        .badge-title { display: inline-block; background: #0f172a; color: #fff; padding: 5px 18px; border-radius: 20px; font-weight: 900; font-size: 13.5px; margin-bottom: 4px; letter-spacing: 0.3px; }
+        .sys-subtitle { font-size: 11px; font-weight: 700; color: #475569; }
+        .meta-info { flex: 1.1; text-align: left; font-size: 11.5px; line-height: 1.7; }
+        .meta-info strong { font-family: monospace; color: #0369a1; font-size: 12.5px; }
+        .cust-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; overflow: hidden; position: relative; z-index: 1; }
+        .cust-table td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12.5px; }
+        .cust-table td.lbl { width: 18%; font-weight: 700; color: #475569; }
+        .cust-table td.val { width: 32%; font-weight: 800; color: #0f172a; }
+        .fin-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; position: relative; z-index: 1; }
+        .fin-table th { background: #0f172a; color: #fff; padding: 7px 12px; font-weight: 800; font-size: 13px; text-align: right; }
+        .fin-table th.num { text-align: center; width: 160px; }
+        .fin-table td { padding: 6px 12px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: 700; }
+        .fin-table td.num { text-align: center; font-family: monospace; font-size: 13.5px; font-weight: 800; }
+        .fin-table tr.highlight { background: #f0fdf4; color: #166534; font-size: 14px; font-weight: 900; }
+        .fin-table tr.highlight td { border: 2px solid #16a34a; }
+        .fin-table tr.highlight td.num { font-size: 15px; font-weight: 900; }
+        .fin-table tr.collected { background: #f8fafc; font-weight: 900; }
+        .tafqeet-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 7px 14px; margin-bottom: 14px; font-size: 12.5px; font-weight: 800; color: #1e293b; position: relative; z-index: 1; }
+        .footer-grid { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px dashed #94a3b8; padding-top: 10px; position: relative; z-index: 1; }
+        .instructions { max-width: 58%; font-size: 11px; color: #475569; line-height: 1.6; }
+        .instructions .warn { color: #b45309; font-weight: 800; margin-bottom: 2px; font-size: 11.5px; }
+        .sign-box { display: flex; align-items: center; gap: 20px; }
+        .sign-col { text-align: center; font-size: 11.5px; font-weight: 800; }
+        .sign-line { margin-top: 22px; border-bottom: 1.5px dotted #000; width: 85px; }
+        @media print {
+            body { padding: 0 !important; background: #fff !important; }
+            .receipt-card { box-shadow: none !important; border: 2px solid #000 !important; border-radius: 0 !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-card">
+        <div class="watermark">شركة توزيع كهرباء مصر الوسطى</div>
+        
+        <div class="header-grid">
+            <div class="comp-info">
+                <h2>${headerInfo.company}</h2>
+                <div class="sub-line">${headerInfo.sector}</div>
+                <div class="branch-line">${headerInfo.branchName}</div>
+                <div class="mini-line">منظومة الشحن الموحد MEEDCO • مركز الشحن</div>
+            </div>
+            
+            <div class="center-title">
+                ${logoHTML}
+                <div><span class="badge-title">إيصال سداد شحن عداد</span></div>
+                <div class="sys-subtitle">(كارت مسبق الدفع)</div>
+                <div style="margin-top: 4px;">${barcodeHTML}</div>
+            </div>
+
+            <div class="meta-info">
+                <div>رقم الإيصال: <strong>${data.id}</strong></div>
+                <div>تاريخ السداد: <span>${data.date}</span></div>
+                <div>وقت السداد: <span>${data.time || ''}</span></div>
+                <div>طريقة الدفع: <span>${data.paymentMethod || 'نقدي'}</span></div>
+                <div>المحصل: <span>${data.collectorName || 'مسؤول الشحن'}</span></div>
+            </div>
+        </div>
+
+        <table class="cust-table">
+            <tr>
+                <td class="lbl">اسم المشترك:</td>
+                <td class="val" colspan="3"><strong style="font-size: 14px; color: #0284c7;">${data.customerName}</strong></td>
+            </tr>
+            <tr>
+                <td class="lbl">كود المشترك:</td>
+                <td class="val"><span style="font-family: monospace;">${data.customerCode}</span></td>
+                <td class="lbl">رقم شاسية العداد:</td>
+                <td class="val"><span style="font-family: monospace;">${data.meterNumber}</span></td>
+            </tr>
+            <tr>
+                <td class="lbl">مرجع الحساب:</td>
+                <td class="val"><span style="font-family: monospace;">${data.accountReference || '-'}</span></td>
+                <td class="lbl">الرقم القومي:</td>
+                <td class="val"><span style="font-family: monospace;">${data.nationalId || '-'}</span></td>
+            </tr>
+            <tr>
+                <td class="lbl">الشريحة الحالية:</td>
+                <td class="val"><span style="color: #b45309;">${data.slice || 'الشريحة الأولى'}</span></td>
+                <td class="lbl">تتابع الشحن:</td>
+                <td class="val"><span>${data.sequence || '1'}</span></td>
+            </tr>
+            <tr>
+                <td class="lbl">نوع النشاط:</td>
+                <td class="val"><span>${data.activityName || 'منزلي كودي'}</span></td>
+                <td class="lbl">العنوان:</td>
+                <td class="val"><span>${data.address || '-'}</span></td>
+            </tr>
+        </table>
+
+        <table class="fin-table">
+            <thead>
+                <tr>
+                    <th>البيان المالي للعملية</th>
+                    <th class="num">المبلغ (جنيهاً مصرياً)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>مبلغ الشحن المطلوب (الإجمالي)</td>
+                    <td class="num">${Number(data.chargeAmount).toFixed(2)} ج.م</td>
+                </tr>
+                ${Number(data.fees || 0) > 0 ? `
+                <tr style="color: #475569;">
+                    <td>رسوم خدمة عملاء ودمغات ومصروفات إدارية</td>
+                    <td class="num">${Number(data.fees).toFixed(2)} ج.م</td>
+                </tr>` : ''}
+                ${Number(data.cleaningFee || 0) > 0 ? `
+                <tr style="color: #475569;">
+                    <td>رسوم نظافة مقررة</td>
+                    <td class="num">${Number(data.cleaningFee).toFixed(2)} ج.م</td>
+                </tr>` : ''}
+                ${Number(data.debtsDeducted || 0) > 0 ? `
+                <tr style="color: #dc2626;">
+                    <td>أقساط ومديونيات مستحقة مخصومة</td>
+                    <td class="num">-${Number(data.debtsDeducted).toFixed(2)} ج.م</td>
+                </tr>` : ''}
+                <tr style="background: #fef2f2; color: #b91c1c;">
+                    <td>إجمالي المبالغ والرسوم المخصومة</td>
+                    <td class="num">${Number(data.deductions || 0).toFixed(2)} ج.م</td>
+                </tr>
+                <tr class="highlight">
+                    <td>صافي الرصيد المضاف للكارت والعداد</td>
+                    <td class="num">${Number(data.netCredited || data.chargeAmount).toFixed(2)} ج.م</td>
+                </tr>
+                <tr class="collected">
+                    <td>إجمالي المبلغ المحصل والمسدد نقداً من المشترك</td>
+                    <td class="num" style="color: #0f172a; font-size: 14.5px;">${Number(data.netCollected).toFixed(2)} ج.م</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="tafqeet-box">
+            فقط وقدره: <strong style="color: #0369a1;">${tafqeet}</strong> جنيهاً مصرياً لا غير.
+        </div>
+
+        <div class="footer-grid">
+            <div class="instructions">
+                <div class="warn">⚠️ تنبيه هام: يرجى إدخال الكارت في العداد فوراً لتفريغ الشحنة والتأكد من إضاءة الشاشة وظهور الرصيد.</div>
+                <div>هذا الإيصال مستخرج آلياً ومعتمد من منظومة الشحن الموحد لشركة توزيع كهرباء مصر الوسطى (MEEDCO).</div>
+            </div>
+
+            <div class="sign-box">
+                ${qrHTML}
+                <div class="sign-col">
+                    <div>المحصل / الصراف</div>
+                    <div style="font-size: 10px; color: #64748b; margin-top: 2px;">${data.collectorName || 'مسؤول الشحن'}</div>
+                    <div class="sign-line"></div>
+                </div>
+                <div class="sign-col">
+                    <div>المشترك / المستلم</div>
+                    <div style="font-size: 10px; color: #64748b; margin-top: 2px;">التوقيع</div>
+                    <div class="sign-line"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>`;
+};
+const generateThermalChargingReceiptHTML = (data, paperWidth = 80) => {
+    const isBig = paperWidth === 80;
+    const wrapWidth = isBig ? '72mm' : '52mm';
+    const headerInfo = getDynamicReceiptHeader(data.collectorName);
+    const tafqeet = data.tafqeet || tafqeetNumber(Number(data.netCollected) || Number(data.chargeAmount) || 0);
+    const qrString = `MEEDCO|${data.id}|${data.customerCode}|${data.meterNumber}|${data.netCredited || data.chargeAmount}|${data.netCollected}`;
+    const qrHTML = renderReceiptQRCodeSVG(qrString, isBig ? 85 : 75);
+    return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إيصال سداد حراري - ${data.id}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        @page { size: ${paperWidth}mm auto; margin: 0; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 4px;
+            background: #ffffff;
+            color: #000000;
+            direction: rtl;
+            font-family: 'Tajawal', sans-serif;
+            font-size: ${isBig ? '13px' : '11.5px'};
+            line-height: 1.35;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .thermal-wrapper {
+            width: ${wrapWidth} !important;
+            max-width: ${wrapWidth} !important;
+            margin: 0 auto !important;
+            text-align: center;
+        }
+        .th-header { border-bottom: 2px dashed #000; padding-bottom: 5px; margin-bottom: 5px; }
+        .th-comp { font-size: ${isBig ? '16px' : '13.5px'}; font-weight: 900; margin: 0 0 2px 0; }
+        .th-sector { font-size: ${isBig ? '13px' : '11.5px'}; font-weight: 800; margin: 0 0 2px 0; }
+        .th-branch { font-size: ${isBig ? '12.5px' : '11px'}; font-weight: 700; }
+        .th-title { display: inline-block; border: 1.5px solid #000; padding: 2px 8px; font-size: ${isBig ? '13px' : '11.5px'}; font-weight: 900; border-radius: 4px; margin: 3px 0; background: #000; color: #fff; }
+        .th-meta { display: flex; justify-content: space-between; font-size: ${isBig ? '12px' : '10.5px'}; font-weight: 800; border-bottom: 1px dashed #000; padding-bottom: 4px; margin-bottom: 5px; }
+        .th-table { width: 100%; border-collapse: collapse; text-align: right; margin: 4px 0; font-size: ${isBig ? '12.5px' : '11px'}; }
+        .th-table td { padding: 2px 1px; }
+        .th-table td.lbl { width: 40%; font-weight: 800; }
+        .th-table td.val { width: 60%; font-weight: 900; }
+        .th-fin-box { border: 1.5px solid #000; border-radius: 4px; padding: 5px 6px; margin: 5px 0; }
+        .th-fin-row { display: flex; justify-content: space-between; font-weight: 800; padding: 2px 0; }
+        .th-fin-highlight { border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; background: #000; color: #fff; padding: 4px 5px; margin: 3px 0; font-size: ${isBig ? '14px' : '12px'}; font-weight: 900; }
+        .th-fin-amt { font-size: ${isBig ? '18px' : '15px'}; font-weight: 900; font-family: monospace; }
+        .th-tafqeet { font-size: ${isBig ? '11.5px' : '10px'}; font-weight: 800; margin-top: 3px; }
+        .th-qr { margin: 6px auto; display: flex; justify-content: center; }
+        .th-footer { border-top: 1.5px dashed #000; padding-top: 5px; margin-top: 5px; font-size: ${isBig ? '11px' : '9.5px'}; font-weight: 800; }
+        .th-cut { margin-top: 6px; font-size: 10px; border-top: 1px dashed #666; padding-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="thermal-wrapper">
+        <div class="th-header">
+            <div class="th-comp">${headerInfo.company}</div>
+            <div class="th-sector">${headerInfo.sector}</div>
+            <div class="th-branch">${headerInfo.branchName}</div>
+            <div><span class="th-title">إيصال سداد شحن فوري</span></div>
+            <div style="font-size: 10px; font-weight: bold;">منظومة الشحن الموحد MEEDCO</div>
+        </div>
+
+        <div class="th-meta">
+            <span>الإيصال: <strong>${data.id}</strong></span>
+            <span>${data.date}</span>
+        </div>
+
+        <table class="th-table">
+            <tr><td class="lbl">اسم المشترك:</td><td class="val">${data.customerName}</td></tr>
+            <tr><td class="lbl">كود المشترك:</td><td class="val">${data.customerCode}</td></tr>
+            <tr><td class="lbl">رقم العداد:</td><td class="val">${data.meterNumber}</td></tr>
+            <tr><td class="lbl">المرجع:</td><td class="val">${data.accountReference || '-'}</td></tr>
+            <tr><td class="lbl">الشريحة:</td><td class="val">${data.slice || '1'}</td></tr>
+            <tr><td class="lbl">التتابع:</td><td class="val">${data.sequence || '1'}</td></tr>
+            <tr><td class="lbl">المحصل:</td><td class="val">${data.collectorName || 'مسؤول الشحن'}</td></tr>
+        </table>
+
+        <div class="th-fin-box">
+            <div class="th-fin-row">
+                <span>إجمالي الشحن:</span>
+                <strong>${Number(data.chargeAmount).toFixed(2)} ج.م</strong>
+            </div>
+            ${Number(data.deductions || 0) > 0 ? `
+            <div class="th-fin-row" style="color: #b91c1c;">
+                <span>الخصومات والديون:</span>
+                <span>-${Number(data.deductions).toFixed(2)} ج.م</span>
+            </div>` : ''}
+            <div class="th-fin-highlight">
+                <div>المبلغ المسدد نقداً</div>
+                <div class="th-fin-amt">${Number(data.netCollected).toFixed(2)} ج.م</div>
+            </div>
+            <div class="th-fin-row" style="font-size: 11px;">
+                <span>صافي شحن العداد:</span>
+                <strong>${Number(data.netCredited || data.chargeAmount).toFixed(2)} ج.م</strong>
+            </div>
+            <div class="th-tafqeet">فقط: ${tafqeet} لا غير</div>
+        </div>
+
+        <div class="th-qr">${qrHTML}</div>
+
+        <div class="th-footer">
+            <div>⚠️ يرجى إدخال الكارت في العداد فوراً لتفعيل الشحنة</div>
+            <div>شكراً لتعاملكم معنا • ${data.time || ''}</div>
+        </div>
+
+        <div class="th-cut">---------------------------------------</div>
+    </div>
+</body>
+</html>`;
+};
+const printStandardChargingReceipt = (receiptData) => {
+    const data = receiptData || currentChargingReceiptData || lastChargingReceiptData;
+    if (!data) {
+        showToast('لا توجد بيانات إيصال جاهزة للطباعة.', 'warning');
+        return;
+    }
+    const html = generateStandardChargingReceiptHTML(data);
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            printWindow.print();
+        }, 300);
+    }
+    else {
+        showToast('يرجى السماح بالنوافذ المنبثقة لطباعة الإيصال.', 'error');
+    }
+};
+const printThermalChargingReceipt = async (receiptData) => {
+    const data = receiptData || currentChargingReceiptData || lastChargingReceiptData;
+    if (!data) {
+        showToast('لا توجد بيانات إيصال جاهزة للطباعة.', 'warning');
+        return;
+    }
+    const savedWidth = Number(localStorage.getItem('preferred_thermal_paper_width')) || 80;
+    const html = generateThermalChargingReceiptHTML(data, savedWidth);
+    const printWindow = window.open('', '_blank', `width=${savedWidth === 80 ? 400 : 320},height=600`);
+    if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            printWindow.print();
+        }, 300);
+    }
+    else {
+        showToast('يرجى السماح بالنوافذ المنبثقة لطباعة الإيصال الحراري.', 'error');
+    }
+};
 const showChargingReceiptModal = (data) => {
     if (!hasButtonPermission('view_charge_receipts')) {
         showToast('ليس لديك صلاحية عرض وطباعة إيصالات الشحن.', 'error');
@@ -14344,37 +14724,172 @@ const showChargingReceiptModal = (data) => {
     const modal = document.getElementById('chg-receipt-modal');
     if (!modal)
         return;
+    // Ensure defaults and completeness
+    const grossAmt = Number(data.chargeAmount) || 0;
+    const netCredited = Number(data.netCredited) || grossAmt;
+    const netCollected = Number(data.netCollected) || grossAmt;
+    const totalDeductions = Number(data.deductions) || Math.max(0, grossAmt - netCredited);
+    const tafqeet = data.tafqeet || tafqeetNumber(netCollected > 0 ? netCollected : grossAmt);
+    currentChargingReceiptData = Object.assign(Object.assign({}, data), { chargeAmount: grossAmt, grossAmt,
+        netCredited,
+        netCollected,
+        totalDeductions,
+        tafqeet });
+    lastChargingReceiptData = currentChargingReceiptData;
+    // Modal Header & Net Display (MEEDCO Metronic standard)
+    const headerName = document.getElementById('rcpt-header-name');
+    if (headerName)
+        headerName.textContent = data.customerName || '-';
+    const headerNet = document.getElementById('rcpt-header-net');
+    if (headerNet)
+        headerNet.textContent = netCredited.toFixed(2);
+    // Standard Preview Elements
+    const headerInfo = getDynamicReceiptHeader(data.collectorName);
+    const compTitle = document.getElementById('rcpt-comp-title');
+    if (compTitle)
+        compTitle.textContent = headerInfo.company || 'شركة توزيع كهرباء مصر الوسطى';
+    const sectorTitle = document.getElementById('rcpt-sector-title');
+    if (sectorTitle)
+        sectorTitle.textContent = headerInfo.sector;
+    const branchTitle = document.getElementById('rcpt-branch-title');
+    if (branchTitle)
+        branchTitle.textContent = headerInfo.branchName;
     const rcptId = document.getElementById('rcpt-id');
-    const rcptDate = document.getElementById('rcpt-date');
-    const rcptName = document.getElementById('rcpt-cust-name');
-    const rcptCode = document.getElementById('rcpt-cust-code');
-    const rcptMeter = document.getElementById('rcpt-meter-num');
-    const rcptSeq = document.getElementById('rcpt-seq');
-    const rcptAmt = document.getElementById('rcpt-charge-amt');
-    const rcptDeduct = document.getElementById('rcpt-deductions');
-    const rcptNet = document.getElementById('rcpt-net-collected');
     if (rcptId)
         rcptId.textContent = data.id || '-';
+    const rcptDate = document.getElementById('rcpt-date');
     if (rcptDate)
-        rcptDate.textContent = data.date || '-';
+        rcptDate.textContent = `${data.date || '-'} ${data.time ? ('- ' + data.time) : ''}`;
+    const rcptPayMethod = document.getElementById('rcpt-pay-method');
+    if (rcptPayMethod)
+        rcptPayMethod.textContent = data.paymentMethod || 'نقدي';
+    const rcptCollector = document.getElementById('rcpt-collector');
+    if (rcptCollector)
+        rcptCollector.textContent = data.collectorName || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الشحن';
+    // Customer details
+    const rcptName = document.getElementById('rcpt-cust-name');
     if (rcptName)
         rcptName.textContent = data.customerName || '-';
+    const rcptCode = document.getElementById('rcpt-cust-code');
     if (rcptCode)
         rcptCode.textContent = data.customerCode || '-';
+    const rcptMeter = document.getElementById('rcpt-meter-num');
     if (rcptMeter)
         rcptMeter.textContent = data.meterNumber || '-';
+    const rcptRef = document.getElementById('rcpt-account-ref');
+    if (rcptRef)
+        rcptRef.textContent = data.accountReference || '-';
+    const rcptSlice = document.getElementById('rcpt-slice');
+    if (rcptSlice)
+        rcptSlice.textContent = data.slice || 'الشريحة الأولى';
+    const rcptSeq = document.getElementById('rcpt-seq');
     if (rcptSeq)
-        rcptSeq.textContent = data.sequence || '1';
+        rcptSeq.textContent = String(data.sequence || '1');
+    const rcptAddr = document.getElementById('rcpt-cust-addr');
+    if (rcptAddr)
+        rcptAddr.textContent = data.address || '-';
+    // Financial table
+    const rcptAmt = document.getElementById('rcpt-charge-amt');
     if (rcptAmt)
-        rcptAmt.textContent = data.chargeAmount + ' ج.م';
+        rcptAmt.textContent = grossAmt.toFixed(2) + ' ج.م';
+    const rcptFees = document.getElementById('rcpt-fees-amt');
+    if (rcptFees)
+        rcptFees.textContent = Number(data.fees || 0).toFixed(2) + ' ج.م';
+    const rcptCleaning = document.getElementById('rcpt-cleaning-amt');
+    if (rcptCleaning)
+        rcptCleaning.textContent = Number(data.cleaningFee || 0).toFixed(2) + ' ج.م';
+    const rcptDebts = document.getElementById('rcpt-debts-amt');
+    if (rcptDebts)
+        rcptDebts.textContent = Number(data.debtsDeducted || 0).toFixed(2) + ' ج.م';
+    const rcptDeduct = document.getElementById('rcpt-deductions');
     if (rcptDeduct)
-        rcptDeduct.textContent = (Number(data.deductions) > 0 ? ('-' + data.deductions) : '0.00') + ' ج.م';
+        rcptDeduct.textContent = totalDeductions.toFixed(2) + ' ج.م';
+    const rcptNetCredited = document.getElementById('rcpt-net-credited');
+    if (rcptNetCredited)
+        rcptNetCredited.textContent = netCredited.toFixed(2) + ' ج.م';
+    const rcptNet = document.getElementById('rcpt-net-collected');
     if (rcptNet)
-        rcptNet.textContent = data.netCollected + ' ج.م';
+        rcptNet.textContent = netCollected.toFixed(2) + ' ج.م';
+    // Tafqeet
+    const rcptTafqeet = document.getElementById('rcpt-tafqeet-text');
+    if (rcptTafqeet)
+        rcptTafqeet.textContent = tafqeet + ' جنيهاً مصرياً لا غير.';
+    // Barcode & QR Code
+    const barcodeContainer = document.getElementById('rcpt-barcode-container');
+    if (barcodeContainer)
+        barcodeContainer.innerHTML = renderReceiptBarcodeSVG(data.id);
+    const qrContainer = document.getElementById('rcpt-qr-code');
+    if (qrContainer) {
+        const qrStr = `MEEDCO|CHG:${data.id}|CODE:${data.customerCode}|METER:${data.meterNumber}|NET:${netCredited}|COLLECTED:${netCollected}|DATE:${data.date}`;
+        qrContainer.innerHTML = renderReceiptQRCodeSVG(qrStr, 65);
+    }
+    // Mirror Thermal Content in preview
+    const thermalView = document.getElementById('rcpt-view-thermal');
+    if (thermalView) {
+        thermalView.innerHTML = `
+                <div style="text-align: center; border-bottom: 1.5px dashed #000; padding-bottom: 5px; margin-bottom: 6px;">
+                    <div style="font-weight: 900; font-size: 1.05rem;">${headerInfo.company}</div>
+                    <div style="font-size: 0.85rem; font-weight: 800;">${headerInfo.sector}</div>
+                    <div style="font-size: 0.8rem; font-weight: 700;">${headerInfo.branchName}</div>
+                    <div style="background: #000; color: #fff; padding: 2px 6px; border-radius: 4px; display: inline-block; font-weight: 900; margin-top: 3px; font-size: 0.85rem;">إيصال سداد شحن فوري</div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 800; border-bottom: 1px dashed #000; padding-bottom: 4px; margin-bottom: 6px;">
+                    <span>الإيصال: <strong>${data.id}</strong></span>
+                    <span>${data.date}</span>
+                </div>
+                <div style="font-size: 0.85rem; line-height: 1.5; margin-bottom: 6px;">
+                    <div><strong>المشترك:</strong> ${data.customerName}</div>
+                    <div><strong>كود المشترك:</strong> ${data.customerCode}</div>
+                    <div><strong>رقم العداد:</strong> ${data.meterNumber}</div>
+                    <div><strong>المرجع:</strong> ${data.accountReference || '-'}</div>
+                    <div><strong>الشريحة:</strong> ${data.slice || '1'} | <strong>تتابع:</strong> ${data.sequence || '1'}</div>
+                </div>
+                <div style="border: 1.5px solid #000; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 6px;">
+                    <div style="display: flex; justify-content: space-between; font-weight: 800;">
+                        <span>إجمالي الشحن:</span>
+                        <span>${grossAmt.toFixed(2)} ج.م</span>
+                    </div>
+                    ${totalDeductions > 0 ? `
+                    <div style="display: flex; justify-content: space-between; color: #b91c1c; font-weight: 800;">
+                        <span>إجمالي الخصومات:</span>
+                        <span>-${totalDeductions.toFixed(2)} ج.م</span>
+                    </div>` : ''}
+                    <div style="background: #000; color: #fff; padding: 4px; margin: 4px 0; border-radius: 4px; font-weight: 900;">
+                        <div>المبلغ المسدد نقداً</div>
+                        <div style="font-size: 1.25rem; font-family: monospace;">${netCollected.toFixed(2)} ج.م</div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 800;">
+                        <span>صافي الرصيد المضاف:</span>
+                        <span>${netCredited.toFixed(2)} ج.م</span>
+                    </div>
+                    <div style="font-size: 0.78rem; font-weight: 800; margin-top: 3px;">فقط: ${tafqeet}</div>
+                </div>
+                <div style="display: flex; justify-content: center; margin: 6px 0;">
+                    ${renderReceiptQRCodeSVG('MEEDCO|' + data.id + '|' + data.customerCode + '|' + data.meterNumber + '|' + netCredited, 70)}
+                </div>
+                <div style="text-align: center; font-size: 0.75rem; font-weight: 800; border-top: 1px dashed #000; padding-top: 4px;">
+                    <div>⚠️ يرجى إدخال الكارت في العداد فوراً لتفعيل الشحنة</div>
+                    <div>شكراً لتعاملكم معنا</div>
+                </div>
+            `;
+    }
+    // Set default tab to standard A4
+    const stdView = document.getElementById('rcpt-view-standard');
+    const thView = document.getElementById('rcpt-view-thermal');
+    const tabStd = document.getElementById('tab-btn-rcpt-standard');
+    const tabTh = document.getElementById('tab-btn-rcpt-thermal');
+    if (stdView && thView && tabStd && tabTh) {
+        stdView.style.display = 'block';
+        thView.style.display = 'none';
+        tabStd.style.background = '#0284c7';
+        tabStd.style.color = '#fff';
+        tabTh.style.background = '#f1f5f9';
+        tabTh.style.color = '#475569';
+    }
     modal.style.display = 'flex';
 };
 const initChargingCardListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6;
     (_a = document.getElementById('btn-chg-read-card')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => readChargingSmartCard());
     (_b = document.getElementById('btn-chg-standby-read-card')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => readChargingSmartCard());
     (_c = document.getElementById('btn-chg-reset')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => resetChargingCardUI());
@@ -14420,72 +14935,125 @@ const initChargingCardListeners = () => {
             }
         });
     });
-    // (Subscriber select removed per MEEDCO smart card standard)
+    // Print last receipt button
     (_u = document.getElementById('btn-chg-print-last')) === null || _u === void 0 ? void 0 : _u.addEventListener('click', () => {
+        var _a, _b, _c, _d;
+        if (lastChargingReceiptData) {
+            showChargingReceiptModal(lastChargingReceiptData);
+            return;
+        }
         if (currentChargingCustomer) {
             const amtInp = (document.getElementById('field-charge-amount') || document.getElementById('chg-recharge-amount'));
             const amt = Number(amtInp === null || amtInp === void 0 ? void 0 : amtInp.value) || 100;
             const net = calculateChargingNetAmount();
+            const cleaning = Number((_a = document.getElementById('chg-financial-cleaning')) === null || _a === void 0 ? void 0 : _a.value) || 0;
+            const debtsDeducted = Number((_b = document.getElementById('field-total-debts')) === null || _b === void 0 ? void 0 : _b.value) || ((currentChargingFinancials === null || currentChargingFinancials === void 0 ? void 0 : currentChargingFinancials.debts) || 0);
+            const feesAmt = Number((_c = document.getElementById('chg-financial-fees')) === null || _c === void 0 ? void 0 : _c.value) || ((currentChargingFinancials === null || currentChargingFinancials === void 0 ? void 0 : currentChargingFinancials.fees) || 0);
+            const payMethodSel = document.getElementById('field-payment-method');
+            const payMethod = ((_d = payMethodSel === null || payMethodSel === void 0 ? void 0 : payMethodSel.options[payMethodSel.selectedIndex]) === null || _d === void 0 ? void 0 : _d.text) || 'نقدي';
             showChargingReceiptModal({
-                id: 'RCP-' + Date.now().toString().slice(-6),
-                date: new Date().toLocaleString('ar-EG'),
+                id: 'CHG-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000),
+                date: new Date().toLocaleDateString('ar-EG'),
+                time: new Date().toLocaleTimeString('ar-EG'),
                 customerName: currentChargingCustomer.name,
                 customerCode: currentChargingCustomer.code,
                 meterNumber: currentChargingCustomer.meterNumber,
-                sequence: currentChargingCustomer.chargeSequence || '1',
+                accountReference: currentChargingCustomer.accountNumberReferenceCustomer || '-',
+                address: currentChargingCustomer.address || '-',
+                nationalId: currentChargingCustomer.nationalId || '-',
+                slice: currentChargingCustomer.consumptionSlice || 'الشريحة الأولى',
+                activityName: currentChargingCustomer.activityName || 'منزلي كودي',
+                sequence: String(currentChargingCustomer.chargeSequence || '1'),
                 chargeAmount: amt.toFixed(2),
+                fees: feesAmt,
+                cleaningFee: cleaning,
+                debtsDeducted: debtsDeducted,
                 deductions: (amt - net).toFixed(2),
-                netCollected: net.toFixed(2)
+                netCredited: amt.toFixed(2),
+                netCollected: net.toFixed(2),
+                paymentMethod: payMethod,
+                collectorName: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الشحن'
             });
         }
         else {
-            showToast('يرجى تحديد المشترك أو قراءة الكارت أولاً لعرض آخر إيصال.');
+            showToast('يرجى تحديد المشترك أو قراءة الكارت أولاً لعرض آخر إيصال.', 'warning');
         }
     });
     // Receipt modal listeners
-    (_v = document.getElementById('btn-chg-receipt-close')) === null || _v === void 0 ? void 0 : _v.addEventListener('click', () => {
+    const closeReceiptModal = () => {
         const m = document.getElementById('chg-receipt-modal');
         if (m)
             m.style.display = 'none';
+    };
+    (_v = document.getElementById('btn-chg-receipt-close')) === null || _v === void 0 ? void 0 : _v.addEventListener('click', closeReceiptModal);
+    (_w = document.getElementById('btn-chg-receipt-header-close')) === null || _w === void 0 ? void 0 : _w.addEventListener('click', closeReceiptModal);
+    // MEEDCO Buttons
+    (_x = document.getElementById('btn-print-standard-receipt')) === null || _x === void 0 ? void 0 : _x.addEventListener('click', () => {
+        printStandardChargingReceipt();
     });
-    (_w = document.getElementById('btn-chg-receipt-print')) === null || _w === void 0 ? void 0 : _w.addEventListener('click', () => {
-        const printArea = document.getElementById('chg-receipt-print-area');
-        if (!printArea)
-            return;
-        const printWindow = window.open('', '_blank', 'width=450,height=600');
-        if (printWindow) {
-            printWindow.document.write(`
-                    <html dir="rtl" lang="ar">
-                        <head>
-                            <title>إيصال شحن العداد</title>
-                            <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
-                            <style>
-                                body { font-family: 'Tajawal', sans-serif; padding: 20px; text-align: right; }
-                            </style>
-                        </head>
-                        <body>${printArea.innerHTML}</body>
-                    </html>
-                `);
-            printWindow.document.close();
-            printWindow.focus();
-            setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-            }, 300);
+    (_y = document.getElementById('btn-print-thermal-receipt')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', () => {
+        printThermalChargingReceipt();
+    });
+    // Tabs
+    (_z = document.getElementById('tab-btn-rcpt-standard')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', () => {
+        const stdView = document.getElementById('rcpt-view-standard');
+        const thView = document.getElementById('rcpt-view-thermal');
+        const tabStd = document.getElementById('tab-btn-rcpt-standard');
+        const tabTh = document.getElementById('tab-btn-rcpt-thermal');
+        if (stdView && thView && tabStd && tabTh) {
+            stdView.style.display = 'block';
+            thView.style.display = 'none';
+            tabStd.style.background = '#0284c7';
+            tabStd.style.color = '#fff';
+            tabTh.style.background = '#f1f5f9';
+            tabTh.style.color = '#475569';
+        }
+    });
+    (_0 = document.getElementById('tab-btn-rcpt-thermal')) === null || _0 === void 0 ? void 0 : _0.addEventListener('click', () => {
+        const stdView = document.getElementById('rcpt-view-standard');
+        const thView = document.getElementById('rcpt-view-thermal');
+        const tabStd = document.getElementById('tab-btn-rcpt-standard');
+        const tabTh = document.getElementById('tab-btn-rcpt-thermal');
+        if (stdView && thView && tabStd && tabTh) {
+            stdView.style.display = 'none';
+            thView.style.display = 'block';
+            tabTh.style.background = '#16a34a';
+            tabTh.style.color = '#fff';
+            tabStd.style.background = '#f1f5f9';
+            tabStd.style.color = '#475569';
+        }
+    });
+    // Thermal printer settings
+    (_1 = document.getElementById('btn-chg-receipt-thermal-cfg')) === null || _1 === void 0 ? void 0 : _1.addEventListener('click', () => {
+        if (window.openThermalPrinterSettingsModal) {
+            window.openThermalPrinterSettingsModal();
+        }
+        else {
+            showToast('إعدادات الطابعة الحرارية: يدعم الورق مقاس 80mm و 58mm وطابعات VTC/POS.', 'info');
+        }
+    });
+    // Direct print button
+    (_2 = document.getElementById('btn-chg-receipt-print')) === null || _2 === void 0 ? void 0 : _2.addEventListener('click', () => {
+        const thView = document.getElementById('rcpt-view-thermal');
+        if (thView && thView.style.display === 'block') {
+            printThermalChargingReceipt();
+        }
+        else {
+            printStandardChargingReceipt();
         }
     });
     // Card update modal listeners
-    (_x = document.getElementById('cm-card-modal-close-x')) === null || _x === void 0 ? void 0 : _x.addEventListener('click', () => {
+    (_3 = document.getElementById('cm-card-modal-close-x')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', () => {
         const m = document.getElementById('cm-card-update-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_y = document.getElementById('btn-cm-card-modal-close')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', () => {
+    (_4 = document.getElementById('btn-cm-card-modal-close')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', () => {
         const m = document.getElementById('cm-card-update-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_z = document.getElementById('btn-cm-card-read-again')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', async () => {
+    (_5 = document.getElementById('btn-cm-card-read-again')) === null || _5 === void 0 ? void 0 : _5.addEventListener('click', async () => {
         showToast('جاري إعادة قراءة الكارت من القارئ...');
         try {
             const cardRes = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
@@ -14513,7 +15081,7 @@ const initChargingCardListeners = () => {
             showToast('خطأ في قراءة الكارت.', 'error');
         }
     });
-    (_0 = document.getElementById('btn-cm-card-send-update')) === null || _0 === void 0 ? void 0 : _0.addEventListener('click', async () => {
+    (_6 = document.getElementById('btn-cm-card-send-update')) === null || _6 === void 0 ? void 0 : _6.addEventListener('click', async () => {
         const meterNumInp = document.getElementById('cm-card-meter-number');
         const custCodeInp = document.getElementById('cm-card-customer-code');
         const custNameInp = document.getElementById('cm-card-customer-name');
@@ -14949,14 +15517,25 @@ const executeNewCardNoChargeProcess = async () => {
             }
             showChargingReceiptModal({
                 id: receiptNumber,
-                date: new Date().toLocaleString('ar-EG'),
+                date: new Date().toLocaleDateString('ar-EG'),
+                time: new Date().toLocaleTimeString('ar-EG'),
                 customerName: currentNewCardCustomer.name,
                 customerCode: currentNewCardCustomer.code,
                 meterNumber: currentNewCardCustomer.meterNumber,
+                accountReference: currentNewCardCustomer.accountNumberReferenceCustomer || '-',
+                address: currentNewCardCustomer.address || '-',
+                nationalId: currentNewCardCustomer.nationalId || '-',
                 sequence: 'بديل بدون شحن',
-                chargeAmount: '0.00 (بدون شحن)',
-                deductions: 'رسوم كارت 50.00 ج.م',
-                netCollected: '50.00'
+                chargeAmount: '0.00',
+                fees: 50.00,
+                cleaningFee: 0,
+                debtsDeducted: 0,
+                deductions: '0.00',
+                netCredited: '0.00',
+                netCollected: '50.00',
+                isReplacement: true,
+                replacementType: 'كارت بديل بدون شحن (رسوم كارت 50 ج.م)',
+                collectorName: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الشحن'
             });
         }
         else {
@@ -15345,15 +15924,26 @@ const executeNewCardWithChargeProcess = async () => {
                 banner.innerHTML = `<strong>تمت العملية بنجاح!</strong> تم إصدار الكارت البديل وشحن رصيد ${rechargeAmount.toFixed(2)} ج.م بنجاح على الشريحة الذكية.`;
             }
             showChargingReceiptModal({
-                id: res.chargeId || ('RCP-NC-' + Date.now().toString().slice(-6)),
-                date: new Date().toLocaleString('ar-EG'),
+                id: res.chargeId || ('CHG-NC-' + Date.now().toString().slice(-6)),
+                date: new Date().toLocaleDateString('ar-EG'),
+                time: new Date().toLocaleTimeString('ar-EG'),
                 customerName: currentNewChargeCustomer.name,
                 customerCode: currentNewChargeCustomer.code,
                 meterNumber: currentNewChargeCustomer.meterNumber,
+                accountReference: currentNewChargeCustomer.accountNumberReferenceCustomer || '-',
+                address: currentNewChargeCustomer.address || '-',
+                nationalId: currentNewChargeCustomer.nationalId || '-',
                 sequence: String((Number(currentNewChargeCustomer.chargeSequence) || 1) + 1),
                 chargeAmount: rechargeAmount.toFixed(2),
-                deductions: 'رسوم كارت 50.00 ج.م',
-                netCollected: netCollected.toFixed(2)
+                fees: 50.00,
+                cleaningFee: 0,
+                debtsDeducted: 0,
+                deductions: 'رسوم إصدار كارت 50.00 ج.م',
+                netCredited: rechargeAmount.toFixed(2),
+                netCollected: netCollected.toFixed(2),
+                isReplacement: true,
+                replacementType: 'كارت بديل بشحن (شحن + رسوم كارت)',
+                collectorName: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الشحن'
             });
         }
         else {
