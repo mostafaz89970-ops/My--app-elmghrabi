@@ -1063,7 +1063,7 @@
                           <li><a href="#" class="nav-link" data-target="org-hierarchy-management" data-permission="manage_users"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg><span>الهيكل الإداري والقطاعات</span></a></li>
                           <li><a href="#" class="nav-link" data-target="permissions" data-permission="manage_settings"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg><span>الصلاحيات</span></a></li>
                           <li><a href="#" class="nav-link" data-target="activity-log" data-permission="view_activity_log"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg><span>نشاط المستخدمين</span></a></li>
-                          <li><a href="#" class="nav-link" data-target="technicians" data-permission="view_technicians"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg><span>الفنيين</span></a></li>
+                          <li><a href="#" class="nav-link" data-target="technicians" data-permission="view_technicians"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span>الموظفين والصلاحيات</span></a></li>
                        </ul>
                   </details>
               </li>
@@ -2228,6 +2228,10 @@
                 <div class="section-header">
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <h3>الاستعلام عن مشترك</h3>
+                        <button type="button" id="btn-chg-print-last" class="btn" style="background: #ffffff; color: #475569; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            <span>آخر إيصال</span>
+                        </button>
                         <button type="button" class="btn btn-back-page" title="رجوع">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
                             <span>رجوع</span>
@@ -2363,7 +2367,197 @@
         </section>
 
         <!-- Other sections -->
-        <section id="technicians" class="content-section"></section>
+        <section id="technicians" class="content-section" style="padding: 1.5rem;">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 14px; background: #ffffff; padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                        <span style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: #e0f2fe; color: #0284c7;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        </span>
+                        <h2 style="margin: 0; font-size: 1.4rem; font-weight: 800; color: #0f172a;">إدارة الموظفين والصلاحيات والأدوار (MEEDCO)</h2>
+                    </div>
+                    <small style="color: #64748b; font-size: 0.9rem;">التحكم الكامل في حسابات الموظفين، إسناد الأدوار، شجرة الصلاحيات، وسجل تدقيق التغييرات</small>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <button type="button" id="btn-open-tech-staff-modal" class="btn" style="background: #0284c7; color: #fff; font-weight: 700; padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(2,132,199,0.3);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span>إضافة موظف / مستخدم</span>
+                    </button>
+                    <button type="button" id="btn-open-tech-role-modal" class="btn" style="background: #10b981; color: #fff; font-weight: 700; padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(16,185,129,0.3);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        <span>إضافة دور وظيفي</span>
+                    </button>
+                    <button type="button" id="btn-print-tech-audit-report" class="btn" style="background: #f8fafc; color: #334155; border: 1px solid #cbd5e1; font-weight: 600; padding: 8px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        <span>طباعة تقرير الصلاحيات المعتمد</span>
+                    </button>
+                    <button type="button" class="btn btn-back-page" style="background: #f1f5f9; color: #475569; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; cursor: pointer;">
+                        <span>رجوع</span> ➔
+                    </button>
+                </div>
+            </div>
+
+            <!-- Top KPI Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 1.5rem;">
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 48px; height: 48px; border-radius: 10px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">👥</div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: #64748b; font-weight: 600;">إجمالي الموظفين والمستخدمين</div>
+                        <div id="tech-kpi-total-staff" style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">0</div>
+                    </div>
+                </div>
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 48px; height: 48px; border-radius: 10px; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">✅</div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: #64748b; font-weight: 600;">الحسابات المفعلة (نشط)</div>
+                        <div id="tech-kpi-active-staff" style="font-size: 1.5rem; font-weight: 800; color: #16a34a;">0</div>
+                    </div>
+                </div>
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 48px; height: 48px; border-radius: 10px; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🛡️</div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: #64748b; font-weight: 600;">الأدوار الوظيفية المعرفة</div>
+                        <div id="tech-kpi-total-roles" style="font-size: 1.5rem; font-weight: 800; color: #d97706;">0</div>
+                    </div>
+                </div>
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 48px; height: 48px; border-radius: 10px; background: #f3e8ff; color: #9333ea; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🔑</div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: #64748b; font-weight: 600;">إجمالي الصلاحيات المنفذة</div>
+                        <div id="tech-kpi-total-perms" style="font-size: 1.5rem; font-weight: 800; color: #9333ea;">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation Buttons -->
+            <div style="display: flex; gap: 8px; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.5rem; background: #ffffff; padding: 8px 14px 0 14px; border-radius: 10px 10px 0 0;">
+                <button type="button" class="tab-btn-tech active" data-tech-tab="tab-content-tech-staff" style="background: none; border: none; padding: 10px 18px; font-weight: 700; font-size: 0.95rem; color: #0284c7; border-bottom: 3px solid #0284c7; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                    <span>الموظفون والمستخدمون</span>
+                </button>
+                <button type="button" class="tab-btn-tech" data-tech-tab="tab-content-tech-roles" style="background: none; border: none; padding: 10px 18px; font-weight: 600; font-size: 0.95rem; color: #64748b; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                    <span>الأدوار وصلاحيات MEEDCO</span>
+                </button>
+                <button type="button" class="tab-btn-tech" data-tech-tab="tab-content-tech-audit" style="background: none; border: none; padding: 10px 18px; font-weight: 600; font-size: 0.95rem; color: #64748b; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                    <span>سجل تدقيق وتغييرات الصلاحيات (النظام)</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: Staff & Users List -->
+            <div id="tab-content-tech-staff" class="tech-tab-pane" style="display: block;">
+                <!-- Filter Bar -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 1.25rem; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 220px;">
+                        <input type="text" id="tech-search-input" class="form-control" placeholder="بحث بالاسم، اسم المستخدم، الرقم القومي أو الهاتف..." style="width: 100%; padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem;">
+                    </div>
+                    <div style="width: 180px;">
+                        <select id="tech-filter-role" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem;">
+                            <option value="">كل الأدوار</option>
+                        </select>
+                    </div>
+                    <div style="width: 180px;">
+                        <select id="tech-filter-branch" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem;">
+                            <option value="">كل الإدارات والفروع</option>
+                        </select>
+                    </div>
+                    <div style="width: 140px;">
+                        <select id="tech-filter-status" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem;">
+                            <option value="">كل الحالات</option>
+                            <option value="active">نشط فقط</option>
+                            <option value="inactive">معطل فقط</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Staff Table -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; overflow-x: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <table style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #475569; font-weight: 700;">
+                                <th style="padding: 12px 16px;">الموظف / الاسم</th>
+                                <th style="padding: 12px 16px;">اسم الدخول (Username)</th>
+                                <th style="padding: 12px 16px;">الرقم القومي / الهاتف</th>
+                                <th style="padding: 12px 16px;">الإدارة / الهندسة</th>
+                                <th style="padding: 12px 16px;">الدور الوظيفي</th>
+                                <th style="padding: 12px 16px; text-align: center;">الحالة</th>
+                                <th style="padding: 12px 16px; text-align: center;">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tech-staff-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 2: Roles & MEEDCO Permissions Matrix -->
+            <div id="tab-content-tech-roles" class="tech-tab-pane" style="display: none;">
+                <div style="display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start;">
+                    <!-- Left: Roles List Cards -->
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: #1e293b;">الأدوار الوظيفية</h4>
+                            <button type="button" id="btn-quick-add-role" class="btn" style="background: #e0f2fe; color: #0284c7; border: none; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer;">+ دور جديد</button>
+                        </div>
+                        <div id="tech-roles-cards-container" style="display: flex; flex-direction: column; gap: 10px;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Permissions Matrix of selected Role -->
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+                            <div>
+                                <h3 id="tech-active-role-title" style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #0f172a;">صلاحيات الدور: مدير النظام</h3>
+                                <small id="tech-active-role-desc" style="color: #64748b;">تحكم كامل في كافة وظائف المنظومة والبطاقات والماليات</small>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button type="button" id="btn-select-all-tech-perms" class="btn" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">تحديد الكل</button>
+                                <button type="button" id="btn-deselect-all-tech-perms" class="btn" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">إلغاء التحديد</button>
+                                <button type="button" id="btn-save-role-perms" class="btn" style="background: #16a34a; color: #fff; border: none; padding: 6px 18px; border-radius: 6px; font-weight: 700; font-size: 0.9rem; cursor: pointer; box-shadow: 0 2px 4px rgba(22,163,74,0.3);">💾 حفظ الصلاحيات</button>
+                            </div>
+                        </div>
+
+                        <!-- Categorized Tree -->
+                        <div id="tech-permissions-tree-container" style="display: flex; flex-direction: column; gap: 14px;">
+                            <!-- Categories generated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: Audit & Permissions Change History (System Author) -->
+            <div id="tab-content-tech-audit" class="tech-tab-pane" style="display: none;">
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h4 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #1e293b;">سجل تدقيق وتغييرات الصلاحيات والأدوار المعتمد</h4>
+                            <small style="color: #64748b;">جميع التعديلات والقرارات يتم تقييدها رسمياً تحت إشراف المنظومة الآلية</small>
+                        </div>
+                        <button type="button" id="btn-print-audit-table" class="btn" style="background: #0284c7; color: #fff; border: none; padding: 6px 16px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">
+                            طباعة هذا التقرير
+                        </button>
+                    </div>
+
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.9rem;">
+                            <thead>
+                                <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1; color: #334155; font-weight: 700;">
+                                    <th style="padding: 10px 14px;">التاريخ والوقت</th>
+                                    <th style="padding: 10px 14px;">نوع العملية</th>
+                                    <th style="padding: 10px 14px;">الموظف / الدور المستهدف</th>
+                                    <th style="padding: 10px 14px;">تفاصيل التغيير</th>
+                                    <th style="padding: 10px 14px; text-align: center; color: #0284c7; font-weight: 800;">القائم بالتعديل</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tech-audit-log-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <!-- LOST MEMOS SECTIONS -->
         <section id="lost-memos-write" class="content-section">
@@ -4323,16 +4517,7 @@
                 <div id="chg-status-banner" style="display: none; padding: 12px 18px; border-radius: 8px; margin-bottom: 1.25rem; font-weight: 500; font-size: 0.95rem;"></div>
 
                 <!-- Quick Subscriber Search/Selector (Compact helper) -->
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 14px; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 12px;">
-                    <label for="chg-subscriber-select" style="font-weight: 700; color: #475569; font-size: 0.9rem; white-space: nowrap;">البحث / الاختيار اليدوي للمشترك:</label>
-                    <select id="chg-subscriber-select" class="form-control" style="flex: 1; padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; color: #0284c7; background: #fff; font-size: 0.9rem;">
-                        <option value="">-- اضغط قراءة الكارت أو اختر مشتركاً من القائمة --</option>
-                    </select>
-                    <button type="button" id="btn-chg-print-last" class="btn" style="background: #ffffff; color: #475569; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                        <span>آخر إيصال</span>
-                    </button>
-                </div>
+                
 
                 <!-- Main Section: Left Panel (Deductions & Payments) + Right Panel (Subscriber & Meter Info) -->
                 <div style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 1.5rem; flex-wrap: wrap;">
@@ -6810,6 +6995,158 @@
                 </div>
             </div>
         </div>
+
+
+    <!-- Modal: Add / Edit Employee (MEEDCO Staff) -->
+    <div id="modal-tech-staff-form" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+        <div class="modal-content" style="background: #ffffff; border-radius: 14px; max-width: 720px; width: 94%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 18px;">
+                <h3 id="modal-tech-staff-title" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #0f172a;">إضافة موظف / مستخدم جديد (MEEDCO)</h3>
+                <button type="button" class="close-modal" id="btn-close-tech-staff-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
+            </div>
+            
+            <form id="tech-staff-form" style="display: flex; flex-direction: column; gap: 14px;">
+                <input type="hidden" id="tech-staff-edit-id" value="">
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">الاسم باللغة العربية <span style="color: red;">*</span></label>
+                        <input type="text" id="tech-staff-name-ar" class="form-control" required placeholder="مثال: م. أحمد مصطفى إبراهيم" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">الاسم باللغة الإنجليزية</label>
+                        <input type="text" id="tech-staff-name-en" class="form-control" placeholder="e.g. Ahmed Mostafa Ibrahim" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">اسم المستخدم للدخول (Username) <span style="color: red;">*</span></label>
+                        <input type="text" id="tech-staff-username" class="form-control" required placeholder="e.g. ahmed.mostafa" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">الرقم القومي (14 رقم)</label>
+                        <input type="text" id="tech-staff-national-id" maxlength="14" class="form-control" placeholder="2950101XXXXXXXX" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">البريد الإلكتروني</label>
+                        <input type="email" id="tech-staff-email" class="form-control" placeholder="staff@meedco.gov.eg" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">رقم المحمول</label>
+                        <input type="tel" id="tech-staff-phone" class="form-control" placeholder="010XXXXXXXX" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <div id="tech-staff-password-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">كلمة المرور <span style="color: red;">*</span></label>
+                        <input type="password" id="tech-staff-password" class="form-control" placeholder="••••••••" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">تأكيد كلمة المرور <span style="color: red;">*</span></label>
+                        <input type="password" id="tech-staff-confirm-password" class="form-control" placeholder="••••••••" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">الدور الوظيفي (Role) <span style="color: red;">*</span></label>
+                        <select id="tech-staff-role-select" class="form-control" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600;">
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">مركز الشحن المخصص</label>
+                        <input type="text" id="tech-staff-recharge-center" class="form-control" placeholder="مركز شحن هندسة المنيا" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">الإدارة العامة</label>
+                        <input type="text" id="tech-staff-general-admin" class="form-control" placeholder="قطاع توزيع جنوب المنيا" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">الإدارة الفرعية / الهندسة</label>
+                        <input type="text" id="tech-staff-sub-admin" class="form-control" placeholder="هندسة ملوي" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 20px; align-items: center; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; color: #334155;">
+                        <input type="checkbox" id="tech-staff-is-active" checked style="width: 18px; height: 18px; accent-color: #16a34a;">
+                        <span>تفعيل الحساب (Active)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; color: #334155;">
+                        <input type="checkbox" id="tech-staff-monitor-flag" style="width: 18px; height: 18px; accent-color: #0284c7;">
+                        <span>صلاحية مراقبة أداء الشركة والتقارير الوزارية</span>
+                    </label>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 14px;">
+                    <button type="button" class="btn close-modal" id="btn-cancel-tech-staff" style="background: #f1f5f9; color: #475569; padding: 8px 18px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; cursor: pointer;">إلغاء</button>
+                    <button type="submit" id="btn-save-tech-staff" class="btn" style="background: #0284c7; color: #fff; padding: 8px 24px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 2px 4px rgba(2,132,199,0.3);">حفظ الموظف</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add / Edit Role -->
+    <div id="modal-tech-role-form" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+        <div class="modal-content" style="background: #ffffff; border-radius: 14px; max-width: 500px; width: 92%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 18px;">
+                <h3 id="modal-tech-role-title" style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #0f172a;">إنشاء دور وظيفي جديد</h3>
+                <button type="button" class="close-modal" id="btn-close-tech-role-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
+            </div>
+            <form id="tech-role-form" style="display: flex; flex-direction: column; gap: 14px;">
+                <div>
+                    <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">اسم الدور بالعربية <span style="color: red;">*</span></label>
+                    <input type="text" id="tech-role-name-ar" class="form-control" required placeholder="مثال: مسؤول شحن كروت متقدم" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">اسم الدور بالإنجليزية</label>
+                    <input type="text" id="tech-role-name-en" class="form-control" placeholder="e.g. Senior Charging Specialist" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155; font-size: 0.85rem;">وصف ومهام الدور</label>
+                    <textarea id="tech-role-desc" class="form-control" rows="3" placeholder="تحديد نطاق العمل والمسؤوليات..." style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;"></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 14px;">
+                    <button type="button" class="btn close-modal" id="btn-cancel-tech-role" style="background: #f1f5f9; color: #475569; padding: 8px 18px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; cursor: pointer;">إلغاء</button>
+                    <button type="submit" id="btn-save-new-role" class="btn" style="background: #10b981; color: #fff; padding: 8px 24px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer;">حفظ الدور</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: User Direct Permissions Editor -->
+    <div id="modal-tech-user-perms" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+        <div class="modal-content" style="background: #ffffff; border-radius: 14px; max-width: 800px; width: 94%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 14px;">
+                <div>
+                    <h3 id="tech-user-perms-modal-title" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #0f172a;">صلاحيات المستخدم المباشرة</h3>
+                    <small id="tech-user-perms-modal-sub" style="color: #64748b;">تخصيص صلاحيات استثنائية لهذا الموظف</small>
+                </div>
+                <button type="button" class="close-modal" id="btn-close-tech-user-perms" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #f8fafc; padding: 8px 12px; border-radius: 8px;">
+                <span id="tech-user-perms-count-badge" style="font-weight: 700; color: #0284c7; font-size: 0.9rem;">0 صلاحية مفعلة</span>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" id="btn-user-select-all-perms" class="btn" style="background: #fff; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer;">تحديد الكل</button>
+                    <button type="button" id="btn-user-deselect-all-perms" class="btn" style="background: #fff; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer;">إلغاء التحديد</button>
+                </div>
+            </div>
+            <div id="tech-user-perms-tree" style="display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto; padding: 4px;">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+                <button type="button" class="btn close-modal" id="btn-cancel-tech-user-perms" style="background: #f1f5f9; color: #475569; padding: 8px 18px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; cursor: pointer;">إلغاء</button>
+                <button type="button" id="btn-save-user-direct-perms" class="btn" style="background: #0284c7; color: #fff; padding: 8px 24px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer;">حفظ وتطبيق الصلاحيات</button>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>

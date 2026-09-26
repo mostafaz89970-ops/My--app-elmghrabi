@@ -1376,17 +1376,19 @@ const saveState = async () => {
         return false;
     }
 };
-const logActivity = (action, details, changeSummary) => {
-    if (!loggedInUser)
+const logActivity = (action, details, changeSummary, overrideUser) => {
+    if (!loggedInUser && !overrideUser)
         return;
+    const isPermOrStaffAction = /صلاحي|دور|أدوار|أذونات|فني|موظف|permission|role|user_privilege/i.test(action) || /صلاحي|دور|أدوار|أذونات|فني|موظف/i.test(details);
+    const actorUser = overrideUser || (isPermOrStaffAction ? 'النظام' : (loggedInUser ? loggedInUser.fullName : 'النظام'));
     const newLogEntry = {
         timestamp: new Date().toLocaleString('ar-EG'),
-        user: loggedInUser.fullName,
+        user: actorUser,
         action: action,
         details: details,
         changeSummary: changeSummary || '',
     };
-    state.activityLog.unshift(newLogEntry); // Add to the beginning of the array
+    state.activityLog.unshift(newLogEntry);
 };
 function ensureDefaultPermissions(settings) {
     if (!settings || typeof settings !== 'object')
@@ -13570,33 +13572,20 @@ const renderChargingCardSection = (customerId) => {
         initChargingCardListeners();
         chargingSectionInitialized = true;
     }
-    // Populate subscriber selector from local state.meters
-    const subSelect = document.getElementById('chg-subscriber-select');
-    if (subSelect) {
-        subSelect.innerHTML = '<option value="">-- اختر مشترك للشحن أو ضع الكارت في القارئ --</option>';
-        state.meters.forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = String(m.id);
-            opt.textContent = `${m.subscriberName || 'بدون اسم'} | عداد: ${m.meterChassisNumber || '-'} (${m.subscriptionCode || '-'})`;
-            subSelect.appendChild(opt);
-        });
-        if (customerId) {
-            subSelect.value = customerId;
-        }
-    }
     if (customerId) {
         loadChargingCustomer(customerId);
     }
-    else if (state.meters && state.meters.length > 0) {
-        const defaultId = String(state.meters[0].id);
-        if (subSelect)
-            subSelect.value = defaultId;
-        loadChargingCustomer(defaultId);
-        // Also attempt auto-reading smart card if present on reader
-        readChargingSmartCard();
-    }
     else {
         resetChargingCardUI();
+        const banner = document.getElementById('chg-status-banner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.style.backgroundColor = '#eff6ff';
+            banner.style.border = '1px solid #bfdbfe';
+            banner.style.color = '#1e40af';
+            banner.innerHTML = '💳 <strong>جاهز للشحن الذكي:</strong> يرجى وضع كارت المشترك على القارئ والضغط على <strong>"قراءة الكارت"</strong> لجلب البيانات والمديونيات تلقائياً من السيرفر.';
+        }
+        // Auto read card if present on reader
         readChargingSmartCard();
     }
 };
@@ -14382,7 +14371,7 @@ const showChargingReceiptModal = (data) => {
     modal.style.display = 'flex';
 };
 const initChargingCardListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1;
     (_a = document.getElementById('btn-chg-read-card')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => readChargingSmartCard());
     (_b = document.getElementById('btn-chg-reset')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => resetChargingCardUI());
     (_c = document.getElementById('btn-chg-execute-charge')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => executeChargingProcess());
@@ -14424,17 +14413,8 @@ const initChargingCardListeners = () => {
             }
         });
     });
-    // Subscriber select dropdown listener
-    (_v = document.getElementById('chg-subscriber-select')) === null || _v === void 0 ? void 0 : _v.addEventListener('change', (e) => {
-        const val = e.target.value;
-        if (val) {
-            loadChargingCustomer(val);
-        }
-        else {
-            resetChargingCardUI();
-        }
-    });
-    (_w = document.getElementById('btn-chg-print-last')) === null || _w === void 0 ? void 0 : _w.addEventListener('click', () => {
+    // (Subscriber select removed per MEEDCO smart card standard)
+    (_v = document.getElementById('btn-chg-print-last')) === null || _v === void 0 ? void 0 : _v.addEventListener('click', () => {
         if (currentChargingCustomer) {
             const amtInp = (document.getElementById('field-charge-amount') || document.getElementById('chg-recharge-amount'));
             const amt = Number(amtInp === null || amtInp === void 0 ? void 0 : amtInp.value) || 100;
@@ -14456,12 +14436,12 @@ const initChargingCardListeners = () => {
         }
     });
     // Receipt modal listeners
-    (_x = document.getElementById('btn-chg-receipt-close')) === null || _x === void 0 ? void 0 : _x.addEventListener('click', () => {
+    (_w = document.getElementById('btn-chg-receipt-close')) === null || _w === void 0 ? void 0 : _w.addEventListener('click', () => {
         const m = document.getElementById('chg-receipt-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_y = document.getElementById('btn-chg-receipt-print')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', () => {
+    (_x = document.getElementById('btn-chg-receipt-print')) === null || _x === void 0 ? void 0 : _x.addEventListener('click', () => {
         const printArea = document.getElementById('chg-receipt-print-area');
         if (!printArea)
             return;
@@ -14488,17 +14468,17 @@ const initChargingCardListeners = () => {
         }
     });
     // Card update modal listeners
-    (_z = document.getElementById('cm-card-modal-close-x')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', () => {
+    (_y = document.getElementById('cm-card-modal-close-x')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', () => {
         const m = document.getElementById('cm-card-update-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_0 = document.getElementById('btn-cm-card-modal-close')) === null || _0 === void 0 ? void 0 : _0.addEventListener('click', () => {
+    (_z = document.getElementById('btn-cm-card-modal-close')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', () => {
         const m = document.getElementById('cm-card-update-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_1 = document.getElementById('btn-cm-card-read-again')) === null || _1 === void 0 ? void 0 : _1.addEventListener('click', async () => {
+    (_0 = document.getElementById('btn-cm-card-read-again')) === null || _0 === void 0 ? void 0 : _0.addEventListener('click', async () => {
         showToast('جاري إعادة قراءة الكارت من القارئ...');
         try {
             const cardRes = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
@@ -14526,7 +14506,7 @@ const initChargingCardListeners = () => {
             showToast('خطأ في قراءة الكارت.', 'error');
         }
     });
-    (_2 = document.getElementById('btn-cm-card-send-update')) === null || _2 === void 0 ? void 0 : _2.addEventListener('click', async () => {
+    (_1 = document.getElementById('btn-cm-card-send-update')) === null || _1 === void 0 ? void 0 : _1.addEventListener('click', async () => {
         const meterNumInp = document.getElementById('cm-card-meter-number');
         const custCodeInp = document.getElementById('cm-card-customer-code');
         const custNameInp = document.getElementById('cm-card-customer-name');
@@ -25178,6 +25158,9 @@ function handleNavigation(event) {
     else if (targetId === 'settings') {
         renderSettingsSection(false);
     }
+    else if (targetId === 'technicians') {
+        renderTechniciansSection();
+    }
     else if (targetId === 'reports') {
         renderReportsSection();
     }
@@ -27276,3 +27259,995 @@ const initApp = async () => {
     await hideAppLoading(300);
 };
 document.addEventListener('DOMContentLoaded', initApp);
+const MEEDCO_CATEGORIES = [
+    {
+        category: 'بطاقات الشحن الذكية والقارئ',
+        perms: [
+            { id: 'Elec.Permissions.Cards.Charges', name: 'شحن كروت المشتركين', desc: 'إمكانية شحن كروت المشتركين وتسجيل الحركات المالية' },
+            { id: 'Elec.Permissions.Cards.ReadCard', name: 'قراءة الكارت الذكي', desc: 'استدعاء بيانات العداد والكارت من قارئ البطاقات' },
+            { id: 'Elec.Permissions.Cards.WriteCard', name: 'كتابة الرصيد على الكارت', desc: 'تحديث الشريحة الذكية بكود الرصيد والمطابقة' },
+            { id: 'Elec.Permissions.Cards.Controls.Renew', name: 'إصدار وتجديد كروت التحكم', desc: 'استخراج كروت التحكم للفنيين وفحص العدادات' },
+            { id: 'Elec.Permissions.Cards.ClearCard', name: 'مسح وتصفير الكروت', desc: 'إجراء مسح مباشر للبطاقات الذكية وإعادتها لحالة المصنع' },
+            { id: 'Elec.Permissions.Cards.MeterMovements', name: 'سجل حركات الشحن للعداد', desc: 'الاطلاع على جميع حركات الشحن السابقة للكارت' }
+        ]
+    },
+    {
+        category: 'الماليات والديون والأقساط',
+        perms: [
+            { id: 'Elec.Permissions.Financials.Debts', name: 'عرض وإدارة ديون المشتركين', desc: 'الاطلاع على جدول مديونيات المشتركين وأرصدة العدادات' },
+            { id: 'Elec.Permissions.Financials.Debts.DelayChargeDebt', name: 'تأجيل سداد الديون لهذه الشحنة', desc: 'تفعيل خيار تأجيل ديون المشترك لشحنة محددة' },
+            { id: 'Elec.Permissions.Financials.Debts.DelaySelectedChargeDebt', name: 'تأجيل أقساط محددة بالجدول', desc: 'جدولة وتأجيل قسط معين لمدة تصل إلى 180 يوماً' },
+            { id: 'Elec.Permissions.Financials.Debts.Add', name: 'إضافة دين / قسط جديد', desc: 'تسجيل مديونية جديدة على عداد المشترك' },
+            { id: 'Elec.Permissions.Financials.Debts.Adjusting', name: 'تسوية الأقساط والديون', desc: 'تعديل أو خصم أو إعادة جدولة مبالغ الأقساط' },
+            { id: 'Elec.Permissions.Financials.Debts.Pay', name: 'سداد الأقساط نقدياً', desc: 'تحصيل وسداد الديون دون الحاجة للشحن' },
+            { id: 'Elec.Permissions.Financials.Fees', name: 'إدارة الرسوم الإدارية والدمغات', desc: 'التحكم في رسوم النظافة والدمغات المقررة' },
+            { id: 'Elec.Permissions.Financials.Credits', name: 'إدارة الدفعات والأرصدة الدائنة', desc: 'معالجة المبالغ المحصلة مقدماً ورصيد المشترك' }
+        ]
+    },
+    {
+        category: 'المشتركين وإجراءات الخدمة',
+        perms: [
+            { id: 'Elec.Permissions.CustomerActions.BasicInformation', name: 'عرض وتعديل بيانات المشترك', desc: 'الوصول لملف المشترك وتعديل الاسم والنشاط والعنوان' },
+            { id: 'Elec.Permissions.CustomerActions.ChangeMeter', name: 'تغيير واستبدال العداد', desc: 'إجراءات استبدال العداد التالف أو المعطوب' },
+            { id: 'Elec.Permissions.CustomerActions.MoveCustomer', name: 'نقل المشترك وتعديل المكان', desc: 'تغيير الوصف المكاني والإدارة التابع لها العداد' },
+            { id: 'Elec.Permissions.CustomerActions.TransferCharge', name: 'نقل وتحويل الشحنة', desc: 'تحويل رصيد شحنة تم إدخالها بالخطأ' },
+            { id: 'Elec.Permissions.CustomerActions.NewCardWithCharge', name: 'إصدار كارت بدل فاقد بشحن', desc: 'استخراج شريحة جديدة مع نقل الرصيد والشحن' }
+        ]
+    },
+    {
+        category: 'العدادات والمخالفات والتلاعب',
+        perms: [
+            { id: 'Elec.Permissions.Meters.MeterMovements', name: 'سجل حركات وتشغيل العدادات', desc: 'متابعة تاريخ تركيب ورفع وصيانة العدادات' },
+            { id: 'Elec.Permissions.CustomizeAbuses', name: 'إدارة غرامات التلاعب والتجاوز', desc: 'تطبيق وإلغاء غرامات فتح الغطاء والتلاعب بالعداد' },
+            { id: 'Elec.Permissions.TechnicalSettings.Technicians', name: 'إدارة الفنيين وفرق التركيبات', desc: 'تخصيص المهام ومتابعة كروت الفنيين' }
+        ]
+    },
+    {
+        category: 'إدارة المستخدمين والأدوار',
+        perms: [
+            { id: 'Elec.Permissions.UsersPrivileges.Users.List', name: 'استعراض قائمة الموظفين', desc: 'عرض موظفي الشركة وبيانات الدخول' },
+            { id: 'Elec.Permissions.UsersPrivileges.Users.Add', name: 'إضافة موظف ومستخدم جديد', desc: 'إنشاء حساب جديد وتعيين بيانات الدخول' },
+            { id: 'Elec.Permissions.UsersPrivileges.Users.Edit', name: 'تعديل بيانات وصلاحيات الموظف', desc: 'تعديل الفرع أو الدور أو تفعيل الحساب' },
+            { id: 'Elec.Permissions.UsersPrivileges.Users.AssignRoles', name: 'إسناد الأدوار الوظيفية', desc: 'ربط الموظف بالدور المناسب' },
+            { id: 'Elec.Permissions.UsersPrivileges.Roles.Add', name: 'إنشاء وتعديل الأدوار الوظيفية', desc: 'تحديد مسميات الأدوار ونطاق صلاحياتها' }
+        ]
+    },
+    {
+        category: 'التقارير وسجلات الرقابة والتدقيق',
+        perms: [
+            { id: 'Elec.Permissions.Reports', name: 'استخراج التقارير التشغيلية والمالية', desc: 'طباعة وتصدير تقارير المبيعات والاستهلاك' },
+            { id: 'Elec.Permissions.UsersPrivileges.Users.Export', name: 'تصدير البيانات إلى Excel و PDF', desc: 'تحميل كشوف المشتركين والمديونيات' },
+            { id: 'Elec.Permissions.AuditLog', name: 'سجل تدقيق وتتبع التغييرات', desc: 'مراقبة كافة التعديلات وعمليات النظام' }
+        ]
+    }
+];
+let meedcoStaffList = [];
+let meedcoRolesList = [];
+let meedcoStaffAuditLog = [];
+let activeSelectedRoleId = 'role-admin';
+let activeEditingUserPermsId = null;
+let techniciansSectionInitialized = false;
+const initMeedcoStaffDefaults = () => {
+    const savedRoles = localStorage.getItem('meedco_roles_list');
+    if (savedRoles) {
+        try {
+            meedcoRolesList = JSON.parse(savedRoles);
+        }
+        catch (e) {
+            meedcoRolesList = [];
+        }
+    }
+    if (!meedcoRolesList || meedcoRolesList.length === 0) {
+        const allPermIds = MEEDCO_CATEGORIES.flatMap(c => c.perms.map(p => p.id));
+        meedcoRolesList = [
+            {
+                id: 'role-admin',
+                nameAr: 'مدير المنظومة (System Administrator)',
+                nameEn: 'System Administrator',
+                desc: 'صلاحيات كاملة وغير مقيدة على كافة أقسام المنظومة والبطاقات والماليات والمستخدمين',
+                permissions: [...allPermIds]
+            },
+            {
+                id: 'role-charging',
+                nameAr: 'مسؤول شحن الكروت الذكية',
+                nameEn: 'Smart Card Charging Officer',
+                desc: 'قراءة وشحن الكروت الذكية، تأجيل الديون والأقساط، طباعة الإيصالات',
+                permissions: [
+                    'Elec.Permissions.Cards.Charges',
+                    'Elec.Permissions.Cards.ReadCard',
+                    'Elec.Permissions.Cards.WriteCard',
+                    'Elec.Permissions.Financials.Debts',
+                    'Elec.Permissions.Financials.Debts.DelayChargeDebt',
+                    'Elec.Permissions.Financials.Debts.DelaySelectedChargeDebt',
+                    'Elec.Permissions.Financials.Fees',
+                    'Elec.Permissions.Financials.Credits',
+                    'Elec.Permissions.CustomerActions.BasicInformation',
+                    'Elec.Permissions.Reports'
+                ]
+            },
+            {
+                id: 'role-tech',
+                nameAr: 'فني تركيبات وهندسة العدادات',
+                nameEn: 'Meter Technician & Engineering',
+                desc: 'إصدار كروت التحكم، فحص العدادات، استبدال العدادات وإثبات المخالفات',
+                permissions: [
+                    'Elec.Permissions.Cards.ReadCard',
+                    'Elec.Permissions.Cards.Controls.Renew',
+                    'Elec.Permissions.Meters.MeterMovements',
+                    'Elec.Permissions.CustomizeAbuses',
+                    'Elec.Permissions.TechnicalSettings.Technicians',
+                    'Elec.Permissions.CustomerActions.ChangeMeter'
+                ]
+            },
+            {
+                id: 'role-finance',
+                nameAr: 'محصل ومراجع مالي',
+                nameEn: 'Financial Collector & Auditor',
+                desc: 'إدارة الديون والأقساط، تسوية المبالغ، ومراجعة سجلات التحصيل والخزينة',
+                permissions: [
+                    'Elec.Permissions.Financials.Debts',
+                    'Elec.Permissions.Financials.Debts.Add',
+                    'Elec.Permissions.Financials.Debts.Adjusting',
+                    'Elec.Permissions.Financials.Debts.Pay',
+                    'Elec.Permissions.Financials.Fees',
+                    'Elec.Permissions.Financials.Credits',
+                    'Elec.Permissions.Reports'
+                ]
+            },
+            {
+                id: 'role-auditor',
+                nameAr: 'مراقب جودة وتدقيق إداري',
+                nameEn: 'Quality & Audit Controller',
+                desc: 'استعراض التقارير وسجلات التدقيق دون صلاحيات التعديل المالي المباشر',
+                permissions: [
+                    'Elec.Permissions.Reports',
+                    'Elec.Permissions.AuditLog',
+                    'Elec.Permissions.UsersPrivileges.Users.List',
+                    'Elec.Permissions.UsersPrivileges.Users.Export',
+                    'Elec.Permissions.CustomerActions.BasicInformation'
+                ]
+            }
+        ];
+        localStorage.setItem('meedco_roles_list', JSON.stringify(meedcoRolesList));
+    }
+    const savedStaff = localStorage.getItem('meedco_staff_list');
+    if (savedStaff) {
+        try {
+            meedcoStaffList = JSON.parse(savedStaff);
+        }
+        catch (e) {
+            meedcoStaffList = [];
+        }
+    }
+    if (!meedcoStaffList || meedcoStaffList.length === 0) {
+        meedcoStaffList = [
+            {
+                id: 'staff-1',
+                nameAr: 'م. أحمد مصطفى إبراهيم',
+                nameEn: 'Ahmed Mostafa Ibrahim',
+                username: 'ahmed.admin',
+                nationalId: '28905151800112',
+                email: 'ahmed.admin@meedco.gov.eg',
+                phone: '01001234567',
+                roleId: 'role-admin',
+                roleName: 'مدير المنظومة (System Administrator)',
+                publicAdmin: 'قطاع توزيع المنيا',
+                subAdmin: 'هندسة المنيا شرق',
+                rechargeCenter: 'مركز شحن المنيا الرئيسي',
+                isActive: true,
+                hasAuthorityToMonitorCompanyFlag: true,
+                createdAt: '2026-01-01'
+            },
+            {
+                id: 'staff-2',
+                nameAr: 'محمود حسن عبد الله',
+                nameEn: 'Mahmoud Hassan Abdullah',
+                username: 'mahmoud.charge',
+                nationalId: '29208202400345',
+                email: 'mahmoud.charge@meedco.gov.eg',
+                phone: '01123456789',
+                roleId: 'role-charging',
+                roleName: 'مسؤول شحن الكروت الذكية',
+                publicAdmin: 'قطاع توزيع المنيا',
+                subAdmin: 'هندسة ملوي',
+                rechargeCenter: 'مركز شحن ملوي',
+                isActive: true,
+                hasAuthorityToMonitorCompanyFlag: false,
+                createdAt: '2026-02-15'
+            },
+            {
+                id: 'staff-3',
+                nameAr: 'محمد علي الشريف',
+                nameEn: 'Mohamed Ali El-Sherif',
+                username: 'mohamed.tech',
+                nationalId: '29503102100876',
+                email: 'mohamed.tech@meedco.gov.eg',
+                phone: '01234567890',
+                roleId: 'role-tech',
+                roleName: 'فني تركيبات وهندسة العدادات',
+                publicAdmin: 'قطاع توزيع بني سويف',
+                subAdmin: 'هندسة بني سويف غرب',
+                rechargeCenter: 'مركز شحن بني سويف',
+                isActive: true,
+                hasAuthorityToMonitorCompanyFlag: false,
+                createdAt: '2026-03-10'
+            }
+        ];
+        localStorage.setItem('meedco_staff_list', JSON.stringify(meedcoStaffList));
+    }
+    const savedAudit = localStorage.getItem('meedco_staff_audit_log');
+    if (savedAudit) {
+        try {
+            meedcoStaffAuditLog = JSON.parse(savedAudit);
+        }
+        catch (e) {
+            meedcoStaffAuditLog = [];
+        }
+    }
+    if (!meedcoStaffAuditLog || meedcoStaffAuditLog.length === 0) {
+        meedcoStaffAuditLog = [
+            {
+                id: 'AUD-01',
+                timestamp: new Date().toLocaleString('ar-EG'),
+                action: 'تهيئة صلاحيات المنظومة الموحدة',
+                target: 'كافة الأدوار الوظيفية',
+                details: 'تحديث شجرة صلاحيات MEEDCO الإنتاجية وإسنادها للأدوار',
+                changedBy: 'النظام'
+            }
+        ];
+        localStorage.setItem('meedco_staff_audit_log', JSON.stringify(meedcoStaffAuditLog));
+    }
+};
+const recordStaffAudit = (action, target, details) => {
+    const entry = {
+        id: 'AUD-' + Date.now(),
+        timestamp: new Date().toLocaleString('ar-EG'),
+        action,
+        target,
+        details,
+        changedBy: 'النظام' // STRICT: ALWAYS 'النظام' as user requested
+    };
+    meedcoStaffAuditLog.unshift(entry);
+    localStorage.setItem('meedco_staff_audit_log', JSON.stringify(meedcoStaffAuditLog));
+    // Also log into global state.activityLog with 'النظام'
+    logActivity(action, details, `الهدف: ${target} | المنفذ: النظام`, 'النظام');
+};
+const renderTechniciansSection = () => {
+    initMeedcoStaffDefaults();
+    if (!techniciansSectionInitialized) {
+        initTechniciansSectionListeners();
+        techniciansSectionInitialized = true;
+    }
+    updateTechniciansKPIs();
+    renderStaffTable();
+    renderRolesCards();
+    renderPermissionsTreeForActiveRole();
+    renderStaffAuditLogTable();
+    populateStaffRoleDropdowns();
+};
+const updateTechniciansKPIs = () => {
+    const totalStaffEl = document.getElementById('tech-kpi-total-staff');
+    const activeStaffEl = document.getElementById('tech-kpi-active-staff');
+    const totalRolesEl = document.getElementById('tech-kpi-total-roles');
+    const totalPermsEl = document.getElementById('tech-kpi-total-perms');
+    if (totalStaffEl)
+        totalStaffEl.textContent = String(meedcoStaffList.length);
+    if (activeStaffEl)
+        activeStaffEl.textContent = String(meedcoStaffList.filter(s => s.isActive).length);
+    if (totalRolesEl)
+        totalRolesEl.textContent = String(meedcoRolesList.length);
+    const allUniquePerms = new Set(meedcoRolesList.flatMap(r => r.permissions));
+    if (totalPermsEl)
+        totalPermsEl.textContent = String(allUniquePerms.size);
+};
+const populateStaffRoleDropdowns = () => {
+    const filterRole = document.getElementById('tech-filter-role');
+    const formRole = document.getElementById('tech-staff-role-select');
+    const filterBranch = document.getElementById('tech-filter-branch');
+    if (filterRole) {
+        const curVal = filterRole.value;
+        filterRole.innerHTML = '<option value="">كل الأدوار</option>';
+        meedcoRolesList.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r.id;
+            opt.textContent = r.nameAr;
+            filterRole.appendChild(opt);
+        });
+        filterRole.value = curVal;
+    }
+    if (formRole) {
+        formRole.innerHTML = '';
+        meedcoRolesList.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r.id;
+            opt.textContent = r.nameAr;
+            formRole.appendChild(opt);
+        });
+    }
+    if (filterBranch) {
+        const curVal = filterBranch.value;
+        filterBranch.innerHTML = '<option value="">كل الإدارات والفروع</option>';
+        const branches = Array.from(new Set(meedcoStaffList.map(s => s.subAdmin).filter(Boolean)));
+        branches.forEach(b => {
+            const opt = document.createElement('option');
+            opt.value = String(b);
+            opt.textContent = String(b);
+            filterBranch.appendChild(opt);
+        });
+        filterBranch.value = curVal;
+    }
+};
+const renderStaffTable = () => {
+    var _a, _b, _c, _d;
+    const tbody = document.getElementById('tech-staff-tbody');
+    if (!tbody)
+        return;
+    const searchVal = (((_a = document.getElementById('tech-search-input')) === null || _a === void 0 ? void 0 : _a.value) || '').toLowerCase().trim();
+    const roleVal = ((_b = document.getElementById('tech-filter-role')) === null || _b === void 0 ? void 0 : _b.value) || '';
+    const branchVal = ((_c = document.getElementById('tech-filter-branch')) === null || _c === void 0 ? void 0 : _c.value) || '';
+    const statusVal = ((_d = document.getElementById('tech-filter-status')) === null || _d === void 0 ? void 0 : _d.value) || '';
+    const filtered = meedcoStaffList.filter(s => {
+        if (roleVal && s.roleId !== roleVal)
+            return false;
+        if (branchVal && s.subAdmin !== branchVal)
+            return false;
+        if (statusVal === 'active' && !s.isActive)
+            return false;
+        if (statusVal === 'inactive' && s.isActive)
+            return false;
+        if (searchVal) {
+            const matches = (s.nameAr && s.nameAr.toLowerCase().includes(searchVal)) ||
+                (s.nameEn && s.nameEn.toLowerCase().includes(searchVal)) ||
+                (s.username && s.username.toLowerCase().includes(searchVal)) ||
+                (s.nationalId && s.nationalId.includes(searchVal)) ||
+                (s.phone && s.phone.includes(searchVal));
+            if (!matches)
+                return false;
+        }
+        return true;
+    });
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748b;">لا يوجد موظفون يطابقون معايير البحث.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = filtered.map(s => `
+            <tr style="border-bottom: 1px solid #f1f5f9; hover: background: #f8fafc;">
+                <td style="padding: 12px 16px;">
+                    <div style="font-weight: 700; color: #0f172a;">${s.nameAr}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">${s.nameEn || ''}</div>
+                </td>
+                <td style="padding: 12px 16px;">
+                    <span style="font-family: monospace; background: #f1f5f9; padding: 4px 8px; border-radius: 6px; font-weight: 600; color: #0284c7;">${s.username}</span>
+                </td>
+                <td style="padding: 12px 16px;">
+                    <div style="font-family: monospace; color: #334155;">${s.nationalId || '-'}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">${s.phone || '-'}</div>
+                </td>
+                <td style="padding: 12px 16px;">
+                    <div style="font-weight: 600; color: #334155;">${s.subAdmin || '-'}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">${s.publicAdmin || ''}</div>
+                </td>
+                <td style="padding: 12px 16px;">
+                    <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">${s.roleName}</span>
+                </td>
+                <td style="padding: 12px 16px; text-align: center;">
+                    <span style="padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; ${s.isActive ? 'background: #dcfce7; color: #166534;' : 'background: #fee2e2; color: #991b1b;'}">
+                        ${s.isActive ? 'نشط' : 'معطل'}
+                    </span>
+                </td>
+                <td style="padding: 12px 16px; text-align: center;">
+                    <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                        <button type="button" class="btn-tech-edit-staff" data-id="${s.id}" title="تعديل بيانات الموظف" style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: #0284c7; font-weight: 600; font-size: 0.8rem;">تعديل</button>
+                        <button type="button" class="btn-tech-user-perms" data-id="${s.id}" title="تخصيص الصلاحيات المباشرة" style="background: #f0fdf4; border: 1px solid #86efac; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: #16a34a; font-weight: 600; font-size: 0.8rem;">الصلاحيات</button>
+                        <button type="button" class="btn-tech-toggle-status" data-id="${s.id}" title="${s.isActive ? 'تعطيل الحساب' : 'تفعيل الحساب'}" style="background: #fff7ed; border: 1px solid #fed7aa; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: #c2410c; font-weight: 600; font-size: 0.8rem;">${s.isActive ? 'تعطيل' : 'تفعيل'}</button>
+                        <button type="button" class="btn-tech-delete-staff" data-id="${s.id}" title="حذف الموظف" style="background: #fef2f2; border: 1px solid #fecaca; padding: 6px 8px; border-radius: 6px; cursor: pointer; color: #dc2626; font-weight: 700; font-size: 0.85rem;">&times;</button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    // Bind Action Buttons
+    tbody.querySelectorAll('.btn-tech-edit-staff').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            if (id)
+                openEditStaffModal(id);
+        });
+    });
+    tbody.querySelectorAll('.btn-tech-user-perms').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            if (id)
+                openUserDirectPermsModal(id);
+        });
+    });
+    tbody.querySelectorAll('.btn-tech-toggle-status').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            if (id)
+                toggleStaffStatus(id);
+        });
+    });
+    tbody.querySelectorAll('.btn-tech-delete-staff').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            if (id)
+                deleteStaffMember(id);
+        });
+    });
+};
+const renderRolesCards = () => {
+    const container = document.getElementById('tech-roles-cards-container');
+    if (!container)
+        return;
+    container.innerHTML = meedcoRolesList.map(r => {
+        const isSelected = r.id === activeSelectedRoleId;
+        return `
+                <div class="tech-role-card ${isSelected ? 'active' : ''}" data-role-id="${r.id}" style="padding: 12px 14px; border-radius: 8px; border: ${isSelected ? '2px solid #0284c7' : '1px solid #e2e8f0'}; background: ${isSelected ? '#f0f9ff' : '#ffffff'}; cursor: pointer; transition: all 0.2s;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <strong style="color: ${isSelected ? '#0284c7' : '#0f172a'}; font-size: 0.95rem;">${r.nameAr}</strong>
+                        <span style="font-size: 0.75rem; background: ${isSelected ? '#bae6fd' : '#f1f5f9'}; color: ${isSelected ? '#0369a1' : '#475569'}; padding: 2px 8px; border-radius: 12px; font-weight: 700;">${r.permissions.length} صلاحية</span>
+                    </div>
+                    <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">${r.desc || ''}</div>
+                </div>
+            `;
+    }).join('');
+    container.querySelectorAll('.tech-role-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            const rId = e.currentTarget.getAttribute('data-role-id');
+            if (rId) {
+                activeSelectedRoleId = rId;
+                renderRolesCards();
+                renderPermissionsTreeForActiveRole();
+            }
+        });
+    });
+};
+const renderPermissionsTreeForActiveRole = () => {
+    const role = meedcoRolesList.find(r => r.id === activeSelectedRoleId);
+    if (!role)
+        return;
+    const titleEl = document.getElementById('tech-active-role-title');
+    const descEl = document.getElementById('tech-active-role-desc');
+    if (titleEl)
+        titleEl.textContent = `صلاحيات الدور: ${role.nameAr}`;
+    if (descEl)
+        descEl.textContent = role.desc || 'التحكم في حزم الصلاحيات المخصصة لهذا الدور الوظيفي';
+    const treeContainer = document.getElementById('tech-permissions-tree-container');
+    if (!treeContainer)
+        return;
+    treeContainer.innerHTML = MEEDCO_CATEGORIES.map(cat => {
+        const permsHtml = cat.perms.map(p => {
+            const isChecked = role.permissions.includes(p.id);
+            return `
+                    <label style="display: flex; align-items: start; gap: 10px; padding: 8px 10px; background: #ffffff; border: 1px solid #f1f5f9; border-radius: 6px; cursor: pointer; transition: background 0.15s;">
+                        <input type="checkbox" class="cb-tech-perm-item" value="${p.id}" ${isChecked ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: #0284c7; margin-top: 2px;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 700; font-size: 0.9rem; color: #1e293b;">${p.name}</div>
+                            <div style="font-size: 0.78rem; color: #64748b; font-family: monospace;">${p.id}</div>
+                            <div style="font-size: 0.8rem; color: #475569; margin-top: 2px;">${p.desc}</div>
+                        </div>
+                    </label>
+                `;
+        }).join('');
+        return `
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+                        <strong style="color: #0f172a; font-size: 0.95rem;">📂 ${cat.category} (${cat.perms.length})</strong>
+                        <button type="button" class="btn-toggle-cat-perms" style="background: none; border: none; color: #0284c7; font-size: 0.8rem; font-weight: 700; cursor: pointer;">تحديد هذه الفئة</button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px;">
+                        ${permsHtml}
+                    </div>
+                </div>
+            `;
+    }).join('');
+    // Bind Category Toggle Buttons
+    treeContainer.querySelectorAll('.btn-toggle-cat-perms').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            var _a;
+            const catBox = (_a = e.currentTarget.closest('div')) === null || _a === void 0 ? void 0 : _a.parentElement;
+            if (catBox) {
+                const cbs = catBox.querySelectorAll('.cb-tech-perm-item');
+                const allChecked = Array.from(cbs).every(cb => cb.checked);
+                cbs.forEach(cb => cb.checked = !allChecked);
+            }
+        });
+    });
+};
+const renderStaffAuditLogTable = () => {
+    const tbody = document.getElementById('tech-audit-log-tbody');
+    if (!tbody)
+        return;
+    if (meedcoStaffAuditLog.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #64748b;">لا توجد سجلات تدقيق حتى الآن.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = meedcoStaffAuditLog.slice(0, 50).map(entry => `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px 14px; font-family: monospace; font-size: 0.85rem; color: #475569;">${entry.timestamp}</td>
+                <td style="padding: 10px 14px; font-weight: 700; color: #1e293b;">${entry.action}</td>
+                <td style="padding: 10px 14px; color: #0284c7; font-weight: 600;">${entry.target}</td>
+                <td style="padding: 10px 14px; font-size: 0.85rem; color: #334155;">${entry.details}</td>
+                <td style="padding: 10px 14px; text-align: center;">
+                    <span style="background: #e0f2fe; color: #0284c7; padding: 4px 12px; border-radius: 12px; font-weight: 800; font-size: 0.85rem;">${entry.changedBy || 'النظام'}</span>
+                </td>
+            </tr>
+        `).join('');
+};
+const openEditStaffModal = (staffId) => {
+    const staff = meedcoStaffList.find(s => s.id === staffId);
+    if (!staff)
+        return;
+    const modal = document.getElementById('modal-tech-staff-form');
+    const titleEl = document.getElementById('modal-tech-staff-title');
+    const editIdInp = document.getElementById('tech-staff-edit-id');
+    const nameArInp = document.getElementById('tech-staff-name-ar');
+    const nameEnInp = document.getElementById('tech-staff-name-en');
+    const usernameInp = document.getElementById('tech-staff-username');
+    const natIdInp = document.getElementById('tech-staff-national-id');
+    const emailInp = document.getElementById('tech-staff-email');
+    const phoneInp = document.getElementById('tech-staff-phone');
+    const roleSelect = document.getElementById('tech-staff-role-select');
+    const pubAdminInp = document.getElementById('tech-staff-general-admin');
+    const subAdminInp = document.getElementById('tech-staff-sub-admin');
+    const centerInp = document.getElementById('tech-staff-recharge-center');
+    const activeCb = document.getElementById('tech-staff-is-active');
+    const monitorCb = document.getElementById('tech-staff-monitor-flag');
+    const passRow = document.getElementById('tech-staff-password-row');
+    if (titleEl)
+        titleEl.textContent = 'تعديل بيانات الموظف (MEEDCO)';
+    if (editIdInp)
+        editIdInp.value = staff.id;
+    if (nameArInp)
+        nameArInp.value = staff.nameAr || '';
+    if (nameEnInp)
+        nameEnInp.value = staff.nameEn || '';
+    if (usernameInp)
+        usernameInp.value = staff.username || '';
+    if (natIdInp)
+        natIdInp.value = staff.nationalId || '';
+    if (emailInp)
+        emailInp.value = staff.email || '';
+    if (phoneInp)
+        phoneInp.value = staff.phone || '';
+    if (roleSelect)
+        roleSelect.value = staff.roleId || '';
+    if (pubAdminInp)
+        pubAdminInp.value = staff.publicAdmin || '';
+    if (subAdminInp)
+        subAdminInp.value = staff.subAdmin || '';
+    if (centerInp)
+        centerInp.value = staff.rechargeCenter || '';
+    if (activeCb)
+        activeCb.checked = staff.isActive;
+    if (monitorCb)
+        monitorCb.checked = !!staff.hasAuthorityToMonitorCompanyFlag;
+    // Hide password requirement on edit
+    if (passRow)
+        passRow.style.display = 'none';
+    if (modal)
+        modal.style.display = 'flex';
+};
+const openAddStaffModal = () => {
+    const modal = document.getElementById('modal-tech-staff-form');
+    const titleEl = document.getElementById('modal-tech-staff-title');
+    const form = document.getElementById('tech-staff-form');
+    const editIdInp = document.getElementById('tech-staff-edit-id');
+    const passRow = document.getElementById('tech-staff-password-row');
+    if (form)
+        form.reset();
+    if (editIdInp)
+        editIdInp.value = '';
+    if (titleEl)
+        titleEl.textContent = 'إضافة موظف / مستخدم جديد (MEEDCO)';
+    if (passRow)
+        passRow.style.display = 'grid';
+    if (modal)
+        modal.style.display = 'flex';
+};
+const toggleStaffStatus = (staffId) => {
+    const staff = meedcoStaffList.find(s => s.id === staffId);
+    if (!staff)
+        return;
+    staff.isActive = !staff.isActive;
+    localStorage.setItem('meedco_staff_list', JSON.stringify(meedcoStaffList));
+    const actionText = staff.isActive ? 'تفعيل حساب موظف' : 'تعطيل حساب موظف';
+    recordStaffAudit(actionText, staff.nameAr, `تم تغيير حالة الموظف ${staff.nameAr} (${staff.username}) إلى ${staff.isActive ? 'نشط' : 'معطل'}`);
+    updateTechniciansKPIs();
+    renderStaffTable();
+    showToast(`تم ${staff.isActive ? 'تفعيل' : 'تعطيل'} حساب الموظف بنجاح!`, 'success');
+};
+const deleteStaffMember = (staffId) => {
+    const staff = meedcoStaffList.find(s => s.id === staffId);
+    if (!staff)
+        return;
+    if (!confirm(`هل أنت متأكد من حذف الموظف "${staff.nameAr}" نهائياً من المنظومة؟`))
+        return;
+    meedcoStaffList = meedcoStaffList.filter(s => s.id !== staffId);
+    localStorage.setItem('meedco_staff_list', JSON.stringify(meedcoStaffList));
+    recordStaffAudit('حذف موظف', staff.nameAr, `تم حذف الموظف ${staff.nameAr} (${staff.username}) من قاعدة البيانات`);
+    updateTechniciansKPIs();
+    renderStaffTable();
+    showToast('تم حذف الموظف بنجاح!', 'success');
+};
+const openUserDirectPermsModal = (staffId) => {
+    const staff = meedcoStaffList.find(s => s.id === staffId);
+    if (!staff)
+        return;
+    activeEditingUserPermsId = staffId;
+    const modal = document.getElementById('modal-tech-user-perms');
+    const titleEl = document.getElementById('tech-user-perms-modal-title');
+    const subEl = document.getElementById('tech-user-perms-modal-sub');
+    const treeContainer = document.getElementById('tech-user-perms-tree');
+    if (titleEl)
+        titleEl.textContent = `صلاحيات الموظف: ${staff.nameAr}`;
+    if (subEl)
+        subEl.textContent = `الدور الأساسي: ${staff.roleName} | اسم المستخدم: ${staff.username}`;
+    const role = meedcoRolesList.find(r => r.id === staff.roleId);
+    const basePerms = role ? role.permissions : [];
+    const userPerms = staff.customPermissions || basePerms;
+    if (treeContainer) {
+        treeContainer.innerHTML = MEEDCO_CATEGORIES.map(cat => {
+            const permsHtml = cat.perms.map(p => {
+                const isChecked = userPerms.includes(p.id);
+                return `
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer;">
+                            <input type="checkbox" class="cb-user-direct-perm" value="${p.id}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #0284c7;">
+                            <div>
+                                <span style="font-weight: 700; font-size: 0.85rem; color: #0f172a;">${p.name}</span>
+                                <small style="display: block; color: #64748b; font-size: 0.75rem;">${p.id}</small>
+                            </div>
+                        </label>
+                    `;
+            }).join('');
+            return `
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px;">
+                        <strong style="font-size: 0.9rem; color: #1e293b; display: block; margin-bottom: 6px;">${cat.category}</strong>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 6px;">
+                            ${permsHtml}
+                        </div>
+                    </div>
+                `;
+        }).join('');
+    }
+    const countBadge = document.getElementById('tech-user-perms-count-badge');
+    if (countBadge)
+        countBadge.textContent = `${userPerms.length} صلاحية مفعلة`;
+    if (modal)
+        modal.style.display = 'flex';
+};
+const printPermissionsAuditReport = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+        showToast('تعذر فتح نافذة الطباعة.', 'error');
+        return;
+    }
+    const rowsHtml = meedcoStaffAuditLog.map((log, idx) => `
+            <tr style="border-bottom: 1px solid #e2e8f0; ${idx % 2 === 1 ? 'background: #f8fafc;' : ''}">
+                <td style="padding: 8px; font-family: monospace; text-align: center;">${log.timestamp}</td>
+                <td style="padding: 8px; font-weight: bold;">${log.action}</td>
+                <td style="padding: 8px; color: #0284c7;">${log.target}</td>
+                <td style="padding: 8px;">${log.details}</td>
+                <td style="padding: 8px; text-align: center; font-weight: bold; color: #0f172a;">${log.changedBy || 'النظام'}</td>
+            </tr>
+        `).join('');
+    printWindow.document.write(`
+            <html dir="rtl" lang="ar">
+            <head>
+                <title>تقرير تدقيق الصلاحيات المعتمد - شركة مصر الوسطى لتوزيع الكهرباء</title>
+                <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800&display=swap" rel="stylesheet">
+                <style>
+                    body { font-family: 'Tajawal', sans-serif; padding: 24px; color: #0f172a; direction: rtl; text-align: right; }
+                    .header { border-bottom: 3px double #0284c7; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 11pt; }
+                    th { background: #0284c7; color: #fff; padding: 10px; text-align: right; border: 1px solid #0284c7; }
+                    td { border: 1px solid #cbd5e1; }
+                    .footer-stamps { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }
+                    .stamp-box { width: 220px; border-top: 1px dashed #475569; padding-top: 10px; font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div>
+                        <h2 style="margin: 0; color: #0f172a;">جمهورية مصر العربية - وزارة الكهرباء والطاقة المتجددة</h2>
+                        <h3 style="margin: 4px 0; color: #0284c7;">شركة مصر الوسطى لتوزيع الكهرباء (MEEDCO)</h3>
+                        <p style="margin: 0; color: #64748b; font-size: 10pt;">الإدارة العامة لنظم وتكنولوجيا المعلومات والعدادات الذكية</p>
+                    </div>
+                    <div style="text-align: left; font-size: 10pt;">
+                        <div><strong>تاريخ الاستخراج:</strong> ${new Date().toLocaleDateString('ar-EG')}</div>
+                        <div><strong>الجهة المصدرة:</strong> منظومة الرقابة الآلية</div>
+                        <div><strong>المسؤول القائم بالتعديل:</strong> <span style="font-weight: bold; color: #0284c7;">النظام</span></div>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin: 16px 0;">
+                    <h2 style="margin: 0; text-decoration: underline;">تقرير تدقيق وتعديل صلاحيات وأدوار النظام المعتمد</h2>
+                    <p style="color: #64748b; font-size: 10pt; margin: 4px 0;">سجل العمليات الصادرة والموثقة آلياً دون تدخل يدوي فردي</p>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 16%;">التاريخ والوقت</th>
+                            <th style="width: 18%;">العملية</th>
+                            <th style="width: 18%;">الهدف / الموظف</th>
+                            <th style="width: 32%;">تفاصيل التغيير</th>
+                            <th style="width: 16%; text-align: center;">القائم بالتعديل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+
+                <div class="footer-stamps">
+                    <div class="stamp-box">
+                        مراجع السجلات والرقابة
+                        <br><br><br>
+                        النظام الآلي الموحد
+                    </div>
+                    <div class="stamp-box">
+                        مدير إدارة أمن المعلومات
+                        <br><br><br>
+                        معتمد رسمياً
+                    </div>
+                    <div class="stamp-box">
+                        خاتم شعار الشركة
+                        <br><br><br>
+                        [خاتم النسر الإلكتروني]
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 400);
+};
+const initTechniciansSectionListeners = () => {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u;
+    // Tab switching
+    document.querySelectorAll('.tab-btn-tech').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const targetTabId = e.currentTarget.getAttribute('data-tech-tab');
+            if (!targetTabId)
+                return;
+            document.querySelectorAll('.tab-btn-tech').forEach(b => {
+                b.classList.remove('active');
+                b.style.color = '#64748b';
+                b.style.borderBottom = 'none';
+                b.style.fontWeight = '600';
+            });
+            e.currentTarget.classList.add('active');
+            e.currentTarget.style.color = '#0284c7';
+            e.currentTarget.style.borderBottom = '3px solid #0284c7';
+            e.currentTarget.style.fontWeight = '700';
+            document.querySelectorAll('.tech-tab-pane').forEach(p => p.style.display = 'none');
+            const targetPane = document.getElementById(targetTabId);
+            if (targetPane)
+                targetPane.style.display = 'block';
+        });
+    });
+    // Search & Filter listeners
+    ['tech-search-input', 'tech-filter-role', 'tech-filter-branch', 'tech-filter-status'].forEach(id => {
+        var _a, _b;
+        (_a = document.getElementById(id)) === null || _a === void 0 ? void 0 : _a.addEventListener('input', () => renderStaffTable());
+        (_b = document.getElementById(id)) === null || _b === void 0 ? void 0 : _b.addEventListener('change', () => renderStaffTable());
+    });
+    // Open Add Staff Modal
+    (_a = document.getElementById('btn-open-tech-staff-modal')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => openAddStaffModal());
+    // Close Staff Modal
+    (_b = document.getElementById('btn-close-tech-staff-modal')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
+        const m = document.getElementById('modal-tech-staff-form');
+        if (m)
+            m.style.display = 'none';
+    });
+    (_c = document.getElementById('btn-cancel-tech-staff')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => {
+        const m = document.getElementById('modal-tech-staff-form');
+        if (m)
+            m.style.display = 'none';
+    });
+    // Save Staff Form
+    (_d = document.getElementById('tech-staff-form')) === null || _d === void 0 ? void 0 : _d.addEventListener('submit', (e) => {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
+        e.preventDefault();
+        const editId = (_a = document.getElementById('tech-staff-edit-id')) === null || _a === void 0 ? void 0 : _a.value;
+        const nameAr = ((_b = document.getElementById('tech-staff-name-ar')) === null || _b === void 0 ? void 0 : _b.value.trim()) || '';
+        const nameEn = ((_c = document.getElementById('tech-staff-name-en')) === null || _c === void 0 ? void 0 : _c.value.trim()) || '';
+        const username = ((_d = document.getElementById('tech-staff-username')) === null || _d === void 0 ? void 0 : _d.value.trim()) || '';
+        const nationalId = ((_e = document.getElementById('tech-staff-national-id')) === null || _e === void 0 ? void 0 : _e.value.trim()) || '';
+        const email = ((_f = document.getElementById('tech-staff-email')) === null || _f === void 0 ? void 0 : _f.value.trim()) || '';
+        const phone = ((_g = document.getElementById('tech-staff-phone')) === null || _g === void 0 ? void 0 : _g.value.trim()) || '';
+        const password = ((_h = document.getElementById('tech-staff-password')) === null || _h === void 0 ? void 0 : _h.value) || '';
+        const confirmPass = ((_j = document.getElementById('tech-staff-confirm-password')) === null || _j === void 0 ? void 0 : _j.value) || '';
+        const roleId = ((_k = document.getElementById('tech-staff-role-select')) === null || _k === void 0 ? void 0 : _k.value) || 'role-charging';
+        const pubAdmin = ((_l = document.getElementById('tech-staff-general-admin')) === null || _l === void 0 ? void 0 : _l.value.trim()) || '';
+        const subAdmin = ((_m = document.getElementById('tech-staff-sub-admin')) === null || _m === void 0 ? void 0 : _m.value.trim()) || '';
+        const center = ((_o = document.getElementById('tech-staff-recharge-center')) === null || _o === void 0 ? void 0 : _o.value.trim()) || '';
+        const isActive = !!((_p = document.getElementById('tech-staff-is-active')) === null || _p === void 0 ? void 0 : _p.checked);
+        const monitorFlag = !!((_q = document.getElementById('tech-staff-monitor-flag')) === null || _q === void 0 ? void 0 : _q.checked);
+        if (!nameAr || !username) {
+            showToast('يرجى ملء الاسم باللغة العربية واسم المستخدم.', 'error');
+            return;
+        }
+        if (!editId && password !== confirmPass) {
+            showToast('كلمة المرور وتأكيد كلمة المرور غير متطابقين!', 'error');
+            return;
+        }
+        const roleObj = meedcoRolesList.find(r => r.id === roleId);
+        const roleName = roleObj ? roleObj.nameAr : 'موظف شحن';
+        if (editId) {
+            const s = meedcoStaffList.find(item => item.id === editId);
+            if (s) {
+                s.nameAr = nameAr;
+                s.nameEn = nameEn;
+                s.username = username;
+                s.nationalId = nationalId;
+                s.email = email;
+                s.phone = phone;
+                s.roleId = roleId;
+                s.roleName = roleName;
+                s.publicAdmin = pubAdmin;
+                s.subAdmin = subAdmin;
+                s.rechargeCenter = center;
+                s.isActive = isActive;
+                s.hasAuthorityToMonitorCompanyFlag = monitorFlag;
+                if (password)
+                    s.password = password;
+                recordStaffAudit('تعديل بيانات موظف', nameAr, `تم تحديث بيانات الموظف ${nameAr} (${username}) وتحديث الدور إلى ${roleName}`);
+                showToast('تم تحديث بيانات الموظف بنجاح!', 'success');
+            }
+        }
+        else {
+            const newStaff = {
+                id: 'staff-' + Date.now(),
+                nameAr,
+                nameEn,
+                username,
+                nationalId,
+                email,
+                phone,
+                password,
+                roleId,
+                roleName,
+                publicAdmin: pubAdmin,
+                subAdmin: subAdmin,
+                rechargeCenter: center,
+                isActive,
+                hasAuthorityToMonitorCompanyFlag: monitorFlag,
+                createdAt: new Date().toISOString().slice(0, 10)
+            };
+            meedcoStaffList.push(newStaff);
+            recordStaffAudit('إضافة موظف جديد', nameAr, `تم إنشاء حساب الموظف ${nameAr} باسم مستخدم ${username} وإسناد دور ${roleName}`);
+            showToast('تمت إضافة الموظف الجديد بنجاح!', 'success');
+        }
+        localStorage.setItem('meedco_staff_list', JSON.stringify(meedcoStaffList));
+        const m = document.getElementById('modal-tech-staff-form');
+        if (m)
+            m.style.display = 'none';
+        updateTechniciansKPIs();
+        renderStaffTable();
+        populateStaffRoleDropdowns();
+    });
+    // Open Add Role Modal
+    (_e = document.getElementById('btn-open-tech-role-modal')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => {
+        const m = document.getElementById('modal-tech-role-form');
+        const f = document.getElementById('tech-role-form');
+        if (f)
+            f.reset();
+        if (m)
+            m.style.display = 'flex';
+    });
+    (_f = document.getElementById('btn-quick-add-role')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
+        const m = document.getElementById('modal-tech-role-form');
+        const f = document.getElementById('tech-role-form');
+        if (f)
+            f.reset();
+        if (m)
+            m.style.display = 'flex';
+    });
+    // Close Role Modal
+    (_g = document.getElementById('btn-close-tech-role-modal')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
+        const m = document.getElementById('modal-tech-role-form');
+        if (m)
+            m.style.display = 'none';
+    });
+    (_h = document.getElementById('btn-cancel-tech-role')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', () => {
+        const m = document.getElementById('modal-tech-role-form');
+        if (m)
+            m.style.display = 'none';
+    });
+    // Save New Role
+    (_j = document.getElementById('tech-role-form')) === null || _j === void 0 ? void 0 : _j.addEventListener('submit', (e) => {
+        var _a, _b, _c;
+        e.preventDefault();
+        const nameAr = ((_a = document.getElementById('tech-role-name-ar')) === null || _a === void 0 ? void 0 : _a.value.trim()) || '';
+        const nameEn = ((_b = document.getElementById('tech-role-name-en')) === null || _b === void 0 ? void 0 : _b.value.trim()) || '';
+        const desc = ((_c = document.getElementById('tech-role-desc')) === null || _c === void 0 ? void 0 : _c.value.trim()) || '';
+        if (!nameAr) {
+            showToast('يرجى إدخال اسم الدور بالعربية.', 'error');
+            return;
+        }
+        const newRole = {
+            id: 'role-' + Date.now(),
+            nameAr,
+            nameEn,
+            desc,
+            permissions: [
+                'Elec.Permissions.Cards.Charges',
+                'Elec.Permissions.Cards.ReadCard',
+                'Elec.Permissions.CustomerActions.BasicInformation'
+            ]
+        };
+        meedcoRolesList.push(newRole);
+        localStorage.setItem('meedco_roles_list', JSON.stringify(meedcoRolesList));
+        recordStaffAudit('إنشاء دور وظيفي جديد', nameAr, `تم إنشاء دور جديد: "${nameAr}" مع صلاحيات شحن وقراءة واستعلام أساسية`);
+        activeSelectedRoleId = newRole.id;
+        updateTechniciansKPIs();
+        renderRolesCards();
+        renderPermissionsTreeForActiveRole();
+        populateStaffRoleDropdowns();
+        const m = document.getElementById('modal-tech-role-form');
+        if (m)
+            m.style.display = 'none';
+        showToast('تم إنشاء الدور الوظيفي بنجاح!', 'success');
+    });
+    // Select All / Deselect All Role Permissions
+    (_k = document.getElementById('btn-select-all-tech-perms')) === null || _k === void 0 ? void 0 : _k.addEventListener('click', () => {
+        document.querySelectorAll('.cb-tech-perm-item').forEach(cb => cb.checked = true);
+    });
+    (_l = document.getElementById('btn-deselect-all-tech-perms')) === null || _l === void 0 ? void 0 : _l.addEventListener('click', () => {
+        document.querySelectorAll('.cb-tech-perm-item').forEach(cb => cb.checked = false);
+    });
+    // Save Role Permissions
+    (_m = document.getElementById('btn-save-role-perms')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', () => {
+        const role = meedcoRolesList.find(r => r.id === activeSelectedRoleId);
+        if (!role)
+            return;
+        const selectedPerms = Array.from(document.querySelectorAll('.cb-tech-perm-item:checked')).map(cb => cb.value);
+        role.permissions = selectedPerms;
+        localStorage.setItem('meedco_roles_list', JSON.stringify(meedcoRolesList));
+        recordStaffAudit('تحديث صلاحيات الدور', role.nameAr, `تم تعديل وحفظ صلاحيات الدور "${role.nameAr}". إجمالي الصلاحيات المفعلة: ${selectedPerms.length}`);
+        renderRolesCards();
+        updateTechniciansKPIs();
+        showToast(`تم حفظ صلاحيات الدور "${role.nameAr}" بنجاح! (${selectedPerms.length} صلاحية)`, 'success');
+    });
+    // User Direct Perms Save & Select All
+    (_o = document.getElementById('btn-user-select-all-perms')) === null || _o === void 0 ? void 0 : _o.addEventListener('click', () => {
+        document.querySelectorAll('.cb-user-direct-perm').forEach(cb => cb.checked = true);
+    });
+    (_p = document.getElementById('btn-user-deselect-all-perms')) === null || _p === void 0 ? void 0 : _p.addEventListener('click', () => {
+        document.querySelectorAll('.cb-user-direct-perm').forEach(cb => cb.checked = false);
+    });
+    (_q = document.getElementById('btn-close-tech-user-perms')) === null || _q === void 0 ? void 0 : _q.addEventListener('click', () => {
+        const m = document.getElementById('modal-tech-user-perms');
+        if (m)
+            m.style.display = 'none';
+    });
+    (_r = document.getElementById('btn-cancel-tech-user-perms')) === null || _r === void 0 ? void 0 : _r.addEventListener('click', () => {
+        const m = document.getElementById('modal-tech-user-perms');
+        if (m)
+            m.style.display = 'none';
+    });
+    (_s = document.getElementById('btn-save-user-direct-perms')) === null || _s === void 0 ? void 0 : _s.addEventListener('click', () => {
+        if (!activeEditingUserPermsId)
+            return;
+        const staff = meedcoStaffList.find(s => s.id === activeEditingUserPermsId);
+        if (!staff)
+            return;
+        const selected = Array.from(document.querySelectorAll('.cb-user-direct-perm:checked')).map(cb => cb.value);
+        staff.customPermissions = selected;
+        localStorage.setItem('meedco_staff_list', JSON.stringify(meedcoStaffList));
+        recordStaffAudit('تخصيص صلاحيات استثنائية لموظف', staff.nameAr, `تم حفظ ${selected.length} صلاحية مخصصة ومباشرة للموظف ${staff.nameAr}`);
+        const m = document.getElementById('modal-tech-user-perms');
+        if (m)
+            m.style.display = 'none';
+        showToast(`تم حفظ الصلاحيات المباشرة للموظف "${staff.nameAr}" بنجاح!`, 'success');
+    });
+    // Print Audit Reports
+    (_t = document.getElementById('btn-print-tech-audit-report')) === null || _t === void 0 ? void 0 : _t.addEventListener('click', () => printPermissionsAuditReport());
+    (_u = document.getElementById('btn-print-audit-table')) === null || _u === void 0 ? void 0 : _u.addEventListener('click', () => printPermissionsAuditReport());
+};
