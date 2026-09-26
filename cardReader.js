@@ -31,6 +31,7 @@ module.exports = {
     clearSmartCard: nativeEngine.clearSmartCard,
     issueReplacementWithoutCharge: nativeEngine.issueReplacementWithoutCharge,
     issueReplacementWithCharge: nativeEngine.issueReplacementWithCharge,
+    searchCustomer: nativeEngine.searchCustomer,
     getCardStore: nativeEngine.getCardStore,
     saveCardStore: nativeEngine.saveCardStore
 };

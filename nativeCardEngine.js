@@ -458,15 +458,42 @@ async function writeCustomerCard(params = {}) {
 
 // 5. Clear Smart Card (حذف بيانات الكارت)
 async function clearSmartCard(params = {}) {
+    // 1. Live clear on physical card reader via UnifiedCardClient
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.clearSmartCardLive === 'function') {
+            const liveRes = await unifiedClient.clearSmartCardLive();
+            if (liveRes && liveRes.success) {
+                // Clear in local card store
+                const store = getCardStore();
+                const status = await getReaderStatus();
+                const uid = (status.card?.uid || '').toUpperCase().replace(/\s+/g, '');
+                if (uid && store.cards[uid]) {
+                    delete store.cards[uid];
+                    saveCardStore(store);
+                }
+                return liveRes;
+            } else if (liveRes && (liveRes.status === 'no_card' || liveRes.status === 'no_reader')) {
+                return liveRes;
+            }
+        }
+    } catch (e) {
+        console.warn('Live clearSmartCard failed:', e.message);
+    }
+
     const status = await getReaderStatus();
+    if (!status.connected || !status.cardPresent) {
+        return {
+            success: false,
+            message: 'لا يوجد كارت على القارئ. يرجى وضع كارت العداد في القارئ قبل المسح.'
+        };
+    }
+
     const uid = (status.card?.uid || 'EF74A35F').toUpperCase();
     const store = getCardStore();
 
     if (store.cards[uid]) {
-        store.cards[uid].remainingBalance = 0.00;
-        store.cards[uid].hasCharge = false;
-        store.cards[uid].isCleared = true;
-        store.cards[uid].clearedAt = new Date().toISOString();
+        delete store.cards[uid];
         saveCardStore(store);
     }
 
@@ -478,6 +505,41 @@ async function clearSmartCard(params = {}) {
 
 // 6. Issue Replacement Card Without Charge (كارت بديل بدون شحن)
 async function issueReplacementWithoutCharge(params = {}) {
+    // 1. Try Live issue via UnifiedCardClient
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.issueReplacementWithoutChargeLive === 'function') {
+            const liveRes = await unifiedClient.issueReplacementWithoutChargeLive(params);
+            if (liveRes && liveRes.success) {
+                const store = getCardStore();
+                const mNum = params.meterNumber || liveRes.data?.meterNumber;
+                if (mNum) {
+                    store.cards[mNum] = {
+                        meterNumber: mNum,
+                        customerName: params.customerName,
+                        subscriptionCode: params.subscriptionCode || params.code,
+                        nationalId: params.nationalId,
+                        address: params.address,
+                        activityName: params.activityName,
+                        customerTypeName: params.customerTypeName,
+                        meterCompanyName: params.meterCompanyName || 'المصرية',
+                        remainingBalance: 0,
+                        chargeSequence: Number(params.chargeSequence || 1),
+                        consumptionSlice: 1,
+                        lastChargeDate: new Date().toLocaleDateString('ar-EG'),
+                        hasCharge: false,
+                        isReplacement: true,
+                        updatedAt: new Date().toISOString()
+                    };
+                    saveCardStore(store);
+                }
+                return liveRes;
+            }
+        }
+    } catch (e) {
+        console.warn('Live issueReplacementWithoutCharge notice:', e.message);
+    }
+
     const status = await getReaderStatus();
     const uid = (status.card?.uid || 'EF74A35F').toUpperCase();
     const store = getCardStore();
@@ -514,6 +576,41 @@ async function issueReplacementWithoutCharge(params = {}) {
 
 // 7. Issue Replacement Card With Charge (كارت بديل بشحن)
 async function issueReplacementWithCharge(params = {}) {
+    // 1. Try Live issue via UnifiedCardClient
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.issueReplacementWithChargeLive === 'function') {
+            const liveRes = await unifiedClient.issueReplacementWithChargeLive(params);
+            if (liveRes && liveRes.success) {
+                const store = getCardStore();
+                const mNum = params.meterNumber || liveRes.data?.meterNumber;
+                if (mNum) {
+                    store.cards[mNum] = {
+                        meterNumber: mNum,
+                        customerName: params.customerName,
+                        subscriptionCode: params.subscriptionCode || params.code,
+                        nationalId: params.nationalId,
+                        address: params.address,
+                        activityName: params.activityName,
+                        customerTypeName: params.customerTypeName,
+                        meterCompanyName: params.meterCompanyName || 'المصرية',
+                        remainingBalance: Number(params.chargeAmount || 0),
+                        chargeSequence: Number(params.chargeSequence || 1) + 1,
+                        consumptionSlice: 1,
+                        lastChargeDate: new Date().toLocaleDateString('ar-EG'),
+                        hasCharge: false,
+                        isReplacement: true,
+                        updatedAt: new Date().toISOString()
+                    };
+                    saveCardStore(store);
+                }
+                return liveRes;
+            }
+        }
+    } catch (e) {
+        console.warn('Live issueReplacementWithCharge notice:', e.message);
+    }
+
     const status = await getReaderStatus();
     const uid = (status.card?.uid || 'EF74A35F').toUpperCase();
     const store = getCardStore();
@@ -549,6 +646,53 @@ async function issueReplacementWithCharge(params = {}) {
         success: true,
         message: `تم إصدار وبرمجة كارت بديل بشحن بنجاح للعداد رقم ${record.meterNumber} بمبلغ ${chargeAmt.toFixed(2)} ج.م (إجمالي الرصيد: ${balance.toFixed(2)} ج.م).`,
         data: record
+    };
+}
+
+// 7.1 Search Customer by Chassis Number or Customer Code
+async function searchCustomer(term) {
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.searchCustomerLive === 'function') {
+            const liveRes = await unifiedClient.searchCustomerLive(term);
+            if (liveRes && liveRes.success) {
+                return liveRes;
+            }
+        }
+    } catch (e) {
+        console.warn('Live searchCustomer notice:', e.message);
+    }
+
+    const q = String(term || '').trim();
+    const store = getCardStore();
+    const card = Object.values(store.cards || {}).find(c =>
+        String(c.meterNumber).trim() === q ||
+        String(c.subscriptionCode).trim() === q ||
+        String(c.nationalId).trim() === q
+    );
+    if (card) {
+        return {
+            success: true,
+            customer: {
+                id: card.subscriptionCode || card.meterNumber,
+                name: card.customerName,
+                code: card.subscriptionCode,
+                meterNumber: card.meterNumber,
+                meterCompanyName: card.meterCompanyName || 'المصرية',
+                nationalId: card.nationalId,
+                address: card.address,
+                activityName: card.activityName,
+                customerTypeName: card.customerTypeName,
+                chargeSequence: card.chargeSequence || 1,
+                remainingBalance: card.remainingBalance || 0
+            },
+            financials: { debts: 0, fees: 0, credits: 0, abuses: 0, minCharge: 10 }
+        };
+    }
+
+    return {
+        success: false,
+        message: `لم يتم العثور على مشترك برقم الشاسيه أو الكود: ${q}`
     };
 }
 
@@ -864,6 +1008,7 @@ module.exports = {
     clearSmartCard,
     issueReplacementWithoutCharge,
     issueReplacementWithCharge,
+    searchCustomer,
     readControlCard,
     renewControlCard,
     getControlCardMetadata,

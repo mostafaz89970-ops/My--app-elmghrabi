@@ -31,3 +31,4 @@ contextBridge.exposeInMainWorld('clearSmartCard', (params) => ipcRenderer.invoke
 contextBridge.exposeInMainWorld('issueReplacementWithoutCharge', (params) => ipcRenderer.invoke('customer-card:replace-no-charge', params));
 contextBridge.exposeInMainWorld('issueReplacementWithCharge', (params) => ipcRenderer.invoke('customer-card:replace-with-charge', params));
 contextBridge.exposeInMainWorld('getCustomerChargingDetails', (customerId) => ipcRenderer.invoke('customer-card:charging-details', customerId));
+contextBridge.exposeInMainWorld('searchCustomer', (term) => ipcRenderer.invoke('customer:search', term));

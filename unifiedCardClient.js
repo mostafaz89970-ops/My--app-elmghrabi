@@ -1938,6 +1938,115 @@ async function getPlaceDescsDropdownLive(activityId) {
     }
 }
 
+/**
+ * Search Customer Live by Chassis / Meter Number or Customer Code or Search Term
+ */
+async function searchCustomerLive(term) {
+    if (!term || !String(term).trim()) {
+        return { success: false, message: 'يرجى إدخال رقم الشاسيه أو كود المشترك للبحث' };
+    }
+    const q = String(term).trim();
+    let customer = null;
+    let customerId = null;
+
+    // 1. Search by Meter Chassis Number (/Customer/GetCustomerByMeterNumber/{q})
+    try {
+        const mRes = await apiMeedcoRequest('/Customer/GetCustomerByMeterNumber/' + encodeURIComponent(q), 'GET');
+        if (mRes && mRes.data && mRes.data.customerId) {
+            customerId = mRes.data.customerId;
+            const full = await getCustomerDetailsLive(customerId);
+            if (full && full.data) {
+                customer = full.data;
+            } else {
+                customer = mRes.data;
+            }
+        }
+    } catch (e) {
+        console.warn('Live search by meter number notice:', e.message);
+    }
+
+    // 2. Search by Subscriber Code or General Search Term (/Customer/GetAll)
+    if (!customer) {
+        try {
+            const allRes = await apiMeedcoRequest('/Customer/GetAll', 'POST', {
+                searchTerm: q,
+                paginator: { page: 1, pageSize: 5 },
+                filter: {},
+                sorting: { column: 'id', direction: 'desc' },
+                grouping: {}
+            });
+            if (allRes && allRes.data && allRes.data.result && allRes.data.result.length > 0) {
+                const match = allRes.data.result.find(x => 
+                    String(x.code).trim() === q || 
+                    String(x.meterNumber).trim() === q ||
+                    String(x.codeNumber).trim() === q ||
+                    String(x.oldCode).trim() === q ||
+                    String(x.nationalId).trim() === q
+                ) || allRes.data.result[0];
+
+                customerId = match.id;
+                const full = await getCustomerDetailsLive(customerId);
+                if (full && full.data) {
+                    customer = full.data;
+                } else {
+                    customer = match;
+                }
+            }
+        } catch (e) {
+            console.warn('Live search by searchTerm notice:', e.message);
+        }
+    }
+
+    // 3. Fallback to local card_store.json
+    if (!customer) {
+        try {
+            const cardStore = JSON.parse(fs.readFileSync(path.join(__dirname, 'card_store.json'), 'utf8'));
+            const card = Object.values(cardStore.cards || {}).find(c => 
+                String(c.meterNumber).trim() === q ||
+                String(c.subscriptionCode).trim() === q ||
+                String(c.nationalId).trim() === q
+            );
+            if (card) {
+                customer = {
+                    id: card.subscriptionCode || card.meterNumber,
+                    name: card.customerName,
+                    code: card.subscriptionCode,
+                    meterNumber: card.meterNumber,
+                    meterCompanyName: card.meterCompanyName || 'المصرية',
+                    nationalId: card.nationalId,
+                    address: card.address,
+                    activityName: card.activityName,
+                    customerTypeName: card.customerTypeName,
+                    chargeSequence: card.chargeSequence || 1,
+                    remainingBalance: card.remainingBalance || 0
+                };
+            }
+        } catch (e) {}
+    }
+
+    if (!customer) {
+        return { success: false, message: `لم يتم العثور على أي مشترك مطابق لرقم الشاسيه أو الكود: ${q}` };
+    }
+
+    // 4. Retrieve Financials (Debts, Fees, etc.)
+    let financials = { debts: 0, fees: 0, credits: 0, abuses: 0, minCharge: 10 };
+    if (customerId) {
+        try {
+            const chgDetails = await getCustomerChargingDetailsLive(customerId);
+            if (chgDetails && chgDetails.financials) {
+                financials = chgDetails.financials;
+            }
+        } catch (e) {}
+    }
+
+    return {
+        success: true,
+        customer: customer,
+        financials: financials,
+        message: `تم جلب بيانات المشترك بنجاح: ${customer.name || customer.customerName}`
+    };
+}
+
 module.exports = {
     getActiveAuthToken,
     getUcsToken,
@@ -1957,6 +2066,7 @@ module.exports = {
     clearSmartCardLive,
     issueReplacementWithoutChargeLive,
     issueReplacementWithChargeLive,
+    searchCustomerLive,
     getSectorsDropdownLive,
     getPublicAdminsDropdownLive,
     getSubAdminsDropdownLive,

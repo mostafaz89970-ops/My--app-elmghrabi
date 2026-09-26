@@ -116,6 +116,17 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // 7.1 Search Customer by Chassis / Code
+            if (pathname === '/api/customer/search' || pathname === '/api/customer-search') {
+                const term = url.searchParams.get('term') || url.searchParams.get('q');
+                const body = await getBody();
+                const searchTerm = term || body.term || body.q;
+                const result = await nativeEngine.searchCustomer(searchTerm);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
             // 8. General Read Smart Card
             if (pathname === '/api/read-smart-card' || pathname === '/api/read-card') {
                 const result = await nativeEngine.readSmartCard();

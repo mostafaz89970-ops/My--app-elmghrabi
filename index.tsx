@@ -15458,6 +15458,9 @@ const handlePrintJudicialControlDetails = () => {
     // =========================================================================
     // قسم مسح كارت (Clear Smart Card - مباشر وبدون قراءة مسبقة)
     // =========================================================================
+        // =========================================================================
+    // قسم مسح الكارت (Clear / Format Smart Card) - مطابق للمنظومة الأساسية
+    // =========================================================================
     let clearCardInitialized = false;
 
     const renderClearCardSection = () => {
@@ -15474,6 +15477,13 @@ const handlePrintJudicialControlDetails = () => {
     };
 
     const executeClearCardProcess = async () => {
+        const confirmMsg = `تأكيد عملية مسح الكارت:
+سوف يتم مسح جميع البيانات وحذفها نهائياً من الشريحة الذكية بالكارت (إذا لم توجد عليه تلاعبات) وتهيئته لإعادة الاستخدام.
+
+هل تريد المتابعة ومسح الكارت الآن؟`;
+
+        if (!confirm(confirmMsg)) return;
+
         const execBtn = document.getElementById('btn-clr-execute') as HTMLButtonElement | null;
         const banner = document.getElementById('clr-status-banner');
         const origHtml = execBtn ? execBtn.innerHTML : '';
@@ -15482,7 +15492,7 @@ const handlePrintJudicialControlDetails = () => {
             execBtn.disabled = true;
             execBtn.innerHTML = `
                 <span style="display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-left:6px;"></span>
-                <span>جاري المسح...</span>
+                <span>جاري مسح الكارت...</span>
             `;
         }
 
@@ -15494,21 +15504,32 @@ const handlePrintJudicialControlDetails = () => {
             banner.innerHTML = `
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="display:inline-block; width:16px; height:16px; border:2px solid #1e40af; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite;"></span>
-                    <span>جاري مسح الكارت.. برجاء عدم تحريك الكارت او سحبه قبل انتهاء العملية لتجنب حدوث مشكلة</span>
+                    <span>جاري مسح الكارت عبر القارئ.. برجاء عدم تحريك الكارت أو سحبه قبل انتهاء العملية لتجنب تلف الشريحة</span>
                 </div>
             `;
         }
 
         try {
-            showToast('جاري مسح الكارت.. برجاء عدم تحريك الكارت او سحبه قبل انتهاء العملية لتجنب حدوث مشكلة');
+            showToast('جاري مسح الكارت.. برجاء عدم تحريك الكارت من القارئ...');
 
-            const res = await fetch('http://127.0.0.1:5002/api/customer-card/clear', {
-                method: 'POST'
-            }).then(r => r.json()).catch(() => null);
+            let res: any = null;
+            if (typeof (window as any).clearSmartCard === 'function') {
+                try {
+                    res = await (window as any).clearSmartCard();
+                } catch (e: any) {
+                    console.warn('IPC clearSmartCard failed:', e);
+                }
+            }
+
+            if (!res || !res.success) {
+                res = await fetch('http://127.0.0.1:5002/api/customer-card/clear', {
+                    method: 'POST'
+                }).then(r => r.json()).catch(() => null);
+            }
 
             if (res && res.success) {
-                showToast(res.message || 'تمت مسح الكارت بنجاح', 'success');
-                logActivity('مسح كارت', 'تم مسح وتفريغ بيانات الكارت بنجاح عبر خدمة الكروت الذكية');
+                showToast(res.message || 'تم مسح الكارت بنجاح وتفريغ جميع بياناته!', 'success');
+                logActivity('مسح كارت', 'تم مسح وتفريغ بيانات الكارت بنجاح من الشريحة الذكية عبر القارئ');
 
                 if (banner) {
                     banner.style.display = 'block';
@@ -15518,19 +15539,20 @@ const handlePrintJudicialControlDetails = () => {
                     banner.innerHTML = `
                         <div style="display:flex; align-items:center; gap:8px;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                            <span style="font-size: 1.15rem; font-weight: bold;">تمت مسح الكارت بنجاح</span>
+                            <span style="font-size: 1.15rem; font-weight: bold;">تمت عملية مسح الكارت بنجاح! الكارت الآن فارغ تماماً وجاهز لإعادة التخصيص أو الاستخدام.</span>
                         </div>
                     `;
                 }
 
             } else {
-                showToast(res?.message || 'فشلت عملية مسح الكارت.', 'error');
+                const msg = res?.message || 'تعذر استكمال مسح الكارت. تأكد من وضع الكارت وثباته في القارئ وتشغيل الخدمة.';
+                showToast(msg, 'error');
                 if (banner) {
                     banner.style.display = 'block';
                     banner.style.backgroundColor = '#fef2f2';
                     banner.style.color = '#b91c1c';
                     banner.style.border = '1px solid #fecaca';
-                    banner.textContent = res?.message || 'تعذر استكمال مسح الكارت. تأكد من ثبات الكارت في القارئ وتشغيل الخدمة.';
+                    banner.textContent = msg;
                 }
             }
 
@@ -15561,30 +15583,13 @@ const handlePrintJudicialControlDetails = () => {
             newCardNoChargeInitialized = true;
         }
 
-        // Populate dropdown from state.meters
-        const selectEl = document.getElementById('nc-subscriber-select') as HTMLSelectElement | null;
-        if (selectEl) {
-            selectEl.innerHTML = '<option value="">-- اختر مشترك لإصدار كارت بديل له --</option>';
-            state.meters.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = String(m.id);
-                opt.textContent = `${m.subscriberName || 'بدون اسم'} | عداد: ${m.meterChassisNumber || '-'} (${m.subscriptionCode || '-'})`;
-                selectEl.appendChild(opt);
-            });
-            if (customerId) selectEl.value = customerId;
-        }
-
         const rcptInp = document.getElementById('nc-receipt-number') as HTMLInputElement | null;
         if (rcptInp && !rcptInp.value) {
             rcptInp.value = 'REC-' + Date.now().toString().slice(-6);
         }
 
         if (customerId) {
-            loadNewCardCustomer(customerId);
-        } else if (state.meters && state.meters.length > 0) {
-            const defaultId = String(state.meters[0].id);
-            if (selectEl) selectEl.value = defaultId;
-            loadNewCardCustomer(defaultId);
+            searchCustomerForNewCardNoCharge(customerId);
         } else {
             resetNewCardNoChargeUI();
         }
@@ -15600,48 +15605,88 @@ const handlePrintJudicialControlDetails = () => {
         const actEl = document.getElementById('nc-cust-activity');
         const addrEl = document.getElementById('nc-cust-address');
         const banner = document.getElementById('nc-status-banner');
+        const searchInp = document.getElementById('nc-search-input') as HTMLInputElement | null;
 
         if (nameEl) nameEl.textContent = '-';
         if (codeEl) codeEl.textContent = '-';
         if (meterEl) meterEl.textContent = '-';
-        if (compEl) compEl.textContent = 'السويدي';
+        if (compEl) compEl.textContent = 'المصرية';
         if (nidEl) nidEl.textContent = '-';
-        if (actEl) actEl.textContent = 'منزلي';
+        if (actEl) actEl.textContent = '-';
         if (addrEl) addrEl.textContent = '-';
         if (banner) banner.style.display = 'none';
+        if (searchInp) searchInp.value = '';
     };
 
-    const loadNewCardCustomer = async (customerId: string) => {
-        const banner = document.getElementById('nc-status-banner');
-        try {
-            let res = await fetch(`http://127.0.0.1:5002/api/customer-charging/details/${encodeURIComponent(customerId)}`).then(r => r.json()).catch(() => null);
-            let cust: any = null;
+    const searchCustomerForNewCardNoCharge = async (term?: string) => {
+        const searchInp = document.getElementById('nc-search-input') as HTMLInputElement | null;
+        const q = term || searchInp?.value.trim();
+        if (!q) {
+            showToast('يرجى إدخال رقم الشاسيه (العداد) أو كود المشترك للبحث.', 'error');
+            searchInp?.focus();
+            return;
+        }
 
-            if (res && res.success && res.customer) {
-                cust = res.customer;
-            } else {
-                const local = state.meters.find(m => String(m.id) === String(customerId) || String(m.subscriptionCode || '') === String(customerId) || String(m.meterChassisNumber || '') === String(customerId));
+        const banner = document.getElementById('nc-status-banner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.style.backgroundColor = '#eff6ff';
+            banner.style.color = '#1d4ed8';
+            banner.style.border = '1px solid #bfdbfe';
+            banner.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="display:inline-block; width:16px; height:16px; border:2px solid #1d4ed8; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite;"></span>
+                    <span>جاري البحث عن المشترك واستدعاء البيانات الفعلية من السيرفر...</span>
+                </div>
+            `;
+        }
+
+        try {
+            let res: any = null;
+            if (typeof (window as any).searchCustomer === 'function') {
+                try {
+                    res = await (window as any).searchCustomer(q);
+                } catch (e: any) {
+                    console.warn('IPC searchCustomer error:', e);
+                }
+            }
+
+            if (!res || !res.success) {
+                res = await fetch('http://127.0.0.1:5002/api/customer/search?term=' + encodeURIComponent(q)).then(r => r.json()).catch(() => null);
+            }
+
+            let cust: any = res?.customer || res?.data;
+
+            // Local state.meters fallback if offline
+            if (!cust) {
+                const local = state.meters.find(m => 
+                    String(m.meterChassisNumber || '').trim() === q ||
+                    String(m.subscriptionCode || '').trim() === q ||
+                    String(m.nationalId || '').trim() === q ||
+                    String(m.id || '').trim() === q
+                );
                 if (local) {
                     cust = {
                         id: local.id,
-                        name: local.subscriberName || 'مشترك مسجل',
-                        code: local.subscriptionCode || '-',
-                        meterNumber: local.meterChassisNumber || '-',
-                        meterCompanyName: local.meterType || 'السويدي',
-                        nationalId: local.nationalId || '-',
-                        activityName: local.activityType || 'منزلي',
-                        address: local.address || '-'
+                        name: local.subscriberName,
+                        code: local.subscriptionCode,
+                        meterNumber: local.meterChassisNumber,
+                        meterCompanyName: local.meterType || 'المصرية',
+                        nationalId: local.nationalId,
+                        address: local.address,
+                        activityName: (local as any).activityType || 'منزلي كودي'
                     };
                 }
             }
 
             if (!cust) {
+                const errMsg = res?.message || `لم يتم العثور على أي مشترك مطابق لرقم الشاسيه أو الكود "${q}".`;
+                showToast(errMsg, 'error');
                 if (banner) {
-                    banner.style.display = 'block';
                     banner.style.backgroundColor = '#fef2f2';
                     banner.style.color = '#b91c1c';
                     banner.style.border = '1px solid #fecaca';
-                    banner.textContent = 'تعذر تحميل بيانات المشترك.';
+                    banner.textContent = errMsg;
                 }
                 return;
             }
@@ -15656,23 +15701,31 @@ const handlePrintJudicialControlDetails = () => {
             const addrEl = document.getElementById('nc-cust-address');
 
             if (nameEl) nameEl.textContent = cust.name || '-';
-            if (codeEl) codeEl.textContent = cust.code || '-';
+            if (codeEl) codeEl.textContent = cust.code || cust.codeNumber || '-';
             if (meterEl) meterEl.textContent = cust.meterNumber || '-';
-            if (compEl) compEl.textContent = cust.meterCompanyName || 'السويدي';
-            if (nidEl) nidEl.textContent = cust.nationalId || cust.identityNumber || '-';
-            if (actEl) actEl.textContent = cust.activityName || 'منزلي';
+            if (compEl) compEl.textContent = cust.meterCompanyName || 'المصرية';
+            if (nidEl) nidEl.textContent = cust.nationalId || '-';
+            if (actEl) actEl.textContent = cust.activityName || 'منزلي كودي';
             if (addrEl) addrEl.textContent = cust.address || '-';
+            if (searchInp) searchInp.value = cust.meterNumber || cust.code || q;
 
             if (banner) {
                 banner.style.display = 'block';
-                banner.style.backgroundColor = '#eff6ff';
-                banner.style.color = '#1d4ed8';
-                banner.style.border = '1px solid #bfdbfe';
-                banner.textContent = `تم تحميل بيانات المشترك (${cust.name}). ضع الكارت الجديد في القارئ واضغط على "إصدار وكتابة الكارت البديل".`;
+                banner.style.backgroundColor = '#f0fdf4';
+                banner.style.color = '#166534';
+                banner.style.border = '1px solid #bbf7d0';
+                banner.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                        <span>تم جلب بيانات المشترك الفعلية بنجاح (${cust.name} - عداد: ${cust.meterNumber}).</span>
+                        <span style="font-weight:bold; background:rgba(22,101,52,0.1); padding:2px 8px; border-radius:4px;">ضع الكارت البديل على القارئ واضغط "إصدار وكتابة الكارت البديل"</span>
+                    </div>
+                `;
             }
+            showToast(`تم العثور على المشترك: ${cust.name}`, 'success');
 
         } catch (err: any) {
-            console.error('Error loading customer for new card:', err);
+            console.error('Error in searchCustomerForNewCardNoCharge:', err);
+            showToast('حدث خطأ أثناء البحث عن المشترك: ' + (err.message || err), 'error');
         }
     };
 
@@ -15683,23 +15736,40 @@ const handlePrintJudicialControlDetails = () => {
             btn.disabled = true;
             btn.innerHTML = `
                 <span style="display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-left:6px;"></span>
-                <span>جاري قراءة الكارت...</span>
+                <span>جاري قراءة الكارت الحالي...</span>
             `;
         }
 
         try {
-            showToast('جاري قراءة الكارت الحالي...');
-            const res = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
-            if (res && res.success && res.customer) {
-                const c = res.customer;
-                showToast(`تم العثور على المشترك المرتبط بالكارت: ${c.name}`, 'success');
-                const selectEl = document.getElementById('nc-subscriber-select') as HTMLSelectElement | null;
-                if (selectEl) {
-                    selectEl.value = String(c.id);
+            showToast('جاري قراءة الكارت من القارئ...');
+            let res: any = null;
+            if (typeof (window as any).readCustomerCard === 'function') {
+                try {
+                    res = await (window as any).readCustomerCard();
+                } catch (e: any) {
+                    console.warn('IPC readCustomerCard error:', e);
                 }
-                loadNewCardCustomer(String(c.id));
+            }
+            if (!res || !res.success) {
+                res = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
+            }
+
+            if (res && res.success) {
+                const meterNum = res.data?.meterNumber || res.customer?.meterNumber;
+                const custCode = res.customer?.code || res.customer?.codeNumber;
+                const searchKey = meterNum || custCode;
+
+                if (searchKey) {
+                    showToast(`تمت قراءة الكارت (عداد: ${meterNum}). جاري استدعاء البيانات...`, 'success');
+                    const searchInp = document.getElementById('nc-search-input') as HTMLInputElement | null;
+                    if (searchInp) searchInp.value = searchKey;
+                    searchCustomerForNewCardNoCharge(searchKey);
+                } else if (res.customer) {
+                    currentNewCardCustomer = res.customer;
+                    searchCustomerForNewCardNoCharge(res.customer.name);
+                }
             } else {
-                showToast(res?.message || 'تم فحص القارئ، يرجى تحديد المشترك من القائمة.');
+                showToast(res?.message || 'لم يتم العثور على كارت في القارئ. يرجى وضع كارت العداد في قارئ البطاقات.', 'error');
             }
         } catch (err: any) {
             showToast('حدث خطأ أثناء قراءة الكارت.', 'error');
@@ -15713,7 +15783,8 @@ const handlePrintJudicialControlDetails = () => {
 
     const executeNewCardNoChargeProcess = async () => {
         if (!currentNewCardCustomer || !currentNewCardCustomer.id) {
-            showToast('يرجى تحديد المشترك أولاً.', 'error');
+            showToast('يرجى البحث عن المشترك وتحديده أولاً قبل محاولة إصدار الكارت.', 'error');
+            document.getElementById('nc-search-input')?.focus();
             return;
         }
 
@@ -15724,12 +15795,12 @@ const handlePrintJudicialControlDetails = () => {
 
         const confirmMsg = `تأكيد إصدار كارت بديل بدون شحن:
 المشترك: ${currentNewCardCustomer.name}
-عداد: ${currentNewCardCustomer.meterNumber}
-رسوم الكارت البديل: 50.00 ج.م
+رقم العداد (الشاسيه): ${currentNewCardCustomer.meterNumber}
+رسوم استخراج كارت بديل: 50.00 ج.م
 رقم الإيصال: ${receiptNumber}
-إصدار على نفس الكارت: ${onSameCard ? 'نعم' : 'لا (كارت جديد)'}
+إصدار على نفس الكارت: ${onSameCard ? 'نعم (On Same Card)' : 'لا (بطاقة جديدة)'}
 
-هل أنت متأكد من المتابعة والكتابة على الكارت الآن؟`;
+هل تريد المتابعة وبرمجة الكارت الآن عبر القارئ؟`;
 
         if (!confirm(confirmMsg)) return;
 
@@ -15741,29 +15812,49 @@ const handlePrintJudicialControlDetails = () => {
             btn.disabled = true;
             btn.innerHTML = `
                 <span style="display:inline-block; width:18px; height:18px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-left:8px;"></span>
-                <span>جاري إصدار وكتابة الكارت البديل على القارئ...</span>
+                <span>جاري برمجة وكتابة الكارت البديل على القارئ...</span>
             `;
         }
 
         try {
-            showToast('جاري الاتصال بخدمة الكروت وإصدار الكارت البديل...');
+            showToast('جاري الاتصال بخدمة الكروت وبرمجة الشريحة الذكية...');
             const payload = {
                 cardType: 1,
                 id: currentNewCardCustomer.id,
                 isInitalize: 4,
                 onSameCard: onSameCard,
                 recieptNumber: receiptNumber,
-                generationType: 'g1'
+                generationType: 'g1',
+                customerName: currentNewCardCustomer.name,
+                meterNumber: currentNewCardCustomer.meterNumber,
+                code: currentNewCardCustomer.code,
+                nationalId: currentNewCardCustomer.nationalId,
+                address: currentNewCardCustomer.address,
+                activityName: currentNewCardCustomer.activityName,
+                customerTypeName: currentNewCardCustomer.customerTypeName,
+                meterCompanyName: currentNewCardCustomer.meterCompanyName || 'المصرية',
+                chargeSequence: currentNewCardCustomer.chargeSequence || 1
             };
 
-            const res = await fetch('http://127.0.0.1:5002/api/customer-card/replacement-no-charge', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(r => r.json()).catch(() => null);
+            let res: any = null;
+            if (typeof (window as any).issueReplacementWithoutCharge === 'function') {
+                try {
+                    res = await (window as any).issueReplacementWithoutCharge(payload);
+                } catch (e: any) {
+                    console.warn('IPC issueReplacementWithoutCharge error:', e);
+                }
+            }
+
+            if (!res || !res.success) {
+                res = await fetch('http://127.0.0.1:5002/api/customer-card/replacement-no-charge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(r => r.json()).catch(() => null);
+            }
 
             if (res && res.success) {
-                showToast('تم إصدار وكتابة الكارت البديل بنجاح!', 'success');
+                showToast('تم إصدار وبرمجة الكارت البديل بنجاح على الشريحة الذكية!', 'success');
                 logActivity('كارت بديل بدون شحن', `تم إصدار كارت بديل بدون شحن للعداد ${currentNewCardCustomer.meterNumber} للمشترك ${currentNewCardCustomer.name} برقم إيصال ${receiptNumber}`);
 
                 if (banner) {
@@ -15771,7 +15862,7 @@ const handlePrintJudicialControlDetails = () => {
                     banner.style.backgroundColor = '#f0fdf4';
                     banner.style.color = '#166534';
                     banner.style.border = '1px solid #bbf7d0';
-                    banner.innerHTML = `<strong>تمت العملية بنجاح!</strong> تم تخصيص وكتابة الكارت البديل للمشترك ${currentNewCardCustomer.name} (رقم الإيصال: ${receiptNumber}).`;
+                    banner.innerHTML = `<strong>تمت العملية بنجاح!</strong> تم تخصيص وبرمجة الكارت البديل للمشترك ${currentNewCardCustomer.name} (عداد: ${currentNewCardCustomer.meterNumber}) بنجاح على الشريحة.`;
                 }
 
                 showChargingReceiptModal({
@@ -15780,34 +15871,21 @@ const handlePrintJudicialControlDetails = () => {
                     customerName: currentNewCardCustomer.name,
                     customerCode: currentNewCardCustomer.code,
                     meterNumber: currentNewCardCustomer.meterNumber,
-                    sequence: 'بديل (Replacement)',
+                    sequence: 'بديل بدون شحن',
                     chargeAmount: '0.00 (بدون شحن)',
-                    deductions: 'رسوم كارت 50.00',
+                    deductions: 'رسوم كارت 50.00 ج.م',
                     netCollected: '50.00'
                 });
 
             } else {
-                // Offline fallback
-                const local = state.meters.find(m => String(m.id) === String(currentNewCardCustomer.id) || String(m.subscriptionCode || '') === String(currentNewCardCustomer.code) || String(m.meterChassisNumber || '') === String(currentNewCardCustomer.meterNumber));
-                if (local) {
-                    local.chargeCount = (local.chargeCount || 1) + 1;
-                    saveState();
-                    logActivity('كارت بديل بدون شحن', `تم إصدار كارت بديل بدون شحن (محلي) للعداد ${local.meterChassisNumber} للمشترك ${local.subscriberName}`);
-                    showToast('تم إصدار الكارت البديل بنجاح في المنظومة المستقلة!', 'success');
-
-                    showChargingReceiptModal({
-                        id: receiptNumber,
-                        date: new Date().toLocaleString('ar-EG'),
-                        customerName: currentNewCardCustomer.name,
-                        customerCode: currentNewCardCustomer.code,
-                        meterNumber: currentNewCardCustomer.meterNumber,
-                        sequence: 'بديل (Replacement)',
-                        chargeAmount: '0.00 (بدون شحن)',
-                        deductions: 'رسوم كارت 50.00',
-                        netCollected: '50.00'
-                    });
-                } else {
-                    showToast(res?.message || 'تعذر استكمال إصدار الكارت البديل.', 'error');
+                const errMsg = res?.message || 'تعذر استكمال إصدار وبرمجة الكارت البديل. تأكد من ثبات الكارت في القارئ.';
+                showToast(errMsg, 'error');
+                if (banner) {
+                    banner.style.display = 'block';
+                    banner.style.backgroundColor = '#fef2f2';
+                    banner.style.color = '#b91c1c';
+                    banner.style.border = '1px solid #fecaca';
+                    banner.textContent = errMsg;
                 }
             }
 
@@ -15823,13 +15901,15 @@ const handlePrintJudicialControlDetails = () => {
     };
 
     const initNewCardNoChargeListeners = () => {
+        document.getElementById('btn-nc-search')?.addEventListener('click', () => searchCustomerForNewCardNoCharge());
+        document.getElementById('nc-search-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchCustomerForNewCardNoCharge();
+            }
+        });
         document.getElementById('btn-nc-read-card')?.addEventListener('click', () => readNewCardSmartCard());
         document.getElementById('btn-nc-execute')?.addEventListener('click', () => executeNewCardNoChargeProcess());
-        document.getElementById('nc-subscriber-select')?.addEventListener('change', (e) => {
-            const val = (e.target as HTMLSelectElement).value;
-            if (val) loadNewCardCustomer(val);
-            else resetNewCardNoChargeUI();
-        });
     };
 
     // =========================================================================
@@ -15845,24 +15925,8 @@ const handlePrintJudicialControlDetails = () => {
             newCardWithChargeInitialized = true;
         }
 
-        const selectEl = document.getElementById('ncc-subscriber-select') as HTMLSelectElement | null;
-        if (selectEl) {
-            selectEl.innerHTML = '<option value="">-- اختر مشترك لإصدار كارت بديل بشحن --</option>';
-            state.meters.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = String(m.id);
-                opt.textContent = `${m.subscriberName || 'بدون اسم'} | عداد: ${m.meterChassisNumber || '-'} (${m.subscriptionCode || '-'})`;
-                selectEl.appendChild(opt);
-            });
-            if (customerId) selectEl.value = customerId;
-        }
-
         if (customerId) {
-            loadNewChargeCustomer(customerId);
-        } else if (state.meters && state.meters.length > 0) {
-            const defaultId = String(state.meters[0].id);
-            if (selectEl) selectEl.value = defaultId;
-            loadNewChargeCustomer(defaultId);
+            searchCustomerForNewCardWithCharge(customerId);
         } else {
             resetNewCardWithChargeUI();
         }
@@ -15884,50 +15948,100 @@ const handlePrintJudicialControlDetails = () => {
         const minEl = document.getElementById('ncc-min-val');
         const netDisplay = document.getElementById('ncc-net-amount-display');
         const banner = document.getElementById('ncc-status-banner');
+        const rechargeAmtInp = document.getElementById('ncc-recharge-amount') as HTMLInputElement | null;
+        const searchInp = document.getElementById('ncc-search-input') as HTMLInputElement | null;
 
         if (nameEl) nameEl.textContent = '-';
         if (codeEl) codeEl.textContent = '-';
         if (meterEl) meterEl.textContent = '-';
-        if (compEl) compEl.textContent = 'السويدي';
-        if (seqEl) seqEl.textContent = '1';
+        if (compEl) compEl.textContent = 'المصرية';
+        if (seqEl) seqEl.textContent = '-';
         if (nidEl) nidEl.textContent = '-';
         if (addrEl) addrEl.textContent = '-';
 
         if (debtsEl) debtsEl.textContent = '0.00 ج.م';
         if (feesEl) feesEl.textContent = '0.00 ج.م';
         if (minEl) minEl.textContent = '10.00 ج.م';
-        if (netDisplay) netDisplay.textContent = '150.00 ج.م';
+        if (netDisplay) netDisplay.textContent = '50.00 ج.م';
         if (banner) banner.style.display = 'none';
+        if (rechargeAmtInp) rechargeAmtInp.value = '';
+        if (searchInp) searchInp.value = '';
     };
 
-    const loadNewChargeCustomer = async (customerId: string) => {
-        const banner = document.getElementById('ncc-status-banner');
-        try {
-            let res = await fetch(`http://127.0.0.1:5002/api/customer-charging/details/${encodeURIComponent(customerId)}`).then(r => r.json()).catch(() => null);
-            let cust: any = null;
-            let fin: any = null;
+    const searchCustomerForNewCardWithCharge = async (term?: string) => {
+        const searchInp = document.getElementById('ncc-search-input') as HTMLInputElement | null;
+        const q = term || searchInp?.value.trim();
+        if (!q) {
+            showToast('يرجى إدخال رقم الشاسيه (العداد) أو كود المشترك للبحث.', 'error');
+            searchInp?.focus();
+            return;
+        }
 
-            if (res && res.success && res.customer) {
-                cust = res.customer;
-                fin = res.financials || {};
-            } else {
-                const local = state.meters.find(m => String(m.id) === String(customerId) || String(m.subscriptionCode || '') === String(customerId) || String(m.meterChassisNumber || '') === String(customerId));
+        const banner = document.getElementById('ncc-status-banner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.style.backgroundColor = '#eff6ff';
+            banner.style.color = '#1d4ed8';
+            banner.style.border = '1px solid #bfdbfe';
+            banner.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="display:inline-block; width:16px; height:16px; border:2px solid #1d4ed8; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite;"></span>
+                    <span>جاري البحث واستدعاء الملف المالي والتعاقدي للمشترك...</span>
+                </div>
+            `;
+        }
+
+        try {
+            let res: any = null;
+            if (typeof (window as any).searchCustomer === 'function') {
+                try {
+                    res = await (window as any).searchCustomer(q);
+                } catch (e: any) {
+                    console.warn('IPC searchCustomer error:', e);
+                }
+            }
+
+            if (!res || !res.success) {
+                res = await fetch('http://127.0.0.1:5002/api/customer/search?term=' + encodeURIComponent(q)).then(r => r.json()).catch(() => null);
+            }
+
+            let cust: any = res?.customer || res?.data;
+            let fin: any = res?.financials || {};
+
+            // Fallback from state.meters if offline
+            if (!cust) {
+                const local = state.meters.find(m => 
+                    String(m.meterChassisNumber || '').trim() === q ||
+                    String(m.subscriptionCode || '').trim() === q ||
+                    String(m.nationalId || '').trim() === q ||
+                    String(m.id || '').trim() === q
+                );
                 if (local) {
                     cust = {
                         id: local.id,
-                        name: local.subscriberName || 'مشترك مسجل',
-                        code: local.subscriptionCode || '-',
-                        meterNumber: local.meterChassisNumber || '-',
-                        meterCompanyName: local.meterType || 'السويدي',
+                        name: local.subscriberName,
+                        code: local.subscriptionCode,
+                        meterNumber: local.meterChassisNumber,
+                        meterCompanyName: local.meterType || 'المصرية',
                         chargeSequence: (Number(local.chargeCount) || 1) + 1,
-                        nationalId: local.nationalId || '-',
-                        address: local.address || '-'
+                        nationalId: local.nationalId,
+                        address: local.address
                     };
                     fin = { debts: 0, fees: 0, minCharge: 10 };
                 }
             }
 
-            if (!cust) return;
+            if (!cust) {
+                const errMsg = res?.message || `لم يتم العثور على أي مشترك مطابق لرقم الشاسيه أو الكود "${q}".`;
+                showToast(errMsg, 'error');
+                if (banner) {
+                    banner.style.backgroundColor = '#fef2f2';
+                    banner.style.color = '#b91c1c';
+                    banner.style.border = '1px solid #fecaca';
+                    banner.textContent = errMsg;
+                }
+                return;
+            }
 
             currentNewChargeCustomer = cust;
             currentNewChargeFinancials = {
@@ -15949,12 +16063,13 @@ const handlePrintJudicialControlDetails = () => {
             const minEl = document.getElementById('ncc-min-val');
 
             if (nameEl) nameEl.textContent = cust.name || '-';
-            if (codeEl) codeEl.textContent = cust.code || '-';
+            if (codeEl) codeEl.textContent = cust.code || cust.codeNumber || '-';
             if (meterEl) meterEl.textContent = cust.meterNumber || '-';
-            if (compEl) compEl.textContent = cust.meterCompanyName || 'السويدي';
+            if (compEl) compEl.textContent = cust.meterCompanyName || 'المصرية';
             if (seqEl) seqEl.textContent = String(cust.chargeSequence || '1');
             if (nidEl) nidEl.textContent = cust.nationalId || '-';
             if (addrEl) addrEl.textContent = cust.address || '-';
+            if (searchInp) searchInp.value = cust.meterNumber || cust.code || q;
 
             if (debtsEl) debtsEl.textContent = currentNewChargeFinancials.debts.toFixed(2) + ' ج.م';
             if (feesEl) feesEl.textContent = currentNewChargeFinancials.fees.toFixed(2) + ' ج.م';
@@ -15967,11 +16082,18 @@ const handlePrintJudicialControlDetails = () => {
                 banner.style.backgroundColor = '#f0fdf4';
                 banner.style.color = '#166534';
                 banner.style.border = '1px solid #bbf7d0';
-                banner.textContent = `تم جلب ملف المشترك (${cust.name}). أدخل قيمة الشحنة المطلوبة وضع الكارت في القارئ.`;
+                banner.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                        <span>تم جلب ملف المشترك بنجاح (${cust.name} - عداد: ${cust.meterNumber}).</span>
+                        <span style="font-weight:bold; background:rgba(22,101,52,0.1); padding:2px 8px; border-radius:4px;">حدد قيمة الشحن وضع الكارت البديل على القارئ</span>
+                    </div>
+                `;
             }
+            showToast(`تم العثور على المشترك: ${cust.name}`, 'success');
 
         } catch (err: any) {
-            console.error('Error loading customer for new charge card:', err);
+            console.error('Error in searchCustomerForNewCardWithCharge:', err);
+            showToast('حدث خطأ أثناء استدعاء بيانات المشترك: ' + (err.message || err), 'error');
         }
     };
 
@@ -15984,7 +16106,7 @@ const handlePrintJudicialControlDetails = () => {
         const isDelay = Boolean(delayDebtsCb?.checked);
         const debts = isDelay ? 0 : currentNewChargeFinancials.debts;
         const fees = currentNewChargeFinancials.fees;
-        const cardPrice = currentNewChargeFinancials.cardPrice; // 50
+        const cardPrice = currentNewChargeFinancials.cardPrice; // 50.00
 
         const net = Math.max(0, cardPrice + recharge + debts + fees);
         if (netDisplay) {
@@ -16000,20 +16122,40 @@ const handlePrintJudicialControlDetails = () => {
             btn.disabled = true;
             btn.innerHTML = `
                 <span style="display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-left:6px;"></span>
-                <span>جاري قراءة الكارت...</span>
+                <span>جاري قراءة الكارت الحالي...</span>
             `;
         }
 
         try {
-            showToast('جاري قراءة الكارت الحالي في القارئ...');
-            const res = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
-            if (res && res.success && res.customer) {
-                showToast(`تم التعرف على المشترك: ${res.customer.name}`, 'success');
-                const selectEl = document.getElementById('ncc-subscriber-select') as HTMLSelectElement | null;
-                if (selectEl) selectEl.value = String(res.customer.id);
-                loadNewChargeCustomer(String(res.customer.id));
+            showToast('جاري قراءة الكارت من القارئ...');
+            let res: any = null;
+            if (typeof (window as any).readCustomerCard === 'function') {
+                try {
+                    res = await (window as any).readCustomerCard();
+                } catch (e: any) {
+                    console.warn('IPC readCustomerCard error:', e);
+                }
+            }
+            if (!res || !res.success) {
+                res = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
+            }
+
+            if (res && res.success) {
+                const meterNum = res.data?.meterNumber || res.customer?.meterNumber;
+                const custCode = res.customer?.code || res.customer?.codeNumber;
+                const searchKey = meterNum || custCode;
+
+                if (searchKey) {
+                    showToast(`تمت قراءة الكارت (عداد: ${meterNum}). جاري استدعاء البيانات...`, 'success');
+                    const searchInp = document.getElementById('ncc-search-input') as HTMLInputElement | null;
+                    if (searchInp) searchInp.value = searchKey;
+                    searchCustomerForNewCardWithCharge(searchKey);
+                } else if (res.customer) {
+                    currentNewChargeCustomer = res.customer;
+                    searchCustomerForNewCardWithCharge(res.customer.name);
+                }
             } else {
-                showToast(res?.message || 'تم فحص القارئ.');
+                showToast(res?.message || 'لم يتم العثور على كارت في القارئ. يرجى وضع كارت العداد في قارئ البطاقات.', 'error');
             }
         } catch (err: any) {
             showToast('حدث خطأ أثناء قراءة الكارت.', 'error');
@@ -16027,7 +16169,8 @@ const handlePrintJudicialControlDetails = () => {
 
     const executeNewCardWithChargeProcess = async () => {
         if (!currentNewChargeCustomer || !currentNewChargeCustomer.id) {
-            showToast('يرجى تحديد المشترك أولاً.', 'error');
+            showToast('يرجى البحث عن المشترك وتحديده أولاً قبل تنفيذ الشحن والكتابة.', 'error');
+            document.getElementById('ncc-search-input')?.focus();
             return;
         }
 
@@ -16036,11 +16179,13 @@ const handlePrintJudicialControlDetails = () => {
         const sameCardCb = document.getElementById('ncc-opt-same-card') as HTMLInputElement | null;
         const delayDebtsCb = document.getElementById('ncc-opt-delay-debts') as HTMLInputElement | null;
 
-        const rechargeAmount = Number(rechargeAmtInp?.value) || 0;
+        const rawAmt = rechargeAmtInp?.value != null ? rechargeAmtInp.value.trim() : '';
+        const rechargeAmount = Number(rawAmt) || 0;
         const minCharge = currentNewChargeFinancials.minCharge;
 
-        if (rechargeAmount < minCharge) {
-            showToast(`الحد الأدنى للشحن هو ${minCharge} ج.م`, 'error');
+        if (!rawAmt || rechargeAmount < minCharge) {
+            showToast(`يرجى كتابة مبلغ الشحن (الحد الأدنى للشحن هو ${minCharge} ج.م)`, 'error');
+            rechargeAmtInp?.focus();
             return;
         }
 
@@ -16053,9 +16198,9 @@ const handlePrintJudicialControlDetails = () => {
 سعر الكارت البديل: 50.00 ج.م
 قيمة الشحن: ${rechargeAmount.toFixed(2)} ج.م
 صافي المبلغ المطلوب تحصيله: ${netCollected.toFixed(2)} ج.م
-إصدار على نفس الكارت: ${onSameCard ? 'نعم' : 'لا'}
+إصدار على نفس الكارت: ${onSameCard ? 'نعم (On Same Card)' : 'لا (كارت جديد)'}
 
-هل تريد المتابعة والكتابة على الكارت الآن؟`;
+هل تريد المتابعة والكتابة المباشرة على الكارت الآن عبر القارئ؟`;
 
         if (!confirm(confirmMsg)) return;
 
@@ -16067,12 +16212,12 @@ const handlePrintJudicialControlDetails = () => {
             btn.disabled = true;
             btn.innerHTML = `
                 <span style="display:inline-block; width:18px; height:18px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-left:8px;"></span>
-                <span>جاري كتابة الشحنة والكارت البديل...</span>
+                <span>جاري كتابة الشحنة والكارت البديل على القارئ...</span>
             `;
         }
 
         try {
-            showToast('جاري الاتصال بخدمة الكروت وإصدار الكارت البديل مع الشحنة...');
+            showToast('جاري الاتصال بخدمة الكروت وبرمجة الكارت البديل مع الشحنة...');
             const payload = {
                 cardType: 1,
                 id: currentNewChargeCustomer.id,
@@ -16082,17 +16227,37 @@ const handlePrintJudicialControlDetails = () => {
                 paymentTypeId: Number(paymentTypeSelect?.value) || 37,
                 generationType: 'g1',
                 netPrice: netCollected,
-                isDebitsDelay: Boolean(delayDebtsCb?.checked)
+                isDebitsDelay: Boolean(delayDebtsCb?.checked),
+                customerName: currentNewChargeCustomer.name,
+                meterNumber: currentNewChargeCustomer.meterNumber,
+                code: currentNewChargeCustomer.code,
+                nationalId: currentNewChargeCustomer.nationalId,
+                address: currentNewChargeCustomer.address,
+                activityName: currentNewChargeCustomer.activityName,
+                customerTypeName: currentNewChargeCustomer.customerTypeName,
+                meterCompanyName: currentNewChargeCustomer.meterCompanyName || 'المصرية',
+                chargeSequence: Number(currentNewChargeCustomer.chargeSequence || 1) + 1
             };
 
-            const res = await fetch('http://127.0.0.1:5002/api/customer-card/replacement-with-charge', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(r => r.json()).catch(() => null);
+            let res: any = null;
+            if (typeof (window as any).issueReplacementWithCharge === 'function') {
+                try {
+                    res = await (window as any).issueReplacementWithCharge(payload);
+                } catch (e: any) {
+                    console.warn('IPC issueReplacementWithCharge error:', e);
+                }
+            }
+
+            if (!res || !res.success) {
+                res = await fetch('http://127.0.0.1:5002/api/customer-card/replacement-with-charge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(r => r.json()).catch(() => null);
+            }
 
             if (res && res.success) {
-                showToast('تمت كتابة الكارت البديل مع الشحنة بنجاح!', 'success');
+                showToast('تمت برمجة وكتابة الكارت البديل مع الشحنة بنجاح على الشريحة الذكية!', 'success');
                 logActivity('كارت بديل بشحن', `تم إصدار كارت بديل بشحن بمبلغ ${rechargeAmount.toFixed(2)} ج.م للعداد ${currentNewChargeCustomer.meterNumber} للمشترك ${currentNewChargeCustomer.name}`);
 
                 if (banner) {
@@ -16100,7 +16265,7 @@ const handlePrintJudicialControlDetails = () => {
                     banner.style.backgroundColor = '#f0fdf4';
                     banner.style.color = '#166534';
                     banner.style.border = '1px solid #bbf7d0';
-                    banner.innerHTML = `<strong>تمت العملية بنجاح!</strong> تم إصدار الكارت البديل وشحن رصيد ${rechargeAmount.toFixed(2)} ج.م على الشريحة.`;
+                    banner.innerHTML = `<strong>تمت العملية بنجاح!</strong> تم إصدار الكارت البديل وشحن رصيد ${rechargeAmount.toFixed(2)} ج.م بنجاح على الشريحة الذكية.`;
                 }
 
                 showChargingReceiptModal({
@@ -16116,28 +16281,14 @@ const handlePrintJudicialControlDetails = () => {
                 });
 
             } else {
-                // Offline fallback
-                const local = state.meters.find(m => String(m.id) === String(currentNewChargeCustomer.id) || String(m.subscriptionCode || '') === String(currentNewChargeCustomer.code) || String(m.meterChassisNumber || '') === String(currentNewChargeCustomer.meterNumber));
-                if (local) {
-                    local.balance = (parseFloat(String(local.balance || 0)) || 0) + rechargeAmount;
-                    local.chargeCount = (local.chargeCount || 1) + 1;
-                    saveState();
-                    logActivity('كارت بديل بشحن', `تم إصدار كارت بديل بشحن (محلي) بمبلغ ${rechargeAmount.toFixed(2)} ج.م للعداد ${local.meterChassisNumber} للمشترك ${local.subscriberName}`);
-                    showToast('تم إصدار الكارت البديل والشحن بنجاح في المنظومة المستقلة!', 'success');
-
-                    showChargingReceiptModal({
-                        id: 'RCP-NC-' + Date.now().toString().slice(-6),
-                        date: new Date().toLocaleString('ar-EG'),
-                        customerName: currentNewChargeCustomer.name,
-                        customerCode: currentNewChargeCustomer.code,
-                        meterNumber: currentNewChargeCustomer.meterNumber,
-                        sequence: String((Number(currentNewChargeCustomer.chargeSequence) || 1) + 1),
-                        chargeAmount: rechargeAmount.toFixed(2),
-                        deductions: 'رسوم كارت 50.00 ج.م',
-                        netCollected: netCollected.toFixed(2)
-                    });
-                } else {
-                    showToast(res?.message || 'تعذر استكمال إصدار الكارت البديل بشحن.', 'error');
+                const errMsg = res?.message || 'تعذر استكمال إصدار وبرمجة الكارت البديل بشحن. تأكد من ثبات الكارت في القارئ.';
+                showToast(errMsg, 'error');
+                if (banner) {
+                    banner.style.display = 'block';
+                    banner.style.backgroundColor = '#fef2f2';
+                    banner.style.color = '#b91c1c';
+                    banner.style.border = '1px solid #fecaca';
+                    banner.textContent = errMsg;
                 }
             }
 
@@ -16153,23 +16304,21 @@ const handlePrintJudicialControlDetails = () => {
     };
 
     const initNewCardWithChargeListeners = () => {
+        document.getElementById('btn-ncc-search')?.addEventListener('click', () => searchCustomerForNewCardWithCharge());
+        document.getElementById('ncc-search-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchCustomerForNewCardWithCharge();
+            }
+        });
         document.getElementById('btn-ncc-read-card')?.addEventListener('click', () => readNewChargeCardSmartCard());
         document.getElementById('btn-ncc-execute')?.addEventListener('click', () => executeNewCardWithChargeProcess());
-        document.getElementById('ncc-recharge-amount')?.addEventListener('input', () => calculateNewChargeCardNet());
-        document.getElementById('ncc-opt-delay-debts')?.addEventListener('change', () => calculateNewChargeCardNet());
-        document.getElementById('ncc-subscriber-select')?.addEventListener('change', (e) => {
-            const val = (e.target as HTMLSelectElement).value;
-            if (val) loadNewChargeCustomer(val);
-            else resetNewCardWithChargeUI();
+        ['input', 'keyup', 'change'].forEach(evt => {
+            document.getElementById('ncc-recharge-amount')?.addEventListener(evt, () => calculateNewChargeCardNet());
         });
+        document.getElementById('ncc-opt-delay-debts')?.addEventListener('change', () => calculateNewChargeCardNet());
     };
 
-
-    // =========================================================================
-    // قسم إضافة الاستثناءات والرسوم والدمغات (MEEDCO Exceptions, Fees & Debts)
-    // =========================================================================
-
-    // Sample/Default data initialization
     const initDebtsDefaultsIfNeeded = () => {
         if (!state.settings) (state.settings as any) = {};
         if ((state.settings as any).debtsModuleInitialized) {

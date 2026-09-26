@@ -352,6 +352,10 @@ ipcMain.handle('customer-card:charging-details', async (event, customerId) => {
   return await cardReader.getCustomerChargingDetails(customerId);
 });
 
+ipcMain.handle('customer:search', async (event, term) => {
+  return await cardReader.searchCustomer(term);
+});
+
 // أغلق التطبيق عند إغلاق جميع النوافذ (باستثناء macOS).
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
