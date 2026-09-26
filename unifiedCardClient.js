@@ -2047,7 +2047,36 @@ async function searchCustomerLive(term) {
     };
 }
 
+
+/**
+ * Get Customer Meter Movements (حركات عداد)
+ * Calls MEEDCO API /Customer/GetCustomerMeterMovements/
+ */
+async function getCustomerMeterMovementsLive(param) {
+    if (!param) {
+        return { success: false, message: 'يرجى تحديد المشترك أو رقم العداد' };
+    }
+    let payload = {};
+    if (typeof param === 'object') {
+        payload = { customerId: param.customerId || 0, code: param.code || '' };
+    } else {
+        const q = String(param).trim();
+        payload = { customerId: 0, code: q };
+    }
+
+    try {
+        const res = await apiMeedcoRequest('/Customer/GetCustomerMeterMovements/', 'POST', payload);
+        if (res && res.data) {
+            return { success: true, data: res.data };
+        }
+        return { success: false, message: res?.message || 'لم يتم العثور على حركات للعداد' };
+    } catch (err) {
+        return { success: false, message: err.message };
+    }
+}
+
 module.exports = {
+    getCustomerMeterMovementsLive,
     getActiveAuthToken,
     getUcsToken,
     apiMeedcoRequest,

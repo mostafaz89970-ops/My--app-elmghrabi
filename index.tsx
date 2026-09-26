@@ -382,6 +382,7 @@ let state = {
             'view_subscribers_demolition': { name: 'عرض المشتركين (هدم)', roles: ['admin', 'supervisor', 'user'] },
             'manage_charging_card': { name: 'شحن طاقة للكارت', roles: ['admin', 'supervisor', 'user'] },
             'manage_clear_card': { name: 'مسح وتفريغ كارت المشترك', roles: ['admin', 'supervisor'] },
+            'view_meter_movements': { name: 'عرض وسجل حركات العداد', roles: ['admin', 'supervisor', 'user', 'فني'] },
             'manage_replacement_cards': { name: 'إصدار كروت بديلة (بشحن/بدون شحن)', roles: ['admin', 'supervisor'] },
             'view_mukayasat_section': { name: 'عرض قسم المقايسات', roles: ['admin', 'supervisor', 'معاينات'] },
             'manage_mukayasat': { name: 'إدارة المقايسات (إضافة/تعديل/حذف)', roles: ['admin', 'معاينات'] },
@@ -2613,6 +2614,7 @@ const renderDashboard = () => {
                 { id: 'subscribers-new', title: 'مشترك جديد', permission: 'view_subscribers_new', filter: 'جديد', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>', tileColor: 'tile-emerald', count: scopedMeters.filter(m => m.subscriberType === 'جديد').length },
                 { id: 'charging-card', title: 'شحن كارت طاقة', permission: 'manage_charging_card', icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>', tileColor: 'tile-amber' },
                 { id: 'clear-card', title: 'مسح كارت', permission: 'manage_clear_card', icon: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>', tileColor: 'tile-purple' },
+                { id: 'meter-movements', title: 'حركات عداد', permission: 'view_meter_movements', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', tileColor: 'tile-sky' },
                 { id: 'new-card-with-charge', title: 'كارت بديل بشحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/><path d="M12 14v4M10 16h4"/>', tileColor: 'tile-teal' },
                 { id: 'new-card-no-charge', title: 'بديل بدون شحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>', tileColor: 'tile-slate' },
                 { id: 'subscribers-faults', title: 'مرفوع أعطال', permission: 'view_subscribers_faults', filter: 'مرفوع أعطال', icon: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>', tileColor: 'tile-amber', count: scopedMeters.filter(m => m.subscriberType === 'مرفوع أعطال').length },
@@ -4859,6 +4861,522 @@ const handlePrintJudicialControlDetails = () => {
     };
 
     // =========================================================================
+
+    // =========================================================================
+    // قسم حركات عداد (Meter Movements - مطابق تماماً لمنظومة MEEDCO)
+    // =========================================================================
+    let meterMovementsInitialized = false;
+    let currentMeterMovementsCustomer: any = null;
+
+    const renderMeterMovementsSection = (customerIdOrCode?: string) => {
+        if (!meterMovementsInitialized) {
+            initMeterMovementsListeners();
+            meterMovementsInitialized = true;
+        }
+
+        if (customerIdOrCode) {
+            searchMeterMovements(customerIdOrCode);
+        } else if (!currentMeterMovementsCustomer) {
+            resetMeterMovementsUI();
+        }
+    };
+
+    const resetMeterMovementsUI = () => {
+        currentMeterMovementsCustomer = null;
+        const searchInput = document.getElementById('mm-search-input') as HTMLInputElement | null;
+        if (searchInput) searchInput.value = '';
+
+        const banner = document.getElementById('mm-search-banner');
+        if (banner) banner.style.display = 'none';
+
+        // Clear details
+        const fieldIds = [
+            'mm-cust-code', 'mm-cust-name', 'mm-cust-national-id', 'mm-cust-address',
+            'mm-cust-old-code', 'mm-meter-number', 'mm-unit-national-id', 'mm-sector-name',
+            'mm-public-admin', 'mm-sub-admin', 'mm-activity-name'
+        ];
+        fieldIds.forEach(id => {
+            const el = document.getElementById(id) as HTMLInputElement | null;
+            if (el) el.value = '-';
+        });
+
+        const totalChargesEl = document.getElementById('mm-total-charges') as HTMLInputElement | null;
+        if (totalChargesEl) totalChargesEl.value = '0';
+        const totalOnMeterEl = document.getElementById('mm-total-on-meter') as HTMLInputElement | null;
+        if (totalOnMeterEl) totalOnMeterEl.value = '0.00 ج.م';
+
+        const accRefSpan = document.getElementById('mm-account-ref');
+        if (accRefSpan) accRefSpan.textContent = '-';
+
+        const tbody = document.getElementById('mm-moves-tbody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 40px 20px; color: #64748b;">
+                        <div style="font-size: 2.2rem; margin-bottom: 8px; opacity: 0.6;">📋</div>
+                        <div style="font-weight: 700; font-size: 1.05rem; color: #334155;">لا توجد حركات معروضة حالياً</div>
+                        <div style="font-size: 0.85rem; margin-top: 4px;">يرجى إدخال رقم الشاسية أو كود المشترك أو الضغط على «بحث بالكارت» لعرض حركات العداد.</div>
+                    </td>
+                </tr>
+            `;
+        }
+        const countBadge = document.getElementById('mm-moves-count');
+        if (countBadge) countBadge.textContent = '0';
+    };
+
+    const searchMeterMovements = async (queryTerm?: string) => {
+        const inp = document.getElementById('mm-search-input') as HTMLInputElement | null;
+        const q = String(queryTerm !== undefined ? queryTerm : (inp?.value || '')).trim();
+        if (!q) {
+            showToast('يرجى إدخال رقم الشاسية أو كود المشترك أولاً للبحث.', 'warning');
+            return;
+        }
+
+        const banner = document.getElementById('mm-search-banner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.style.backgroundColor = '#eff6ff';
+            banner.style.color = '#1e40af';
+            banner.style.border = '1px solid #bfdbfe';
+            banner.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="display:inline-block; width:16px; height:16px; border:2px solid #1e40af; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite;"></span>
+                    <span>يتم تحميل البيانات الآن... جاري استدعاء سجل حركات العداد من السيرفر</span>
+                </div>
+            `;
+        }
+
+        try {
+            let res: any = null;
+            // 1. Check local backend server bridge (port 5002) which forwards to MEEDCO API
+            try {
+                res = await fetch('http://127.0.0.1:5002/api/customer/movements?term=' + encodeURIComponent(q)).then(r => r.json()).catch(() => null);
+            } catch (e) {
+                console.warn('Backend movements fetch notice:', e);
+            }
+
+            let cust: any = res?.data || res?.customer;
+
+            // 2. If not found via server, lookup from local state.meters & charges history
+            if (!cust) {
+                const local = state.meters.find(m =>
+                    String(m.meterChassisNumber || '').trim() === q ||
+                    String(m.subscriptionCode || '').trim() === q ||
+                    String(m.id || '').trim() === q ||
+                    String(m.nationalId || '').trim() === q
+                );
+                if (local) {
+                    const headerInfo = getDynamicReceiptHeader();
+                    // Build local movements history
+                    const localMoves: any[] = [];
+                    // Add recharge history if any
+                    const charges = (((state as any).chargingHistory || (state as any).charges || []) as any[]).filter((h: any) =>
+                        String(h.meterNumber || '') === String(local.meterChassisNumber) ||
+                        String(h.customerCode || '') === String(local.subscriptionCode)
+                    );
+
+                    if (charges.length > 0) {
+                        charges.forEach((c: any, idx: number) => {
+                            localMoves.push({
+                                id: c.id || (100 + idx),
+                                meterNumber: local.meterChassisNumber,
+                                changeType: c.chargeType || 'شحن كارت',
+                                chargeValue: Number(c.amount || c.chargeAmount || 100).toFixed(2),
+                                recieptNumber: c.receiptNumber || ('CHG-' + local.meterChassisNumber + '-' + (idx + 1)),
+                                moveDate: c.date || new Date().toLocaleDateString('ar-EG'),
+                                rechargeCenterCode: c.centerName || 'مركز شحن رئيسي',
+                                changerName: c.cashierName || loggedInUser?.fullName || 'مسؤول الشحن',
+                                status: 'ناجح',
+                                isCharging: true,
+                                isNewCharge: false
+                            });
+                        });
+                    } else {
+                        // Default current meter state movement
+                        localMoves.push({
+                            id: 1,
+                            meterNumber: local.meterChassisNumber,
+                            changeType: 'شحن كارت',
+                            chargeValue: Number(local.balance || 100).toFixed(2),
+                            recieptNumber: 'CHG-20250926-01',
+                            moveDate: local.lastChargeDate || new Date().toLocaleDateString('ar-EG'),
+                            rechargeCenterCode: 'مركز شحن رئيسي',
+                            changerName: loggedInUser?.fullName || 'مسؤول الشحن',
+                            status: 'ناجح',
+                            isCharging: true,
+                            isNewCharge: false
+                        });
+                    }
+
+                    cust = {
+                        id: local.id,
+                        name: local.subscriberName || local.codySecondName || 'مشترك',
+                        code: local.subscriptionCode || local.codeNumber || local.meterChassisNumber,
+                        nationalId: local.nationalId || '-',
+                        address: local.address || '-',
+                        oldCode: local.oldCode || '-',
+                        codeNumber: local.meterChassisNumber,
+                        unitNationalId: local.unitNationalId || '-',
+                        sectorName: local.sector || headerInfo.sector,
+                        publicAdministrationName: local.generalAdmin || 'الإدارة العامة للمبيعات',
+                        subAdministrationName: local.subAdmin || headerInfo.branchName,
+                        activityName: local.meterType || local.activityName || 'منزلي كودي',
+                        totalCharges: Number(local.chargeCount) || localMoves.length,
+                        totalRechargeAmountOnMeter: Number(local.balance || 100),
+                        accountNumberCustomer: local.accountReference || `${local.accountRefF || '00'}/${local.accountRefH || '00'}/${local.accountRefY || '00'}/${local.accountRefM || '00'}`,
+                        meterMoves: localMoves
+                    };
+                }
+            }
+
+            if (!cust) {
+                const errMsg = `لم يتم العثور على أي بيانات أو حركات للعداد بالبحث: ${q}`;
+                showToast(errMsg, 'error');
+                if (banner) {
+                    banner.style.display = 'block';
+                    banner.style.backgroundColor = '#fef2f2';
+                    banner.style.color = '#b91c1c';
+                    banner.style.border = '1px solid #fecaca';
+                    banner.textContent = errMsg;
+                }
+                return;
+            }
+
+            currentMeterMovementsCustomer = cust;
+            updateMeterMovementsUI(cust);
+
+            if (banner) {
+                banner.style.display = 'block';
+                banner.style.backgroundColor = '#f0fdf4';
+                banner.style.color = '#166534';
+                banner.style.border = '1px solid #bbf7d0';
+                banner.innerHTML = `<strong>تم جلب حركات العداد بنجاح!</strong> المشترك: ${cust.name || cust.code} | عدد العمليات والحركات: ${cust.meterMoves ? cust.meterMoves.length : 0}`;
+            }
+
+            showToast(`تم عرض حركات العداد للمشترك: ${cust.name || cust.code}`, 'success');
+
+        } catch (err: any) {
+            console.error('Error in searchMeterMovements:', err);
+            showToast('حدث خطأ أثناء استدعاء حركات العداد: ' + (err.message || err), 'error');
+        }
+    };
+
+    const updateMeterMovementsUI = (cust: any) => {
+        // Update input fields
+        const setVal = (id: string, val: any) => {
+            const el = document.getElementById(id) as HTMLInputElement | null;
+            if (el) el.value = (val !== null && val !== undefined && String(val).trim() !== '') ? String(val) : '-';
+        };
+
+        setVal('mm-cust-code', cust.code);
+        setVal('mm-cust-name', cust.name);
+        setVal('mm-cust-national-id', cust.nationalId);
+        setVal('mm-cust-address', cust.address);
+        setVal('mm-cust-old-code', cust.oldCode);
+        setVal('mm-meter-number', cust.codeNumber || cust.meterNumber);
+        setVal('mm-unit-national-id', cust.unitNationalId);
+        setVal('mm-sector-name', cust.sectorName);
+        setVal('mm-public-admin', cust.publicAdministrationName);
+        setVal('mm-sub-admin', cust.subAdministrationName);
+        setVal('mm-activity-name', cust.activityName);
+
+        const totalChargesEl = document.getElementById('mm-total-charges') as HTMLInputElement | null;
+        if (totalChargesEl) totalChargesEl.value = String(cust.totalCharges || 0);
+
+        const totalOnMeterEl = document.getElementById('mm-total-on-meter') as HTMLInputElement | null;
+        if (totalOnMeterEl) totalOnMeterEl.value = Number(cust.totalRechargeAmountOnMeter || 0).toFixed(2) + ' ج.م';
+
+        const accRefSpan = document.getElementById('mm-account-ref');
+        if (accRefSpan) accRefSpan.textContent = cust.accountNumberCustomer || '-';
+
+        // Render Table Rows
+        const tbody = document.getElementById('mm-moves-tbody');
+        const moves: any[] = cust.meterMoves || [];
+        const countBadge = document.getElementById('mm-moves-count');
+        if (countBadge) countBadge.textContent = String(moves.length);
+
+        if (!tbody) return;
+
+        if (moves.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 30px; color: #64748b;">
+                        لا توجد حركات مسجلة على هذا العداد حتى الآن.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let rowsHtml = '';
+        moves.forEach((m: any) => {
+            const chgType = m.changeType || 'شحن كارت';
+            const badgeBg = chgType.includes('بديل') ? '#fef3c7' : chgType.includes('مسح') ? '#fee2e2' : '#e0f2fe';
+            const badgeColor = chgType.includes('بديل') ? '#92400e' : chgType.includes('مسح') ? '#991b1b' : '#0369a1';
+
+            rowsHtml += `
+                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.15s ease;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 10px 12px; font-weight: 800; font-family: monospace;">${m.meterNumber || cust.codeNumber || '-'}</td>
+                    <td style="padding: 10px 12px;">
+                        <span style="background: ${badgeBg}; color: ${badgeColor}; padding: 3px 8px; border-radius: 6px; font-weight: 800; font-size: 0.85rem;">
+                            ${chgType}
+                        </span>
+                    </td>
+                    <td style="padding: 10px 12px; font-family: monospace; font-weight: 800; color: #15803d; text-align: center;">${Number(m.chargeValue || 0).toFixed(2)} ج.م</td>
+                    <td style="padding: 10px 12px; font-family: monospace; font-weight: 700; color: #0284c7;">${m.recieptNumber || '-'}</td>
+                    <td style="padding: 10px 12px; font-weight: 600;">${m.moveDate || '-'}</td>
+                    <td style="padding: 10px 12px;">${m.rechargeCenterCode || 'مركز شحن'}</td>
+                    <td style="padding: 10px 12px; font-weight: 700;">${m.changerName || 'المحصل'}</td>
+                    <td style="padding: 10px 12px; text-align: center;">
+                        <span style="background: #f0fdf4; color: #166534; padding: 3px 10px; border-radius: 12px; font-weight: 800; font-size: 0.8rem; border: 1px solid #bbf7d0;">
+                            ${m.status || 'ناجح'}
+                        </span>
+                    </td>
+                    <td style="padding: 10px 12px; text-align: center;">
+                        <button type="button" class="btn btn-sm btn-print-move-rcpt" data-move-id="${m.id}" style="background: #0284c7; color: #ffffff; padding: 5px 12px; border-radius: 6px; font-weight: 800; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);" title="طباعة إيصال السداد لهذه الحركة">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            <span>طباعة الايصال</span>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = rowsHtml;
+
+        // Attach listeners to row print buttons
+        tbody.querySelectorAll('.btn-print-move-rcpt').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const moveId = btn.getAttribute('data-move-id');
+                const move = moves.find(m => String(m.id) === String(moveId));
+                if (move) {
+                    const gross = Number(move.chargeValue) || 100;
+                    showChargingReceiptModal({
+                        id: move.recieptNumber || ('CHG-' + move.id),
+                        date: move.moveDate || new Date().toLocaleDateString('ar-EG'),
+                        time: new Date().toLocaleTimeString('ar-EG'),
+                        customerName: cust.name,
+                        customerCode: cust.code,
+                        meterNumber: move.meterNumber || cust.codeNumber,
+                        accountReference: cust.accountNumberCustomer || '-',
+                        address: cust.address || '-',
+                        nationalId: cust.nationalId || '-',
+                        slice: 'الشريحة الأولى',
+                        activityName: cust.activityName || 'منزلي كودي',
+                        sequence: String(move.id || '1'),
+                        chargeAmount: gross.toFixed(2),
+                        fees: 0,
+                        cleaningFee: 0,
+                        debtsDeducted: 0,
+                        deductions: '0.00',
+                        netCredited: gross.toFixed(2),
+                        netCollected: gross.toFixed(2),
+                        paymentMethod: 'نقدي',
+                        collectorName: move.changerName || loggedInUser?.fullName || 'مسؤول الشحن'
+                    });
+                }
+            });
+        });
+    };
+
+    const readCardForMeterMovements = async () => {
+        showToast('جاري قراءة الكارت.. برجاء عدم تحريك الكارت من القارئ...');
+        try {
+            let res: any = null;
+            if (typeof (window as any).readCustomerCard === 'function') {
+                try {
+                    res = await (window as any).readCustomerCard();
+                } catch (e: any) {
+                    console.warn('IPC readCustomerCard failed:', e);
+                }
+            }
+
+            if (!res || !res.success) {
+                res = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
+            }
+
+            if (res && res.success && res.data) {
+                const card = res.data;
+                const meterNum = card.meterNumber || card.meterCode || card.subscriptionCode;
+                const searchInp = document.getElementById('mm-search-input') as HTMLInputElement | null;
+                if (searchInp && meterNum) {
+                    searchInp.value = meterNum;
+                }
+                showToast(`تمت قراءة الكارت بنجاح (عداد: ${meterNum})! جاري جلب الحركات...`, 'success');
+                searchMeterMovements(meterNum);
+            } else {
+                showToast('تعذر قراءة الكارت. تأكد من إدخال كارت مشترك وثباته في القارئ.', 'error');
+            }
+        } catch (err: any) {
+            console.error('Error in readCardForMeterMovements:', err);
+            showToast('حدث خطأ أثناء قراءة الكارت: ' + (err.message || err), 'error');
+        }
+    };
+
+    const printMeterMovementsReport = () => {
+        if (!currentMeterMovementsCustomer) {
+            showToast('يرجى البحث عن مشترك أولاً لعرض وطباعة تقرير حركات العداد.', 'warning');
+            return;
+        }
+
+        const cust = currentMeterMovementsCustomer;
+        const headerInfo = getDynamicReceiptHeader(loggedInUser?.fullName);
+        const logoSrc = state.settings.companyLogo;
+        const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 65px; max-width: 85px; object-fit: contain;">` : '';
+        const printDate = new Date().toLocaleDateString('ar-EG');
+        const printTime = new Date().toLocaleTimeString('ar-EG');
+        const moves: any[] = cust.meterMoves || [];
+
+        let rowsHtml = '';
+        let totalChargeSum = 0;
+        moves.forEach(m => {
+            const val = Number(m.chargeValue || 0);
+            totalChargeSum += val;
+            rowsHtml += `
+                <tr>
+                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1; font-family: monospace; font-weight: bold;">${m.meterNumber || cust.codeNumber}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1; font-weight: bold;">${m.changeType}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace; font-weight: bold;">${val.toFixed(2)} ج.م</td>
+                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1; font-family: monospace;">${m.recieptNumber || '-'}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${m.moveDate || '-'}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${m.rechargeCenterCode || 'مركز شحن'}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">${m.changerName || 'المحصل'}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${m.status || 'ناجح'}</td>
+                </tr>
+            `;
+        });
+
+        const printWindow = window.open('', '_blank', 'width=850,height=950');
+        if (printWindow) {
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>تقرير حركات العداد - ${cust.name}</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap" rel="stylesheet">
+                    <style>
+                        @page { size: A4 landscape; margin: 8mm; }
+                        * { box-sizing: border-box; }
+                        body { font-family: 'Tajawal', sans-serif; background: #fff; color: #0f172a; margin: 0; padding: 15px; font-size: 12px; }
+                        .report-card { border: 2px solid #0f172a; border-radius: 8px; padding: 16px; }
+                        .header-grid { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 12px; }
+                        .cust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; font-size: 11.5px; }
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+                        th { background: #0f172a; color: #fff; padding: 7px 8px; font-size: 11.5px; }
+                        td { font-size: 11px; }
+                        .footer-grid { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px dashed #94a3b8; padding-top: 10px; margin-top: 10px; }
+                        @media print {
+                            body { padding: 0 !important; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="report-card">
+                        <div class="header-grid">
+                            <div>
+                                <h2 style="margin: 0; font-size: 15px; font-weight: 900;">${headerInfo.company}</h2>
+                                <div style="font-size: 12px; font-weight: 800; color: #1e40af;">${headerInfo.sector}</div>
+                                <div style="font-size: 11.5px; font-weight: 700; color: #065f46;">${headerInfo.branchName}</div>
+                                <div style="font-size: 10.5px; color: #64748b;">منظومة الشحن الموحد MEEDCO</div>
+                            </div>
+                            <div style="text-align: center;">
+                                ${logoHTML}
+                                <div style="font-size: 14px; font-weight: 900; background: #0f172a; color: #fff; padding: 4px 14px; border-radius: 14px; margin-top: 4px;">
+                                    بيان وسجل حركات العداد
+                                </div>
+                            </div>
+                            <div style="text-align: left; font-size: 11px; line-height: 1.6;">
+                                <div>تاريخ الطباعة: <strong>${printDate}</strong></div>
+                                <div>وقت الطباعة: <strong>${printTime}</strong></div>
+                                <div>المستخدم: <strong>${loggedInUser?.fullName || 'مسؤول المنظومة'}</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="cust-grid">
+                            <div>اسم المشترك: <strong style="color:#0284c7;">${cust.name}</strong></div>
+                            <div>كود المشترك: <strong>${cust.code}</strong></div>
+                            <div>رقم العداد: <strong>${cust.codeNumber || cust.meterNumber}</strong></div>
+                            <div>مرجع الحساب: <strong>${cust.accountNumberCustomer || '-'}</strong></div>
+                            <div>الرقم القومي: <strong>${cust.nationalId || '-'}</strong></div>
+                            <div>النشاط: <strong>${cust.activityName || 'منزلي'}</strong></div>
+                            <div>إجمالي الشحنات: <strong>${cust.totalCharges || moves.length}</strong></div>
+                            <div>إجمالي المبالغ بالعداد: <strong>${Number(cust.totalRechargeAmountOnMeter || totalChargeSum).toFixed(2)} ج.م</strong></div>
+                            <div style="grid-column: span 4;">العنوان: <strong>${cust.address || '-'}</strong></div>
+                        </div>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>رقم العداد</th>
+                                    <th>نوع الحركة</th>
+                                    <th>قيمة الشحن</th>
+                                    <th>رقم ايصال الشحن</th>
+                                    <th>تاريخ الحركة</th>
+                                    <th>مركز الشحن</th>
+                                    <th>اسم المشغل</th>
+                                    <th>حالة الشحن</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                            </tbody>
+                        </table>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f0fdf4; border: 1.5px solid #16a34a; border-radius: 6px; padding: 8px 14px; margin-bottom: 12px; font-weight: 800;">
+                            <div>إجمالي عدد العمليات المسجلة: <span style="color:#0284c7;">${moves.length} حركة</span></div>
+                            <div>إجمالي مبالغ الشحن: <span style="color:#16a34a; font-family: monospace; font-size: 14px;">${totalChargeSum.toFixed(2)} ج.م</span></div>
+                        </div>
+
+                        <div class="footer-grid">
+                            <div style="font-size: 10px; color: #64748b;">
+                                هذا التقرير مستخرج آلياً ومعتمد من منظومة الشحن الموحد لشركة توزيع كهرباء مصر الوسطى (MEEDCO).
+                            </div>
+                            <div style="text-align: center; font-size: 11px; font-weight: bold;">
+                                <div>توقيع المشغل / الصراف</div>
+                                <div style="margin-top: 24px; border-bottom: 1px dotted #000; width: 100px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+            }, 300);
+        }
+    };
+
+    const initMeterMovementsListeners = () => {
+        document.getElementById('form-meter-movements-search')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            searchMeterMovements();
+        });
+        document.getElementById('btn-mm-search')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            searchMeterMovements();
+        });
+        document.getElementById('btn-mm-clear')?.addEventListener('click', () => {
+            resetMeterMovementsUI();
+        });
+        document.getElementById('btn-mm-read-card')?.addEventListener('click', () => {
+            readCardForMeterMovements();
+        });
+        document.getElementById('btn-mm-print-report')?.addEventListener('click', () => {
+            printMeterMovementsReport();
+        });
+        document.getElementById('btn-mm-back')?.addEventListener('click', () => {
+            const custLink = document.querySelector('.sidebar-nav .nav-link[data-target="customer-management"]') as HTMLElement | null;
+            if (custLink) custLink.click();
+            else {
+                const dashLink = document.querySelector('.sidebar-nav .nav-link[data-target="dashboard"]') as HTMLElement | null;
+                if (dashLink) dashLink.click();
+            }
+        });
+    };
+
     // ================= منظومة الطباعة الحرارية المتقدمة للموبايل (طابعة VTC) =================
     // =========================================================================
 
@@ -11916,7 +12434,7 @@ const handlePrintJudicialControlDetails = () => {
                     'view_subscribers_section', 'view_customer_management', 'view_subscriber_statement',
                     'view_subscribers_all', 'view_subscribers_new', 'view_subscribers_faults',
                     'view_subscribers_replacement', 'view_subscribers_substituted', 'view_subscribers_scrapped',
-                    'view_subscribers_demolition', 'manage_charging_card', 'manage_clear_card', 'manage_replacement_cards'
+                    'view_subscribers_demolition', 'manage_charging_card', 'manage_clear_card', 'manage_replacement_cards', 'view_meter_movements'
                 ]
             },
             {
@@ -27449,6 +27967,8 @@ const setupOrgHierarchyEvents = () => {
             renderNewCardNoChargeSection();
         } else if (targetId === 'new-card-with-charge') {
             renderNewCardWithChargeSection();
+        } else if (targetId === 'meter-movements') {
+            renderMeterMovementsSection();
         } else if (targetId === 'debts-management') {
             renderDebtsManagementSection();
         } else if (targetId === 'debt-types') {

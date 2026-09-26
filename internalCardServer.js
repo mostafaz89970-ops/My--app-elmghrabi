@@ -116,6 +116,18 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            
+            // 7.2 Customer Meter Movements (حركات عداد - MEEDCO)
+            if (pathname === '/api/customer/movements' || pathname === '/api/customer-meter-movements') {
+                const term = url.searchParams.get('term') || url.searchParams.get('code') || url.searchParams.get('customerId') || url.searchParams.get('q');
+                const body = await getBody();
+                const searchTerm = term || body.term || body.code || body.customerId || body.q;
+                const result = await nativeEngine.getCustomerMeterMovements(searchTerm);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
             // 7.1 Search Customer by Chassis / Code
             if (pathname === '/api/customer/search' || pathname === '/api/customer-search') {
                 const term = url.searchParams.get('term') || url.searchParams.get('q');
