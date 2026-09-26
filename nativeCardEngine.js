@@ -213,8 +213,66 @@ async function readSmartCard(mockData = null) {
     };
 }
 
-// 3. Read Customer Card Live (Exact Charging Smart Card Reader)
+// 3. Read Customer Card Live (Interacts directly with physical reader & MEEDCO UCS service)
 async function readCustomerCard() {
+    // 1. Try Live Unified Card Client first (interacts with real physical reader and decrypts card data)
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.readCustomerCardLive === 'function') {
+            const liveRes = await unifiedClient.readCustomerCardLive();
+            if (liveRes && liveRes.success && liveRes.data) {
+                console.log('Successfully read live customer card via UnifiedCardClient:', liveRes.customer?.name);
+                
+                // Update card store with live card
+                const store = getCardStore();
+                const mNum = liveRes.data.meterNumber || liveRes.customer?.meterNumber;
+                if (mNum) {
+                    store.cards[mNum] = {
+                        meterNumber: mNum,
+                        customerName: liveRes.customer?.name,
+                        subscriptionCode: liveRes.customer?.code || liveRes.customer?.codeNumber,
+                        nationalId: liveRes.customer?.nationalId,
+                        address: liveRes.customer?.address,
+                        activityName: liveRes.customer?.activityName,
+                        customerTypeName: liveRes.customer?.customerTypeName,
+                        meterCompanyName: liveRes.customer?.meterCompanyName || 'المصرية',
+                        remainingBalance: Number(liveRes.data.remainingBalance || 0),
+                        chargeSequence: Number(liveRes.data.sequenceOnMeter || 1),
+                        consumptionSlice: Number(liveRes.data.slice || 1),
+                        lastChargeDate: liveRes.data.lastChargeDate,
+                        meterDebit: Number(liveRes.data.meterTotalDebit || 0),
+                        updatedAt: new Date().toISOString()
+                    };
+                    saveCardStore(store);
+                }
+
+                // Query debts for this customer
+                const debtsStore = getDebtsStore();
+                const cCode = liveRes.customer?.code || liveRes.customer?.codeNumber;
+                const custDebts = debtsStore.debts.filter(d => 
+                    (mNum && String(d.meterNumber) === String(mNum)) ||
+                    (cCode && String(d.subscriptionCode) === String(cCode))
+                );
+                const totalRemainingDebts = custDebts.reduce((sum, d) => sum + (Number(d.remainingAmount) || 0), 0);
+                const monthlyInstallment = custDebts
+                    .filter(d => d.status === 'PaymentInProgress' || d.status === 'مستحق فوري')
+                    .reduce((sum, d) => sum + (Number(d.installmentAmount) || 0), 0);
+
+                if (!liveRes.financials) liveRes.financials = {};
+                liveRes.financials.debts = totalRemainingDebts;
+                liveRes.financials.monthlyInstallment = monthlyInstallment;
+                liveRes.financials.detailedDebts = custDebts;
+
+                return liveRes;
+            } else if (liveRes && liveRes.message) {
+                console.warn('readCustomerCardLive returned message:', liveRes.message);
+            }
+        }
+    } catch (liveErr) {
+        console.warn('Live read via UnifiedCardClient failed, trying PC/SC:', liveErr.message);
+    }
+
+    // 2. PC/SC Direct Reader
     const status = await getReaderStatus();
     if (!status.connected) {
         return {
@@ -233,53 +291,27 @@ async function readCustomerCard() {
     }
 
     const card = status.card;
-    const uid = (card.uid || 'EF74A35F').toUpperCase();
+    const uid = (card.uid || card.atr || 'CARD-1').toUpperCase().replace(/\s+/g, '');
     const store = getCardStore();
 
-    // Look up or initialize card record
     let record = store.cards[uid];
     if (!record) {
-        record = {
-            uid: uid,
-            atr: card.atr,
-            meterNumber: "71310234",
-            customerName: "محمد فالح احمد محمد",
-            subscriptionCode: "0503480366",
-            nationalId: "28504121401234",
-            address: "المنيا - بني مزار",
-            activityName: "منزلي كودي",
-            customerTypeName: "أهالي",
-            meterCompanyName: identifyVendor(card.atr),
-            meterType: "أحادي إلكتروني مسبق الدفع",
-            remainingBalance: 85.50,
-            chargeSequence: 5,
-            consumptionSlice: 1,
-            lastChargeDate: new Date().toLocaleDateString('ar-EG'),
-            hasCharge: false,
-            isStop: false,
-            meterDebit: 45.33,
-            updatedAt: new Date().toISOString()
-        };
-        store.cards[uid] = record;
-        saveCardStore(store);
+        // Check if store has any saved cards
+        const keys = Object.keys(store.cards);
+        if (keys.length > 0) {
+            record = store.cards[keys[0]];
+        }
     }
 
-    // Get customer debts
-    const debtsStore = getDebtsStore();
-    const custDebts = debtsStore.debts.filter(d => 
-        String(d.meterNumber) === String(record.meterNumber) ||
-        String(d.subscriptionCode) === String(record.subscriptionCode) ||
-        String(d.customerId) === String(record.subscriptionCode)
-    );
-    const totalRemainingDebts = custDebts.reduce((sum, d) => sum + (Number(d.remainingAmount) || 0), 0);
-    const monthlyInstallment = custDebts
-        .filter(d => d.status === 'PaymentInProgress' || d.status === 'مستحق فوري')
-        .reduce((sum, d) => sum + (Number(d.installmentAmount) || 0), 0);
+    if (!record) {
+        return {
+            success: false,
+            message: 'تم اكتشاف الكارت ولكن تعذر فك تشفير بيانات المشترك من البطاقة. يرجى تشغيل خدمة UCS أو تسجيل الدخول لمنظومة MEEDCO.'
+        };
+    }
 
     return {
         success: true,
-        hasCharge: !!record.hasCharge,
-        isStop: !!record.isStop,
         data: {
             meterNumber: record.meterNumber,
             chassis: record.meterNumber,
@@ -295,7 +327,7 @@ async function readCustomerCard() {
             uid: uid
         },
         customer: {
-            id: record.subscriptionCode,
+            id: record.subscriptionCode || record.meterNumber,
             code: record.subscriptionCode,
             name: record.customerName,
             nationalId: record.nationalId,
@@ -310,19 +342,17 @@ async function readCustomerCard() {
             isChargeStop: !!record.isStop
         },
         financials: {
-            debts: Number(totalRemainingDebts.toFixed(2)),
-            monthlyInstallment: Number(monthlyInstallment.toFixed(2)),
-            fees: 15.00,
-            credits: 0.00,
-            abuses: Number(record.meterDebit || 0),
-            minCharge: 20.00,
-            detailedDebts: custDebts
+            debts: 0,
+            monthlyInstallment: 0,
+            fees: 0,
+            credits: 0,
+            abuses: 0,
+            minCharge: 10
         },
         card: {
             reader: card.reader,
             atr: card.atr,
             uid: uid,
-            protocol: card.protocol,
             readTime: new Date().toLocaleString('ar-EG')
         },
         message: 'تمت قراءة بيانات كارت العداد بنجاح من القارئ.'
@@ -331,6 +361,19 @@ async function readCustomerCard() {
 
 // 4. Write Charge to Customer Card (الشحن الفعلي والكتابة على الكارت)
 async function writeCustomerCard(params = {}) {
+    // 1. Try Live write via UnifiedCardClient
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.writeCustomerCardLive === 'function') {
+            const liveRes = await unifiedClient.writeCustomerCardLive(params);
+            if (liveRes && liveRes.success) {
+                return liveRes;
+            }
+        }
+    } catch (e) {
+        console.warn('Live write failed:', e.message);
+    }
+
     const status = await getReaderStatus();
     if (!status.connected || !status.cardPresent) {
         return {

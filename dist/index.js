@@ -14129,67 +14129,58 @@ const readChargingSmartCard = async () => {
         btn.disabled = true;
         btn.innerHTML = `
                 <span style="display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-left:6px;"></span>
-                <span>جاري قراءة وتفريغ الكارت من MEEDCO...</span>
+                <span>جاري قراءة الكارت من القارئ...</span>
             `;
     }
     try {
-        showToast('جاري قراءة كارت المشترك وتفريغ بيانات العداد الفعلية...');
-        const res = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
-        let card = {};
-        let cust = {};
-        let fin = {};
-        if (res && res.success) {
-            card = res.data || {};
-            cust = res.customer || {};
-            fin = res.financials || {};
+        showToast('جاري الاتصال بقارئ البطاقات الذكية وقراءة الكارت الفعلي...');
+        let res = null;
+        // 1. Electron IPC Bridge directly to live card reader
+        if (typeof window.readCustomerCard === 'function') {
+            try {
+                res = await window.readCustomerCard();
+            }
+            catch (e) {
+                console.warn('Electron readCustomerCard error:', e);
+            }
         }
-        else {
-            // Realistic offline simulation matching MEEDCO
-            const sampleMeter = state.meters[0];
-            card = {
-                meterNumber: (sampleMeter === null || sampleMeter === void 0 ? void 0 : sampleMeter.meterChassisNumber) || '0200847291',
-                meterCode: (sampleMeter === null || sampleMeter === void 0 ? void 0 : sampleMeter.subscriptionCode) || '2008472',
-                remainingBalance: sampleMeter ? Number(sampleMeter.balance || 45.20) : 45.20,
-                sequenceOnMeter: sampleMeter ? Number(sampleMeter.chargeCount || 8) : 8,
-                slice: 2,
-                lastChargeDate: new Date().toLocaleDateString('ar-EG'),
-                lastChargeAmount: 100,
-                meterChargeAmount: 45,
-                totalSystemCharges: 1450,
-                totalMeterCharges: 1450,
-                cardInMeterDate: new Date().toLocaleDateString('ar-EG'),
-                meterTotalDebit: 0
-            };
-            cust = {
-                id: (sampleMeter === null || sampleMeter === void 0 ? void 0 : sampleMeter.id) || 'sample-1',
-                name: (sampleMeter === null || sampleMeter === void 0 ? void 0 : sampleMeter.subscriberName) || 'مشترك تجريبي - شركة كهرباء مصر الوسطى',
-                code: (sampleMeter === null || sampleMeter === void 0 ? void 0 : sampleMeter.subscriptionCode) || '2008472',
-                meterNumber: card.meterNumber,
-                meterCompanyName: (sampleMeter === null || sampleMeter === void 0 ? void 0 : sampleMeter.meterType) || 'السويدي',
-                activityName: 'منزلي كودي',
-                accountNumberReferenceCustomer: 'REF-2025-09',
-                address: (sampleMeter === null || sampleMeter === void 0 ? void 0 : sampleMeter.address) || 'المنيا - مصر الوسطى'
-            };
-            fin = {
-                debts: 120,
-                fees: 15,
-                credits: 0,
-                abuses: 0,
-                minCharge: 10,
-                monthlyInstallment: 50
-            };
+        // 2. Local HTTP Server (Port 5002)
+        if (!res || !res.success) {
+            try {
+                res = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
+            }
+            catch (e) {
+                console.warn('Fetch port 5002 error:', e);
+            }
         }
+        // Check if card reading succeeded with real card data
+        if (!res || !res.success) {
+            const errMsg = (res === null || res === void 0 ? void 0 : res.message) || 'لم يتم العثور على كارت في القارئ. يرجى التأكد من وضع كارت العداد في قارئ البطاقات (USB) ثم النقر على "قراءة الكارت".';
+            showToast(errMsg, 'error');
+            if (banner) {
+                banner.style.display = 'block';
+                banner.style.backgroundColor = '#fef2f2';
+                banner.style.color = '#991b1b';
+                banner.style.border = '1px solid #fecaca';
+                banner.innerHTML = `⚠️ <strong>تنبيه القارئ:</strong> ${errMsg}`;
+            }
+            return;
+        }
+        // Extract REAL card data returned directly from the smart card
+        const card = res.data || {};
+        const cust = res.customer || {};
+        const fin = res.financials || {};
         const meterNumber = card.meterNumber || cust.meterNumber || '';
         const remainingBalance = card.remainingBalance != null ? Number(card.remainingBalance) : 0;
-        const seqOnMeter = card.sequenceOnMeter != null ? card.sequenceOnMeter : 1;
-        const slice = card.slice ? ('الشريحة ' + card.slice) : 'الشريحة 1';
-        const lastDate = card.lastChargeDate || 'اليوم';
+        const seqOnMeter = card.sequenceOnMeter != null ? card.sequenceOnMeter : (cust.chargeSequence || 1);
+        const slice = card.slice ? ('الشريحة ' + card.slice) : (cust.consumptionSlice ? ('الشريحة ' + cust.consumptionSlice) : 'الشريحة 1');
+        const lastDate = card.lastChargeDate || cust.lastChargeDate || 'اليوم';
         currentChargingCustomer = {
-            id: cust.id || card.id || 'cust-1',
-            name: cust.codySecondName || cust.name || 'مشترك مسجل بالمنظومة',
-            code: cust.code || card.meterCode || '-',
+            id: cust.id || card.id || 'cust-id',
+            name: cust.name || cust.codySecondName || 'مشترك',
+            code: cust.code || cust.codeNumber || card.meterCode || '-',
             meterNumber: meterNumber,
-            meterCompanyName: cust.meterCompanyName || 'السويدي',
+            meterCompanyName: cust.meterCompanyName || card.meterCompanyName || 'المصرية',
             chargeSequence: Number(seqOnMeter),
             lastChargeDate: lastDate,
             isChargeStop: Boolean(cust.isChargeStop),
@@ -14197,7 +14188,7 @@ const readChargingSmartCard = async () => {
             nationalId: cust.nationalId || '-',
             activityName: cust.activityName || 'منزلي كودي',
             customerTypeName: cust.customerTypeName || 'أهالي',
-            address: cust.address || 'مصر الوسطى'
+            address: cust.address || '-'
         };
         currentChargingFinancials = {
             debts: Number(fin.debts || 0),
@@ -14207,7 +14198,9 @@ const readChargingSmartCard = async () => {
             minCharge: Math.max(10, Number(fin.minCharge || 10)),
             monthlyInstallment: Number(fin.monthlyInstallment || 0)
         };
+        // Generate debts schedule based on actual customer debts
         initCustomerDebtsSchedule(currentChargingCustomer, currentChargingFinancials);
+        // Populate all fields on the page with real card data
         updateChargingCardFields(currentChargingCustomer, card, currentChargingFinancials);
         if (banner) {
             banner.style.display = 'block';
@@ -14216,12 +14209,12 @@ const readChargingSmartCard = async () => {
             banner.style.border = '1px solid #bbf7d0';
             banner.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                        <span>تمت قراءة كارت المشترك بنجاح (${currentChargingCustomer.name} - ${meterNumber}). جاهز لتحديد المبلغ والشحن.</span>
+                        <span>تمت قراءة كارت العداد الفعلي بنجاح (${currentChargingCustomer.name} - عداد: ${meterNumber}).</span>
                         <span style="font-weight:bold; font-family:monospace; background:rgba(22,101,52,0.1); padding:2px 8px; border-radius:4px;">الرصيد بالعداد: ${remainingBalance.toFixed(2)} ج.م | تتابع: ${seqOnMeter} | ${slice}</span>
                     </div>
                 `;
         }
-        showToast(`تمت قراءة كارت المشترك بنجاح! الرصيد المتبقي بالعداد: ${remainingBalance.toFixed(2)} ج.م`, 'success');
+        showToast(`تمت قراءة كارت العداد بنجاح! المشترك: ${currentChargingCustomer.name} | الرصيد: ${remainingBalance.toFixed(2)} ج.م`, 'success');
     }
     catch (err) {
         console.error('Error in readChargingSmartCard:', err);
@@ -14285,11 +14278,22 @@ const executeChargingProcess = async () => {
             netPrice: netCollected,
             notes: (notesInp === null || notesInp === void 0 ? void 0 : notesInp.value) || ''
         };
-        const writeRes = await fetch('http://127.0.0.1:5002/api/customer-card/write', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }).then(r => r.json()).catch(() => null);
+        let writeRes = null;
+        if (typeof window.writeCustomerCard === 'function') {
+            try {
+                writeRes = await window.writeCustomerCard(payload);
+            }
+            catch (e) {
+                console.warn('Electron writeCustomerCard failed:', e);
+            }
+        }
+        if (!writeRes || !writeRes.success) {
+            writeRes = await fetch('http://127.0.0.1:5002/api/customer-card/write', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json()).catch(() => null);
+        }
         showToast('تمت كتابة الشحنة بنجاح على الكارت وحفظ الإيصال بالمنظومة!', 'success');
         // Update balance on UI
         const balanceEl = document.getElementById('field-current-balance');
