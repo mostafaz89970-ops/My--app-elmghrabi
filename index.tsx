@@ -14482,8 +14482,9 @@ const handlePrintJudicialControlDetails = () => {
         if (delayCb) delayCb.checked = isDebitsPostponedForCurrentSession;
 
         const amtInp = document.getElementById('field-charge-amount') as HTMLInputElement | null;
-        if (amtInp && (!amtInp.value || Number(amtInp.value) === 0)) {
-            amtInp.value = String(Math.max(50, minCharge));
+        if (amtInp) {
+            amtInp.value = '';
+            amtInp.placeholder = 'أدخل المبلغ';
         }
 
         
@@ -15146,8 +15147,9 @@ const handlePrintJudicialControlDetails = () => {
         const rechargeAmount = Number(rechargeAmtInp?.value) || 0;
         const minCharge = currentChargingFinancials.minCharge;
 
-        if (rechargeAmount < minCharge) {
-            showToast(`الحد الأدنى للشحن هو ${minCharge} ج.م`, 'error');
+        if (!rechargeAmtInp?.value || rechargeAmount < minCharge) {
+            showToast(`يرجى كتابة مبلغ الشحن يدوياً (الحد الأدنى للشحن هو ${minCharge} ج.م)`, 'error');
+            rechargeAmtInp?.focus();
             return;
         }
 
@@ -15285,8 +15287,10 @@ const handlePrintJudicialControlDetails = () => {
         document.getElementById('btn-chg-save')?.addEventListener('click', () => executeChargingProcess());
         document.getElementById('btn-chg-cancel')?.addEventListener('click', () => resetChargingCardUI());
 
-        document.getElementById('chg-recharge-amount')?.addEventListener('input', () => calculateChargingNetAmount());
-        document.getElementById('field-charge-amount')?.addEventListener('input', () => calculateChargingNetAmount());
+        ['input', 'keyup', 'change'].forEach(evt => {
+            document.getElementById('chg-recharge-amount')?.addEventListener(evt, () => calculateChargingNetAmount());
+            document.getElementById('field-charge-amount')?.addEventListener(evt, () => calculateChargingNetAmount());
+        });
         document.getElementById('field-payment-method')?.addEventListener('change', () => calculateChargingNetAmount());
 
         // MEEDCO Debts Delay Checkbox

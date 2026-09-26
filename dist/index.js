@@ -13644,8 +13644,9 @@ const updateChargingCardFields = (cust, card, fin) => {
     if (delayCb)
         delayCb.checked = isDebitsPostponedForCurrentSession;
     const amtInp = document.getElementById('field-charge-amount');
-    if (amtInp && (!amtInp.value || Number(amtInp.value) === 0)) {
-        amtInp.value = String(Math.max(50, minCharge));
+    if (amtInp) {
+        amtInp.value = '';
+        amtInp.placeholder = 'أدخل المبلغ';
     }
     calculateChargingNetAmount();
 };
@@ -14245,8 +14246,9 @@ const executeChargingProcess = async () => {
     const notesInp = document.getElementById('field-charge-notes');
     const rechargeAmount = Number(rechargeAmtInp === null || rechargeAmtInp === void 0 ? void 0 : rechargeAmtInp.value) || 0;
     const minCharge = currentChargingFinancials.minCharge;
-    if (rechargeAmount < minCharge) {
-        showToast(`الحد الأدنى للشحن هو ${minCharge} ج.م`, 'error');
+    if (!(rechargeAmtInp === null || rechargeAmtInp === void 0 ? void 0 : rechargeAmtInp.value) || rechargeAmount < minCharge) {
+        showToast(`يرجى كتابة مبلغ الشحن يدوياً (الحد الأدنى للشحن هو ${minCharge} ج.م)`, 'error');
+        rechargeAmtInp === null || rechargeAmtInp === void 0 ? void 0 : rechargeAmtInp.focus();
         return;
     }
     const netCollected = calculateChargingNetAmount();
@@ -14372,33 +14374,36 @@ const showChargingReceiptModal = (data) => {
     modal.style.display = 'flex';
 };
 const initChargingCardListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0;
     (_a = document.getElementById('btn-chg-read-card')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => readChargingSmartCard());
     (_b = document.getElementById('btn-chg-standby-read-card')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => readChargingSmartCard());
     (_c = document.getElementById('btn-chg-reset')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => resetChargingCardUI());
     (_d = document.getElementById('btn-chg-execute-charge')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => executeChargingProcess());
     (_e = document.getElementById('btn-chg-save')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => executeChargingProcess());
     (_f = document.getElementById('btn-chg-cancel')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => resetChargingCardUI());
-    (_g = document.getElementById('chg-recharge-amount')) === null || _g === void 0 ? void 0 : _g.addEventListener('input', () => calculateChargingNetAmount());
-    (_h = document.getElementById('field-charge-amount')) === null || _h === void 0 ? void 0 : _h.addEventListener('input', () => calculateChargingNetAmount());
-    (_j = document.getElementById('field-payment-method')) === null || _j === void 0 ? void 0 : _j.addEventListener('change', () => calculateChargingNetAmount());
+    ['input', 'keyup', 'change'].forEach(evt => {
+        var _a, _b;
+        (_a = document.getElementById('chg-recharge-amount')) === null || _a === void 0 ? void 0 : _a.addEventListener(evt, () => calculateChargingNetAmount());
+        (_b = document.getElementById('field-charge-amount')) === null || _b === void 0 ? void 0 : _b.addEventListener(evt, () => calculateChargingNetAmount());
+    });
+    (_g = document.getElementById('field-payment-method')) === null || _g === void 0 ? void 0 : _g.addEventListener('change', () => calculateChargingNetAmount());
     // MEEDCO Debts Delay Checkbox
-    (_k = document.getElementById('field-debits-delay-cb')) === null || _k === void 0 ? void 0 : _k.addEventListener('change', (e) => {
+    (_h = document.getElementById('field-debits-delay-cb')) === null || _h === void 0 ? void 0 : _h.addEventListener('change', (e) => {
         onIsDebitsDelayChange(e.target.checked);
     });
     // Interactive Card Clicks
-    (_l = document.getElementById('card-trigger-debts')) === null || _l === void 0 ? void 0 : _l.addEventListener('click', () => openChargingDebtsModal());
-    (_m = document.getElementById('card-trigger-fees')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', () => openFeesDetailsModal());
-    (_o = document.getElementById('card-trigger-fines')) === null || _o === void 0 ? void 0 : _o.addEventListener('click', () => openAbusesDetailsModal());
-    (_p = document.getElementById('card-trigger-payments')) === null || _p === void 0 ? void 0 : _p.addEventListener('click', () => openCreditsDetailsModal());
+    (_j = document.getElementById('card-trigger-debts')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', () => openChargingDebtsModal());
+    (_k = document.getElementById('card-trigger-fees')) === null || _k === void 0 ? void 0 : _k.addEventListener('click', () => openFeesDetailsModal());
+    (_l = document.getElementById('card-trigger-fines')) === null || _l === void 0 ? void 0 : _l.addEventListener('click', () => openAbusesDetailsModal());
+    (_m = document.getElementById('card-trigger-payments')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', () => openCreditsDetailsModal());
     // Debts & Installments Postponement buttons
-    (_q = document.getElementById('btn-open-installments-modal')) === null || _q === void 0 ? void 0 : _q.addEventListener('click', () => openChargingDebtsModal());
-    (_r = document.getElementById('btn-chg-view-debts-modal')) === null || _r === void 0 ? void 0 : _r.addEventListener('click', () => openChargingDebtsModal());
-    (_s = document.getElementById('btn-apply-selected-debts-delay')) === null || _s === void 0 ? void 0 : _s.addEventListener('click', () => applySelectedDebtsDelay());
-    (_t = document.getElementById('btn-delay-current-month-installment')) === null || _t === void 0 ? void 0 : _t.addEventListener('click', () => delayCurrentMonthInstallment());
-    (_u = document.getElementById('btn-reset-debts-delay')) === null || _u === void 0 ? void 0 : _u.addEventListener('click', () => resetDebtsDelay());
+    (_o = document.getElementById('btn-open-installments-modal')) === null || _o === void 0 ? void 0 : _o.addEventListener('click', () => openChargingDebtsModal());
+    (_p = document.getElementById('btn-chg-view-debts-modal')) === null || _p === void 0 ? void 0 : _p.addEventListener('click', () => openChargingDebtsModal());
+    (_q = document.getElementById('btn-apply-selected-debts-delay')) === null || _q === void 0 ? void 0 : _q.addEventListener('click', () => applySelectedDebtsDelay());
+    (_r = document.getElementById('btn-delay-current-month-installment')) === null || _r === void 0 ? void 0 : _r.addEventListener('click', () => delayCurrentMonthInstallment());
+    (_s = document.getElementById('btn-reset-debts-delay')) === null || _s === void 0 ? void 0 : _s.addEventListener('click', () => resetDebtsDelay());
     // Select all debts in table
-    (_v = document.getElementById('chg-select-all-debts')) === null || _v === void 0 ? void 0 : _v.addEventListener('change', (e) => {
+    (_t = document.getElementById('chg-select-all-debts')) === null || _t === void 0 ? void 0 : _t.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
         document.querySelectorAll('.cb-debt-item:not([disabled])').forEach(cb => {
             cb.checked = isChecked;
@@ -14416,7 +14421,7 @@ const initChargingCardListeners = () => {
         });
     });
     // (Subscriber select removed per MEEDCO smart card standard)
-    (_w = document.getElementById('btn-chg-print-last')) === null || _w === void 0 ? void 0 : _w.addEventListener('click', () => {
+    (_u = document.getElementById('btn-chg-print-last')) === null || _u === void 0 ? void 0 : _u.addEventListener('click', () => {
         if (currentChargingCustomer) {
             const amtInp = (document.getElementById('field-charge-amount') || document.getElementById('chg-recharge-amount'));
             const amt = Number(amtInp === null || amtInp === void 0 ? void 0 : amtInp.value) || 100;
@@ -14438,12 +14443,12 @@ const initChargingCardListeners = () => {
         }
     });
     // Receipt modal listeners
-    (_x = document.getElementById('btn-chg-receipt-close')) === null || _x === void 0 ? void 0 : _x.addEventListener('click', () => {
+    (_v = document.getElementById('btn-chg-receipt-close')) === null || _v === void 0 ? void 0 : _v.addEventListener('click', () => {
         const m = document.getElementById('chg-receipt-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_y = document.getElementById('btn-chg-receipt-print')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', () => {
+    (_w = document.getElementById('btn-chg-receipt-print')) === null || _w === void 0 ? void 0 : _w.addEventListener('click', () => {
         const printArea = document.getElementById('chg-receipt-print-area');
         if (!printArea)
             return;
@@ -14470,17 +14475,17 @@ const initChargingCardListeners = () => {
         }
     });
     // Card update modal listeners
-    (_z = document.getElementById('cm-card-modal-close-x')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', () => {
+    (_x = document.getElementById('cm-card-modal-close-x')) === null || _x === void 0 ? void 0 : _x.addEventListener('click', () => {
         const m = document.getElementById('cm-card-update-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_0 = document.getElementById('btn-cm-card-modal-close')) === null || _0 === void 0 ? void 0 : _0.addEventListener('click', () => {
+    (_y = document.getElementById('btn-cm-card-modal-close')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', () => {
         const m = document.getElementById('cm-card-update-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_1 = document.getElementById('btn-cm-card-read-again')) === null || _1 === void 0 ? void 0 : _1.addEventListener('click', async () => {
+    (_z = document.getElementById('btn-cm-card-read-again')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', async () => {
         showToast('جاري إعادة قراءة الكارت من القارئ...');
         try {
             const cardRes = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
@@ -14508,7 +14513,7 @@ const initChargingCardListeners = () => {
             showToast('خطأ في قراءة الكارت.', 'error');
         }
     });
-    (_2 = document.getElementById('btn-cm-card-send-update')) === null || _2 === void 0 ? void 0 : _2.addEventListener('click', async () => {
+    (_0 = document.getElementById('btn-cm-card-send-update')) === null || _0 === void 0 ? void 0 : _0.addEventListener('click', async () => {
         const meterNumInp = document.getElementById('cm-card-meter-number');
         const custCodeInp = document.getElementById('cm-card-customer-code');
         const custNameInp = document.getElementById('cm-card-customer-name');

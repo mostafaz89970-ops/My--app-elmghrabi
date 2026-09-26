@@ -14,7 +14,23 @@
       "consumptionSlice": 3,
       "lastChargeDate": "21-09-2026 12:22:33",
       "meterDebit": 0,
-      "updatedAt": "2026-09-26T16:46:18.086Z"
+      "updatedAt": "2026-09-26T16:47:50.965Z"
+    },
+    "50682225": {
+      "meterNumber": "50682225",
+      "customerName": "5262023",
+      "subscriptionCode": "0501373583",
+      "nationalId": null,
+      "address": "م الشيخ فضل",
+      "activityName": "استخدامات منزلية",
+      "customerTypeName": null,
+      "meterCompanyName": "المصرية",
+      "remainingBalance": 165.89,
+      "chargeSequence": 47,
+      "consumptionSlice": 2,
+      "lastChargeDate": "26-09-2026 13:06:17",
+      "meterDebit": 0,
+      "updatedAt": "2026-09-26T16:51:09.887Z"
     },
     "EF74A35F": {
       "uid": "EF74A35F",
