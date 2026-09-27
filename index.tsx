@@ -13219,8 +13219,6 @@ const handlePrintJudicialControlDetails = () => {
     const renderReadControlCardSection = () => {
         if (currentControlCardData) {
             updateControlCardUI(currentControlCardData);
-        } else {
-            handleReadControlCard();
         }
     };
 
@@ -13407,6 +13405,43 @@ const handlePrintJudicialControlDetails = () => {
         }
     };
 
+    const openRenewControlCardSuccessModal = (result: any) => {
+        const dlg = document.getElementById('dialog-renew-control-card-success') as any;
+        if (!dlg) return;
+
+        const cardData = result.card || result.data || currentControlCardData || {};
+        const cardId = result.cardId || cardData.cardId || (currentControlCardData ? currentControlCardData.cardId : '-');
+        const techName = cardData.technicianName || (currentControlCardData ? currentControlCardData.technicianName : '-');
+        const actDate = cardData.activationDate || new Date().toLocaleDateString('ar-EG');
+        const nextYear = new Date();
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        const expDate = cardData.expiryDate || nextYear.toLocaleDateString('ar-EG');
+
+        const cardIdEl = document.getElementById('renewed-card-id-display');
+        const techNameEl = document.getElementById('renewed-tech-name');
+        const actDateEl = document.getElementById('renewed-activation-date');
+        const expDateEl = document.getElementById('renewed-expiry-date');
+
+        if (cardIdEl) cardIdEl.textContent = cardId;
+        if (techNameEl) techNameEl.textContent = techName;
+        if (actDateEl) actDateEl.textContent = actDate;
+        if (expDateEl) expDateEl.textContent = expDate;
+
+        const badgeEl = document.getElementById('ctrl-card-status-badge');
+        if (badgeEl) {
+            badgeEl.textContent = 'كارت مفعل';
+            badgeEl.style.backgroundColor = '#dcfce7';
+            badgeEl.style.color = '#15803d';
+            badgeEl.style.border = '1px solid #86efac';
+        }
+
+        if (typeof dlg.showModal === 'function') {
+            dlg.showModal();
+        } else {
+            dlg.style.display = 'block';
+        }
+    };
+
     const handleRenewControlCard = async () => {
         const renewBtn = document.getElementById('btn-renew-control-card') as HTMLButtonElement | null;
         const origHtml = renewBtn ? renewBtn.innerHTML : '';
@@ -13435,10 +13470,7 @@ const handlePrintJudicialControlDetails = () => {
             }
 
             if (result && result.success) {
-                showToast(result.message || 'تم تحديث وتفعيل كارت التحكم بنجاح! جاري إعادة قراءة الكارت...', 'success');
-                setTimeout(() => {
-                    handleReadControlCard();
-                }, 1000);
+                openRenewControlCardSuccessModal(result);
             } else {
                 showToast(result?.message || 'فشل تحديث كارت التحكم. تأكد من إدخال الكارت وثباته في القارئ.', 'error');
             }
@@ -29296,6 +29328,25 @@ const setupOrgHierarchyEvents = () => {
         // كروت التحكم (Control Cards Event Listeners)
         
         // مسح كارت التحكم
+        // إغلاق نافذة نجاح تحديث كارت التحكم
+        document.getElementById('btn-close-renewed-dialog')?.addEventListener('click', () => {
+            const dlg = document.getElementById('dialog-renew-control-card-success') as any;
+            if (dlg) {
+                if (typeof dlg.close === 'function') dlg.close();
+                else dlg.style.display = 'none';
+            }
+        });
+
+        // قراءة الكارت يدوياً من داخل نافذة التحديث في حال رغب المستخدم
+        document.getElementById('btn-manual-read-after-renew')?.addEventListener('click', () => {
+            const dlg = document.getElementById('dialog-renew-control-card-success') as any;
+            if (dlg) {
+                if (typeof dlg.close === 'function') dlg.close();
+                else dlg.style.display = 'none';
+            }
+            handleReadControlCard();
+        });
+
         document.getElementById('btn-clear-control-card')?.addEventListener('click', (e) => {
             e.preventDefault();
             handleClearControlCard();
