@@ -208,23 +208,24 @@ function startInternalServer(port = 5002) {
 
             if (pathname.startsWith('/api/debts/customer/')) {
                 const custId = decodeURIComponent(pathname.split('/').pop());
-                const store = getDebtsStore();
-                const debts = store.debts.filter(d => 
-                    String(d.customerId) === custId || 
-                    String(d.subscriptionCode) === custId || 
-                    String(d.meterNumber) === custId
-                );
-                const totalRemaining = debts.reduce((sum, d) => sum + (Number(d.remainingAmount) || 0), 0);
-                const totalMonthlyInstallment = debts
-                    .filter(d => d.status === 'PaymentInProgress' || d.status === 'مستحق فوري')
-                    .reduce((sum, d) => sum + (Number(d.installmentAmount) || 0), 0);
+                const resData = await nativeEngine.getCustomerDebts(custId);
                 res.writeHead(200);
-                res.end(JSON.stringify({
-                    success: true,
-                    debts,
-                    totalRemaining: Number(totalRemaining.toFixed(2)),
-                    totalMonthlyInstallment: Number(totalMonthlyInstallment.toFixed(2))
-                }));
+                res.end(JSON.stringify(resData));
+                return;
+            }
+
+            if (pathname === '/api/debts/types' || pathname === '/api/debt-types') {
+                const resData = await nativeEngine.getLiveDebtTypes();
+                res.writeHead(200);
+                res.end(JSON.stringify(resData));
+                return;
+            }
+
+            if (pathname === '/api/debts/create' && req.method === 'POST') {
+                const body = await getBody();
+                const resData = await nativeEngine.createCustomerDebt(body);
+                res.writeHead(200);
+                res.end(JSON.stringify(resData));
                 return;
             }
 

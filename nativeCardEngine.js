@@ -1095,7 +1095,152 @@ async function getMeedcoHierarchy(sectorId = null, publicAdminId = null) {
     return { success: false, message: 'تعذر جلب البيانات الهيكلية' };
 }
 
+
+// --- Live Debts Engine Methods ---
+async function getLiveDebtTypes() {
+    const unifiedClient = require('./unifiedCardClient');
+    if (unifiedClient && typeof unifiedClient.getDebtTypesLive === 'function') {
+        const res = await unifiedClient.getDebtTypesLive();
+        if (res.success && res.data) return res;
+    }
+    // Fallback to local debts_store.json
+    const store = getDebtsStore();
+    return { success: true, data: store.debtTypes || [] };
+}
+
+async function getCustomerDebts(term) {
+    const unifiedClient = require('./unifiedCardClient');
+    const q = String(term || '').trim();
+
+    // 1. Try Live MEEDCO Server
+    if (unifiedClient) {
+        try {
+            let customerId = null;
+            // Check if term is already a UUID customerId
+            if (q.includes('-') && q.length > 20) {
+                customerId = q;
+            } else {
+                const custRes = await unifiedClient.searchCustomerLive(q);
+                if (custRes.success && custRes.customer && custRes.customer.id) {
+                    customerId = custRes.customer.id;
+                }
+            }
+
+            if (customerId) {
+                const liveDebts = await unifiedClient.getCustomerDebtsLive(customerId);
+                if (liveDebts.success && liveDebts.data) {
+                    return { success: true, live: true, data: liveDebts.data };
+                }
+            }
+        } catch (e) {
+            console.warn('Live debts fetch error:', e.message);
+        }
+    }
+
+    // 2. Fallback to local debts store
+    const store = getDebtsStore();
+    const debts = (store.debts || []).filter(d => 
+        String(d.meterNumber || '').trim() === q ||
+        String(d.subscriptionCode || '').trim() === q ||
+        String(d.customerId || '').trim() === q ||
+        String(d.nationalId || '').trim() === q
+    );
+
+    return {
+        success: true,
+        live: false,
+        data: {
+            debts: debts.map((d, i) => ({
+                id: d.id || ('LOCAL-DEBT-' + (i + 1)),
+                startDate: d.startDate || new Date().toISOString(),
+                totalDebtAmount: Number(d.totalAmount || d.totalDebtAmount || 0),
+                debtAmount: Number(d.amount || d.debtAmount || 0),
+                interestTypeName: d.interestTypeName || 'بدون فائدة',
+                installmentsCount: Number(d.installmentsCount || 1),
+                paidAmount: Number(d.paidAmount || 0),
+                remainingAmount: Number(d.remainingAmount || (d.totalAmount - (d.paidAmount || 0))),
+                installmentAmount: Number(d.installmentAmount || 0),
+                receiptNumber: d.receiptNumber || ('REC-' + q + '-' + (i + 1)),
+                createdUser: d.createdUser || 'المحصل / النظام',
+                createdDate: d.createdDate || new Date().toISOString(),
+                isComplete: (Number(d.remainingAmount) <= 0),
+                isAdjust: Boolean(d.isAdjust),
+                debtTypeName: d.debtTypeName || d.name || 'مديونية عامة'
+            }))
+        }
+    };
+}
+
+async function createCustomerDebt(debtModel) {
+    const unifiedClient = require('./unifiedCardClient');
+    let liveResult = null;
+
+    if (unifiedClient && typeof unifiedClient.createDebtLive === 'function') {
+        try {
+            liveResult = await unifiedClient.createDebtLive(debtModel);
+        } catch (e) {
+            console.warn('Live create debt failed, persisting locally:', e.message);
+        }
+    }
+
+    // Always persist to local debts_store.json as backup / offline capability
+    const store = getDebtsStore();
+    if (!store.debts) store.debts = [];
+
+    const receiptNum = liveResult?.data?.receiptNumber || ('REC' + Date.now().toString().slice(-8));
+    const newDebt = {
+        id: liveResult?.data?.id || ('DEBT-' + Date.now()),
+        customerId: debtModel.customerId,
+        subscriptionCode: debtModel.subscriptionCode || debtModel.code,
+        meterNumber: debtModel.meterNumber,
+        customerName: debtModel.customerName || debtModel.name,
+        debtTypeId: debtModel.debtTypeId,
+        debtTypeName: debtModel.debtTypeName,
+        categoryId: debtModel.categoryId,
+        categoryName: debtModel.categoryName,
+        amount: Number(debtModel.debtAmount || 0),
+        debtAmount: Number(debtModel.debtAmount || 0),
+        totalAmount: Number(debtModel.totalDebtAmount || debtModel.debtAmount || 0),
+        totalDebtAmount: Number(debtModel.totalDebtAmount || debtModel.debtAmount || 0),
+        installmentsCount: Number(debtModel.installmentsCount || 1),
+        installmentAmount: Number(debtModel.installmentAmount || 0),
+        paidAmount: 0,
+        remainingAmount: Number(debtModel.totalDebtAmount || debtModel.debtAmount || 0),
+        interestTypeId: debtModel.interestTypeId || 57,
+        interestTypeName: debtModel.interestTypeName || 'بدون فائدة',
+        interestPercentage: Number(debtModel.interestPercentage || 0),
+        receiptNumber: receiptNum,
+        startDate: debtModel.startDate || new Date().toISOString(),
+        createdDate: new Date().toISOString(),
+        createdUser: debtModel.createdUser || 'مسؤول الشحن والديون',
+        status: 'مستحق فوري',
+        isComplete: false,
+        isAdjust: Boolean(debtModel.isAdjust),
+        notes: debtModel.notes || '',
+        reason: debtModel.reason || ''
+    };
+
+    store.debts.unshift(newDebt);
+    saveDebtsStore(store);
+
+    return {
+        success: true,
+        live: Boolean(liveResult && liveResult.success),
+        message: 'تم تسجيل وإضافة الدين بنجاح',
+        data: {
+            id: newDebt.id,
+            totalDebtAmount: newDebt.totalDebtAmount,
+            receiptNumber: newDebt.receiptNumber,
+            debt: newDebt
+        }
+    };
+}
+
+
 module.exports = {
+    getLiveDebtTypes,
+    getCustomerDebts,
+    createCustomerDebt,
     loginMeedco,
     getMeedcoStatus,
     getMeedcoHierarchy,

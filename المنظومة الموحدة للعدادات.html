@@ -5389,6 +5389,10 @@
                         </h3>
                     </div>
                     <div class="card-toolbar" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" id="btn-meedco-read-card" class="btn" style="background-color: #1bc5bd; border-color: #1bc5bd; color: #ffffff; font-weight: 600; padding: 0.65rem 1.25rem; font-size: 0.95rem; border-radius: 0.42rem; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                            <span>بحث بالكارت</span>
+                        </button>
                         <button type="button" id="btn-meedco-add-debt" class="btn" style="background-color: #3699ff; border-color: #3699ff; color: #ffffff; font-weight: 600; padding: 0.65rem 1.25rem; font-size: 0.95rem; border-radius: 0.42rem; display: flex; align-items: center; gap: 6px; cursor: pointer;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                             <span>إضافة دين</span>
@@ -5728,307 +5732,180 @@
         <!-- MODALS: نوافذ الديون والرسوم والدمغات -->
         <!-- ========================================================================= -->
 
-        <!-- Modal 1: إضافة دين جديد للمشترك -->
+        <!-- Modal 1: إضافة وتعديل دين - مطابق تماماً لـ MEEDCO app-add-debt -->
         <div id="modal-add-debt" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
-            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 650px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
-                <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #fef2f2;">
+            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 860px; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); text-align: right; direction: rtl;">
+                <div style="padding: 16px 24px; border-bottom: 1px solid #ebedf3; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <div style="background: #fee2e2; color: #dc2626; padding: 8px; border-radius: 8px; display: flex;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                        </div>
-                        <h4 style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #991b1b;">إضافة وتسجيل دين جديد لمشترك</h4>
+                        <span style="display: inline-block; width: 4px; height: 20px; background: #3699ff; border-radius: 2px;"></span>
+                        <h4 id="modal-add-debt-title" style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #181c32;">إضافة دين</h4>
                     </div>
-                    <button type="button" class="btn-close-modal" data-modal="modal-add-debt" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
+                    <button type="button" class="btn-close-modal" data-modal="modal-add-debt" style="background: none; border: none; font-size: 1.6rem; color: #7e8299; cursor: pointer; line-height: 1;">&times;</button>
                 </div>
-                <form id="form-add-debt" style="padding: 20px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto;">
-                    <div class="form-group" style="margin: 0;">
-                        <label style="font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">اختيار المشترك *</label>
-                        <select id="modal-debt-subscriber-select" class="form-control" required style="padding: 10px;">
-                            <option value="">-- اختر مشترك لإضافة الدين له --</option>
-                        </select>
+                
+                <form id="form-add-debt" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;">
+                    <!-- المشترك المختار (معلومات) -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <span style="font-size: 0.85rem; color: #64748b;">المشترك: </span>
+                            <span id="modal-add-debt-cust-name" style="font-weight: 700; color: #0f172a;">-</span>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85rem; color: #64748b;">رقم المشترك: </span>
+                            <span id="modal-add-debt-cust-code" style="font-weight: 700; color: #3699ff; font-family: monospace;">-</span>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85rem; color: #64748b;">رقم العداد: </span>
+                            <span id="modal-add-debt-cust-meter" style="font-weight: 700; color: #0f172a; font-family: monospace;">-</span>
+                        </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <!-- Row 1: الفئة | نوع الدين | تاريخ البدء -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
                         <div class="form-group" style="margin: 0;">
-                            <label style="font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">نوع الدين *</label>
-                            <select id="modal-debt-type-select" class="form-control" required style="padding: 10px;">
-                                <!-- Populated dynamically -->
+                            <label style="font-weight: 600; color: #3f4254; margin-bottom: 6px; display: block; font-size: 0.9rem;">الفئة *</label>
+                            <select id="modal-debt-category" class="form-control" required style="padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; width: 100%; background: #fff;">
+                                <option value="">اختر الفئة ...</option>
                             </select>
                         </div>
                         <div class="form-group" style="margin: 0;">
-                            <label style="font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">طريقة الخصم *</label>
-                            <select id="modal-debt-deduct-way" class="form-control" style="padding: 10px;">
-                                <option value="charge">خصم أثناء الشحن (Deduct During Charge)</option>
-                                <option value="meter">خصم عن طريق العداد (Meter Deduct)</option>
-                                <option value="cash">سداد نقدي مباشر (Direct Pay)</option>
+                            <label style="font-weight: 600; color: #3f4254; margin-bottom: 6px; display: block; font-size: 0.9rem;">نوع الدين *</label>
+                            <select id="modal-debt-type-select" class="form-control" required style="padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; width: 100%; background: #fff;">
+                                <option value="">اختر نوع الدين ...</option>
                             </select>
                         </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
                         <div class="form-group" style="margin: 0;">
-                            <label style="font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">أصل الدين الإجمالي (ج.م) *</label>
-                            <input type="number" step="0.01" id="modal-debt-total-amount" class="form-control" required placeholder="0.00" style="padding: 10px; font-weight: bold; color: #dc2626;" />
+                            <label style="font-weight: 600; color: #3f4254; margin-bottom: 6px; display: block; font-size: 0.9rem;">تاريخ البدء *</label>
+                            <input type="date" id="modal-debt-start-date" class="form-control" required style="padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; width: 100%;" />
                         </div>
+                    </div>
+
+                    <!-- Row 2: أصل الدين | نوع الفائدة | طريقة المحاسبة -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
                         <div class="form-group" style="margin: 0;">
-                            <label style="font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">عدد الأقساط *</label>
-                            <input type="number" min="1" max="60" id="modal-debt-installments-count" class="form-control" value="1" required style="padding: 10px;" />
-                        </div>
-                        <div class="form-group" style="margin: 0;">
-                            <label style="font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">القسط الشهري المحسوب</label>
-                            <input type="text" id="modal-debt-installment-amount" class="form-control" readonly style="padding: 10px; font-weight: bold; background: #f8fafc; color: #0f172a;" value="0.00 ج.م" />
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin: 0;">
-                        <label style="font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">تاريخ بدء استحقاق أول قسط</label>
-                        <input type="date" id="modal-debt-start-date" class="form-control" style="padding: 10px;" />
-                    </div>
-
-                    <div class="form-group" style="margin: 0;">
-                        <label style="font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">ملاحظات / سبب الدين</label>
-                        <textarea id="modal-debt-notes" class="form-control" rows="2" placeholder="أدخل أي ملاحظات تعاقدية أو أرقام محاضر/تسويات..."></textarea>
-                    </div>
-
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                        <button type="button" class="btn secondary btn-close-modal" data-modal="modal-add-debt">إلغاء</button>
-                        <button type="submit" class="btn primary" style="background: #dc2626; border: none; font-weight: bold; padding: 10px 24px;">حفظ واعتماد الدين</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Modal 2: بيان تفاصيل الأقساط وجدول السداد للدين -->
-        <!-- Modal: دفع بدون شحن / سداد نقدي للمديونية (Direct Cash Debt Payment) -->
-        <div id="modal-cash-debt-payment" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10002; align-items: center; justify-content: center; padding: 20px;">
-            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
-                <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #fff8eb;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div style="background: #fff4de; color: #ffa800; padding: 8px; border-radius: 8px; display: flex;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-                        </div>
-                        <div>
-                            <h4 style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #b45309;">دفع بدون شحن / سداد نقدي للمديونية</h4>
-                            <small class="text-muted" style="font-size: 0.85rem;">تحصيل نقدي مباشر لأقساط أو أصل الدين بدون كارت شحن</small>
-                        </div>
-                    </div>
-                    <button type="button" class="btn-close-modal" data-modal="modal-cash-debt-payment" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
-                </div>
-                <form id="form-cash-debt-payment" style="padding: 20px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto;">
-                    <div class="form-group" style="margin: 0;">
-                        <label style="font-weight: 700; color: #3f4254; margin-bottom: 6px; display: block;">اختيار المشترك *</label>
-                        <select id="cash-pay-subscriber-select" class="form-control" required style="padding: 10px; border-radius: 0.42rem;">
-                            <option value="">-- اختر مشترك --</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group" style="margin: 0;">
-                        <label style="font-weight: 700; color: #3f4254; margin-bottom: 6px; display: block;">اختيار الدين المراد سداده *</label>
-                        <select id="cash-pay-debt-select" class="form-control" required style="padding: 10px; border-radius: 0.42rem;">
-                            <option value="">-- اختر الدين --</option>
-                        </select>
-                    </div>
-
-                    <!-- Financial Summary for selected debt -->
-                    <div id="cash-pay-summary-box" style="display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;">
-                        <div>
-                            <small style="color: #64748b; font-weight: 600;">أصل الدين</small>
-                            <div id="cash-pay-lbl-total" style="font-weight: 800; color: #0f172a; font-family: monospace;">0.00 ج.م</div>
-                        </div>
-                        <div>
-                            <small style="color: #64748b; font-weight: 600;">المسدد سابقاً</small>
-                            <div id="cash-pay-lbl-paid" style="font-weight: 800; color: #16a34a; font-family: monospace;">0.00 ج.م</div>
-                        </div>
-                        <div>
-                            <small style="color: #64748b; font-weight: 600;">المتبقي حالياً</small>
-                            <div id="cash-pay-lbl-rem" style="font-weight: 800; color: #dc2626; font-family: monospace;">0.00 ج.م</div>
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div class="form-group" style="margin: 0;">
-                            <label style="font-weight: 700; color: #3f4254; margin-bottom: 6px; display: block;">المبلغ المطلوب سداده (ج.م) *</label>
-                            <input type="number" step="0.01" min="1" id="cash-pay-amount" class="form-control" required placeholder="0.00" style="padding: 10px; font-weight: 800; color: #16a34a; font-size: 1.1rem; border-radius: 0.42rem;" />
+                            <label style="font-weight: 600; color: #3f4254; margin-bottom: 6px; display: block; font-size: 0.9rem;">أصل الدين (ج.م) *</label>
+                            <input type="number" step="0.01" min="0" id="modal-debt-amount" class="form-control" required placeholder="أصل الدين" style="padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 1rem; font-weight: 700; color: #181c32; width: 100%;" />
                         </div>
                         <div class="form-group" style="margin: 0;">
-                            <label style="font-weight: 700; color: #3f4254; margin-bottom: 6px; display: block;">طريقة الدفع *</label>
-                            <select id="cash-pay-type" class="form-control" style="padding: 10px; border-radius: 0.42rem;">
-                                <option value="monetary">سداد نقدي بخزينة الفرع</option>
-                                <option value="credit">خصم من الرصيد الدائن للعميل</option>
-                                <option value="bank">تحويل / إيداع بنكي</option>
+                            <label style="font-weight: 600; color: #3f4254; margin-bottom: 6px; display: block; font-size: 0.9rem;">نوع الفائدة *</label>
+                            <select id="modal-debt-interest-type" class="form-control" style="padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; width: 100%; background: #fff;">
+                                <option value="57">بدون فائدة</option>
+                                <option value="58">فائدة شهرية</option>
+                                <option value="59">فائدة سنوية تناقصية</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-weight: 600; color: #3f4254; margin-bottom: 6px; display: block; font-size: 0.9rem;">طريقة المحاسبة</label>
+                            <select id="modal-debt-accounting-way" class="form-control" style="padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; width: 100%; background: #fff;">
+                                <option value="95">خصم مع الشحن</option>
+                                <option value="96">دفعة بمديونية (حساب استهلاك)</option>
                             </select>
                         </div>
                     </div>
 
-                    <div class="form-group" style="margin: 0;">
-                        <label style="font-weight: 700; color: #3f4254; margin-bottom: 6px; display: block;">رقم إيصال التوريد / المرجع</label>
-                        <input type="text" id="cash-pay-receipt-no" class="form-control" placeholder="مثال: RCP-98721 أو يترك لإنشائه تلقائياً" style="padding: 10px; border-radius: 0.42rem;" />
+                    <!-- Consumption Row (Show when accounting way 96 or consumption based) -->
+                    <div id="modal-debt-consumption-row" style="display: none; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px 14px; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: flex-end;">
+                        <div>
+                            <label style="font-weight: 600; color: #92400e; font-size: 0.85rem; margin-bottom: 4px; display: block;">الاستهلاك ك.و</label>
+                            <input type="number" step="0.01" id="modal-debt-consume-amount" class="form-control" placeholder="الاستهلاك ك.و" style="padding: 8px 12px; border: 1px solid #fcd34d; border-radius: 6px; width: 100%;" />
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; color: #92400e; font-size: 0.85rem; margin-bottom: 4px; display: block;">عدد شهور الاستهلاك</label>
+                            <input type="number" min="1" id="modal-debt-consume-month" class="form-control" placeholder="عدد الشهور" style="padding: 8px 12px; border: 1px solid #fcd34d; border-radius: 6px; width: 100%;" />
+                        </div>
+                        <div>
+                            <button type="button" id="btn-calc-consumption" class="btn" style="background: #d97706; color: #fff; padding: 8px 16px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; height: 38px;">
+                                احسب الاستهلاك
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="form-group" style="margin: 0;">
-                        <label style="font-weight: 700; color: #3f4254; margin-bottom: 6px; display: block;">ملاحظات السداد</label>
-                        <textarea id="cash-pay-notes" class="form-control" rows="2" placeholder="ملاحظات إضافية على عملية السداد النقدي..."></textarea>
+                    <!-- Row 3: نسبة الفائدة % | عدد الأقساط | زر احسب -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 14px; align-items: flex-end;">
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-weight: 600; color: #3f4254; margin-bottom: 6px; display: block; font-size: 0.9rem;">قيمة الفائدة %</label>
+                            <input type="number" step="0.01" min="0" id="modal-debt-interest-percentage" class="form-control" value="0" style="padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.95rem; width: 100%;" />
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-weight: 600; color: #3f4254; margin-bottom: 6px; display: block; font-size: 0.9rem;">عدد الأقساط *</label>
+                            <input type="number" min="1" max="120" id="modal-debt-installments-count" class="form-control" value="1" required style="padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.95rem; width: 100%;" />
+                        </div>
+                        <div>
+                            <button type="button" id="btn-calc-debt-fields" class="btn" style="background-color: #ffa800; border-color: #ffa800; color: #ffffff; font-weight: 700; padding: 9px 20px; font-size: 0.95rem; border-radius: 6px; cursor: pointer; border: none; display: flex; align-items: center; gap: 6px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg>
+                                <span>احسب</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                        <button type="button" class="btn btn-close-modal" data-modal="modal-cash-debt-payment" style="background: #f3f6f9; color: #7e8299; font-weight: 600; padding: 10px 20px; border: none; border-radius: 0.42rem; cursor: pointer;">إلغاء</button>
-                        <button type="submit" class="btn" style="background: #ffa800; color: #ffffff; font-weight: 700; padding: 10px 24px; border: none; border-radius: 0.42rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                            <span>تأكيد السداد وإصدار الإيصال</span>
+                    <!-- Row 4: الحسابات التلقائية المطابقة لـ MEEDCO -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px;">
+                        <div>
+                            <label style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 4px; display: block;">قيمة الفائدة</label>
+                            <input type="text" id="modal-debt-interest-amount" class="form-control form-control-solid" readonly value="0.00" style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 700; color: #3699ff; font-family: monospace; width: 100%;" />
+                        </div>
+                        <div>
+                            <label style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 4px; display: block;">إجمالي الدين</label>
+                            <input type="text" id="modal-debt-total-with-interest" class="form-control form-control-solid" readonly value="0.00" style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 700; color: #f64e60; font-family: monospace; width: 100%;" />
+                        </div>
+                        <div>
+                            <label style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 4px; display: block;">المستحق أول شهر</label>
+                            <input type="text" id="modal-debt-first-amount" class="form-control form-control-solid" readonly value="0.00" style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 700; color: #181c32; font-family: monospace; width: 100%;" />
+                        </div>
+                        <div>
+                            <label style="font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 4px; display: block;">قيمة كل قسط</label>
+                            <input type="text" id="modal-debt-installment-amount" class="form-control form-control-solid" readonly value="0.00" style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 700; color: #1bc5bd; font-family: monospace; width: 100%;" />
+                        </div>
+                    </div>
+
+                    <!-- Row 5: الملاحظات وسبب الدين -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-weight: 600; color: #3f4254; margin-bottom: 6px; display: block; font-size: 0.9rem;">سبب الدين</label>
+                            <input type="text" id="modal-debt-reason" class="form-control" placeholder="أدخل سبب إضافة الدين..." style="padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; width: 100%;" />
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-weight: 600; color: #3f4254; margin-bottom: 6px; display: block; font-size: 0.9rem;">ملاحظات</label>
+                            <input type="text" id="modal-debt-notes" class="form-control" placeholder="أي ملاحظات إضافية..." style="padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; width: 100%;" />
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; padding-top: 12px; border-top: 1px solid #ebedf3;">
+                        <button type="button" class="btn btn-close-modal" data-modal="modal-add-debt" style="background: #f3f6f9; color: #7e8299; border: none; font-weight: 600; padding: 10px 24px; border-radius: 6px; cursor: pointer;">إلغاء</button>
+                        <button type="submit" id="btn-submit-add-debt" class="btn" style="background: #3699ff; color: #fff; border: none; font-weight: 700; padding: 10px 30px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(54,153,255,0.35);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            <span>حفظ</span>
                         </button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <div id="modal-debt-installments-details" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10001; align-items: center; justify-content: center; padding: 20px;">
-            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
-                <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
-                    <div>
-                        <h4 id="dtl-debt-title" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #0f172a;">بيان الأقساط وسجل السداد</h4>
-                        <small id="dtl-debt-subtitle" class="text-muted">مشترك: - | نوع الدين: -</small>
-                    </div>
-                    <button type="button" class="btn-close-modal" data-modal="modal-debt-installments-details" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
+        <!-- Modal 2: تمت إضافة الدين - مطابق تماماً لـ MEEDCO app-saved-debt -->
+        <div id="modal-saved-debt" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10001; align-items: center; justify-content: center; padding: 20px;">
+            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); text-align: center; direction: rtl;">
+                <div style="padding: 20px 24px; border-bottom: 1px solid #ebedf3;">
+                    <h2 style="margin: 0; font-size: 1.4rem; font-weight: 800; color: #181c32;">تمت اضافة الدين</h2>
                 </div>
-                <div style="padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
-                    <!-- Debt Summary Row -->
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                        <div>
-                            <div style="font-size: 0.8rem; color: #64748b;">أصل الدين</div>
-                            <div id="dtl-orig-amt" style="font-size: 1.15rem; font-weight: bold; color: #dc2626;">0.00 ج.م</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.8rem; color: #64748b;">المسدد</div>
-                            <div id="dtl-paid-amt" style="font-size: 1.15rem; font-weight: bold; color: #16a34a;">0.00 ج.م</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.8rem; color: #64748b;">المتبقي</div>
-                            <div id="dtl-rem-amt" style="font-size: 1.15rem; font-weight: bold; color: #ea580c;">0.00 ج.م</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.8rem; color: #64748b;">القسط الشهري</div>
-                            <div id="dtl-inst-amt" style="font-size: 1.15rem; font-weight: bold; color: #0284c7;">0.00 ج.م</div>
-                        </div>
+                <div style="padding: 28px 24px;">
+                    <div style="width: 60px; height: 60px; background: #e8fff3; color: #1bc5bd; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </div>
-
-                    <!-- Installments Table -->
-                    <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                        <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: right;">
-                            <thead>
-                                <tr style="background: #f1f5f9; font-size: 0.85rem;">
-                                    <th style="padding: 10px;">رقم القسط</th>
-                                    <th style="padding: 10px;">تاريخ الاستحقاق</th>
-                                    <th style="padding: 10px;">قيمة القسط</th>
-                                    <th style="padding: 10px;">المبلغ المسدد</th>
-                                    <th style="padding: 10px;">تاريخ السداد</th>
-                                    <th style="padding: 10px;">الحالة</th>
-                                    <th style="padding: 10px; text-align: center;">إجراء</th>
-                                </tr>
-                            </thead>
-                            <tbody id="dtl-installments-tbody">
-                                <!-- Populated dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end;">
-                    <button type="button" class="btn secondary btn-close-modal" data-modal="modal-debt-installments-details">إغلاق</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal 3: نافذة تفاصيل ديون وأقساط المشترك وتأجيل القسط (MEEDCO Delay Selected Charge Debt) -->
-        <div id="modal-charging-debts-details" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10002; align-items: center; justify-content: center; padding: 20px;">
-            <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 900px; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
-                <!-- Modal Header -->
-                <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #fff1f2;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div style="background: #fee2e2; color: #dc2626; padding: 8px; border-radius: 8px; display: flex;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                        </div>
-                        <div>
-                            <h4 id="chg-modal-cust-name" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #9f1239;">بيان الديون وتأجيل الأقساط الشهرية</h4>
-                            <small id="chg-modal-cust-sub" class="text-muted">نظام تأجيل وجدولة سداد الأقساط والمديونيات مطابق لمنظومة MEEDCO</small>
-                        </div>
-                    </div>
-                    <button type="button" class="btn-close-modal" data-modal="modal-charging-debts-details" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
-                </div>
-
-                <!-- Modal Body -->
-                <div style="padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
-                    <!-- Financial Alert Banner -->
-                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                        <div>
-                            <span style="color: #991b1b; font-weight: 700;">إجمالي أصل الديون: </span>
-                            <span id="chg-modal-total-debts" style="font-size: 1.25rem; font-weight: 800; color: #dc2626; font-family: monospace;">0.00 ج.م</span>
-                        </div>
-                        <div>
-                            <span style="color: #075985; font-weight: 700;">القسط الشهري المستحق: </span>
-                            <span id="chg-modal-installment" style="font-size: 1.25rem; font-weight: 800; color: #0284c7; font-family: monospace;">0.00 ج.م</span>
-                        </div>
-                        <div>
-                            <span style="color: #166534; font-weight: 700;">حالة التأجيل: </span>
-                            <span id="chg-modal-delay-status" style="font-size: 0.95rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; background: #e0f2fe; color: #0369a1;">غير مؤجل</span>
-                        </div>
-                    </div>
-
-                    <!-- Debts List Table -->
-                    <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                        <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: right;">
-                            <thead>
-                                <tr style="background: #f8fafc; font-size: 0.85rem; color: #475569;">
-                                    <th style="padding: 10px; width: 40px; text-align: center;"><input type="checkbox" id="chg-select-all-debts" /></th>
-                                    <th style="padding: 10px;">نوع الدين / القسط</th>
-                                    <th style="padding: 10px;">أصل الدين</th>
-                                    <th style="padding: 10px;">المسدد</th>
-                                    <th style="padding: 10px;">المتبقي</th>
-                                    <th style="padding: 10px;">قيمة القسط</th>
-                                    <th style="padding: 10px;">تاريخ الاستحقاق الأصلي</th>
-                                    <th style="padding: 10px;">تاريخ التأجيل</th>
-                                    <th style="padding: 10px; text-align: center;">الحالة</th>
-                                    <th style="padding: 10px; text-align: center;">إجراء سريع</th>
-                                </tr>
-                            </thead>
-                            <tbody id="chg-modal-debts-tbody">
-                                <!-- Populated dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Postponement Configuration Section (MEEDCO Date & Reason) -->
-                    <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 18px; display: flex; flex-direction: column; gap: 12px;" data-button-permission="delay_charge_debts">
-                        <div style="font-weight: 800; font-size: 0.95rem; color: #1e293b; display: flex; align-items: center; justify-content: space-between;">
-                            <span>إعدادات تأجيل السداد (Postpone Installment Settings):</span>
-                            <span id="chg-max-delay-notice" style="font-size: 0.85rem; color: #64748b; font-weight: normal;">أقصى موعد مسموح للتأجيل: 6 أشهر</span>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                            <div>
-                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 4px;">تاريخ الاستحقاق الجديد بعد التأجيل (New Due Date):</label>
-                                <input type="date" id="chg-delay-new-date" class="form-control" style="background: #ffffff; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; width: 100%; font-weight: 600;" />
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 4px;">سبب التأجيل / رقم الموافقة (Notes / Approval):</label>
-                                <input type="text" id="chg-delay-notes" class="form-control" placeholder="أدخل سبب أو إذن تأجيل القسط..." style="background: #ffffff; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; width: 100%; font-size: 0.9rem;" />
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap;">
-                            <button type="button" id="btn-apply-selected-debts-delay" class="btn" style="background: #dc2626; color: #ffffff; font-weight: 700; padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                <span>تأكيد تأجيل الأقساط المحددة</span>
-                            </button>
-                            <button type="button" id="btn-delay-current-month-installment" class="btn" style="background: #f59e0b; color: #ffffff; font-weight: 700; padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                                <span>تأجيل قسط هذا الشهر كاملاً</span>
-                            </button>
-                            <button type="button" id="btn-reset-debts-delay" class="btn" style="background: #ffffff; color: #64748b; border: 1px solid #cbd5e1; font-weight: 600; padding: 8px 14px; border-radius: 6px; cursor: pointer;">
-                                <span>استعادة وسداد الأقساط (إلغاء التأجيل)</span>
-                            </button>
+                    <h4 id="saved-debt-total-display" style="font-size: 1.25rem; font-weight: 700; color: #181c32; margin-bottom: 16px;">
+                        تمت اضافة دين بمبلغ : <span id="saved-debt-amount-text" style="color: #3699ff;">0.00</span> ج.م
+                    </h4>
+                    <div style="margin: 16px 0;">
+                        <div style="background: #17c4bb; color: #ffffff; padding: 12px 20px; border-radius: 8px; font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            <span>رقم الايصال : </span>
+                            <span id="saved-debt-receipt-text" style="font-family: monospace; letter-spacing: 1px;">-</span>
                         </div>
                     </div>
                 </div>
-
-                <!-- Modal Footer -->
-                <div style="padding: 12px 20px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end; gap: 10px;">
-                    <button type="button" class="btn secondary btn-close-modal" data-modal="modal-charging-debts-details">إغلاق</button>
+                <div style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid #ebedf3; display: flex; justify-content: center;">
+                    <button type="button" class="btn btn-close-modal" data-modal="modal-saved-debt" style="background: #3699ff; color: #fff; border: none; font-weight: 700; padding: 10px 36px; border-radius: 6px; cursor: pointer;">
+                        إغلاق
+                    </button>
                 </div>
             </div>
         </div>

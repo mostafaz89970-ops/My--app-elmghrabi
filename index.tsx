@@ -17931,8 +17931,66 @@ const handlePrintJudicialControlDetails = () => {
         });
     };
 
-    // Helper: Execute Customer Retrieval by Meter Number or Subscriber Code
-    const executeDebtsCustomerRetrieval = () => {
+    // =========================================================================
+    // MEEDCO Exact Math & Debt Categories/Types Helpers
+    // =========================================================================
+    const MEEDCO_DEBT_CATEGORIES = [
+        { id: 148, name: 'فواتير' },
+        { id: 169, name: 'انارة' },
+        { id: 170, name: 'مهمات' },
+        { id: 171, name: 'غرامات' },
+        { id: 172, name: 'مقايسات' },
+        { id: 178, name: 'نظافة' }
+    ];
+
+    let cachedDebtTypes: any[] = [];
+
+    const calculateDebtFields = (debtAmount: number, installmentsCount: number, interestTypeId: number, interestPercentage: number) => {
+        let interestDebtAmount = 0;
+        if (interestTypeId === 58) {
+            // فائدة شهرية
+            interestDebtAmount = ((interestPercentage * debtAmount) / 100) * installmentsCount;
+        } else if (interestTypeId === 59) {
+            // فائدة سنوية تناقصية
+            interestDebtAmount = ((interestPercentage * debtAmount) / 100) * (installmentsCount / 12);
+        } else {
+            interestDebtAmount = 0;
+        }
+        interestDebtAmount = Math.round(interestDebtAmount * 100) / 100;
+        const totalWithInterestDebtAmount = Math.round((debtAmount + interestDebtAmount) * 100) / 100;
+        const count = Math.max(1, installmentsCount || 1);
+        const debtAmountPerMonth = Math.trunc(100 * (debtAmount / count)) / 100;
+        const firstDebtAmount = Math.round((interestDebtAmount + (debtAmount / count)) * 100) / 100;
+
+        return {
+            interestDebtAmount,
+            totalWithInterestDebtAmount,
+            debtAmountPerMonth,
+            firstDebtAmount
+        };
+    };
+
+    const recalcModalDebtFields = () => {
+        const debtAmt = Number((document.getElementById('modal-debt-amount') as HTMLInputElement | null)?.value) || 0;
+        const instCount = Math.max(1, Number((document.getElementById('modal-debt-installments-count') as HTMLInputElement | null)?.value) || 1);
+        const intType = Number((document.getElementById('modal-debt-interest-type') as HTMLSelectElement | null)?.value) || 57;
+        const intPct = Number((document.getElementById('modal-debt-interest-percentage') as HTMLInputElement | null)?.value) || 0;
+
+        const res = calculateDebtFields(debtAmt, instCount, intType, intPct);
+
+        const intAmtEl = document.getElementById('modal-debt-interest-amount') as HTMLInputElement | null;
+        const totEl = document.getElementById('modal-debt-total-with-interest') as HTMLInputElement | null;
+        const firstEl = document.getElementById('modal-debt-first-amount') as HTMLInputElement | null;
+        const instEl = document.getElementById('modal-debt-installment-amount') as HTMLInputElement | null;
+
+        if (intAmtEl) intAmtEl.value = res.interestDebtAmount.toFixed(2);
+        if (totEl) totEl.value = res.totalWithInterestDebtAmount.toFixed(2);
+        if (firstEl) firstEl.value = res.firstDebtAmount.toFixed(2);
+        if (instEl) instEl.value = res.debtAmountPerMonth.toFixed(2);
+    };
+
+    // Helper: Execute Customer Retrieval by Meter Number or Subscriber Code (Live MEEDCO + Local Fallback)
+    const executeDebtsCustomerRetrieval = async () => {
         const input = document.getElementById('debts-customer-search-input') as HTMLInputElement | null;
         const term = input?.value?.trim() || '';
 
@@ -17942,7 +18000,73 @@ const handlePrintJudicialControlDetails = () => {
             return;
         }
 
-        const foundCust = findCustomerByMeterOrCode(term);
+        let foundCust: any = null;
+        let liveDebts: any[] | null = null;
+
+        await withAppLoading('جارٍ استدعاء بيانات المشترك والديون والمديونيات...', async () => {
+            // 1. Try querying live MEEDCO backend via internal bridge
+            try {
+                const resp = await fetch(`http://127.0.0.1:5002/api/debts/customer/${encodeURIComponent(term)}`);
+                if (resp.ok) {
+                    const resJson = await resp.json();
+                    const rawData = resJson.data || resJson;
+                    const custObj = rawData.customer || rawData;
+                    if (custObj && (custObj.code || custObj.meterNumber || custObj.name)) {
+                        foundCust = {
+                            id: String(custObj.id || custObj.customerId || term),
+                            name: custObj.name || custObj.subscriberName || 'مشترك مسجل',
+                            code: custObj.code || custObj.subscriptionCode || term,
+                            meterNumber: custObj.meterNumber || custObj.meterChassisNumber || term
+                        };
+                        const debtList = Array.isArray(rawData.debts) ? rawData.debts : (Array.isArray(resJson.debts) ? resJson.debts : []);
+                        if (debtList.length > 0) {
+                            liveDebts = debtList.map((d: any) => ({
+                                id: d.id || 'DEBT-' + Math.random().toString(36).slice(2, 8),
+                                customerId: foundCust.id,
+                                customerName: foundCust.name,
+                                meterNumber: foundCust.meterNumber,
+                                subscriptionCode: foundCust.code,
+                                debtTypeId: d.debtTypeId,
+                                debtTypeName: d.debtTypeName || 'دين',
+                                totalDebtAmount: Number(d.totalDebtAmount || d.debtAmount || 0),
+                                debtAmount: Number(d.debtAmount || d.totalDebtAmount || 0),
+                                paidAmount: Number(d.paidAmount || 0),
+                                remainingAmount: Number(d.remainingAmount !== undefined ? d.remainingAmount : (d.totalDebtAmount - (d.paidAmount || 0))),
+                                installmentsCount: Number(d.installmentsCount || 1),
+                                installmentAmount: Number(d.installmentAmount || (d.totalDebtAmount / (d.installmentsCount || 1))),
+                                startDate: d.startDate ? d.startDate.split('T')[0] : (d.createdDate ? d.createdDate.split('T')[0] : '2026-01-01'),
+                                receiptNumber: d.receiptNumber || '-',
+                                createdUser: d.createdUser || 'المشغل',
+                                status: (d.isComplete || Number(d.remainingAmount) <= 0) ? 'Completed' : 'PaymentInProgress',
+                                statusName: (d.isComplete || Number(d.remainingAmount) <= 0) ? 'مسدد بالكامل' : 'قيد التسديد',
+                                deductWay: 'charge',
+                                deductWayName: 'خصم مع الشحن'
+                            }));
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Live backend fetch failed, using local search:', e);
+            }
+
+            // 2. Fallback to local meters & debts
+            if (!foundCust) {
+                foundCust = findCustomerByMeterOrCode(term);
+            }
+
+            // 3. Integrate live debts if found
+            if (foundCust && liveDebts) {
+                state.debts = state.debts || [];
+                // Remove outdated local debts for this customer and replace with live backend data
+                state.debts = state.debts.filter(d =>
+                    String(d.customerId) !== foundCust.id &&
+                    String(d.subscriptionCode) !== foundCust.code &&
+                    String(d.meterNumber) !== foundCust.meterNumber
+                );
+                state.debts.unshift(...liveDebts);
+                await saveState();
+            }
+        }, 'استدعاء فوري مطابق لمنظومة MEEDCO', '🔍');
 
         if (!foundCust) {
             showToast('لم يتم العثور على أي مشترك مسجل برقم العداد أو الكود المدخل.', 'error');
@@ -17971,6 +18095,30 @@ const handlePrintJudicialControlDetails = () => {
                 e.preventDefault();
                 executeDebtsCustomerRetrieval();
             }
+        });
+
+        // Read Card Button (بحث بالكارت)
+        document.getElementById('btn-meedco-read-card')?.addEventListener('click', async () => {
+            await withAppLoading('جارٍ قراءة كارت المشترك من القارئ الذكي...', async () => {
+                try {
+                    const resp = await fetch('http://127.0.0.1:5002/api/customer-card/read');
+                    const data = await resp.json();
+                    if (data && data.success && data.card) {
+                        const meterNum = data.card.meterNumber || data.card.meterChassisNumber;
+                        const custCode = data.card.customerCode || data.card.subscriptionCode;
+                        const searchInp = document.getElementById('debts-customer-search-input') as HTMLInputElement | null;
+                        if (searchInp) {
+                            searchInp.value = meterNum || custCode || '';
+                        }
+                        showToast(`تمت قراءة كارت العداد بنجاح: ${meterNum || custCode}`, 'success');
+                        await executeDebtsCustomerRetrieval();
+                    } else {
+                        showToast(data?.error || 'تعذر قراءة الكارت. يرجى التأكد من وضع الكارت بالقارئ.', 'error');
+                    }
+                } catch (e) {
+                    showToast('قارئ الكروت غير متصل أو توجد مشكلة في الخدمة.', 'error');
+                }
+            }, 'قراءة بطاقة المشترك', '💳');
         });
 
         // Clear button
@@ -18049,42 +18197,140 @@ const handlePrintJudicialControlDetails = () => {
             });
         });
 
-        // Dynamic installment calculation in modal-add-debt
-        const debtTotalInp = document.getElementById('modal-debt-total-amount') as HTMLInputElement | null;
-        const debtCountInp = document.getElementById('modal-debt-installments-count') as HTMLInputElement | null;
-        const debtInstInp = document.getElementById('modal-debt-installment-amount') as HTMLInputElement | null;
+        // Modal category change listener -> filter debt types
+        document.getElementById('modal-debt-category')?.addEventListener('change', () => {
+            const catId = (document.getElementById('modal-debt-category') as HTMLSelectElement | null)?.value;
+            const typeSelect = document.getElementById('modal-debt-type-select') as HTMLSelectElement | null;
+            if (!typeSelect) return;
 
-        const calcModalInst = () => {
-            const tot = Number(debtTotalInp?.value) || 0;
-            const cnt = Math.max(1, Number(debtCountInp?.value) || 1);
-            if (debtInstInp) {
-                debtInstInp.value = (tot / cnt).toFixed(2) + ' ج.م';
+            typeSelect.innerHTML = '<option value="">اختر نوع الدين ...</option>';
+            if (!catId) return;
+
+            const filtered = cachedDebtTypes.filter((t: any) => 
+                String(t.category) === String(catId) || 
+                String(t.debtClassificationId) === String(catId) ||
+                String(t.categoryId) === String(catId)
+            );
+
+            (filtered.length > 0 ? filtered : cachedDebtTypes).forEach((dt: any) => {
+                const opt = document.createElement('option');
+                opt.value = String(dt.id);
+                opt.textContent = dt.name || dt.debtTypeName || `دين ${dt.id}`;
+                typeSelect.appendChild(opt);
+            });
+        });
+
+        // Modal debt type select change listener -> set defaults
+        document.getElementById('modal-debt-type-select')?.addEventListener('change', () => {
+            const typeId = (document.getElementById('modal-debt-type-select') as HTMLSelectElement | null)?.value;
+            const typeObj = cachedDebtTypes.find((t: any) => String(t.id) === String(typeId));
+            if (!typeObj) return;
+
+            if (typeObj.maxInstallments) {
+                const instInp = document.getElementById('modal-debt-installments-count') as HTMLInputElement | null;
+                if (instInp) instInp.value = String(Math.min(Number(typeObj.maxInstallments) || 12, 12));
             }
-        };
+            if (typeObj.interestTypeId !== undefined) {
+                const itInp = document.getElementById('modal-debt-interest-type') as HTMLSelectElement | null;
+                if (itInp) itInp.value = String(typeObj.interestTypeId);
+            }
+            if (typeObj.accountingWayId !== undefined) {
+                const awInp = document.getElementById('modal-debt-accounting-way') as HTMLSelectElement | null;
+                if (awInp) {
+                    awInp.value = String(typeObj.accountingWayId);
+                    awInp.dispatchEvent(new Event('change'));
+                }
+            }
+            if (typeObj.interestPercentage !== undefined) {
+                const ipInp = document.getElementById('modal-debt-interest-percentage') as HTMLInputElement | null;
+                if (ipInp) ipInp.value = String(typeObj.interestPercentage);
+            }
 
-        debtTotalInp?.addEventListener('input', calcModalInst);
-        debtCountInp?.addEventListener('input', calcModalInst);
+            recalcModalDebtFields();
+        });
 
-        // Submit form-add-debt
+        // Accounting way change listener -> show/hide consumption row
+        document.getElementById('modal-debt-accounting-way')?.addEventListener('change', (e) => {
+            const val = (e.target as HTMLSelectElement).value;
+            const row = document.getElementById('modal-debt-consumption-row');
+            if (row) {
+                row.style.display = val === '96' ? 'grid' : 'none';
+            }
+        });
+
+        // Consumption calculation button
+        document.getElementById('btn-calc-consumption')?.addEventListener('click', async () => {
+            const kwh = Number((document.getElementById('modal-debt-consume-amount') as HTMLInputElement | null)?.value) || 0;
+            const months = Number((document.getElementById('modal-debt-consume-month') as HTMLInputElement | null)?.value) || 1;
+            if (kwh <= 0) {
+                showToast('يرجى إدخال استهلاك صحيح أكبر من صفر.', 'warning');
+                return;
+            }
+            try {
+                const resp = await fetch(`http://127.0.0.1:5002/api/debts/calculate-consumption?kwh=${kwh}&months=${months}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data && data.pounds) {
+                        const amtInp = document.getElementById('modal-debt-amount') as HTMLInputElement | null;
+                        if (amtInp) {
+                            amtInp.value = data.pounds.toFixed(2);
+                            recalcModalDebtFields();
+                        }
+                        showToast(`تم حساب قيمة الاستهلاك: ${data.pounds.toFixed(2)} ج.م`, 'success');
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn('Consumption calc endpoint error:', e);
+            }
+            const estPounds = Math.round(kwh * 1.50 * 100) / 100;
+            const amtInp = document.getElementById('modal-debt-amount') as HTMLInputElement | null;
+            if (amtInp) {
+                amtInp.value = estPounds.toFixed(2);
+                recalcModalDebtFields();
+            }
+            showToast(`تم حساب القيمة التقديرية للاستهلاك: ${estPounds.toFixed(2)} ج.م`, 'info');
+        });
+
+        // Input change listeners for reactive MEEDCO calculations
+        document.getElementById('modal-debt-amount')?.addEventListener('input', recalcModalDebtFields);
+        document.getElementById('modal-debt-installments-count')?.addEventListener('input', recalcModalDebtFields);
+        document.getElementById('modal-debt-interest-type')?.addEventListener('change', recalcModalDebtFields);
+        document.getElementById('modal-debt-interest-percentage')?.addEventListener('input', recalcModalDebtFields);
+        document.getElementById('btn-calc-debt-fields')?.addEventListener('click', () => {
+            recalcModalDebtFields();
+            showToast('تمت إعادة حساب الفائدة والأقساط طبقاً لمعايير MEEDCO', 'info');
+        });
+
+        // Submit form-add-debt (Authentic MEEDCO Add Debt)
         document.getElementById('form-add-debt')?.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const subId = (document.getElementById('modal-debt-subscriber-select') as HTMLSelectElement | null)?.value;
-            const typeId = (document.getElementById('modal-debt-type-select') as HTMLSelectElement | null)?.value;
-            const deductWay = (document.getElementById('modal-debt-deduct-way') as HTMLSelectElement | null)?.value || 'charge';
-            const totalAmount = Number((document.getElementById('modal-debt-total-amount') as HTMLInputElement | null)?.value) || 0;
-            const installmentsCount = Math.max(1, Number((document.getElementById('modal-debt-installments-count') as HTMLInputElement | null)?.value) || 1);
-            const startDate = (document.getElementById('modal-debt-start-date') as HTMLInputElement | null)?.value || new Date().toISOString().split('T')[0];
-            const notes = (document.getElementById('modal-debt-notes') as HTMLTextAreaElement | null)?.value || '';
-
-            if (!subId || totalAmount <= 0) {
-                showToast('يرجى اختيار المشترك وتحديد أصل دين صحيح أكبر من صفر.', 'warning');
+            if (!currentSelectedDebtCustomer) {
+                showToast('يرجى استدعاء المشترك أولاً.', 'warning');
                 return;
             }
 
-            const meter = (state.meters || []).find(m => String(m.id) === subId || String(m.subscriptionCode) === subId || String(m.meterChassisNumber) === subId);
-            const dtObj = (state.debtTypes || []).find(dt => String(dt.id) === typeId);
-            const typeName = dtObj?.name || 'دين جديد';
-            const installmentVal = Number((totalAmount / installmentsCount).toFixed(2));
+            const categoryId = (document.getElementById('modal-debt-category') as HTMLSelectElement | null)?.value;
+            const typeId = (document.getElementById('modal-debt-type-select') as HTMLSelectElement | null)?.value;
+            const startDate = (document.getElementById('modal-debt-start-date') as HTMLInputElement | null)?.value || new Date().toISOString().split('T')[0];
+            const debtAmount = Number((document.getElementById('modal-debt-amount') as HTMLInputElement | null)?.value) || 0;
+            const interestTypeId = Number((document.getElementById('modal-debt-interest-type') as HTMLSelectElement | null)?.value) || 57;
+            const accountingWayId = Number((document.getElementById('modal-debt-accounting-way') as HTMLSelectElement | null)?.value) || 95;
+            const interestPercentage = Number((document.getElementById('modal-debt-interest-percentage') as HTMLInputElement | null)?.value) || 0;
+            const installmentsCount = Math.max(1, Number((document.getElementById('modal-debt-installments-count') as HTMLInputElement | null)?.value) || 1);
+            const reason = (document.getElementById('modal-debt-reason') as HTMLInputElement | null)?.value || '';
+            const notes = (document.getElementById('modal-debt-notes') as HTMLInputElement | null)?.value || '';
+
+            if (!typeId || debtAmount <= 0) {
+                showToast('يرجى اختيار نوع الدين وتحديد أصل دين صحيح أكبر من صفر.', 'warning');
+                return;
+            }
+
+            const calc = calculateDebtFields(debtAmount, installmentsCount, interestTypeId, interestPercentage);
+            const typeObj = cachedDebtTypes.find((t: any) => String(t.id) === String(typeId));
+            const typeName = typeObj?.name || typeObj?.debtTypeName || 'دين جديد';
+            const cust = currentSelectedDebtCustomer;
+            const receiptNo = 'RCP-' + Date.now().toString().slice(-6);
 
             // Generate installment schedule
             const installments: any[] = [];
@@ -18094,10 +18340,11 @@ const handlePrintJudicialControlDetails = () => {
             for (let i = 1; i <= installmentsCount; i++) {
                 const dDate = new Date(startD);
                 dDate.setMonth(dDate.getMonth() + (i - 1));
+                const instVal = i === 1 ? calc.firstDebtAmount : calc.debtAmountPerMonth;
                 installments.push({
                     seq: i,
                     dueDate: dDate.toISOString().split('T')[0],
-                    amount: installmentVal,
+                    amount: instVal,
                     paidAmount: 0.00,
                     status: i === 1 ? 'مستحق' : 'قادم',
                     payDate: null
@@ -18106,28 +18353,35 @@ const handlePrintJudicialControlDetails = () => {
 
             const newDebt: any = {
                 id: 'DEBT-' + Date.now().toString().slice(-6),
-                customerId: subId,
-                customerName: meter?.subscriberName || 'مشترك مسجل',
-                meterNumber: meter?.meterChassisNumber || '-',
-                subscriptionCode: meter?.subscriptionCode || subId,
-                debtTypeId: Number(typeId) || 1,
+                customerId: cust.id,
+                customerName: cust.name,
+                meterNumber: cust.meterNumber,
+                subscriptionCode: cust.code,
+                debtTypeId: Number(typeId),
                 debtTypeName: typeName,
-                totalDebtAmount: totalAmount,
-                debtAmount: totalAmount,
+                debtCategoryId: Number(categoryId) || 148,
+                totalDebtAmount: calc.totalWithInterestDebtAmount,
+                debtAmount: debtAmount,
+                interestDebtAmount: calc.interestDebtAmount,
+                interestTypeId: interestTypeId,
+                interestPercentage: interestPercentage,
+                accountingWayId: accountingWayId,
                 paidAmount: 0.00,
-                remainingAmount: totalAmount,
+                remainingAmount: calc.totalWithInterestDebtAmount,
                 installmentsCount: installmentsCount,
                 paidInstallmentsCount: 0,
-                installmentAmount: installmentVal,
+                installmentAmount: calc.debtAmountPerMonth,
+                firstDebtAmount: calc.firstDebtAmount,
                 startDate: startDate,
                 nextDueDate: startDate,
-                deductWay: deductWay,
-                deductWayName: deductWay === 'charge' ? 'خصم أثناء الشحن' : (deductWay === 'meter' ? 'خصم من العداد' : 'سداد نقدي مباشر'),
+                deductWay: accountingWayId === 95 ? 'charge' : 'meter',
+                deductWayName: accountingWayId === 95 ? 'خصم مع الشحن' : 'دفعة بمديونية',
                 status: 'PaymentInProgress',
                 statusName: 'قيد التسديد',
+                reason: reason,
                 notes: notes,
-                receiptNumber: 'RCP-' + Date.now().toString().slice(-6),
-                createdUser: 'المشغل',
+                receiptNumber: receiptNo,
+                createdUser: loggedInUser?.fullName || 'المشغل',
                 installments: installments
             };
 
@@ -18135,71 +18389,100 @@ const handlePrintJudicialControlDetails = () => {
             state.debts.unshift(newDebt);
             await saveState();
 
-            // Sync with backend bridge
-            fetch('http://127.0.0.1:5002/api/debts', {
+            // Sync with backend bridge to create debt in MEEDCO
+            fetch('http://127.0.0.1:5002/api/debts/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newDebt)
+                body: JSON.stringify({
+                    customerId: cust.id,
+                    debtTypeId: Number(typeId),
+                    debtAmount: debtAmount,
+                    installmentsCount: installmentsCount,
+                    interestTypeId: interestTypeId,
+                    accountingWayId: accountingWayId,
+                    interestPercentage: interestPercentage,
+                    startDate: startDate,
+                    reason: reason,
+                    notes: notes
+                })
             }).catch(() => null);
 
-            showToast('تم حفظ واعتماد الدين وجدولة الأقساط بنجاح.', 'success');
-            logActivity('إضافة دين', `تم إضافة دين جديد بقيمة ${totalAmount} ج.م للمشترك ${newDebt.customerName}`);
+            logActivity('إضافة دين', `تم إضافة دين جديد بمبلغ ${calc.totalWithInterestDebtAmount} ج.م للمشترك ${cust.name}`);
 
-            const modal = document.getElementById('modal-add-debt');
-            if (modal) modal.style.display = 'none';
+            const addModal = document.getElementById('modal-add-debt');
+            if (addModal) addModal.style.display = 'none';
 
-            // Reset form
-            (document.getElementById('form-add-debt') as HTMLFormElement | null)?.reset();
+            // Show authentic MEEDCO Saved Debt Modal
+            const savedModal = document.getElementById('modal-saved-debt');
+            const savedAmtText = document.getElementById('saved-debt-amount-text');
+            const savedRcptText = document.getElementById('saved-debt-receipt-text');
 
-            // Keep this customer selected and refresh view
-            currentSelectedDebtCustomer = {
-                id: subId,
-                name: newDebt.customerName,
-                code: newDebt.subscriptionCode,
-                meterNumber: newDebt.meterNumber
-            };
+            if (savedAmtText) savedAmtText.textContent = calc.totalWithInterestDebtAmount.toFixed(2);
+            if (savedRcptText) savedRcptText.textContent = receiptNo;
+            if (savedModal) savedModal.style.display = 'flex';
+
             updateCustomerDebtsSummaryBox();
             renderDebtsTable();
         });
     };
 
-    // Helper: Open Add Debt Modal
-    const openAddDebtModal = (preselectedCustomerId?: string | null) => {
+    // Helper: Open Add Debt Modal (Authentic MEEDCO app-add-debt)
+    const openAddDebtModal = async (preselectedCustomerId?: string | null) => {
         const modal = document.getElementById('modal-add-debt');
         if (!modal) return;
 
-        const subSelect = document.getElementById('modal-debt-subscriber-select') as HTMLSelectElement | null;
-        if (subSelect) {
-            subSelect.innerHTML = '<option value="">-- اختر مشترك لإضافة الدين له --</option>';
-            (state.meters || []).forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = String(m.id || m.subscriptionCode);
-                opt.textContent = `${m.subscriberName} (${m.meterChassisNumber} - ${m.subscriptionCode})`;
-                subSelect.appendChild(opt);
-            });
-            if (preselectedCustomerId) {
-                subSelect.value = preselectedCustomerId;
+        if (currentSelectedDebtCustomer) {
+            const nameEl = document.getElementById('modal-add-debt-cust-name');
+            const codeEl = document.getElementById('modal-add-debt-cust-code');
+            const meterEl = document.getElementById('modal-add-debt-cust-meter');
+            if (nameEl) nameEl.textContent = currentSelectedDebtCustomer.name;
+            if (codeEl) codeEl.textContent = currentSelectedDebtCustomer.code;
+            if (meterEl) meterEl.textContent = currentSelectedDebtCustomer.meterNumber;
+        }
+
+        // Populate Categories
+        const catSelect = document.getElementById('modal-debt-category') as HTMLSelectElement | null;
+        if (catSelect) {
+            catSelect.innerHTML = '<option value="">اختر الفئة ...</option>' + 
+                MEEDCO_DEBT_CATEGORIES.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        }
+
+        // Fetch live debt types if not loaded
+        if (cachedDebtTypes.length === 0) {
+            try {
+                const resp = await fetch('http://127.0.0.1:5002/api/debts/types');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const list = Array.isArray(data) ? data : (data.data || []);
+                    if (Array.isArray(list) && list.length > 0) {
+                        cachedDebtTypes = list;
+                    }
+                }
+            } catch (e) {
+                console.warn('Could not load debt types from backend:', e);
+            }
+            if (cachedDebtTypes.length === 0 && Array.isArray(state.debtTypes)) {
+                cachedDebtTypes = state.debtTypes;
             }
         }
 
-        const typeSelect = document.getElementById('modal-debt-type-select') as HTMLSelectElement | null;
-        if (typeSelect) {
-            typeSelect.innerHTML = '';
-            (state.debtTypes || []).forEach(dt => {
-                const opt = document.createElement('option');
-                opt.value = String(dt.id);
-                opt.textContent = `${dt.name} (أقصى تقسيط: ${dt.maxInstallments} شهر)`;
-                typeSelect.appendChild(opt);
-            });
-        }
+        // Set default start date
+        const startDateInp = document.getElementById('modal-debt-start-date') as HTMLInputElement | null;
+        if (startDateInp) startDateInp.value = new Date().toISOString().split('T')[0];
 
-        const startDateInput = document.getElementById('modal-debt-start-date') as HTMLInputElement | null;
-        if (startDateInput && !startDateInput.value) {
-            startDateInput.value = new Date().toISOString().split('T')[0];
-        }
+        // Reset form inputs
+        const debtAmtInp = document.getElementById('modal-debt-amount') as HTMLInputElement | null;
+        if (debtAmtInp) debtAmtInp.value = '';
+        const intPctInp = document.getElementById('modal-debt-interest-percentage') as HTMLInputElement | null;
+        if (intPctInp) intPctInp.value = '0';
+        const instCountInp = document.getElementById('modal-debt-installments-count') as HTMLInputElement | null;
+        if (instCountInp) instCountInp.value = '1';
 
+        recalcModalDebtFields();
         modal.style.display = 'flex';
     };
+
+
 
     // Helper: Open Cash Debt Payment Modal (دفع بدون شحن)
     const openCashDebtPaymentModal = (preselectedCustomerId?: string | null) => {

@@ -2312,7 +2312,72 @@ async function getCustomerMeterMovementsLive(param) {
     }
 }
 
+
+// --- MEEDCO Live Debts API Methods ---
+let cachedDebtTypes = null;
+
+async function getDebtTypesLive(force = false) {
+    if (!force && cachedDebtTypes && cachedDebtTypes.length > 0) {
+        return { success: true, data: cachedDebtTypes };
+    }
+    try {
+        const res = await apiMeedcoRequest('/DebtType/GetAll', 'GET');
+        if (res && res.data) {
+            cachedDebtTypes = res.data;
+            return { success: true, data: res.data };
+        }
+        return { success: false, message: res?.message || 'تعذر جلب أنواع الديون' };
+    } catch (e) {
+        return { success: false, message: e.message };
+    }
+}
+
+async function getCustomerDebtsLive(customerId) {
+    if (!customerId) return { success: false, message: 'معرف المشترك مطلوب' };
+    try {
+        const res = await apiMeedcoRequest('/Debt/GetAll/' + encodeURIComponent(customerId), 'GET');
+        if (res && res.data) {
+            return { success: true, data: res.data };
+        }
+        return { success: false, message: res?.message || 'لم يتم العثور على ديون للمشترك' };
+    } catch (e) {
+        return { success: false, message: e.message };
+    }
+}
+
+async function createDebtLive(debtModel) {
+    if (!debtModel) return { success: false, message: 'بيانات الدين مطلوبة' };
+    try {
+        const res = await apiMeedcoRequest('/Debt/', 'POST', debtModel);
+        if (res && (res.status === 200 || res.status === 201 || (res.data && res.data.receiptNumber))) {
+            return { success: true, data: res.data || res };
+        }
+        // If server returns error, return message
+        return { success: false, message: res?.message || 'فشل حفظ الدين في المنظومة' };
+    } catch (e) {
+        return { success: false, message: e.message };
+    }
+}
+
+async function calculateConsumptionPoundsLive(customerId, consumeAmount, consumeMonth) {
+    try {
+        const url = `/Debt/CalculateConsumptionPound/${encodeURIComponent(customerId)}/${encodeURIComponent(consumeAmount)}/${encodeURIComponent(consumeMonth)}`;
+        const res = await apiMeedcoRequest(url, 'GET');
+        if (res && res.data != null) {
+            return { success: true, data: res.data };
+        }
+        return { success: false, message: res?.message || 'تعذر حساب الاستهلاك' };
+    } catch (e) {
+        return { success: false, message: e.message };
+    }
+}
+
+
 module.exports = {
+    getDebtTypesLive,
+    getCustomerDebtsLive,
+    createDebtLive,
+    calculateConsumptionPoundsLive,
     loginMeedcoLive,
     getMeedcoStatus,
     getMeedcoHierarchyLive,
