@@ -12595,6 +12595,7 @@ const openRenewControlCardSuccessModal = (result) => {
     }
 };
 const handleRenewControlCard = async () => {
+    var _a, _b, _c;
     const renewBtn = document.getElementById('btn-renew-control-card');
     const origHtml = renewBtn ? renewBtn.innerHTML : '';
     if (renewBtn) {
@@ -12607,20 +12608,59 @@ const handleRenewControlCard = async () => {
     try {
         showToast('جاري تحديث وتفعيل كارت التحكم عبر خدمة UnifiedCardService...');
         let result = null;
+        const cardIdToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.cardId) || '';
+        const genToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.generationType) || 'g1';
+        const vendorToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.vendorCode) || (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.vendor_id) || 4;
         if (window.renewControlCard) {
-            result = await window.renewControlCard();
+            result = await window.renewControlCard(cardIdToRenew, genToRenew, vendorToRenew);
         }
         else {
             try {
-                const res = await fetch('http://127.0.0.1:5002/api/renew-control-card');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                const res = await fetch('http://127.0.0.1:5002/api/renew-control-card', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cardId: cardIdToRenew,
+                        generationType: genToRenew,
+                        vendorCode: vendorToRenew
+                    }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
                 result = await res.json();
             }
             catch (bridgeErr) {
-                showToast('تعذر الاتصال بخدمة كروت التحكم المحلية.', 'error');
+                const errMsg = bridgeErr.name === 'AbortError' ? 'انتهت مهلة التحديث' : 'تعذر الاتصال بخدمة كروت التحكم المحلية.';
+                showToast(errMsg, 'error');
                 return;
             }
         }
         if (result && result.success) {
+            if (currentControlCardData) {
+                currentControlCardData.cardId = result.cardId || currentControlCardData.cardId;
+                if ((_a = result.card) === null || _a === void 0 ? void 0 : _a.expiryDate)
+                    currentControlCardData.expiryDate = result.card.expiryDate;
+                if ((_b = result.card) === null || _b === void 0 ? void 0 : _b.activationDate)
+                    currentControlCardData.activationDate = result.card.activationDate;
+                currentControlCardData.status = 'مفعل';
+            }
+            const cardIdDisplayEl = document.getElementById('ctrl-card-id');
+            if (cardIdDisplayEl && result.cardId) {
+                cardIdDisplayEl.textContent = result.cardId;
+            }
+            const badgeEl = document.getElementById('ctrl-card-status-badge');
+            if (badgeEl) {
+                badgeEl.textContent = 'كارت مفعل';
+                badgeEl.style.backgroundColor = '#dcfce7';
+                badgeEl.style.color = '#15803d';
+                badgeEl.style.border = '1px solid #86efac';
+            }
+            const expiryEl = document.getElementById('ctrl-card-expiry');
+            if (expiryEl && ((_c = result.card) === null || _c === void 0 ? void 0 : _c.expiryDate)) {
+                expiryEl.textContent = result.card.expiryDate;
+            }
             openRenewControlCardSuccessModal(result);
         }
         else {

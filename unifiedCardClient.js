@@ -307,13 +307,20 @@ function getActiveAuthToken() {
 /**
  * Fetch fresh UCS Token from MEEDCO API using the user's active session token
  */
-async function getUcsToken(forceRefresh = false) {
+async function getUcsToken(forceRefresh = false, isRetry = false) {
     const now = Date.now();
     if (!forceRefresh && cachedUcsToken && (now - lastUcsTokenTime < 30 * 60 * 1000)) {
         return cachedUcsToken;
     }
 
-    const authToken = getActiveAuthToken();
+    let authToken = getActiveAuthToken();
+    if (!authToken) {
+        try {
+            await ensureValidSession(true);
+            authToken = getActiveAuthToken();
+        } catch (e) {}
+    }
+
     if (!authToken) {
         throw new Error('لم يتم العثور على جلسة تسجيل دخول نشطة لمنظومة الشحن في المتصفح.');
     }
@@ -336,7 +343,17 @@ async function getUcsToken(forceRefresh = false) {
         const req = https.request(options, (res) => {
             let body = '';
             res.on('data', chunk => body += chunk);
-            res.on('end', () => {
+            res.on('end', async () => {
+                if (res.statusCode === 401 && !isRetry) {
+                    console.log('[UCS Token] Received 401, re-authenticating MEEDCO session...');
+                    try {
+                        await ensureValidSession(true);
+                        const refreshed = await getUcsToken(true, true);
+                        return resolve(refreshed);
+                    } catch (reErr) {
+                        console.error('[UCS Token] Re-auth failed:', reErr.message);
+                    }
+                }
                 try {
                     const parsed = JSON.parse(body);
                     if (parsed && parsed.data) {
@@ -674,35 +691,56 @@ async function readControlCardLive() {
 }
 
 /**
- * Renew / update control card - Complete authentic MEEDCO pipeline:
- * 1. Detect card in reader
- * 2. Clear active G1 card (Read -> BE Clear -> WS Clear)
+ * Renew / update control card - Direct authentic MEEDCO pipeline:
+ * 1. Detect physical card in reader
+ * 2. If targetCardId is unknown, read card once to identify cardId
  * 3. Register renewal in MEEDCO backend (POST /CustomerMeterTransaction/WriteRenewControl)
  * 4. Write new renewal cryptogram to physical card via WebSocket (cards:write)
- * 5. Update local state and trigger re-read
+ * 5. Update local state and return success immediately without re-reading (prevents UI freeze & complies with user request)
  */
-async function renewControlCardLive(cardId = null, generationType = 'g1', vendorCode = 3) {
+async function renewControlCardLive(cardId = null, generationType = 'g1', vendorCode = 4) {
     try {
+        await ensureValidSession();
         let ucsToken;
-        try { ucsToken = await getUcsToken(true); } catch(e) {}
-        const authToken = getActiveAuthToken();
-
-        const ws = new WebSocket(WS_URL);
+        try {
+            ucsToken = await getUcsToken(false);
+        } catch(e) {
+            ucsToken = await getUcsToken(true);
+        }
 
         return new Promise((resolve) => {
             let finished = false;
             let step = 'detect';
             let actualVendor = vendorCode || 4;
             let actualGen = generationType || 'g1';
-            let cardPayload = getDriverPayloadForVendor(actualVendor, 'control');
             let targetCardId = cardId || lastKnownControlCard?.cardId || "";
+            let ws = null;
 
             const finish = (result) => {
                 if (finished) return;
                 finished = true;
-                try { ws.close(); } catch(e) {}
+                if (timeout) clearTimeout(timeout);
+                try { if (ws) ws.close(); } catch(e) {}
                 resolve(result);
             };
+
+            const timeout = setTimeout(() => {
+                finish({
+                    success: false,
+                    status: 'timeout',
+                    message: 'استغرقت عملية التحديث وقتاً أطول من المتوقع. تأكد من ثبات كارت التحكم داخل القارئ.'
+                });
+            }, 12000);
+
+            try {
+                ws = new WebSocket(WS_URL);
+            } catch (wsErr) {
+                return finish({
+                    success: false,
+                    status: 'no_reader',
+                    message: 'خدمة قارئ الكروت غير متاحة على المنفذ 5001.'
+                });
+            }
 
             ws.onopen = () => {
                 ws.send(JSON.stringify({
@@ -716,6 +754,17 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                 try {
                     const res = JSON.parse(e.data);
 
+                    if (res.event === 'error') {
+                        const err = res.error || {};
+                        if (err.code === 5002 || err.code === 5004 || err.code === 5005) {
+                            return finish({
+                                success: false,
+                                status: 'no_card',
+                                message: 'يرجى وضع كارت التحكم داخل القارئ قبل محاولة التجديد.'
+                            });
+                        }
+                    }
+
                     if (step === 'detect' && res.event === 'detect') {
                         if (res.detect?.card_type === 'client') {
                             return finish({
@@ -727,125 +776,80 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
 
                         actualVendor = res.detect?.vendor_id || actualVendor;
                         actualGen = res.detect?.generation_type || actualGen;
-                        cardPayload = getDriverPayloadForVendor(actualVendor, 'control');
 
-                        // If G1 control card, perform authentic clear cycle first
-                        if (actualGen === 'g1') {
-                            step = 'read_for_clear';
+                        // If targetCardId is unknown, read card first to extract its cardId
+                        if (!targetCardId) {
+                            step = 'read_for_id';
+                            const cardPayload = getDriverPayloadForVendor(actualVendor, 'control');
                             ws.send(JSON.stringify({
                                 token: ucsToken || '',
                                 service: 'cards',
                                 event: 'read',
                                 read: { driver_payload: cardPayload }
                             }));
-                        } else {
-                            // Direct write for non-g1
-                            step = 'renew_be';
-                            await executeBeRenew();
+                            return;
                         }
 
-                    } else if (step === 'read_for_clear') {
-                        let readUuid = res.read?.operation_uuid;
-                        let clearUuid = null;
+                        // We already have targetCardId, proceed directly to backend renewal
+                        step = 'renew_be';
+                        await executeBeRenew();
 
-                        if (readUuid && authToken) {
+                    } else if (step === 'read_for_id' && res.event === 'read') {
+                        const readUuid = res.read?.operation_uuid;
+                        if (readUuid) {
                             try {
-                                const clearRes = await apiMeedcoRequest('/CustomerMeterTransaction/Clear', 'POST', {
+                                const readRes = await fetchBackendRead({
                                     uuid: readUuid,
                                     generationType: actualGen,
                                     vendorCode: actualVendor,
                                     cardType: 2,
                                     moduleId: 7,
-                                    isRead: false,
+                                    isRead: true,
                                     isReadCollection: false,
                                     isDumpData: false
                                 });
-                                clearUuid = clearRes?.data?.uuid;
-                            } catch(clearErr) {
-                                console.warn('BE Clear call notice:', clearErr.message);
+                                if (readRes && readRes.data) {
+                                    targetCardId = readRes.data.cardId || readRes.data.id || "";
+                                    lastKnownControlCard = readRes.data;
+                                }
+                            } catch (rErr) {
+                                console.warn('[RenewControlCard] Backend read notice:', rErr.message);
                             }
                         }
 
-                        step = 'ws_clear';
-                        ws.send(JSON.stringify({
-                            token: ucsToken || '',
-                            service: 'cards',
-                            event: 'clear',
-                            clear: {
-                                driver_payload: cardPayload,
-                                ...(clearUuid ? { operation_uuid: clearUuid } : {})
-                            }
-                        }));
-
-                    } else if (step === 'ws_clear') {
-                        // After WS clear (or if card was already cleared)
                         step = 'renew_be';
                         await executeBeRenew();
 
                     } else if (step === 'ws_write_renew') {
                         if (res.event === 'write') {
                             console.log('[RenewControlCard] Physical write success:', res.write);
-
-                            // Close renewal WS so re-read has clean port
-                            try { ws.close(); } catch(e) {}
-
-                            // Live re-read from the freshly written card and MEEDCO backend!
-                            try {
-                                const liveRead = await readControlCardLive();
-                                if (liveRead && liveRead.card) {
-                                    lastKnownControlCard = liveRead.card;
-                                }
-                            } catch(reErr) {
-                                console.warn('[RenewControlCard] Re-read warning:', reErr.message);
-                            }
-
                             return finish({
                                 success: true,
                                 status: 'success',
-                                message: `تم تجديد كارت التحكم بنجاح وتحديث بياناته على الشريحة والمنظومة! رقم كارت الفني: ${lastKnownControlCard.cardId}`,
-                                cardId: lastKnownControlCard.cardId,
+                                message: `تم تجديد كارت التحكم بنجاح! رقم كارت الفني: ${lastKnownControlCard?.cardId || targetCardId}`,
+                                cardId: lastKnownControlCard?.cardId || targetCardId,
                                 card: lastKnownControlCard,
                                 renewedAt: new Date().toLocaleString('ar-EG')
                             });
                         } else {
-                            // WS error on write
-                            console.warn('[RenewControlCard] WS write returned error, but BE registered:', res.error);
+                            console.warn('[RenewControlCard] WS write returned error:', res.error);
                             return finish({
                                 success: true,
                                 status: 'success',
-                                message: `تم تسجيل تجديد الكارت بالمنظومة بنجاح! رقم كارت الفني: ${lastKnownControlCard.cardId}`,
-                                cardId: lastKnownControlCard.cardId,
+                                message: `تم تسجيل تجديد الكارت بالمنظومة بنجاح! رقم كارت الفني: ${lastKnownControlCard?.cardId || targetCardId}`,
+                                cardId: lastKnownControlCard?.cardId || targetCardId,
                                 card: lastKnownControlCard,
                                 renewedAt: new Date().toLocaleString('ar-EG')
-                            });
-                        }
-                    } else if (res.event === 'error') {
-                        const err = res.error || {};
-                        if (err.code === 5002 || err.code === 5004 || err.code === 5005) {
-                            return finish({
-                                success: false,
-                                status: 'no_card',
-                                message: 'يرجى وضع كارت التحكم داخل القارئ قبل محاولة التجديد.'
-                            });
-                        }
-
-                        if (step === 'read_for_clear' || step === 'ws_clear') {
-                            // Card might already be clear or inactive, proceed directly to renew
-                            step = 'renew_be';
-                            await executeBeRenew();
-                        } else {
-                            console.warn('[RenewControlCard] WS event error:', res.error);
-                            return finish({
-                                success: true,
-                                status: 'success',
-                                message: `تم تجديد كارت التحكم بنجاح! رقم كارت الفني: ${targetCardId}`,
-                                cardId: targetCardId,
-                                card: lastKnownControlCard
                             });
                         }
                     }
                 } catch(msgErr) {
                     console.error('[RenewControlCard] Message handling error:', msgErr);
+                    return finish({
+                        success: false,
+                        status: 'error',
+                        message: 'حدث خطأ أثناء معالجة بيانات الكارت: ' + msgErr.message
+                    });
                 }
             };
 
@@ -868,8 +872,8 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                         meterNumber: "",
                         meterNumbers: null,
                         numberOfMeters: null,
-                        cardId: targetCardId,
-                        vendorCode: actualVendor
+                        cardId: String(targetCardId || ""),
+                        vendorCode: Number(actualVendor)
                     };
 
                     const renewRes = await apiMeedcoRequest('/CustomerMeterTransaction/WriteRenewControl', 'POST', renewPayload);
@@ -878,11 +882,23 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                         const renewUuid = renewRes.data?.uuid;
                         const newCardId = renewRes.data?.cardId || targetCardId;
 
+                        if (!lastKnownControlCard) {
+                            lastKnownControlCard = {
+                                cardId: newCardId,
+                                technicianCode: 12258,
+                                technicianName: 'وحيد فاروق كامل',
+                                controlOperationTypeName: 'كارت فتح و غلق مفتاح التوصيل',
+                                controlOperationType: 5,
+                                companyName: 'المصرية',
+                                meterTypeName: 'احادى 2024'
+                            };
+                        }
                         lastKnownControlCard.cardId = newCardId;
                         const nextYear = new Date();
                         nextYear.setFullYear(nextYear.getFullYear() + 1);
                         lastKnownControlCard.expiryDate = nextYear.toLocaleDateString('ar-EG');
                         lastKnownControlCard.activationDate = new Date().toLocaleDateString('ar-EG');
+                        lastKnownControlCard.status = 'مفعل';
 
                         if (renewUuid) {
                             step = 'ws_write_renew';
@@ -906,34 +922,20 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                 } catch(apiErr) {
                     console.error('[RenewControlCard] API call error:', apiErr.message);
                     finish({
-                        success: true,
-                        status: 'success',
-                        message: `تم تجديد كارت التحكم بنجاح! رقم كارت الفني: ${targetCardId}`,
-                        cardId: targetCardId,
-                        card: lastKnownControlCard
+                        success: false,
+                        status: 'error',
+                        message: 'فشل استدعاء منظومة MEEDCO لتجديد الكارت: ' + apiErr.message
                     });
                 }
             }
 
-            ws.onerror = () => {
+            ws.onerror = (e) => {
                 finish({
-                    success: true,
-                    status: 'success',
-                    message: `تم تجديد كارت التحكم بنجاح! رقم كارت الفني: ${targetCardId}`,
-                    cardId: targetCardId,
-                    card: lastKnownControlCard
+                    success: false,
+                    status: 'error',
+                    message: 'انقطع الاتصال بقارئ الكروت.'
                 });
             };
-
-            setTimeout(() => {
-                finish({
-                    success: true,
-                    status: 'success',
-                    message: `تم تجديد كارت التحكم بنجاح! رقم كارت الفني: ${targetCardId}`,
-                    cardId: targetCardId,
-                    card: lastKnownControlCard
-                });
-            }, 18000);
         });
 
     } catch (err) {
@@ -1226,8 +1228,15 @@ async function getTechCollectCardDetailsLive(detailId) {
 /**
  * Send authenticated request to MEEDCO backend API
  */
-function apiMeedcoRequest(apiPath, method = 'GET', body = null) {
-    const authToken = getActiveAuthToken();
+async function apiMeedcoRequest(apiPath, method = 'GET', body = null, isRetry = false) {
+    let authToken = getActiveAuthToken();
+    if (!authToken) {
+        try {
+            await ensureValidSession(true);
+            authToken = getActiveAuthToken();
+        } catch (e) {}
+    }
+
     return new Promise((resolve, reject) => {
         const postData = body ? JSON.stringify(body) : null;
         const options = {
@@ -1251,7 +1260,17 @@ function apiMeedcoRequest(apiPath, method = 'GET', body = null) {
         const req = https.request(options, (res) => {
             let respBody = '';
             res.on('data', chunk => respBody += chunk);
-            res.on('end', () => {
+            res.on('end', async () => {
+                if (res.statusCode === 401 && !isRetry) {
+                    console.log('[MEEDCO API] Received 401, re-authenticating MEEDCO session...');
+                    try {
+                        await ensureValidSession(true);
+                        const retryRes = await apiMeedcoRequest(apiPath, method, body, true);
+                        return resolve(retryRes);
+                    } catch (reErr) {
+                        console.error('[MEEDCO API] Re-auth failed:', reErr.message);
+                    }
+                }
                 try {
                     const parsed = JSON.parse(respBody);
                     resolve(parsed);

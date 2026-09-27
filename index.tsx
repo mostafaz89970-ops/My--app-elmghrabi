@@ -23,7 +23,7 @@ interface Window {
     readSmartCard?: (mockData?: any) => Promise<any>;
     getSmartCardStatus?: () => Promise<any>;
     readControlCard?: () => Promise<any>;
-    renewControlCard?: () => Promise<any>;
+    renewControlCard?: (cardId?: any, generationType?: any, vendorCode?: any) => Promise<any>;
     clearControlCard?: () => Promise<any>;
     getControlCardMetadata?: () => Promise<any>;
     getMeterTypesByCompany?: (companyId: string) => Promise<any>;
@@ -13457,19 +13457,61 @@ const handlePrintJudicialControlDetails = () => {
             showToast('جاري تحديث وتفعيل كارت التحكم عبر خدمة UnifiedCardService...');
             let result: any = null;
 
+            const cardIdToRenew = currentControlCardData?.cardId || '';
+            const genToRenew = currentControlCardData?.generationType || 'g1';
+            const vendorToRenew = currentControlCardData?.vendorCode || currentControlCardData?.vendor_id || 4;
+
             if (window.renewControlCard) {
-                result = await window.renewControlCard();
+                result = await window.renewControlCard(cardIdToRenew, genToRenew, vendorToRenew);
             } else {
                 try {
-                    const res = await fetch('http://127.0.0.1:5002/api/renew-control-card');
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+                    const res = await fetch('http://127.0.0.1:5002/api/renew-control-card', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            cardId: cardIdToRenew,
+                            generationType: genToRenew,
+                            vendorCode: vendorToRenew
+                        }),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
                     result = await res.json();
-                } catch (bridgeErr) {
-                    showToast('تعذر الاتصال بخدمة كروت التحكم المحلية.', 'error');
+                } catch (bridgeErr: any) {
+                    const errMsg = bridgeErr.name === 'AbortError' ? 'انتهت مهلة التحديث' : 'تعذر الاتصال بخدمة كروت التحكم المحلية.';
+                    showToast(errMsg, 'error');
                     return;
                 }
             }
 
             if (result && result.success) {
+                if (currentControlCardData) {
+                    currentControlCardData.cardId = result.cardId || currentControlCardData.cardId;
+                    if (result.card?.expiryDate) currentControlCardData.expiryDate = result.card.expiryDate;
+                    if (result.card?.activationDate) currentControlCardData.activationDate = result.card.activationDate;
+                    currentControlCardData.status = 'مفعل';
+                }
+
+                const cardIdDisplayEl = document.getElementById('ctrl-card-id');
+                if (cardIdDisplayEl && result.cardId) {
+                    cardIdDisplayEl.textContent = result.cardId;
+                }
+
+                const badgeEl = document.getElementById('ctrl-card-status-badge');
+                if (badgeEl) {
+                    badgeEl.textContent = 'كارت مفعل';
+                    badgeEl.style.backgroundColor = '#dcfce7';
+                    badgeEl.style.color = '#15803d';
+                    badgeEl.style.border = '1px solid #86efac';
+                }
+
+                const expiryEl = document.getElementById('ctrl-card-expiry');
+                if (expiryEl && result.card?.expiryDate) {
+                    expiryEl.textContent = result.card.expiryDate;
+                }
+
                 openRenewControlCardSuccessModal(result);
             } else {
                 showToast(result?.message || 'فشل تحديث كارت التحكم. تأكد من إدخال الكارت وثباته في القارئ.', 'error');
