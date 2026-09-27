@@ -189,6 +189,48 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            if (pathname === '/api/clear-control-card') {
+                const result = await nativeEngine.clearControlCard();
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            if (pathname.startsWith('/api/control-card/details/')) {
+                const detailId = pathname.replace('/api/control-card/details/', '');
+                const unifiedClient = require('./unifiedCardClient');
+                const result = await unifiedClient.getControlCardDetailsLive(detailId);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            if (pathname === '/api/tech-collect-card/read') {
+                const unifiedClient = require('./unifiedCardClient');
+                const result = await unifiedClient.readTechCollectCardLive();
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            if (pathname === '/api/tech-collect-card/renew') {
+                const unifiedClient = require('./unifiedCardClient');
+                const body = await getBody();
+                const result = await unifiedClient.renewTechCollectCardLive(body.cardId, body.generationType, body.vendorCode);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            if (pathname.startsWith('/api/tech-collect-card/details/')) {
+                const detailId = pathname.replace('/api/tech-collect-card/details/', '');
+                const unifiedClient = require('./unifiedCardClient');
+                const result = await unifiedClient.getTechCollectCardDetailsLive(detailId);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
             // 10. Debts & Fees APIs
             if (pathname === '/api/debts') {
                 const store = getDebtsStore();

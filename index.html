@@ -1006,7 +1006,11 @@
                         <summary><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg><span>كروت التحكم</span></summary>
                         <ul>
                             <li><a href="#" class="nav-link" data-target="read-control-card" data-permission="read_control_card"><span>قراءة كارت التحكم</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="control-card-details" data-permission="control_card_details"><span>تفاصيل قراءة كارت التحكم</span></a></li>
                             <li><a href="#" class="nav-link" data-target="issue-control-card" data-permission="issue_control_card"><span>إصدار كروت التحكم</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="advanced-control-card" data-permission="advanced_control_card"><span>كارت تحكم متقدم</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="tech-collect-card" data-permission="tech_collect_card"><span>قراءة كارت تجميع فني</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="tech-collect-card-details" data-permission="tech_collect_card_details"><span>تفاصيل كارت التجميع الفني</span></a></li>
                         </ul>
                     </details>
                 </li>
@@ -6142,6 +6146,10 @@
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                             <span>تحديث الكارت</span>
                         </button>
+                        <button type="button" id="btn-clear-control-card" class="btn secondary" style="display: inline-flex; align-items: center; gap: 8px; color: #dc2626;" title="مسح وتفريغ كارت التحكم">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            <span>مسح الكارت</span>
+                        </button>
                         <button type="button" id="btn-print-control-card" class="btn secondary" style="display: inline-flex; align-items: center; gap: 8px;" disabled>
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
                             <span>طباعة تقرير الكارت</span>
@@ -6401,6 +6409,479 @@
                 </dialog>
             </div>
         </section>
+
+        <!-- تفاصيل قراءة كارت التحكم (Control Card Details - MEEDCO Component Met) -->
+        <section id="control-card-details" class="content-section">
+            <div class="table-container">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 1.5rem;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="background: #e0f2fe; color: #0284c7; padding: 10px; border-radius: 8px; display: flex;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.35rem;">تفاصيل قراءة كارت التحكم</h3>
+                            <small class="text-muted">عرض البيانات التشخيصية التفصيلية للعداد المقروء من كارت التحكم وفق منظومة MEEDCO</small>
+                        </div>
+                    </div>
+                    <div class="section-actions" style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" id="btn-back-to-read-control" class="btn secondary" style="display: inline-flex; align-items: center; gap: 8px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                            <span>رجوع لقراءة كارت التحكم</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- بطاقة بيانات المشترك والعداد -->
+                <div class="form-container" style="margin-bottom: 1.5rem; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius-lg); padding: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem;">
+                        <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">بيانات المشترك والعداد</h4>
+                        <span id="ccd-meter-status-badge" style="padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; background: #dcfce7; color: #15803d;">حالة سليمة</span>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; font-size: 0.95rem;">
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">كود المشترك:</span>
+                            <strong id="ccd-cust-code" style="font-family: monospace; color: #0284c7; font-size: 1.05rem;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">رقم العداد:</span>
+                            <strong id="ccd-meter-number" style="font-family: monospace; color: #0f172a; font-size: 1.05rem;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">اسم المشترك:</span>
+                            <strong id="ccd-cust-name" style="color: #0f172a;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">العنوان:</span>
+                            <strong id="ccd-address" style="color: #0f172a;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">نوع النشاط:</span>
+                            <strong id="ccd-activity" style="color: #0f172a;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">نوع العداد:</span>
+                            <strong id="ccd-meter-type" style="color: #0f172a;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">الرصيد المتبقي:</span>
+                            <strong id="ccd-remaining-balance" style="color: #059669; font-size: 1.1rem;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">الشحنة المتبقية (ك.و.س):</span>
+                            <strong id="ccd-remaining-power" style="color: #0284c7; font-size: 1.1rem;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">إجمالي الشحن على العداد:</span>
+                            <strong id="ccd-total-recharge" style="color: #0f172a;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">إجمالي الاستهلاك الفعلي:</span>
+                            <strong id="ccd-total-consumption" style="color: #0f172a;">-</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- التبويبات التشخيصية (الجداول المتقدمة) -->
+                <div class="tabs-container" style="margin-top: 1rem;">
+                    <div class="tabs" style="display: flex; gap: 8px; border-bottom: 2px solid #e2e8f0; margin-bottom: 1rem;">
+                        <button type="button" class="tab-btn active" data-tab="ccd-tab-monthly" style="padding: 10px 18px; border: none; background: none; font-weight: 600; cursor: pointer; border-bottom: 3px solid #0284c7; color: #0284c7;">
+                            استهلاك الشهور السابقة
+                        </button>
+                        <button type="button" class="tab-btn" data-tab="ccd-tab-events" style="padding: 10px 18px; border: none; background: none; font-weight: 600; cursor: pointer; color: #64748b;">
+                            سجل التلاعبات والأحداث
+                        </button>
+                        <button type="button" class="tab-btn" data-tab="ccd-tab-cards" style="padding: 10px 18px; border: none; background: none; font-weight: 600; cursor: pointer; color: #64748b;">
+                            سجل عمليات الكروت
+                        </button>
+                    </div>
+
+                    <!-- تبويب استهلاك الشهور السابقة -->
+                    <div id="ccd-tab-monthly" class="tab-content active">
+                        <div class="responsive-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>الشهر</th>
+                                        <th>الطاقة الفعالة (ك.و.س)</th>
+                                        <th>الطاقة غير الفعالة</th>
+                                        <th>قيمة الاستهلاك (ج.م)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ccd-monthly-tbody">
+                                    <tr><td colspan="4" style="text-align: center; padding: 2rem; color: #94a3b8;">لا توجد سجلات استهلاك شهري على الكارت</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- تبويب سجل التلاعبات والأحداث -->
+                    <div id="ccd-tab-events" class="tab-content" style="display: none;">
+                        <div class="responsive-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>كود الحدث / التلاعب</th>
+                                        <th>وقت حدوث التلاعب</th>
+                                        <th>كود فني إزالة التلاعب</th>
+                                        <th>وقت إزالة التلاعب</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ccd-events-tbody">
+                                    <tr><td colspan="4" style="text-align: center; padding: 2rem; color: #94a3b8;">لا توجد تلاعبات مسجلة على العداد</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- تبويب سجل عمليات الكروت -->
+                    <div id="ccd-tab-cards" class="tab-content" style="display: none;">
+                        <div class="responsive-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>رقم الكارت</th>
+                                        <th>كود العملية</th>
+                                        <th>تسلسل العملية</th>
+                                        <th>تاريخ وتوقيت العملية</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ccd-cards-tbody">
+                                    <tr><td colspan="4" style="text-align: center; padding: 2rem; color: #94a3b8;">لا توجد عمليات كروت مسجلة</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- كارت تحكم متقدم (Advanced Control Card - MEEDCO Component mH) -->
+        <section id="advanced-control-card" class="content-section">
+            <div class="form-container">
+                <div class="section-header">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="background: #f0fdf4; color: #16a34a; padding: 10px; border-radius: 8px; display: flex;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.35rem;">كارت تحكم متقدم</h3>
+                            <small class="text-muted">معاملات التحكم والبرمجة المتقدمة للعدادات الذكية وإصدار كارت الإعدادات الميدانية</small>
+                        </div>
+                    </div>
+                    <button class="btn btn-back-page" title="رجوع">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                        <span>رجوع</span>
+                    </button>
+                </div>
+
+                <!-- البحث عن المشترك أو العداد -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 1.5rem 0;">
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+                        <div class="input-group" style="flex: 1; min-width: 240px; margin: 0;">
+                            <label for="adv-ctrl-search-input">البحث بكود المشترك أو رقم العداد</label>
+                            <input type="text" id="adv-ctrl-search-input" placeholder="أدخل كود المشترك أو رقم شاسيه العداد...">
+                        </div>
+                        <button type="button" id="btn-adv-ctrl-search" class="btn" style="background: #0284c7; color: white; display: inline-flex; align-items: center; gap: 6px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <span>بحث</span>
+                        </button>
+                        <button type="button" id="btn-adv-ctrl-read-card" class="btn secondary" style="display: inline-flex; align-items: center; gap: 6px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                            <span>قراءة الكارت الحالي</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- استمارة بيانات التحكم المتقدم -->
+                <form id="advanced-control-card-form" class="form-grid" novalidate>
+                    <div class="input-group">
+                        <label for="adv-ctrl-cust-code">كود المشترك</label>
+                        <input type="text" id="adv-ctrl-cust-code" readonly style="background-color: #f1f5f9;">
+                    </div>
+                    <div class="input-group">
+                        <label for="adv-ctrl-cust-name">اسم المشترك</label>
+                        <input type="text" id="adv-ctrl-cust-name" readonly style="background-color: #f1f5f9;">
+                    </div>
+                    <div class="input-group">
+                        <label for="adv-ctrl-meter-number">رقم العداد</label>
+                        <input type="text" id="adv-ctrl-meter-number" readonly style="background-color: #f1f5f9; font-family: monospace;">
+                    </div>
+                    <div class="input-group">
+                        <label for="adv-ctrl-meter-type">نوع العداد <span style="color: red;">*</span></label>
+                        <select id="adv-ctrl-meter-type" required>
+                            <option value="" disabled selected hidden>اختر نوع العداد...</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="adv-ctrl-activity">نوع النشاط <span style="color: red;">*</span></label>
+                        <select id="adv-ctrl-activity" required>
+                            <option value="" disabled selected hidden>اختر النشاط...</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="adv-ctrl-op-type">نوع العملية المتقدمة <span style="color: red;">*</span></label>
+                        <select id="adv-ctrl-op-type" required>
+                            <option value="1">تعديل معاملات القدرة والتعاقد</option>
+                            <option value="2">إعادة ضبط المصنع المتقدم للعداد</option>
+                            <option value="3">تحديث التعريفة والشرائح الميداني</option>
+                            <option value="4">فحص ومعايرة أجهزة القياس</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="adv-ctrl-charge-value">قيمة الشحن الابتدائي / الحد الائتماني (ج.م)</label>
+                        <input type="number" id="adv-ctrl-charge-value" value="250" min="0">
+                    </div>
+                    <div class="input-group">
+                        <label for="adv-ctrl-effective-date">تاريخ السريان</label>
+                        <input type="date" id="adv-ctrl-effective-date">
+                    </div>
+
+                    <div class="input-group full-width" style="margin-top: 1rem; display: flex; gap: 12px;">
+                        <button type="submit" id="btn-adv-ctrl-write" class="btn" style="background-color: #16a34a; color: white; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 10px 24px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            <span>كتابة كارت التحكم المتقدم</span>
+                        </button>
+                        <button type="button" id="btn-adv-ctrl-clear" class="btn secondary" style="color: #dc2626;">مسح الكارت</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- قراءة كارت تجميع فني (Tech Collect Card - MEEDCO Component GG) -->
+        <section id="tech-collect-card" class="content-section">
+            <div class="table-container">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 1.5rem;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="background: #fef3c7; color: #b45309; padding: 10px; border-radius: 8px; display: flex;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.35rem;">قراءة كارت تجميع القراءات</h3>
+                            <small class="text-muted">قراءة وتفريغ كروت تجميع القراءات الفنية المسجلة من قِبل الكشافين والفنيين</small>
+                        </div>
+                    </div>
+                    <div class="section-actions" style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" id="btn-read-tech-collect-card" class="btn" style="background-color: #0284c7; color: white; display: inline-flex; align-items: center; gap: 8px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="7" cy="15" r="1.5"/></svg>
+                            <span>قراءة الكارت</span>
+                        </button>
+                        <button type="button" id="btn-renew-tech-collect-card" class="btn secondary" style="display: inline-flex; align-items: center; gap: 8px;" title="تجديد وتفريغ كارت التجميع الفني">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                            <span>تجديد الكارت</span>
+                        </button>
+                        <button type="button" id="btn-print-tech-collect-card" class="btn secondary" style="display: inline-flex; align-items: center; gap: 8px;" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            <span>طباعة تقرير</span>
+                        </button>
+                        <button class="btn btn-back-page" title="رجوع">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                            <span>رجوع</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- بطاقة بيانات كارت التجميع الفني -->
+                <div class="form-container" style="margin-bottom: 1.5rem; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius-lg); padding: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem;">
+                        <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">بيانات كارت التجميع الفني</h4>
+                        <span id="tc-card-status-badge" style="padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569;">بانتظار القراءة</span>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; font-size: 0.95rem;">
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">شركة العداد:</span>
+                            <strong id="tc-company-name" style="color: #0f172a;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">موديل العداد:</span>
+                            <strong id="tc-meter-type" style="color: #0f172a;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">كود الكارت:</span>
+                            <strong id="tc-card-id" style="font-family: monospace; color: #0284c7; font-size: 1.05rem;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">كود الكشاف:</span>
+                            <strong id="tc-tech-code" style="font-family: monospace; color: #0f172a;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">اسم الكشاف:</span>
+                            <strong id="tc-tech-name" style="color: #0f172a;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">تاريخ الإصدار:</span>
+                            <strong id="tc-issue-date" style="color: #0f172a;">-</strong>
+                        </div>
+                        <div class="control-info-item">
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">مصدر الكارت:</span>
+                            <strong id="tc-issuer" style="color: #0f172a;">-</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- جدول قراءات العدادات المجمعة -->
+                <div class="table-controls" style="margin-bottom: 1rem;">
+                    <div class="section-header-title">
+                        <h4 style="margin: 0;">العدادات المقروءة في جولة الكشاف (<span id="tc-meters-count">0</span>)</h4>
+                    </div>
+                    <div class="table-actions">
+                        <input type="text" class="table-filter" id="tc-meters-filter" placeholder="بحث برقم العداد أو كود المشترك...">
+                    </div>
+                </div>
+
+                <div class="responsive-table">
+                    <table id="tech-collect-meters-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">م</th>
+                                <th>كود العداد</th>
+                                <th>رقم العداد</th>
+                                <th>الإصدار</th>
+                                <th>المصنع</th>
+                                <th>حالة العداد</th>
+                                <th>حالة البطارية</th>
+                                <th>الرصيد المتبقي</th>
+                                <th>الشحنة المتبقية</th>
+                                <th>إجمالي الشحن</th>
+                                <th>إجمالي الاستهلاك</th>
+                                <th>استهلاك الشهر الحالي</th>
+                                <th style="width: 110px;">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tech-collect-meters-tbody">
+                            <tr>
+                                <td colspan="13" style="padding: 2.5rem; text-align: center; color: #94a3b8;">
+                                    ضع كارت تجميع القراءات في القارئ واضغط "قراءة الكارت"
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- تفاصيل كارت التجميع الفني (Tech Collect Card Detail - MEEDCO Component JG) -->
+        <section id="tech-collect-card-details" class="content-section">
+            <div class="table-container">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 1.5rem;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="background: #fef3c7; color: #b45309; padding: 10px; border-radius: 8px; display: flex;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.35rem;">تفاصيل كارت التجميع الفني</h3>
+                            <small class="text-muted">التقرير التشخيصي الشامل لاستهلاك وأحداث العداد المجمع من كارت التجميع</small>
+                        </div>
+                    </div>
+                    <div class="section-actions" style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" id="btn-back-to-tech-collect" class="btn secondary" style="display: inline-flex; align-items: center; gap: 8px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                            <span>رجوع لكارت التجميع</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- بطاقة ملخص العداد -->
+                <div class="form-container" style="margin-bottom: 1.5rem; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius-lg); padding: 1.25rem;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 0.95rem;">
+                        <div>
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">رقم العداد:</span>
+                            <strong id="tcd-meter-number" style="font-family: monospace; font-size: 1.1rem; color: #0284c7;">-</strong>
+                        </div>
+                        <div>
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">كود العداد:</span>
+                            <strong id="tcd-meter-code" style="font-family: monospace;">-</strong>
+                        </div>
+                        <div>
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">حالة العداد:</span>
+                            <strong id="tcd-meter-status" style="color: #16a34a;">-</strong>
+                        </div>
+                        <div>
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">حالة البطارية:</span>
+                            <strong id="tcd-battery-status">-</strong>
+                        </div>
+                        <div>
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">الرصيد المتبقي:</span>
+                            <strong id="tcd-balance" style="color: #059669;">-</strong>
+                        </div>
+                        <div>
+                            <span style="color: #64748b; font-size: 0.85rem; display: block;">الشحنة المتبقية:</span>
+                            <strong id="tcd-power" style="color: #0284c7;">-</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- التبويبات التشخيصية -->
+                <div class="tabs-container">
+                    <div class="tabs" style="display: flex; gap: 8px; border-bottom: 2px solid #e2e8f0; margin-bottom: 1rem;">
+                        <button type="button" class="tab-btn active" data-tab="tcd-tab-consumption" style="padding: 10px 18px; border: none; background: none; font-weight: 600; cursor: pointer; border-bottom: 3px solid #b45309; color: #b45309;">
+                            سجل الاستهلاك الشهري
+                        </button>
+                        <button type="button" class="tab-btn" data-tab="tcd-tab-events" style="padding: 10px 18px; border: none; background: none; font-weight: 600; cursor: pointer; color: #64748b;">
+                            سجل التلاعبات والأحداث
+                        </button>
+                        <button type="button" class="tab-btn" data-tab="tcd-tab-cards" style="padding: 10px 18px; border: none; background: none; font-weight: 600; cursor: pointer; color: #64748b;">
+                            سجل كروت المشتركين
+                        </button>
+                    </div>
+
+                    <div id="tcd-tab-consumption" class="tab-content active">
+                        <div class="responsive-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>الشهر</th>
+                                        <th>الطاقة الفعالة (ك.و.س)</th>
+                                        <th>الطاقة غير الفعالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tcd-consumption-tbody">
+                                    <tr><td colspan="3" style="text-align: center; padding: 2rem; color: #94a3b8;">لا توجد سجلات استهلاك</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="tcd-tab-events" class="tab-content" style="display: none;">
+                        <div class="responsive-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>كود الحدث</th>
+                                        <th>كود فني الإزالة</th>
+                                        <th>توقيت الحدوث</th>
+                                        <th>توقيت الإزالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tcd-events-tbody">
+                                    <tr><td colspan="4" style="text-align: center; padding: 2rem; color: #94a3b8;">لا توجد تلاعبات مسجلة</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="tcd-tab-cards" class="tab-content" style="display: none;">
+                        <div class="responsive-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>رقم الكارت</th>
+                                        <th>كود العملية</th>
+                                        <th>تسلسل العملية</th>
+                                        <th>تاريخ العملية</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tcd-cards-tbody">
+                                    <tr><td colspan="4" style="text-align: center; padding: 2rem; color: #94a3b8;">لا توجد عمليات كروت مسجلة</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
       </div>
       
       <footer class="main-footer">

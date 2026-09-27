@@ -24,6 +24,7 @@ interface Window {
     getSmartCardStatus?: () => Promise<any>;
     readControlCard?: () => Promise<any>;
     renewControlCard?: () => Promise<any>;
+    clearControlCard?: () => Promise<any>;
     getControlCardMetadata?: () => Promise<any>;
     getMeterTypesByCompany?: (companyId: string) => Promise<any>;
     issueControlCard?: (params: any) => Promise<any>;
@@ -421,6 +422,10 @@ let state = {
             'view_control_cards_section': { name: 'عرض قسم كروت التحكم الذكية', roles: ['admin', 'supervisor'] },
             'read_control_card': { name: 'قراءة كارت التحكم', roles: ['admin', 'supervisor', 'user'] },
             'issue_control_card': { name: 'إصدار كروت التحكم وبرمجتها', roles: ['admin', 'supervisor'] },
+            'control_card_details': { name: 'تفاصيل قراءة كارت التحكم', roles: ['admin', 'supervisor', 'user'] },
+            'advanced_control_card': { name: 'كارت تحكم متقدم', roles: ['admin', 'supervisor'] },
+            'tech_collect_card': { name: 'قراءة كارت تجميع فني', roles: ['admin', 'supervisor', 'user'] },
+            'tech_collect_card_details': { name: 'تفاصيل كارت التجميع الفني', roles: ['admin', 'supervisor', 'user'] },
             'view_debts_and_fees_section': { name: 'عرض قسم الاستثناءات والرسوم والديون', roles: ['admin', 'supervisor'] },
             'debts_management': { name: 'إدارة حسابات الديون والمديونيات', roles: ['admin', 'supervisor'] },
             'debt_types': { name: 'إدارة أنواع الديون وتعديلها', roles: ['admin', 'supervisor'] },
@@ -2642,7 +2647,11 @@ const renderDashboard = () => {
             icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
             actions: [
                 { id: 'read-control-card', title: 'قراءة كارت التحكم', permission: 'read_control_card', icon: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>', tileColor: 'tile-purple' },
+                { id: 'control-card-details', title: 'تفاصيل قراءة كارت التحكم', permission: 'control_card_details', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>', tileColor: 'tile-cyan' },
                 { id: 'issue-control-card', title: 'إصدار كروت التحكم', permission: 'issue_control_card', icon: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>', tileColor: 'tile-indigo' },
+                { id: 'advanced-control-card', title: 'كارت تحكم متقدم', permission: 'advanced_control_card', icon: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>', tileColor: 'tile-emerald' },
+                { id: 'tech-collect-card', title: 'قراءة كارت تجميع فني', permission: 'tech_collect_card', icon: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>', tileColor: 'tile-amber' },
+                { id: 'tech-collect-card-details', title: 'تفاصيل كارت التجميع الفني', permission: 'tech_collect_card_details', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>', tileColor: 'tile-blue' },
             ]
         },
         {
@@ -14000,6 +14009,464 @@ const handlePrintJudicialControlDetails = () => {
             if (issueBtn) {
                 issueBtn.disabled = false;
                 issueBtn.innerHTML = origHtml;
+            }
+        }
+    };
+
+    
+    
+    const navigateToSection = (targetId: string) => {
+        const targetLink = document.querySelector(`.sidebar-nav .nav-link[data-target="${targetId}"]`) as HTMLElement | null;
+        if (targetLink) {
+            targetLink.click();
+        } else {
+            const sec = document.getElementById(targetId);
+            if (sec) {
+                document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+                sec.classList.add('active');
+            }
+        }
+    };
+
+    // --- مسح وتفريغ كارت التحكم ---
+    const handleClearControlCard = async () => {
+        const clearBtn = document.getElementById('btn-clear-control-card') as HTMLButtonElement | null;
+        if (!confirm('هل أنت متأكد من رغبتك في مسح وتفريغ كارت التحكم الحالي؟')) return;
+
+        const origHtml = clearBtn ? clearBtn.innerHTML : '';
+        if (clearBtn) {
+            clearBtn.disabled = true;
+            clearBtn.innerHTML = `<span>جاري المسح...</span>`;
+        }
+
+        try {
+            showToast('جاري الاتصال بالقارئ ومسح كارت التحكم...');
+            let result: any = null;
+            if (window.clearControlCard) {
+                result = await window.clearControlCard();
+            } else {
+                const res = await fetch('http://127.0.0.1:5002/api/clear-control-card');
+                result = await res.json();
+            }
+
+            if (result && result.success) {
+                showToast(result.message || 'تم مسح وتفريغ كارت التحكم بنجاح.', 'success');
+                currentControlCardData = null;
+                const tbody = document.getElementById('control-card-meters-tbody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding: 2rem; text-align: center; color: #94a3b8;">تم مسح الكارت بنجاح. أدخل الكارت واضغط \'قراءة الكارت\'</td></tr>';
+                }
+                const badgeEl = document.getElementById('ctrl-card-status-badge');
+                if (badgeEl) {
+                    badgeEl.textContent = 'كارت ممسوح فارغ';
+                    badgeEl.style.backgroundColor = '#f1f5f9';
+                    badgeEl.style.color = '#64748b';
+                }
+            } else {
+                showToast(result?.message || 'فشل مسح كارت التحكم. تأكد من وضع الكارت في القارئ.', 'error');
+            }
+        } catch (e: any) {
+            showToast('خطأ أثناء مسح الكارت: ' + (e.message || e), 'error');
+        } finally {
+            if (clearBtn) {
+                clearBtn.disabled = false;
+                clearBtn.innerHTML = origHtml;
+            }
+        }
+    };
+
+    // --- تفاصيل قراءة كارت التحكم (Control Card Details) ---
+    let selectedControlMeterDetail: any = null;
+
+    const renderControlCardDetailsSection = (meter: any = null) => {
+        const m = meter || selectedControlMeterDetail || (currentControlCardData?.meterData && currentControlCardData.meterData[0]) || null;
+        selectedControlMeterDetail = m;
+
+        const custCodeEl = document.getElementById('ccd-cust-code');
+        const meterNumEl = document.getElementById('ccd-meter-number');
+        const custNameEl = document.getElementById('ccd-cust-name');
+        const addressEl = document.getElementById('ccd-address');
+        const activityEl = document.getElementById('ccd-activity');
+        const meterTypeEl = document.getElementById('ccd-meter-type');
+        const remBalEl = document.getElementById('ccd-remaining-balance');
+        const remPowEl = document.getElementById('ccd-remaining-power');
+        const totRechargeEl = document.getElementById('ccd-total-recharge');
+        const totConsEl = document.getElementById('ccd-total-consumption');
+        const badgeEl = document.getElementById('ccd-meter-status-badge');
+
+        if (m) {
+            const meterNum = m.meterNumber || m.meterId || m.chassisNumber || '-';
+            const custCode = m.customerCode || m.customerId || m.subscriptionCode || '-';
+            const localMatch = state.meters.find(lm => 
+                (lm.meterChassisNumber && String(lm.meterChassisNumber).trim() === String(meterNum).trim()) ||
+                (lm.subscriptionCode && String(lm.subscriptionCode).trim() === String(custCode).trim())
+            );
+
+            if (custCodeEl) custCodeEl.textContent = custCode;
+            if (meterNumEl) meterNumEl.textContent = meterNum;
+            if (custNameEl) custNameEl.textContent = m.customerName || m.name || (localMatch ? localMatch.subscriberName : 'غير مسجل محلياً');
+            if (addressEl) addressEl.textContent = m.address || (localMatch ? localMatch.address : '-');
+            if (activityEl) activityEl.textContent = m.activityName || (localMatch ? localMatch.activityType : '-');
+            if (meterTypeEl) meterTypeEl.textContent = m.meterTypeName || currentControlCardData?.meterTypeName || (localMatch ? localMatch.meterType : '-');
+            if (remBalEl) remBalEl.textContent = m.remainingBalance != null ? `${m.remainingBalance} ج.م` : (m.balance != null ? `${m.balance} ج.م` : '-');
+            if (remPowEl) remPowEl.textContent = m.remainingPower != null ? `${m.remainingPower} ك.و.س` : '-';
+            if (totRechargeEl) totRechargeEl.textContent = m.totalRechargeAmountOnMeter != null ? `${m.totalRechargeAmountOnMeter} ج.م` : '-';
+            if (totConsEl) totConsEl.textContent = m.totalPowerConsumption != null ? `${m.totalPowerConsumption} ك.و.س` : (m.totalActiveEnergy != null ? `${m.totalActiveEnergy} ك.و.س` : '-');
+
+            if (badgeEl) {
+                if (m.hasTamper) {
+                    badgeEl.textContent = 'يوجد تلاعب';
+                    badgeEl.style.backgroundColor = '#fee2e2';
+                    badgeEl.style.color = '#dc2626';
+                } else {
+                    badgeEl.textContent = 'حالة سليمة';
+                    badgeEl.style.backgroundColor = '#dcfce7';
+                    badgeEl.style.color = '#15803d';
+                }
+            }
+
+            // Monthly consumption
+            const monthlyTbody = document.getElementById('ccd-monthly-tbody');
+            const monthlyList: any[] = m.monthlyConsumption || m.previousMonthlyActiveConsumption || [];
+            if (monthlyTbody) {
+                if (monthlyList.length === 0) {
+                    monthlyTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: #94a3b8;">لا توجد سجلات استهلاك شهري على الكارت</td></tr>';
+                } else {
+                    monthlyTbody.innerHTML = monthlyList.map((item: any) => `
+                        <tr>
+                            <td>${item.month || item.date || '-'}</td>
+                            <td>${item.activeEnergy || item.power || '-'}</td>
+                            <td>${item.reactiveEnergy || '-'}</td>
+                            <td style="color: #059669; font-weight: 600;">${item.amount || item.value || '-'} ج.م</td>
+                        </tr>
+                    `).join('');
+                }
+            }
+
+            // Events
+            const eventsTbody = document.getElementById('ccd-events-tbody');
+            const eventsList: any[] = m.events || m.tampers || m.meterEvents || [];
+            if (eventsTbody) {
+                if (eventsList.length === 0) {
+                    eventsTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: #94a3b8;">لا توجد تلاعبات أو أحداث مسجلة</td></tr>';
+                } else {
+                    eventsTbody.innerHTML = eventsList.map((ev: any) => `
+                        <tr>
+                            <td style="font-weight: 600; color: #dc2626;">${ev.eventCode || ev.code || 'تلاعب روزتة / غطاء'}</td>
+                            <td>${ev.eventTime || ev.timestamp || '-'}</td>
+                            <td>${ev.technicianCode || ev.removalTechnicianCode || '-'}</td>
+                            <td>${ev.removalTime || '-'}</td>
+                        </tr>
+                    `).join('');
+                }
+            }
+
+            // Cards log
+            const cardsTbody = document.getElementById('ccd-cards-tbody');
+            const cardsList: any[] = m.cardTransactions || m.cardsHistory || [];
+            if (cardsTbody) {
+                if (cardsList.length === 0) {
+                    cardsTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: #94a3b8;">لا توجد عمليات كروت سابقة على هذا العداد</td></tr>';
+                } else {
+                    cardsTbody.innerHTML = cardsList.map((c: any) => `
+                        <tr>
+                            <td style="font-family: monospace;">${c.cardNumber || c.cardId || '-'}</td>
+                            <td>${c.operationName || c.eventCode || 'شحن / قراءة'}</td>
+                            <td>${c.sequence || c.eventSequence || '-'}</td>
+                            <td>${c.dateTime || c.eventDateTime || '-'}</td>
+                        </tr>
+                    `).join('');
+                }
+            }
+        }
+    };
+
+    // --- كارت تحكم متقدم (Advanced Control Card) ---
+    let advCtrlDropdownsInit = false;
+    const renderAdvancedControlCardSection = async () => {
+        if (!advCtrlDropdownsInit) {
+            const typeSelect = document.getElementById('adv-ctrl-meter-type') as HTMLSelectElement | null;
+            const actSelect = document.getElementById('adv-ctrl-activity') as HTMLSelectElement | null;
+
+            if (typeSelect) {
+                typeSelect.innerHTML = '<option value="" disabled selected hidden>اختر نوع العداد...</option>';
+                const types = [
+                    'احادى 2024',
+                    'ثلاثى مباشر 2024',
+                    'احادي جلوبالترونكس 2020',
+                    'ثلاثي محولات السويدي',
+                    'احادى اسكرا مسبق الدفع'
+                ];
+                types.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.textContent = t;
+                    typeSelect.appendChild(opt);
+                });
+            }
+
+            if (actSelect) {
+                actSelect.innerHTML = '<option value="" disabled selected hidden>اختر النشاط...</option>';
+                const acts = [
+                    'منزلى',
+                    'تجارى',
+                    'حكومى',
+                    'صناعى',
+                    'قوى محركة',
+                    'زراعى'
+                ];
+                acts.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a;
+                    opt.textContent = a;
+                    actSelect.appendChild(opt);
+                });
+            }
+            advCtrlDropdownsInit = true;
+        }
+
+        const dateInput = document.getElementById('adv-ctrl-effective-date') as HTMLInputElement | null;
+        if (dateInput && !dateInput.value) {
+            dateInput.value = new Date().toISOString().split('T')[0];
+        }
+    };
+
+    // --- كارت تجميع فني (Tech Collect Card) ---
+    let currentTechCollectData: any = null;
+    let selectedTechCollectMeter: any = null;
+
+    const renderTechCollectCardSection = () => {
+        if (currentTechCollectData) {
+            updateTechCollectUI(currentTechCollectData);
+        } else {
+            handleReadTechCollectCard();
+        }
+    };
+
+    const handleReadTechCollectCard = async () => {
+        const readBtn = document.getElementById('btn-read-tech-collect-card') as HTMLButtonElement | null;
+        const origHtml = readBtn ? readBtn.innerHTML : '';
+        if (readBtn) {
+            readBtn.disabled = true;
+            readBtn.innerHTML = `<span>جاري قراءة كارت التجميع...</span>`;
+        }
+
+        try {
+            showToast('جاري قراءة كارت تجميع القراءات من القارئ...');
+            const res = await fetch('http://127.0.0.1:5002/api/tech-collect-card/read');
+            const result = await res.json();
+
+            if (result && result.success) {
+                const data = result.data || result.card || result;
+                currentTechCollectData = data;
+                updateTechCollectUI(data);
+                showToast(result.message || 'تمت قراءة كارت التجميع الفني بنجاح!', 'success');
+            } else {
+                showToast(result?.message || 'تعذر قراءة كارت التجميع الفني. تأكد من إدخال كارت تجميع قراءات.', 'error');
+            }
+        } catch (e: any) {
+            showToast('خطأ أثناء قراءة كارت التجميع: ' + (e.message || e), 'error');
+        } finally {
+            if (readBtn) {
+                readBtn.disabled = false;
+                readBtn.innerHTML = origHtml;
+            }
+        }
+    };
+
+    const handleRenewTechCollectCard = async () => {
+        const renewBtn = document.getElementById('btn-renew-tech-collect-card') as HTMLButtonElement | null;
+        const origHtml = renewBtn ? renewBtn.innerHTML : '';
+        if (renewBtn) {
+            renewBtn.disabled = true;
+            renewBtn.innerHTML = `<span>جاري تجديد كارت التجميع...</span>`;
+        }
+
+        try {
+            showToast('جاري تجديد وتفريغ كارت التجميع الفني...');
+            const res = await fetch('http://127.0.0.1:5002/api/tech-collect-card/renew', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cardId: currentTechCollectData?.cardId || null,
+                    generationType: 'g1',
+                    vendorCode: 4
+                })
+            });
+            const result = await res.json();
+            if (result && result.success) {
+                showToast(result.message || 'تم تجديد كارت التجميع الفني بنجاح!', 'success');
+                setTimeout(() => handleReadTechCollectCard(), 1000);
+            } else {
+                showToast(result?.message || 'فشل تجديد كارت التجميع.', 'error');
+            }
+        } catch (e: any) {
+            showToast('خطأ أثناء تجديد كارت التجميع: ' + (e.message || e), 'error');
+        } finally {
+            if (renewBtn) {
+                renewBtn.disabled = false;
+                renewBtn.innerHTML = origHtml;
+            }
+        }
+    };
+
+    const updateTechCollectUI = (cardData: any) => {
+        const compEl = document.getElementById('tc-company-name');
+        const typeEl = document.getElementById('tc-meter-type');
+        const idEl = document.getElementById('tc-card-id');
+        const codeEl = document.getElementById('tc-tech-code');
+        const nameEl = document.getElementById('tc-tech-name');
+        const issueDateEl = document.getElementById('tc-issue-date');
+        const issuerEl = document.getElementById('tc-issuer');
+        const badgeEl = document.getElementById('tc-card-status-badge');
+        const countEl = document.getElementById('tc-meters-count');
+        const printBtn = document.getElementById('btn-print-tech-collect-card') as HTMLButtonElement | null;
+
+        if (compEl) compEl.textContent = cardData.companyName || cardData.vendorName || '-';
+        if (typeEl) typeEl.textContent = cardData.meterTypeName || '-';
+        if (idEl) idEl.textContent = cardData.cardId || cardData.id || '-';
+        if (codeEl) codeEl.textContent = cardData.technicianCode != null ? String(cardData.technicianCode) : (cardData.techniciancode != null ? String(cardData.techniciancode) : '-');
+        if (nameEl) nameEl.textContent = cardData.technicianName || '-';
+        if (issueDateEl) issueDateEl.textContent = cardData.issueDate || cardData.cardIssueDate || '-';
+        if (issuerEl) issuerEl.textContent = cardData.issueUsername || 'المشغل المعتمد';
+
+        if (badgeEl) {
+            badgeEl.textContent = 'كارت مفعل';
+            badgeEl.style.backgroundColor = '#dcfce7';
+            badgeEl.style.color = '#15803d';
+        }
+
+        if (printBtn) printBtn.disabled = false;
+
+        const meters: any[] = cardData.meters || cardData.meterData || cardData.collectionMetersList || [];
+        if (countEl) countEl.textContent = String(meters.length);
+
+        const tbody = document.getElementById('tech-collect-meters-tbody');
+        if (!tbody) return;
+
+        if (meters.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="13" style="padding: 2rem; text-align: center; color: #64748b;">تمت قراءة كارت التجميع بنجاح! لا توجد قراءات عدادات مجمعة مسجلة حالياً على هذا الكارت.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = meters.map((m: any, idx: number) => {
+            const meterNum = m.meterId || m.meterNumber || '-';
+            const code = m.code || m.customerCode || '-';
+            const version = m.meterVersion || 'G1';
+            const mfr = m.manufacturerId || m.companyName || cardData.companyName || '-';
+            const mStatus = m.meterStatus || (m.hasTamper ? '<span style="color:#dc2626;">تلاعب</span>' : '<span style="color:#16a34a;">سليم</span>');
+            const batStatus = m.batarryStatus || m.batteryStatus || 'سليمة';
+            const remBal = m.remainingBalance != null ? `${m.remainingBalance} ج.م` : '-';
+            const remPow = m.remainingPower != null ? `${m.remainingPower} ك.و.س` : '-';
+            const totRech = m.totalRechargeAmountOnMeter != null ? `${m.totalRechargeAmountOnMeter} ج.م` : '-';
+            const totCons = m.totalPowerConsumption != null ? `${m.totalPowerConsumption} ك.و.س` : '-';
+            const curCons = m.currentConsumptionAmount != null ? `${m.currentConsumptionAmount} ج.م` : '-';
+
+            return `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td style="font-family: monospace;">${code}</td>
+                    <td style="font-family: monospace; font-weight: bold; color: #0f172a;">${meterNum}</td>
+                    <td>${version}</td>
+                    <td>${mfr}</td>
+                    <td>${mStatus}</td>
+                    <td>${batStatus}</td>
+                    <td style="color: #059669; font-weight: 600;">${remBal}</td>
+                    <td style="color: #0284c7;">${remPow}</td>
+                    <td>${totRech}</td>
+                    <td>${totCons}</td>
+                    <td>${curCons}</td>
+                    <td>
+                        <button type="button" class="btn secondary btn-sm tc-view-details-btn" data-meter-index="${idx}" style="padding: 4px 10px; font-size: 0.85rem;">
+                            تفاصيل
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        tbody.querySelectorAll('.tc-view-details-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = Number(btn.getAttribute('data-meter-index'));
+                if (meters[idx]) {
+                    selectedTechCollectMeter = meters[idx];
+                    navigateToSection('tech-collect-card-details');
+                }
+            });
+        });
+    };
+
+    // --- تفاصيل كارت التجميع الفني ---
+    const renderTechCollectCardDetailsSection = (meter: any = null) => {
+        const m = meter || selectedTechCollectMeter || (currentTechCollectData?.meters && currentTechCollectData.meters[0]) || null;
+        selectedTechCollectMeter = m;
+
+        const numEl = document.getElementById('tcd-meter-number');
+        const codeEl = document.getElementById('tcd-meter-code');
+        const statusEl = document.getElementById('tcd-meter-status');
+        const batEl = document.getElementById('tcd-battery-status');
+        const balEl = document.getElementById('tcd-balance');
+        const powEl = document.getElementById('tcd-power');
+
+        if (m) {
+            if (numEl) numEl.textContent = m.meterId || m.meterNumber || '-';
+            if (codeEl) codeEl.textContent = m.code || m.customerCode || '-';
+            if (statusEl) statusEl.textContent = m.meterStatus || (m.hasTamper ? 'يوجد تلاعب' : 'سليم');
+            if (batEl) batEl.textContent = m.batarryStatus || m.batteryStatus || 'سليمة';
+            if (balEl) balEl.textContent = m.remainingBalance != null ? `${m.remainingBalance} ج.م` : '-';
+            if (powEl) powEl.textContent = m.remainingPower != null ? `${m.remainingPower} ك.و.س` : '-';
+
+            // Consumption
+            const consTbody = document.getElementById('tcd-consumption-tbody');
+            const consList: any[] = m.monthlyConsumption || m.previousMonthlyActiveConsumption || [];
+            if (consTbody) {
+                if (consList.length === 0) {
+                    consTbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 1.5rem; color: #94a3b8;">لا توجد سجلات استهلاك شهري على الكارت</td></tr>';
+                } else {
+                    consTbody.innerHTML = consList.map((c: any) => `
+                        <tr>
+                            <td>${c.month || c.date || '-'}</td>
+                            <td>${c.activeEnergy || c.power || '-'}</td>
+                            <td>${c.reactiveEnergy || '-'}</td>
+                        </tr>
+                    `).join('');
+                }
+            }
+
+            // Events
+            const evTbody = document.getElementById('tcd-events-tbody');
+            const evList: any[] = m.events || m.tampers || [];
+            if (evTbody) {
+                if (evList.length === 0) {
+                    evTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: #94a3b8;">لا توجد تلاعبات مسجلة</td></tr>';
+                } else {
+                    evTbody.innerHTML = evList.map((ev: any) => `
+                        <tr>
+                            <td style="color: #dc2626; font-weight: 600;">${ev.eventCode || ev.code || 'تلاعب'}</td>
+                            <td>${ev.technicianCode || ev.removalTechnicianCode || '-'}</td>
+                            <td>${ev.eventTime || ev.timestamp || '-'}</td>
+                            <td>${ev.removalTime || '-'}</td>
+                        </tr>
+                    `).join('');
+                }
+            }
+
+            // Cards
+            const cardsTbody = document.getElementById('tcd-cards-tbody');
+            const cardsList: any[] = m.cardTransactions || [];
+            if (cardsTbody) {
+                if (cardsList.length === 0) {
+                    cardsTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: #94a3b8;">لا توجد عمليات كروت مسجلة</td></tr>';
+                } else {
+                    cardsTbody.innerHTML = cardsList.map((cd: any) => `
+                        <tr>
+                            <td style="font-family: monospace;">${cd.cardNumber || cd.cardId || '-'}</td>
+                            <td>${cd.operationName || cd.eventCode || '-'}</td>
+                            <td>${cd.sequence || cd.eventSequence || '-'}</td>
+                            <td>${cd.dateTime || cd.eventDateTime || '-'}</td>
+                        </tr>
+                    `).join('');
+                }
             }
         }
     };
@@ -28238,8 +28705,16 @@ const setupOrgHierarchyEvents = () => {
             renderSubscriberStatementSection();
         } else if (targetId === 'read-control-card') {
             renderReadControlCardSection();
+        } else if (targetId === 'control-card-details') {
+            renderControlCardDetailsSection();
         } else if (targetId === 'issue-control-card') {
             loadControlCardIssuanceData();
+        } else if (targetId === 'advanced-control-card') {
+            renderAdvancedControlCardSection();
+        } else if (targetId === 'tech-collect-card') {
+            renderTechCollectCardSection();
+        } else if (targetId === 'tech-collect-card-details') {
+            renderTechCollectCardDetailsSection();
         } else if (targetId === 'customer-management') {
             renderCustomerManagementSection();
         } else if (targetId === 'charging-card') {
@@ -28819,6 +29294,126 @@ const setupOrgHierarchyEvents = () => {
         });
 
         // كروت التحكم (Control Cards Event Listeners)
+        
+        // مسح كارت التحكم
+        document.getElementById('btn-clear-control-card')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleClearControlCard();
+        });
+
+        // زر الرجوع من تفاصيل كارت التحكم
+        document.getElementById('btn-back-to-read-control')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigateToSection('read-control-card');
+        });
+
+        // تبويبات تفاصيل كارت التحكم
+        document.querySelectorAll('#control-card-details .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#control-card-details .tab-btn').forEach(b => {
+                    b.classList.remove('active');
+                    (b as HTMLElement).style.borderBottom = 'none';
+                    (b as HTMLElement).style.color = '#64748b';
+                });
+                btn.classList.add('active');
+                (btn as HTMLElement).style.borderBottom = '3px solid #0284c7';
+                (btn as HTMLElement).style.color = '#0284c7';
+
+                const tabId = btn.getAttribute('data-tab');
+                document.querySelectorAll('#control-card-details .tab-content').forEach(tc => {
+                    (tc as HTMLElement).style.display = 'none';
+                });
+                const targetTc = document.getElementById(tabId || '');
+                if (targetTc) targetTc.style.display = 'block';
+            });
+        });
+
+        // كارت تحكم متقدم
+        document.getElementById('btn-adv-ctrl-search')?.addEventListener('click', () => {
+            const query = (document.getElementById('adv-ctrl-search-input') as HTMLInputElement)?.value.trim();
+            if (!query) {
+                showToast('يرجى إدخال كود المشترك أو رقم العداد للبحث.', 'error');
+                return;
+            }
+            const match = state.meters.find(m => 
+                (m.subscriptionCode && String(m.subscriptionCode).trim() === query) ||
+                (m.meterChassisNumber && String(m.meterChassisNumber).trim() === query)
+            );
+            if (match) {
+                (document.getElementById('adv-ctrl-cust-code') as HTMLInputElement).value = match.subscriptionCode || '';
+                (document.getElementById('adv-ctrl-cust-name') as HTMLInputElement).value = match.subscriberName || '';
+                (document.getElementById('adv-ctrl-meter-number') as HTMLInputElement).value = match.meterChassisNumber || '';
+                showToast('تم العثور على بيانات المشترك والعداد بنجاح!', 'success');
+            } else {
+                showToast('لم يتم العثور على مشترك بهذا الكود أو الرقم.', 'error');
+            }
+        });
+
+        document.getElementById('btn-adv-ctrl-read-card')?.addEventListener('click', async () => {
+            showToast('جاري قراءة كارت التحكم المتقدم...');
+            await handleReadControlCard();
+            if (currentControlCardData) {
+                (document.getElementById('adv-ctrl-cust-code') as HTMLInputElement).value = currentControlCardData.cardId || '';
+                (document.getElementById('adv-ctrl-cust-name') as HTMLInputElement).value = currentControlCardData.technicianName || '';
+                showToast('تم استيراد بيانات الكارت بنجاح!', 'success');
+            }
+        });
+
+        document.getElementById('advanced-control-card-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            showToast('تمت كتابة وتجهيز كارت التحكم المتقدم بنجاح!', 'success');
+        });
+
+        document.getElementById('btn-adv-ctrl-clear')?.addEventListener('click', () => {
+            handleClearControlCard();
+        });
+
+        // كارت تجميع فني
+        document.getElementById('btn-read-tech-collect-card')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleReadTechCollectCard();
+        });
+
+        document.getElementById('btn-renew-tech-collect-card')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleRenewTechCollectCard();
+        });
+
+        document.getElementById('btn-back-to-tech-collect')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigateToSection('tech-collect-card');
+        });
+
+        document.getElementById('tc-meters-filter')?.addEventListener('input', (e) => {
+            const term = (e.target as HTMLInputElement).value.trim().toLowerCase();
+            const rows = document.querySelectorAll('#tech-collect-meters-tbody tr');
+            rows.forEach(r => {
+                const text = r.textContent?.toLowerCase() || '';
+                (r as HTMLElement).style.display = text.includes(term) ? '' : 'none';
+            });
+        });
+
+        // تبويبات تفاصيل كارت التجميع الفني
+        document.querySelectorAll('#tech-collect-card-details .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#tech-collect-card-details .tab-btn').forEach(b => {
+                    b.classList.remove('active');
+                    (b as HTMLElement).style.borderBottom = 'none';
+                    (b as HTMLElement).style.color = '#64748b';
+                });
+                btn.classList.add('active');
+                (btn as HTMLElement).style.borderBottom = '3px solid #b45309';
+                (btn as HTMLElement).style.color = '#b45309';
+
+                const tabId = btn.getAttribute('data-tab');
+                document.querySelectorAll('#tech-collect-card-details .tab-content').forEach(tc => {
+                    (tc as HTMLElement).style.display = 'none';
+                });
+                const targetTc = document.getElementById(tabId || '');
+                if (targetTc) targetTc.style.display = 'block';
+            });
+        });
+
         document.getElementById('btn-read-control-card')?.addEventListener('click', (e) => {
             e.preventDefault();
             handleReadControlCard();

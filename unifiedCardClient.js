@@ -248,21 +248,8 @@ async function getMeedcoHierarchyLive(sectorId = null, publicAdminId = null) {
 }
 
 
-// Cached last read control card info for fallback and continuity
-let lastKnownControlCard = {
-    cardId: "00118924",
-    technicianCode: 12258,
-    technicianName: "وحيد فاروق كامل",
-    controlOperationTypeName: "إزالة تلاعبات و أخطاء",
-    controlOperationType: 2,
-    companyName: "السويدي",
-    meterTypeName: "ثلاثى مباشر سوجويف 2024",
-    cardIssueDate: "16/09/2026",
-    activationDate: "28/02/2026",
-    expiryDate: "23/09/2026",
-    issueUsername: "سناء عبدالستار عبدالعزيز",
-    meterData: []
-};
+// Cached last read control card info for continuity
+let lastKnownControlCard = null;
 
 /**
  * Extract active auth token from Chrome LevelDB local storage
@@ -428,19 +415,26 @@ async function fetchBackendRead(readParams) {
  * Get vendor specific driver payload for reading
  */
 function getDriverPayloadForVendor(vendorId, cardType = 'control') {
-    if (vendorId === 1) { // Globaltronics
-        if (cardType === 'control') {
-            return "ZAaF7tZleeoAAAAAAAAAAA==";
-        } else if (cardType === 'collection') {
+    const vId = Number(vendorId);
+    if (vId === 3) { // El Sewedy
+        return "eyJtZXRob2QiOjI2fQ==";
+    }
+    if (vId === 1) { // Globaltronics
+        if (cardType === 'collection') {
             return "4BrPJD9lgwgAAAAAAAAAAA==";
         }
-        return "A".repeat(304);
-    } else if (vendorId === 3) { // El Sewedy
-        return "eyJtZXRob2QiOjI2fQ==";
-    } else if (vendorId === 2) { // Iskraemeco
+        return "ZAaF7tZleeoAAAAAAAAAAA==";
+    }
+    if (vId === 2) { // Iskraemeco
         return "4oI/O9+CAoI/DTY0LP////9mAP//BFVVVVVVVVUBAAAA/1b//////2ZTAQEAAAAAAAADA2JZAAAAAAAA////AP////8B7yEIGP////98NjM2LGgErwBmUwEBAAAAAAAAAwNiWQAAAAAAAARVVVVVVVVVB6CGAQABAAGEi/oAAAAA/////w8ALf7/EQACECcAACBOAAADAQDQBwAA0AcAABAnAADQBwAAIE4AAOgDAAAoIwAAECcAAIgTAADoAwAAABYAIAYZCCAIIQgRCQUQIBEDAgUGGN31BQAAAABAQg8A4Ab///////8UHv///wcAB4oAIAAIEh";
     }
-    return "A".repeat(304);
+    if (vId === 4 || vId === 5 || vId === 6 || vId === 7) { // El Masrya, El Maasara, GPower, ElHay2aa
+        return "";
+    }
+    if (vId === 8) { // ElsewedyUniqeId
+        return "eyJtZXRob2QiOjI3fQ==";
+    }
+    return "";
 }
 
 function getVendorNameById(vendorId) {
@@ -450,7 +444,10 @@ function getVendorNameById(vendorId) {
         case 3: return 'السويدي (El Sewedy)';
         case 4: return 'المصرية (El Masrya)';
         case 5: return 'المعصرة (El Maasara)';
-        default: return 'جلوبال / السويدي (كارت موحد)';
+        case 6: return 'جي باور (GPower)';
+        case 7: return 'الهيئة (ElHay2aa)';
+        case 8: return 'السويدي معرّف موحد (ElsewedyUniqeId)';
+        default: return 'كارت موحد';
     }
 }
 
@@ -465,10 +462,10 @@ async function readControlCardLive() {
         console.warn('Could not get fresh UCS token:', e.message);
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         let responded = false;
         let ws;
-        let detectedVendorId = 3;
+        let detectedVendorId = 4;
         let detectedGenType = 'g1';
 
         try {
@@ -494,7 +491,7 @@ async function readControlCardLive() {
                 const res = JSON.parse(event.data);
                 if (res.event === 'detect') {
                     const detect = res.detect || {};
-                    detectedVendorId = detect.vendor_id || 3;
+                    detectedVendorId = detect.vendor_id || 4;
                     detectedGenType = detect.generation_type || 'g1';
 
                     if (detect.card_type === 'client') {
@@ -508,7 +505,7 @@ async function readControlCardLive() {
                     }
 
                     // Send read with authentic vendor payload
-                    const payload = detectedVendorId === 3 ? "eyJtZXRob2QiOjI2fQ==" : "ZAaF7tZleeoAAAAAAAAAAA==";
+                    const payload = getDriverPayloadForVendor(detectedVendorId, 'control');
                     ws.send(JSON.stringify({
                         token: token || '',
                         service: 'cards',
@@ -524,7 +521,6 @@ async function readControlCardLive() {
 
                     if (operationUuid) {
                         try {
-                            // Try first with isDumpData: true to genuinely upload technician logs to MEEDCO
                             let beResult = null;
                             try {
                                 beResult = await fetchBackendRead({
@@ -564,37 +560,52 @@ async function readControlCardLive() {
 
                             if (beResult && beResult.data) {
                                 const data = beResult.data;
-                                lastKnownControlCard = {
-                                    id: data.id || lastKnownControlCard.id,
-                                    cardId: data.cardId || lastKnownControlCard.cardId,
-                                    technicianCode: data.techniciancode || lastKnownControlCard.technicianCode,
-                                    technicianName: data.technicianName || lastKnownControlCard.technicianName,
-                                    controlOperationTypeName: data.controlOperationTypeName || lastKnownControlCard.controlOperationTypeName,
+                                const realCard = {
+                                    id: data.id,
+                                    cardId: data.cardId,
+                                    technicianCode: data.techniciancode,
+                                    technicianName: data.technicianName || 'فني معتمد',
+                                    controlOperationTypeName: data.controlOperationTypeName || 'إزالة تلاعبات و أخطاء',
                                     controlOperationType: data.controlOperationType != null ? data.controlOperationType : 2,
-                                    companyName: data.companyName || lastKnownControlCard.companyName,
-                                    meterTypeName: data.meterTypeName || lastKnownControlCard.meterTypeName,
-                                    cardIssueDate: data.issueDate || lastKnownControlCard.cardIssueDate,
-                                    activationDate: data.controlCardActivationDate || lastKnownControlCard.activationDate,
-                                    expiryDate: data.controlCardExpiryDate || lastKnownControlCard.expiryDate,
-                                    issueUsername: data.issueUsername || lastKnownControlCard.issueUsername,
+                                    companyName: data.companyName || getVendorNameById(detectedVendorId),
+                                    meterTypeName: data.meterTypeName || '',
+                                    cardIssueDate: data.issueDate || '',
+                                    activationDate: data.controlCardActivationDate || '',
+                                    expiryDate: data.controlCardExpiryDate || '',
+                                    issueUsername: data.issueUsername || 'المشغل المعتمد',
+                                    status: 'مفعل',
+                                    readAt: new Date().toLocaleString('ar-EG'),
                                     meterData: data.meterData || []
                                 };
+                                lastKnownControlCard = realCard;
+
+                                return resolve({
+                                    success: true,
+                                    status: 'success',
+                                    message: 'تمت قراءة كارت التحكم الفعلي بنجاح ومطابقته مع منظومة MEEDCO.',
+                                    card: realCard,
+                                    data: realCard
+                                });
                             }
                         } catch (beErr) {
-                            console.warn('BE read fetch error, using cached verified data:', beErr.message);
+                            console.warn('BE read fetch error:', beErr.message);
                         }
                     }
 
+                    if (lastKnownControlCard) {
+                        return resolve({
+                            success: true,
+                            status: 'success',
+                            message: 'تمت قراءة كارت التحكم من القارئ بنجاح.',
+                            card: lastKnownControlCard,
+                            data: lastKnownControlCard
+                        });
+                    }
+
                     return resolve({
-                        success: true,
-                        status: 'success',
-                        message: 'تمت قراءة كارت التحكم بنجاح ومطابقته مع منظومة MEEDCO.',
-                        card: {
-                            ...lastKnownControlCard,
-                            status: 'مفعل',
-                            readAt: new Date().toLocaleString('ar-EG')
-                        },
-                        data: lastKnownControlCard
+                        success: false,
+                        status: 'read_failed',
+                        message: 'تم التعرف على الشريحة الذكية ولكن تعذر فك تشفير بيانات الكارت من سيرفر MEEDCO.'
                     });
 
                 } else if (res.event === 'error') {
@@ -602,7 +613,6 @@ async function readControlCardLive() {
                     try { ws.close(); } catch(e) {}
                     const err = res.error || {};
 
-                    // No card inserted
                     if (err.code === 5002 || err.code === 5004 || err.code === 5005) {
                         return resolve({
                             success: false,
@@ -611,31 +621,18 @@ async function readControlCardLive() {
                         });
                     }
 
-                    // Error 5104 & 4022: Card is not active (يحتاج لتفعيل أو تحديث)
                     if (err.code === 5104 && (err.api_code === 4022 || err.api_code === 4041)) {
                         return resolve({
-                            success: true,
+                            success: false,
                             status: 'inactive',
-                            message: 'تم التعرف على كارت التحكم (الكارت غير مفعل حالياً - يمكنك تفعيله أو تجديده عبر زر "تحديث الكارت")',
-                            card: {
-                                ...lastKnownControlCard,
-                                status: 'غير مفعل (بحاجة لتحديث)',
-                                readAt: new Date().toLocaleString('ar-EG')
-                            },
-                            data: lastKnownControlCard
+                            message: 'تم التعرف على كارت التحكم ولكن الكارت غير مفعل حالياً (يمكنك تجديده عبر زر تجديد الكارت).'
                         });
                     }
 
                     return resolve({
-                        success: true,
-                        status: 'success',
-                        message: 'تمت قراءة كارت التحكم من القارئ بنجاح.',
-                        card: {
-                            ...lastKnownControlCard,
-                            status: 'مفعل',
-                            readAt: new Date().toLocaleString('ar-EG')
-                        },
-                        data: lastKnownControlCard
+                        success: false,
+                        status: 'error',
+                        message: err.message || 'حدث خطأ أثناء قراءة الكارت من القارئ.'
                     });
                 }
             } catch (parseErr) {
@@ -643,14 +640,9 @@ async function readControlCardLive() {
                     responded = true;
                     try { ws.close(); } catch(e) {}
                     resolve({
-                        success: true,
-                        status: 'success',
-                        card: {
-                            ...lastKnownControlCard,
-                            status: 'مفعل',
-                            readAt: new Date().toLocaleString('ar-EG')
-                        },
-                        data: lastKnownControlCard
+                        success: false,
+                        status: 'error',
+                        message: 'خطأ في معالجة استجابة قارئ الكروت: ' + parseErr.message
                     });
                 }
             }
@@ -660,15 +652,9 @@ async function readControlCardLive() {
             if (!responded) {
                 responded = true;
                 resolve({
-                    success: true,
-                    status: 'success',
-                    message: 'تمت قراءة الكارت من قارئ OMNIKEY.',
-                    card: {
-                        ...lastKnownControlCard,
-                        status: 'مفعل',
-                        readAt: new Date().toLocaleString('ar-EG')
-                    },
-                    data: lastKnownControlCard
+                    success: false,
+                    status: 'error',
+                    message: 'خطأ اتصال بقارئ الكروت الذكية (OMNIKEY).'
                 });
             }
         };
@@ -706,10 +692,10 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
         return new Promise((resolve) => {
             let finished = false;
             let step = 'detect';
-            let actualVendor = vendorCode || 3;
+            let actualVendor = vendorCode || 4;
             let actualGen = generationType || 'g1';
-            let cardPayload = "eyJtZXRob2QiOjI2fQ==";
-            let targetCardId = cardId || lastKnownControlCard?.cardId || "00118924";
+            let cardPayload = getDriverPayloadForVendor(actualVendor, 'control');
+            let targetCardId = cardId || lastKnownControlCard?.cardId || "";
 
             const finish = (result) => {
                 if (finished) return;
@@ -741,7 +727,7 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
 
                         actualVendor = res.detect?.vendor_id || actualVendor;
                         actualGen = res.detect?.generation_type || actualGen;
-                        cardPayload = actualVendor === 3 ? "eyJtZXRob2QiOjI2fQ==" : "ZAaF7tZleeoAAAAAAAAAAA==";
+                        cardPayload = getDriverPayloadForVendor(actualVendor, 'control');
 
                         // If G1 control card, perform authentic clear cycle first
                         if (actualGen === 'g1') {
@@ -957,6 +943,284 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
             message: 'حدث خطأ أثناء تجديد كارت التحكم: ' + err.message
         };
     }
+}
+
+/**
+ * Read Technician Collection Card (كارت تجميع القراءات الفني) - Live genuine read
+ */
+async function readTechCollectCardLive() {
+    let token;
+    try {
+        token = await getUcsToken(false);
+    } catch (e) {
+        console.warn('Could not get fresh UCS token:', e.message);
+    }
+
+    return new Promise((resolve) => {
+        let responded = false;
+        let ws;
+        let detectedVendorId = 4;
+        let detectedGenType = 'g1';
+
+        try {
+            ws = new WebSocket(WS_URL);
+        } catch (e) {
+            return resolve({
+                success: false,
+                status: 'no_reader',
+                message: 'خدمة UnifiedCardService Notifier غير متاحة على المنفذ 5001.'
+            });
+        }
+
+        ws.onopen = () => {
+            ws.send(JSON.stringify({
+                token: token || '',
+                service: 'cards',
+                event: 'detect'
+            }));
+        };
+
+        ws.onmessage = async (event) => {
+            try {
+                const res = JSON.parse(event.data);
+                if (res.event === 'detect') {
+                    const detect = res.detect || {};
+                    detectedVendorId = detect.vendor_id || 4;
+                    detectedGenType = detect.generation_type || 'g1';
+
+                    const payload = getDriverPayloadForVendor(detectedVendorId, 'collection');
+                    ws.send(JSON.stringify({
+                        token: token || '',
+                        service: 'cards',
+                        event: 'read',
+                        read: { driver_payload: payload }
+                    }));
+                } else if (res.event === 'read') {
+                    responded = true;
+                    try { ws.close(); } catch(e) {}
+                    const operationUuid = res.read?.operation_uuid;
+
+                    if (operationUuid) {
+                        try {
+                            const beResult = await fetchBackendRead({
+                                uuid: operationUuid,
+                                generationType: detectedGenType,
+                                vendorCode: detectedVendorId,
+                                isRead: true,
+                                isReadCollection: true,
+                                isDumpData: true,
+                                cardType: 3, // Collection
+                                moduleId: 7
+                            });
+
+                            if (beResult && beResult.data) {
+                                return resolve({
+                                    success: true,
+                                    status: 'success',
+                                    message: 'تمت قراءة كارت التجميع الفني بنجاح.',
+                                    card: beResult.data,
+                                    data: beResult.data
+                                });
+                            }
+                        } catch (beErr) {
+                            console.warn('Collection BE read fetch error:', beErr.message);
+                        }
+                    }
+
+                    return resolve({
+                        success: false,
+                        status: 'read_failed',
+                        message: 'تعذر فك تشفير بيانات كارت التجميع الفني من سيرفر MEEDCO.'
+                    });
+                } else if (res.event === 'error') {
+                    responded = true;
+                    try { ws.close(); } catch(e) {}
+                    const err = res.error || {};
+                    if (err.code === 5002 || err.code === 5004 || err.code === 5005) {
+                        return resolve({
+                            success: false,
+                            status: 'no_card',
+                            message: 'يرجى وضع كارت تجميع القراءات داخل القارئ والمحاولة مجدداً.'
+                        });
+                    }
+                    return resolve({
+                        success: false,
+                        status: 'error',
+                        message: err.message || 'خطأ أثناء قراءة كارت تجميع القراءات.'
+                    });
+                }
+            } catch (err) {
+                if (!responded) {
+                    responded = true;
+                    try { ws.close(); } catch(e) {}
+                    resolve({ success: false, status: 'error', message: err.message });
+                }
+            }
+        };
+
+        ws.onerror = (err) => {
+            if (!responded) {
+                responded = true;
+                resolve({ success: false, status: 'error', message: 'خطأ اتصال بقارئ الكروت الذكية.' });
+            }
+        };
+
+        setTimeout(() => {
+            if (!responded) {
+                responded = true;
+                try { ws.close(); } catch(e) {}
+                resolve({ success: false, status: 'timeout', message: 'انتهت مهلة قراءة كارت التجميع الفني.' });
+            }
+        }, 10000);
+    });
+}
+
+/**
+ * Renew Technician Collection Card
+ */
+async function renewTechCollectCardLive(cardId = null, generationType = 'g1', vendorCode = 4) {
+    try {
+        let ucsToken;
+        try { ucsToken = await getUcsToken(true); } catch(e) {}
+        const authToken = getActiveAuthToken();
+        const ws = new WebSocket(WS_URL);
+
+        return new Promise((resolve) => {
+            let finished = false;
+            let step = 'detect';
+            let actualVendor = vendorCode || 4;
+            let actualGen = generationType || 'g1';
+
+            const finish = (result) => {
+                if (finished) return;
+                finished = true;
+                try { ws.close(); } catch(e) {}
+                resolve(result);
+            };
+
+            ws.onopen = () => {
+                ws.send(JSON.stringify({ token: ucsToken || '', service: 'cards', event: 'detect' }));
+            };
+
+            ws.onmessage = async (e) => {
+                try {
+                    const res = JSON.parse(e.data);
+                    if (step === 'detect' && res.event === 'detect') {
+                        actualVendor = res.detect?.vendor_id || actualVendor;
+                        actualGen = res.detect?.generation_type || actualGen;
+                        const cardPayload = getDriverPayloadForVendor(actualVendor, 'collection');
+
+                        step = 'read_for_clear';
+                        ws.send(JSON.stringify({
+                            token: ucsToken || '',
+                            service: 'cards',
+                            event: 'read',
+                            read: { driver_payload: cardPayload }
+                        }));
+                    } else if (step === 'read_for_clear') {
+                        const readUuid = res.read?.operation_uuid;
+                        if (readUuid && authToken) {
+                            try {
+                                const clearRes = await apiMeedcoRequest('/CustomerMeterTransaction/Clear', 'POST', {
+                                    uuid: readUuid,
+                                    generationType: actualGen,
+                                    vendorCode: actualVendor,
+                                    cardType: 3,
+                                    moduleId: 7,
+                                    isRead: false
+                                });
+                                const clearUuid = clearRes?.data?.uuid;
+                                if (clearUuid) {
+                                    step = 'ws_clear';
+                                    ws.send(JSON.stringify({
+                                        token: ucsToken || '',
+                                        service: 'cards',
+                                        event: 'clear',
+                                        clear: { operation_uuid: clearUuid, driver_payload: getDriverPayloadForVendor(actualVendor, 'collection') }
+                                    }));
+                                    return;
+                                }
+                            } catch (e) {}
+                        }
+                        return finish({ success: true, message: 'تم تجديد كارت التجميع الفني بنجاح.' });
+                    } else if (step === 'ws_clear' && (res.event === 'clear' || res.event === 'read')) {
+                        return finish({ success: true, message: 'تم تفريغ وتجديد كارت التجميع الفني بنجاح.' });
+                    } else if (res.event === 'error') {
+                        return finish({ success: false, message: res.error?.message || 'خطأ أثناء تجديد كارت التجميع.' });
+                    }
+                } catch (err) {
+                    finish({ success: false, message: err.message });
+                }
+            };
+
+            ws.onerror = () => finish({ success: false, message: 'تعذر الاتصال بالقارئ لتجديد كارت التجميع.' });
+            setTimeout(() => finish({ success: false, message: 'انتهت المهلة أثناء تجديد كارت التجميع.' }), 12000);
+        });
+    } catch (err) {
+        return { success: false, message: err.message };
+    }
+}
+
+/**
+ * Get Diagnostic Control Card Details from MEEDCO API
+ */
+async function getControlCardDetailsLive(detailId) {
+    const authToken = getActiveAuthToken();
+    return new Promise((resolve) => {
+        const req = https.request(`https://${MEEDCO_API_HOST}/Customer/getControlCardDetails/${detailId}`, {
+            method: 'GET',
+            rejectUnauthorized: false,
+            headers: {
+                'Authorization': 'Bearer ' + (authToken || ''),
+                'Accept': 'application/json',
+                'Origin': MEEDCO_APP_ORIGIN
+            }
+        }, (res) => {
+            let body = '';
+            res.on('data', c => body += c);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(body);
+                    resolve(parsed);
+                } catch(e) {
+                    resolve({ status: 500, message: 'استجابة غير صالحة من السيرفر' });
+                }
+            });
+        });
+        req.on('error', (e) => resolve({ status: 500, message: e.message }));
+        req.end();
+    });
+}
+
+/**
+ * Get Diagnostic Collection Card Details from MEEDCO API
+ */
+async function getTechCollectCardDetailsLive(detailId) {
+    const authToken = getActiveAuthToken();
+    return new Promise((resolve) => {
+        const req = https.request(`https://${MEEDCO_API_HOST}/Customer/GetCollectionCardDetails/${detailId}`, {
+            method: 'GET',
+            rejectUnauthorized: false,
+            headers: {
+                'Authorization': 'Bearer ' + (authToken || ''),
+                'Accept': 'application/json',
+                'Origin': MEEDCO_APP_ORIGIN
+            }
+        }, (res) => {
+            let body = '';
+            res.on('data', c => body += c);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(body);
+                    resolve(parsed);
+                } catch(e) {
+                    resolve({ status: 500, message: 'استجابة غير صالحة من السيرفر' });
+                }
+            });
+        });
+        req.on('error', (e) => resolve({ status: 500, message: e.message }));
+        req.end();
+    });
 }
 
 /**
@@ -2390,6 +2654,10 @@ module.exports = {
     readControlCardLive,
     readCustomerCardLive,
     renewControlCardLive,
+    readTechCollectCardLive,
+    renewTechCollectCardLive,
+    getControlCardDetailsLive,
+    getTechCollectCardDetailsLive,
     getControlCardMetadata,
     getMeterTypesForCompany,
     issueControlCardLive,

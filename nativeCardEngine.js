@@ -46,22 +46,7 @@ function getCardStore() {
                 updatedAt: new Date().toISOString()
             }
         },
-        controlCards: {
-            "00118924": {
-                cardId: "00118924",
-                technicianCode: 12258,
-                technicianName: "وحيد فاروق كامل",
-                controlOperationTypeName: "إزالة تلاعبات و أخطاء",
-                controlOperationType: 2,
-                companyName: "السويدي",
-                meterTypeName: "ثلاثى مباشر سوجويف 2024",
-                cardIssueDate: "16/09/2026",
-                activationDate: "28/02/2026",
-                expiryDate: "23/09/2026",
-                issueUsername: "المشغل المعتمد",
-                meterData: []
-            }
-        }
+        controlCards: {}
     };
 }
 
@@ -696,36 +681,73 @@ async function searchCustomer(term) {
     };
 }
 
-// 8. Control Card Operations (كروت التحكم)
+// 8. Control Card Operations (كروت التحكم الحية المباشرة)
 async function readControlCard() {
-    const status = await getReaderStatus();
-    const store = getCardStore();
-    const cardData = store.controlCards["00118924"];
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.readControlCardLive === 'function') {
+            const liveRes = await unifiedClient.readControlCardLive();
+            if (liveRes && liveRes.success && liveRes.card) {
+                const store = getCardStore();
+                if (!store.controlCards) store.controlCards = {};
+                store.controlCards[liveRes.card.cardId] = liveRes.card;
+                store.activeControlCard = liveRes.card;
+                saveCardStore(store);
+                return {
+                    success: true,
+                    card: liveRes.card,
+                    cardData: liveRes.card,
+                    message: liveRes.message || 'تمت قراءة كارت التحكم الفعلي بنجاح ومطابقته مع سيرفر MEEDCO.'
+                };
+            } else if (liveRes) {
+                return liveRes;
+            }
+        }
+    } catch (e) {
+        console.warn('Live control card read failed:', e.message);
+    }
 
     return {
-        success: true,
-        card: cardData,
-        cardData: cardData,
-        message: 'تمت قراءة كارت التحكم بنجاح عبر النظام المباشر.'
+        success: false,
+        status: 'no_card',
+        message: 'لا يوجد كارت تحكم في القارئ أو تعذر قراءة الشريحة الذكية. يرجى التأكد من وضع الكارت بالقارئ.'
     };
 }
 
 async function renewControlCard(cardId, generationType, vendorCode) {
-    const store = getCardStore();
-    const cardData = store.controlCards["00118924"];
-    if (cardData) {
-        cardData.activationDate = new Date().toLocaleDateString('ar-EG');
-        const exp = new Date(Date.now() + 7 * 86400000);
-        cardData.expiryDate = exp.toLocaleDateString('ar-EG');
-        saveCardStore(store);
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.renewControlCardLive === 'function') {
+            const liveRes = await unifiedClient.renewControlCardLive(cardId, generationType, vendorCode);
+            if (liveRes && liveRes.success) {
+                const store = getCardStore();
+                if (store.controlCards && store.controlCards[cardId]) {
+                    store.controlCards[cardId].activationDate = new Date().toLocaleDateString('ar-EG');
+                    const exp = new Date(Date.now() + 7 * 86400000);
+                    store.controlCards[cardId].expiryDate = exp.toLocaleDateString('ar-EG');
+                    saveCardStore(store);
+                }
+            }
+            return liveRes;
+        }
+    } catch (e) {
+        console.warn('Live renew failed:', e.message);
     }
     return {
-        success: true,
-        message: 'تم تجديد صلاحية كارت التحكم بنجاح لمدة 7 أيام.'
+        success: false,
+        message: 'تعذر تجديد صلاحية كارت التحكم عبر القارئ الذكي.'
     };
 }
 
 async function getControlCardMetadata() {
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getControlCardMetadata === 'function') {
+            const meta = await unifiedClient.getControlCardMetadata();
+            if (meta && meta.success) return meta;
+        }
+    } catch(e) {}
+
     return {
         success: true,
         companies: [
@@ -739,7 +761,8 @@ async function getControlCardMetadata() {
             { id: 1, name: "إعادة تهيئة وضبط مصنع" },
             { id: 2, name: "إزالة تلاعبات و أخطاء" },
             { id: 3, name: "اختبار فني وفحص عداد" },
-            { id: 4, name: "تحديث تعريفة وساعة" }
+            { id: 4, name: "تحديث تعريفة وساعة" },
+            { id: 5, name: "كارت تجميع قراءات" }
         ]
     };
 }
@@ -749,15 +772,60 @@ async function getMeterTypesForCompany(companyId) {
         { id: 1, name: "أحادي مباشر سوجويف 2024" },
         { id: 2, name: "ثلاثى مباشر سوجويف 2024" },
         { id: 3, name: "ثلاثي محولات CT" },
-        { id: 4, name: "أحادي إلكتروني نمطي" }
+        { id: 4, name: "احادى 2024" },
+        { id: 5, name: "أحادي إلكتروني نمطي" }
     ];
     return { success: true, data: types };
 }
 
 async function issueControlCard(params) {
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.issueControlCardLive === 'function') {
+            const liveRes = await unifiedClient.issueControlCardLive(params);
+            if (liveRes && liveRes.success) {
+                const store = getCardStore();
+                if (!store.controlCards) store.controlCards = {};
+                const cId = liveRes.cardId || params.cardId || ('CC-' + Date.now().toString().slice(-6));
+                store.controlCards[cId] = {
+                    cardId: cId,
+                    technicianCode: params.technicianCode || 12258,
+                    technicianName: params.technicianName || 'فني معتمد',
+                    controlOperationTypeName: params.operationTypeName || 'كارت تحكم عام',
+                    controlOperationType: params.operationType || 1,
+                    companyName: params.companyName || 'المصرية',
+                    meterTypeName: params.meterTypeName || 'احادى 2024',
+                    cardIssueDate: new Date().toLocaleDateString('ar-EG'),
+                    activationDate: new Date().toLocaleDateString('ar-EG'),
+                    expiryDate: params.expiryDate || new Date(Date.now() + 7 * 86400000).toLocaleDateString('ar-EG'),
+                    issueUsername: 'المشغل',
+                    meterData: []
+                };
+                saveCardStore(store);
+            }
+            return liveRes;
+        }
+    } catch (e) {
+        console.warn('Live issue control card error:', e.message);
+    }
     return {
-        success: true,
-        message: 'تم إصدار كارت التحكم بنجاح وتمت برمجته على القارئ.'
+        success: false,
+        message: 'تعذر برمجة كارت التحكم على القارئ الذكي.'
+    };
+}
+
+async function clearControlCard() {
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.clearSmartCardLive === 'function') {
+            return await unifiedClient.clearSmartCardLive();
+        }
+    } catch (e) {
+        console.warn('Live clear control card error:', e.message);
+    }
+    return {
+        success: false,
+        message: 'تعذر مسح بيانات كارت التحكم عبر القارئ الذكي.'
     };
 }
 
