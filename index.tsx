@@ -1794,13 +1794,28 @@ const loadState = async () => {
         ensureDefaultPermissions(mergedState.settings);
         state = mergedState;
 
-        // تنظيف أي بيانات قديمة موروثة بها تداخل في بيانات الهدم مع الأعطال
+        // تنظيف أي بيانات قديمة موروثة بها تداخل في بيانات الهدم أو العداد الجديد مع الأعطال
         if (state.meters && Array.isArray(state.meters)) {
             state.meters.forEach(meter => {
                 if (isFaultySubscriber(meter.subscriberType)) {
                     if (meter.demolitionType) delete (meter as any).demolitionType;
                     if (meter.demolitionDate) delete (meter as any).demolitionDate;
                     if (meter.meterReceivedBy) delete (meter as any).meterReceivedBy;
+                    if (meter.newMeterType) delete (meter as any).newMeterType;
+                    if (meter.newMeterChassisNumber) delete (meter as any).newMeterChassisNumber;
+                    if (meter.newMeterChassisNumberForReplacement) delete (meter as any).newMeterChassisNumberForReplacement;
+                    if (meter.installationDate) delete (meter as any).installationDate;
+                    if (meter.installationDateForReplacement) delete (meter as any).installationDateForReplacement;
+                    if (meter.installedBy) delete (meter as any).installedBy;
+                    if (meter.installationStatus) delete (meter as any).installationStatus;
+                } else if (isDemolitionSubscriber(meter.subscriberType)) {
+                    if (meter.newMeterType) delete (meter as any).newMeterType;
+                    if (meter.newMeterChassisNumber) delete (meter as any).newMeterChassisNumber;
+                    if (meter.newMeterChassisNumberForReplacement) delete (meter as any).newMeterChassisNumberForReplacement;
+                    if (meter.installationDate) delete (meter as any).installationDate;
+                    if (meter.installationDateForReplacement) delete (meter as any).installationDateForReplacement;
+                    if (meter.installedBy) delete (meter as any).installedBy;
+                    if (meter.installationStatus) delete (meter as any).installationStatus;
                 }
             });
         }
@@ -12960,16 +12975,6 @@ const handlePrintJudicialControlDetails = () => {
                             </div>
                         </div>` : '';
 
-                const meterItems = [
-                    createDetailItem('شاسية العداد', meter.meterChassisNumber, 'meterChassisNumber'),
-                    createDetailItem('نوع العداد', meter.meterType, 'meterType'),
-                    createDetailItem('شركة توريد العداد', meter.meterSupplyCompany, 'meterSupplyCompany'),
-                    createDetailItem('قدرة العداد', meter.meterCapacity, 'meterCapacity'),
-                    createDetailItem('رقم اللوحة', meter.panelNumber, 'panelNumber'),
-                    meter.newMeterChassisNumber ? createDetailItem('شاسية العداد الجديد', meter.newMeterChassisNumber, 'newMeterChassisNumber') : '',
-                    meter.newMeterType ? createDetailItem('نوع العداد الجديد', meter.newMeterType, 'newMeterType') : ''
-                ].join('');
-
                 const isFaulty = isFaultySubscriber(meter.subscriberType);
                 const isDemolition = isDemolitionSubscriber(meter.subscriberType);
                 const isReplacement = isReplacementSubscriber(meter.subscriberType);
@@ -12977,6 +12982,14 @@ const handlePrintJudicialControlDetails = () => {
                 const isNew = isNewSubscriberType(meter.subscriberType);
                 const isChangeContract = isChangeContractSubscriber(meter.subscriberType);
                 const isMechanical = meter.meterType === 'ميكانيكي';
+
+                const meterItems = [
+                    createDetailItem(isReplacement ? 'شاسية العداد القديم' : 'شاسية العداد', meter.meterChassisNumber, 'meterChassisNumber'),
+                    createDetailItem(isReplacement ? 'نوع العداد القديم' : 'نوع العداد', meter.meterType, 'meterType'),
+                    createDetailItem('شركة توريد العداد', meter.meterSupplyCompany, 'meterSupplyCompany'),
+                    createDetailItem('قدرة العداد', meter.meterCapacity, 'meterCapacity'),
+                    createDetailItem('رقم اللوحة', meter.panelNumber, 'panelNumber')
+                ].join('');
 
                 let installOrContractFieldset = '';
 
