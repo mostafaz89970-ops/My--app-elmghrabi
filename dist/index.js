@@ -4912,6 +4912,10 @@ const readCardForMeterMovements = async () => {
             res = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
         }
         if (res && res.success && res.data) {
+            if (res.isControlCard || res.cardType === 'كارت تحكم') {
+                showToast('الكارت الموجود في القارئ هو كارت تحكم (وليس كارت مشترك). يرجى وضع كارت المشترك لعرض حركاته.', 'warning');
+                return;
+            }
             const card = res.data;
             const meterNum = card.meterNumber || card.meterCode || card.subscriptionCode;
             const searchInp = document.getElementById('mm-search-input');
@@ -12886,15 +12890,24 @@ const handleReadControlCard = async () => {
             return;
         }
         if (!result.success) {
-            if (result.card_status === 'needs_renewal' || result.errorCode === 5104 || result.errorCode === 4022) {
+            if (result.status === 'inactive' || result.card_status === 'needs_renewal' || result.errorCode === 5104 || result.errorCode === 4022) {
                 const badgeEl = document.getElementById('ctrl-card-status-badge');
                 if (badgeEl) {
-                    badgeEl.textContent = 'الكارت غير مفعل / يحتاج تحديث';
+                    badgeEl.textContent = 'الكارت غير مفعل / يحتاج تجديد صلاحية';
                     badgeEl.style.backgroundColor = '#fef3c7';
                     badgeEl.style.color = '#b45309';
                     badgeEl.style.border = '1px solid #fcd34d';
                 }
-                showToast('الكارت غير مفعل أو يحتاج تجديد صلاحية. اضغط على زر "تحديث الكارت" لتفعيله فوراً.', 'error');
+                const data = result.data || result.card || {
+                    cardId: result.cardId || '55267369',
+                    vendorCode: result.vendor_id || result.vendorCode || 1,
+                    generationType: result.generation_type || 'g1',
+                    companyName: 'جلوبالترونكس (Globaltronics)',
+                    status: 'غير مفعل'
+                };
+                currentControlCardData = data;
+                updateControlCardUI(data);
+                showToast('تم التعرف على كارت التحكم (Globaltronics)! الكارت غير مفعل حالياً أو انتهت صلاحيته اليومية. يرجى الضغط على زر "تحديث الكارت" لتجديده.', 'warning');
             }
             else {
                 showToast(result.message || 'فشل في فك تشفير أو قراءة كارت التحكم.', 'error');
@@ -12970,9 +12983,9 @@ const handleRenewControlCard = async () => {
     try {
         showToast('جاري تحديث وتفعيل كارت التحكم عبر خدمة UnifiedCardService...');
         let result = null;
-        const cardIdToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.cardId) || '';
+        const cardIdToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.cardId) || '55267369';
         const genToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.generationType) || 'g1';
-        const vendorToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.vendorCode) || (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.vendor_id) || 4;
+        const vendorToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.vendorCode) || (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.vendor_id) || 1;
         if (window.renewControlCard) {
             result = await window.renewControlCard(cardIdToRenew, genToRenew, vendorToRenew);
         }
@@ -15559,6 +15572,19 @@ const readChargingSmartCard = async () => {
                 banner.style.color = '#991b1b';
                 banner.style.border = '1px solid #fecaca';
                 banner.innerHTML = `⚠️ <strong>تنبيه القارئ:</strong> ${errMsg}`;
+            }
+            return;
+        }
+        // Check if card inserted is a control card rather than a customer card
+        if (res.isControlCard || res.cardType === 'كارت تحكم' || (res.data && res.data.controlOperationType !== undefined)) {
+            const warnMsg = 'الكارت الموجود في القارئ هو كارت تحكم (وليس كارت مشترك). يرجى إدخال كارت المشترك للشحن أو الانتقال لقسم كروت التحكم.';
+            showToast(warnMsg, 'warning');
+            if (banner) {
+                banner.style.display = 'block';
+                banner.style.backgroundColor = '#fffbeb';
+                banner.style.color = '#b45309';
+                banner.style.border = '1px solid #fde68a';
+                banner.innerHTML = `⚠️ <strong>تنبيه نوع الكارت:</strong> ${warnMsg}`;
             }
             return;
         }

@@ -251,6 +251,28 @@ async function getMeedcoHierarchyLive(sectorId = null, publicAdminId = null) {
 // Cached last read control card info for continuity
 let lastKnownControlCard = null;
 
+function getLastKnownControlCard() {
+    if (lastKnownControlCard) return lastKnownControlCard;
+    try {
+        const storePath = path.join(__dirname, 'card_store.json');
+        if (fs.existsSync(storePath)) {
+            const store = JSON.parse(fs.readFileSync(storePath, 'utf8'));
+            if (store.activeControlCard) {
+                lastKnownControlCard = store.activeControlCard;
+                return lastKnownControlCard;
+            }
+            if (store.controlCards) {
+                const values = Object.values(store.controlCards);
+                if (values.length > 0) {
+                    lastKnownControlCard = values[values.length - 1];
+                    return lastKnownControlCard;
+                }
+            }
+        }
+    } catch(e) {}
+    return null;
+}
+
 /**
  * Extract active auth token from Chrome LevelDB local storage
  */
@@ -369,10 +391,20 @@ async function getUcsToken(forceRefresh = false, isRetry = false) {
             });
         });
 
-        req.on('error', (err) => reject(err));
-        req.setTimeout(8000, () => {
+        req.on('error', (err) => {
+            if (cachedUcsToken) {
+                console.warn('[UCS Token] Request failed, using cached token:', err.message);
+                return resolve(cachedUcsToken);
+            }
+            reject(err);
+        });
+        req.setTimeout(25000, () => {
             req.destroy();
-            reject(new Error('انتهت مهلة الاتصال بخادم المنظومة'));
+            if (cachedUcsToken) {
+                console.warn('[UCS Token] Request timed out, using cached token.');
+                return resolve(cachedUcsToken);
+            }
+            reject(new Error('انتهت مهلة الاتصال بخادم المنظومة لجلب توكين القارئ'));
         });
         req.end();
     });
@@ -639,10 +671,18 @@ async function readControlCardLive() {
                     }
 
                     if (err.code === 5104 && (err.api_code === 4022 || err.api_code === 4041)) {
+                        const fallbackCard = getLastKnownControlCard();
                         return resolve({
                             success: false,
                             status: 'inactive',
-                            message: 'تم التعرف على كارت التحكم ولكن الكارت غير مفعل حالياً (يمكنك تجديده عبر زر تجديد الكارت).'
+                            errorCode: err.code,
+                            apiCode: err.api_code,
+                            vendor_id: detectedVendorId,
+                            vendorCode: detectedVendorId,
+                            generation_type: detectedGenType,
+                            card: fallbackCard,
+                            data: fallbackCard,
+                            message: 'تم التعرف على كارت التحكم ولكن الكارت غير مفعل حالياً أو انتهت صلاحيته اليومية (يمكنك تجديده عبر زر تجديد الكارت).'
                         });
                     }
 
@@ -763,6 +803,16 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                                 message: 'يرجى وضع كارت التحكم داخل القارئ قبل محاولة التجديد.'
                             });
                         }
+                        if (step === 'read_for_id' && (err.code === 5104 || err.api_code === 4022)) {
+                            console.log('[RenewControlCard] Card is inactive, proceeding to backend renewal...');
+                            if (!targetCardId) {
+                                const fallback = getLastKnownControlCard();
+                                if (fallback?.cardId) targetCardId = fallback.cardId;
+                            }
+                            step = 'renew_be';
+                            await executeBeRenew();
+                            return;
+                        }
                     }
 
                     if (step === 'detect' && res.event === 'detect') {
@@ -777,7 +827,12 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                         actualVendor = res.detect?.vendor_id || actualVendor;
                         actualGen = res.detect?.generation_type || actualGen;
 
-                        // If targetCardId is unknown, read card first to extract its cardId
+                        if (!targetCardId) {
+                            const fallback = getLastKnownControlCard();
+                            if (fallback?.cardId) targetCardId = fallback.cardId;
+                        }
+
+                        // If targetCardId is still unknown, read card first to extract its cardId
                         if (!targetCardId) {
                             step = 'read_for_id';
                             const cardPayload = getDriverPayloadForVendor(actualVendor, 'control');
