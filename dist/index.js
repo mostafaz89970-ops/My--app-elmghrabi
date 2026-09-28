@@ -4615,6 +4615,7 @@ const resetMeterMovementsUI = () => {
         countBadge.textContent = '0';
 };
 const searchMeterMovements = async (queryTerm) => {
+    var _a, _b, _c, _d, _e, _f;
     const inp = document.getElementById('mm-search-input');
     const q = String(queryTerm !== undefined ? queryTerm : ((inp === null || inp === void 0 ? void 0 : inp.value) || '')).trim();
     if (!q) {
@@ -4644,68 +4645,66 @@ const searchMeterMovements = async (queryTerm) => {
             console.warn('Backend movements fetch notice:', e);
         }
         let cust = (res === null || res === void 0 ? void 0 : res.data) || (res === null || res === void 0 ? void 0 : res.customer);
-        // 2. If not found via server, lookup from local state.meters & charges history
+        // 2. If not found via server, lookup from local cardOperations (real saved operations)
         if (!cust) {
+            const headerInfo = getDynamicReceiptHeader();
+            // Search in real saved cardOperations first (all charges, replacements, etc.)
+            const allCardOps = (state.cardOperations || []);
+            const matchedOps = allCardOps.filter((op) => String(op.meterNumber || '').trim() === q ||
+                String(op.customerCode || '').trim() === q ||
+                String(op.nationalId || '').trim() === q ||
+                String(op.customerName || '').toLowerCase().includes(q.toLowerCase()));
+            // Also search in state.meters to get customer info
             const local = state.meters.find(m => String(m.meterChassisNumber || '').trim() === q ||
                 String(m.subscriptionCode || '').trim() === q ||
                 String(m.id || '').trim() === q ||
-                String(m.nationalId || '').trim() === q);
-            if (local) {
-                const headerInfo = getDynamicReceiptHeader();
-                // Build local movements history
-                const localMoves = [];
-                // Add recharge history if any
-                const charges = (state.chargingHistory || state.charges || []).filter((h) => String(h.meterNumber || '') === String(local.meterChassisNumber) ||
-                    String(h.customerCode || '') === String(local.subscriptionCode));
-                if (charges.length > 0) {
-                    charges.forEach((c, idx) => {
-                        localMoves.push({
-                            id: c.id || (100 + idx),
-                            meterNumber: local.meterChassisNumber,
-                            changeType: c.chargeType || 'شحن كارت',
-                            chargeValue: Number(c.amount || c.chargeAmount || 100).toFixed(2),
-                            recieptNumber: c.receiptNumber || ('CHG-' + local.meterChassisNumber + '-' + (idx + 1)),
-                            moveDate: c.date || new Date().toLocaleDateString('ar-EG'),
-                            rechargeCenterCode: c.centerName || 'مركز شحن رئيسي',
-                            changerName: c.cashierName || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الشحن',
-                            status: 'ناجح',
-                            isCharging: true,
-                            isNewCharge: false
-                        });
-                    });
-                }
-                else {
-                    // Default current meter state movement
-                    localMoves.push({
-                        id: 1,
-                        meterNumber: local.meterChassisNumber,
-                        changeType: 'شحن كارت',
-                        chargeValue: Number(local.balance || 100).toFixed(2),
-                        recieptNumber: 'CHG-20250926-01',
-                        moveDate: local.lastChargeDate || new Date().toLocaleDateString('ar-EG'),
-                        rechargeCenterCode: 'مركز شحن رئيسي',
-                        changerName: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الشحن',
-                        status: 'ناجح',
-                        isCharging: true,
-                        isNewCharge: false
-                    });
-                }
+                String(m.nationalId || '').trim() === q ||
+                String(m.subscriberName || '').toLowerCase().includes(q.toLowerCase()));
+            if (matchedOps.length > 0 || local) {
+                // Build movements from real cardOperations
+                const localMoves = matchedOps.map((op, idx) => ({
+                    id: op.id || (100 + idx),
+                    meterNumber: op.meterNumber || (local === null || local === void 0 ? void 0 : local.meterChassisNumber) || q,
+                    changeType: op.operationTypeName || (op.operationType === 'charge' ? 'شحن كارت' :
+                        op.operationType === 'replacement_no_charge' ? 'كارت بديل بدون شحن' :
+                            op.operationType === 'replacement_with_charge' ? 'كارت بديل بشحن' : 'شحن كارت'),
+                    chargeValue: Number(op.rechargeAmount || op.chargeAmount || 0).toFixed(2),
+                    recieptNumber: op.receiptNumber || op.id || ('REC-' + (100 + idx)),
+                    moveDate: op.date ? (op.date + (op.time ? ' ' + op.time : '')) : new Date().toLocaleDateString('ar-EG'),
+                    rechargeCenterCode: op.centerName || op.rechargeCenterName || headerInfo.branchName || 'مركز شحن رئيسي',
+                    changerName: op.operatorName || op.cashierName || (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الشحن',
+                    status: op.status || 'ناجح',
+                    isCharging: op.operationType === 'charge',
+                    isNewCharge: false,
+                    // extra detail for receipt
+                    fees: Number(op.fees || 0),
+                    cleaningFee: Number(op.cleaningFee || 0),
+                    debtsDeducted: Number(op.debtsDeducted || 0),
+                    netCollected: Number(op.netCollected || op.rechargeAmount || 0),
+                    paymentMethod: op.paymentMethod || 'نقدي',
+                    cardPrice: Number(op.cardPrice || 0)
+                }));
+                const baseCustomer = local || (matchedOps.length > 0 ? matchedOps[0] : null);
+                const meterNum = (local === null || local === void 0 ? void 0 : local.meterChassisNumber) || ((_a = matchedOps[0]) === null || _a === void 0 ? void 0 : _a.meterNumber) || q;
+                const custCode = (local === null || local === void 0 ? void 0 : local.subscriptionCode) || ((_b = matchedOps[0]) === null || _b === void 0 ? void 0 : _b.customerCode) || q;
+                const custName = (local === null || local === void 0 ? void 0 : local.subscriberName) || (local === null || local === void 0 ? void 0 : local.codySecondName) || ((_c = matchedOps[0]) === null || _c === void 0 ? void 0 : _c.customerName) || 'مشترك';
+                const totalCharged = localMoves.reduce((sum, m) => sum + Number(m.chargeValue || 0), 0);
                 cust = {
-                    id: local.id,
-                    name: local.subscriberName || local.codySecondName || 'مشترك',
-                    code: local.subscriptionCode || local.codeNumber || local.meterChassisNumber,
-                    nationalId: local.nationalId || '-',
-                    address: local.address || '-',
-                    oldCode: local.oldCode || '-',
-                    codeNumber: local.meterChassisNumber,
-                    unitNationalId: local.unitNationalId || '-',
-                    sectorName: local.sector || headerInfo.sector,
-                    publicAdministrationName: local.generalAdmin || 'الإدارة العامة للمبيعات',
-                    subAdministrationName: local.subAdmin || headerInfo.branchName,
-                    activityName: local.meterType || local.activityName || 'منزلي كودي',
-                    totalCharges: Number(local.chargeCount) || localMoves.length,
-                    totalRechargeAmountOnMeter: Number(local.balance || 100),
-                    accountNumberCustomer: local.accountReference || `${local.accountRefF || '00'}/${local.accountRefH || '00'}/${local.accountRefY || '00'}/${local.accountRefM || '00'}`,
+                    id: (local === null || local === void 0 ? void 0 : local.id) || custCode,
+                    name: custName,
+                    code: custCode,
+                    nationalId: (local === null || local === void 0 ? void 0 : local.nationalId) || ((_d = matchedOps[0]) === null || _d === void 0 ? void 0 : _d.nationalId) || '-',
+                    address: (local === null || local === void 0 ? void 0 : local.address) || ((_e = matchedOps[0]) === null || _e === void 0 ? void 0 : _e.address) || '-',
+                    oldCode: (local === null || local === void 0 ? void 0 : local.oldCode) || '-',
+                    codeNumber: meterNum,
+                    unitNationalId: (local === null || local === void 0 ? void 0 : local.unitNationalId) || '-',
+                    sectorName: (local === null || local === void 0 ? void 0 : local.sector) || headerInfo.sector,
+                    publicAdministrationName: (local === null || local === void 0 ? void 0 : local.generalAdmin) || 'الإدارة العامة للمبيعات',
+                    subAdministrationName: (local === null || local === void 0 ? void 0 : local.subAdmin) || headerInfo.branchName,
+                    activityName: (local === null || local === void 0 ? void 0 : local.meterType) || (local === null || local === void 0 ? void 0 : local.activityName) || ((_f = matchedOps[0]) === null || _f === void 0 ? void 0 : _f.activityName) || 'منزلي كودي',
+                    totalCharges: localMoves.length,
+                    totalRechargeAmountOnMeter: totalCharged,
+                    accountNumberCustomer: (local === null || local === void 0 ? void 0 : local.accountReference) || `${(local === null || local === void 0 ? void 0 : local.accountRefF) || '00'}/${(local === null || local === void 0 ? void 0 : local.accountRefH) || '00'}/${(local === null || local === void 0 ? void 0 : local.accountRefY) || '00'}/${(local === null || local === void 0 ? void 0 : local.accountRefM) || '00'}`,
                     meterMoves: localMoves
                 };
             }
