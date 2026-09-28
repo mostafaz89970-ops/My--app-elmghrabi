@@ -4816,104 +4816,132 @@
                     <div id="chg-receipt-preview-container" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; max-height: 440px; overflow-y: auto;">
                         
                         <!-- Standard A4 Preview -->
-                        <div id="rcpt-view-standard" style="background: #ffffff; border: 2px solid #0f172a; border-radius: 8px; padding: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06); font-family: 'Tajawal', sans-serif; font-size: 0.92rem; color: #0f172a; line-height: 1.5;">
+                        <!-- Standard A4 Preview (مطابق تماماً لمنظومة MEEDCO الرسمية) -->
+                        <div id="rcpt-view-standard" style="background: #ffffff; border: 1.5px solid #0f172a; border-radius: 8px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06); font-family: 'Tajawal', Arial, sans-serif; font-size: 14px; color: #000000; line-height: 1.5; max-width: 650px; margin: 0 auto;">
                             
-                            <!-- Header -->
-                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 10px; gap: 10px;">
-                                <div style="text-align: right; flex: 1;">
-                                    <div style="font-weight: 900; font-size: 1.05rem; color: #0f172a;" id="rcpt-comp-title">شركة توزيع كهرباء مصر الوسطى</div>
-                                    <div style="font-size: 0.85rem; font-weight: 700; color: #1e40af;" id="rcpt-sector-title">قطاع توزيع كهرباء بني سويف</div>
-                                    <div style="font-size: 0.8rem; font-weight: 700; color: #065f46;" id="rcpt-branch-title">هندسة توزيع كهرباء غرب</div>
-                                    <div style="font-size: 0.78rem; color: #64748b;">منظومة الشحن الموحد MEEDCO</div>
-                                </div>
-                                <div style="text-align: center; flex: 1;">
-                                    <div style="display: inline-block; background: #0f172a; color: #fff; padding: 4px 14px; border-radius: 20px; font-weight: 900; font-size: 0.95rem; margin-bottom: 4px;">إيصال سداد شحن عداد</div>
-                                    <div style="font-size: 0.75rem; color: #475569; font-weight: bold;">(كارت مسبق الدفع)</div>
-                                    <!-- Barcode representation -->
-                                    <div id="rcpt-barcode-container" style="margin-top: 4px; display: flex; justify-content: center;"></div>
-                                </div>
-                                <div style="text-align: left; flex: 1; font-size: 0.8rem;">
-                                    <div>رقم الإيصال: <strong id="rcpt-id" style="font-family: monospace; font-size: 0.9rem; color: #0369a1;">-</strong></div>
-                                    <div>تاريخ السداد: <span id="rcpt-date" style="font-weight: 700;">-</span></div>
-                                    <div>طريقة الدفع: <span id="rcpt-pay-method" style="font-weight: 700;">نقدي</span></div>
-                                    <div>المحصل: <span id="rcpt-collector" style="font-weight: 700;">-</span></div>
-                                </div>
+                            <!-- Top CyShield Header -->
+                            <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 12px; font-weight: 800; font-size: 14px;">
+                                تم التطوير بواسطة CyShield
                             </div>
 
-                            <!-- Customer & Meter Grid -->
-                            <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.88rem;">
-                                <div><span style="color: #64748b;">اسم المشترك:</span> <strong id="rcpt-cust-name" style="color: #0f172a;">-</strong></div>
-                                <div><span style="color: #64748b;">كود المشترك:</span> <strong id="rcpt-cust-code" style="font-family: monospace;">-</strong></div>
-                                <div><span style="color: #64748b;">رقم شاسية العداد:</span> <strong id="rcpt-meter-num" style="font-family: monospace;">-</strong></div>
-                                <div><span style="color: #64748b;">مرجع الحساب:</span> <span id="rcpt-account-ref" style="font-family: monospace; font-weight: 700;">-</span></div>
-                                <div><span style="color: #64748b;">الشريحة الحالية:</span> <span id="rcpt-slice" style="font-weight: 700; color: #b45309;">-</span></div>
-                                <div><span style="color: #64748b;">تتابع الشحن:</span> <span id="rcpt-seq" style="font-weight: 700;">-</span></div>
-                                <div style="grid-column: span 2;"><span style="color: #64748b;">العنوان:</span> <span id="rcpt-cust-addr">-</span></div>
+                            <!-- Official Organization Hierarchy -->
+                            <div style="text-align: center; margin-bottom: 16px; font-weight: 900; line-height: 1.6;">
+                                <div style="font-size: 19px;">الشركة القابضة لكهرباء مصر</div>
+                                <div style="font-size: 18px;">شركة مصر الوسطى لتوزيع الكهرباء</div>
+                                <div style="font-size: 15px;">قطاع : <span id="rcpt-sector-title">المنيا شمال</span></div>
+                                <div style="font-size: 15px;">ادارة عامة : <span id="rcpt-branch-title">بنى مزار شرق</span></div>
+                                <div style="font-size: 15px;">ادارة فرعية : <span id="rcpt-subadmin-title">بنى مزار شرق</span></div>
+                                <div style="font-size: 15px; margin-top: 4px;">التسجيل الضريبي : 857-556384</div>
                             </div>
 
-                            <!-- Financial Breakdown Table -->
-                            <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 0.88rem; text-align: right;">
-                                <thead>
-                                    <tr style="background: #e2e8f0; color: #1e293b; font-weight: 800;">
-                                        <th style="padding: 6px 8px; border: 1px solid #cbd5e1;">البيان المالي للشحنة</th>
-                                        <th style="padding: 6px 8px; border: 1px solid #cbd5e1; width: 140px; text-align: center;">المبلغ (ج.م)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td style="padding: 5px 8px; border: 1px solid #e2e8f0; font-weight: 700;">مبلغ الشحن المطلوب (الإجمالي)</td>
-                                        <td style="padding: 5px 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: 800; font-family: monospace;" id="rcpt-charge-amt">-</td>
-                                    </tr>
-                                    <tr id="rcpt-row-fees" style="color: #64748b;">
-                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0;">رسوم خدمة عملاء ودمغات ومصروفات</td>
-                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0; text-align: center; font-family: monospace;" id="rcpt-fees-amt">0.00</td>
-                                    </tr>
-                                    <tr id="rcpt-row-cleaning" style="color: #64748b;">
-                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0;">رسوم نظافة مقررة</td>
-                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0; text-align: center; font-family: monospace;" id="rcpt-cleaning-amt">0.00</td>
-                                    </tr>
-                                    <tr id="rcpt-row-debts" style="color: #dc2626;">
-                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0;">أقساط ومديونيات مستحقة مخصومة</td>
-                                        <td style="padding: 4px 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700; font-family: monospace;" id="rcpt-debts-amt">0.00</td>
-                                    </tr>
-                                    <tr style="background: #fef2f2; color: #b91c1c; font-weight: 800;">
-                                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1;">إجمالي الخصومات والاستقطاعات</td>
-                                        <td style="padding: 5px 8px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace;" id="rcpt-deductions">-</td>
-                                    </tr>
-                                    <tr style="background: #f0fdf4; color: #166534; font-size: 1rem; font-weight: 900;">
-                                        <td style="padding: 7px 8px; border: 2px solid #16a34a;">صافي الرصيد المضاف للكارت والعداد</td>
-                                        <td style="padding: 7px 8px; border: 2px solid #16a34a; text-align: center; font-family: monospace; font-size: 1.1rem;" id="rcpt-net-credited">-</td>
-                                    </tr>
-                                    <tr style="background: #f8fafc; font-weight: 800;">
-                                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1;">المبلغ المسدد نقداً المحصل من المشترك</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace;" id="rcpt-net-collected">-</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-
-                            <!-- Tafqeet -->
-                            <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; font-weight: 800; font-size: 0.88rem; color: #1e293b;">
-                                فقط وقدره: <span id="rcpt-tafqeet-text" style="color: #0369a1;">-</span>
+                            <!-- Section 1: Customer Details Table -->
+                            <div style="margin-bottom: 16px;">
+                                <div style="font-weight: 900; font-size: 15px; margin-bottom: 5px; text-align: center;">بيانات المشترك</div>
+                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #94a3b8; font-size: 13.5px;">
+                                    <tbody>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; width: 38%; font-weight: 700; background: #f8fafc;">مرجع الحساب</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 800; font-family: monospace; text-align: center;" id="rcpt-account-ref">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">رقم المشترك</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 800; font-family: monospace; text-align: center;" id="rcpt-cust-code">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">اسم المشترك</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 800; text-align: center;" id="rcpt-cust-name">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">نوع النشاط</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center;" id="rcpt-activity-name">استخدامات منزلية</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">وصف المكان</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center;" id="rcpt-place-desc">شقة</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">رقم العداد</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 800; font-family: monospace; text-align: center;" id="rcpt-meter-num">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">العنوان</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center;" id="rcpt-cust-addr">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">الرقم القومي العقاري</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center;" id="rcpt-unit-national-id">-</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
 
-                            <!-- Footer & QR -->
-                            <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px dashed #94a3b8; padding-top: 8px;">
-                                <div style="font-size: 0.76rem; color: #475569; max-width: 60%;">
-                                    <div style="font-weight: 700; color: #b45309; margin-bottom: 2px;">⚠️ تنبيه: يرجى وضع الكارت في العداد فوراً لتفريغ الشحنة والتأكد من ظهور الرصيد.</div>
-                                    <div>هذا الإيصال مستخرج آلياً ومعتمد من منظومة الشحن الموحد لشركة توزيع كهرباء مصر الوسطى.</div>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 15px;">
-                                    <div id="rcpt-qr-code" style="background: #fff; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px; display: inline-flex;"></div>
-                                    <div style="text-align: center; font-size: 0.8rem; font-weight: 700;">
-                                        <div>توقيع المحصل</div>
-                                        <div style="margin-top: 18px; border-bottom: 1px dotted #000; width: 80px;"></div>
-                                    </div>
-                                </div>
+                            <!-- Section 2: Charge Process Details Table -->
+                            <div style="margin-bottom: 16px;">
+                                <div style="font-weight: 900; font-size: 15px; margin-bottom: 5px; text-align: center;">تفاصيل عملية الشحن</div>
+                                <table style="width: 100%; border-collapse: collapse; border: 1px solid #94a3b8; font-size: 13.5px;">
+                                    <tbody>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; width: 38%; font-weight: 700; background: #f8fafc;">التاريخ</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700;" id="rcpt-date">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">رقم السداد</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 800; font-family: monospace; text-align: center;" id="rcpt-id">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">القائم بالشحن</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700;" id="rcpt-collector">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">القائم بالطباعة</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700;" id="rcpt-printer">سناء عبدالستار عبدالعزيز</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">الرسوم</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace;" id="rcpt-fees-amt">0.05</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">الغرامات</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace;" id="rcpt-penalties">0</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">قيمة الدفعة</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace;" id="rcpt-down-payment">0</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">رسوم النظافة</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace;" id="rcpt-cleaning-amt">10</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">نوع السداد</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700;" id="rcpt-pay-method">نقدي</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">قسط المديونية</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace; font-weight: 700;" id="rcpt-debt-installment">0.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; font-weight: 700; background: #f8fafc;">المديونيات المتبقية</td>
+                                            <td style="padding: 6px 12px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace; font-weight: 700;" id="rcpt-debts-remaining">0.00</td>
+                                        </tr>
+                                        <tr style="background: #f0fdf4;">
+                                            <td style="padding: 8px 12px; border: 1px solid #86efac; font-weight: 800; font-size: 14px;">صافي الشحنة</td>
+                                            <td style="padding: 8px 12px; border: 1px solid #86efac; text-align: center; font-family: monospace; font-weight: 900; font-size: 16px; color: #166534;" id="rcpt-net-credited">0.00</td>
+                                        </tr>
+                                        <tr style="background: #eff6ff;">
+                                            <td style="padding: 8px 12px; border: 1px solid #93c5fd; font-weight: 900; font-size: 15px;">المطلوب (المسدد نقداً)</td>
+                                            <td style="padding: 8px 12px; border: 1px solid #93c5fd; text-align: center; font-family: monospace; font-weight: 900; font-size: 17px; color: #1e40af;" id="rcpt-net-collected">0.00</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
 
+                            <!-- Bottom Footer CyShield -->
+                            <div style="text-align: center; border-top: 1px solid #000; padding-top: 6px; margin-top: 12px; font-weight: 800; font-size: 12px;">
+                                تم التطوير بواسطة CyShield
+                            </div>
                         </div>
 
-                        <!-- Thermal Receipt Preview (Hidden by default, toggled via tab) -->
                         <div id="rcpt-view-thermal" style="display: none; background: #ffffff; border: 2px dashed #000000; max-width: 340px; margin: 0 auto; padding: 12px; font-family: 'Tajawal', monospace, sans-serif; font-size: 0.86rem; color: #000000; line-height: 1.4;">
                             <!-- Thermal Content will be mirrored dynamically -->
                         </div>

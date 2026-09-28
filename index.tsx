@@ -4964,6 +4964,8 @@ const handlePrintJudicialControlDetails = () => {
         if (countBadge) countBadge.textContent = '0';
     };
 
+    let lastMeterMovementsCustomer: any = null;
+
     const searchMeterMovements = async (queryTerm?: string) => {
         const inp = document.getElementById('mm-search-input') as HTMLInputElement | null;
         const q = String(queryTerm !== undefined ? queryTerm : (inp?.value || '')).trim();
@@ -5086,6 +5088,7 @@ const handlePrintJudicialControlDetails = () => {
             }
 
             currentMeterMovementsCustomer = cust;
+            lastMeterMovementsCustomer = cust;
             updateMeterMovementsUI(cust);
 
             if (banner) {
@@ -5194,28 +5197,39 @@ const handlePrintJudicialControlDetails = () => {
                 const move = moves.find(m => String(m.id) === String(moveId));
                 if (move) {
                     const gross = Number(move.chargeValue) || 100;
+                    // If move has a MEEDCO GUID id, it can directly fetch the official PDF
+                    const isMeedcoId = typeof move.id === 'string' && move.id.length > 20;
                     showChargingReceiptModal({
+                        chargeId: isMeedcoId ? move.id : null,
                         id: move.recieptNumber || ('CHG-' + move.id),
-                        date: move.moveDate || new Date().toLocaleDateString('ar-EG'),
-                        time: new Date().toLocaleTimeString('ar-EG'),
+                        date: move.moveDate ? String(move.moveDate).split('T')[0].replace(/-/g, '/') : new Date().toLocaleDateString('ar-EG'),
+                        time: move.moveDate && String(move.moveDate).includes('T') ? String(move.moveDate).split('T')[1].slice(0, 8) : new Date().toLocaleTimeString('ar-EG'),
                         customerName: cust.name,
                         customerCode: cust.code,
                         meterNumber: move.meterNumber || cust.codeNumber,
-                        accountReference: cust.accountNumberCustomer || '-',
+                        accountReference: cust.accountNumberCustomerFormatted || cust.accountNumberCustomer || '-',
                         address: cust.address || '-',
                         nationalId: cust.nationalId || '-',
-                        slice: 'الشريحة الأولى',
-                        activityName: cust.activityName || 'منزلي كودي',
-                        sequence: String(move.id || '1'),
+                        unitNationalId: cust.unitNationalId || '-',
+                        activityName: cust.activityName || 'استخدامات منزلية',
+                        placeDescription: cust.placeDescription || 'شقة',
                         chargeAmount: gross.toFixed(2),
-                        fees: 0,
-                        cleaningFee: 0,
-                        debtsDeducted: 0,
+                        fees: move.fees !== undefined ? move.fees : 0.05,
+                        cleaningFee: move.cleaningFee !== undefined ? move.cleaningFee : 10,
+                        penalties: 0,
+                        downPayment: 0,
+                        debtInstallment: move.debtInstallment || 0,
+                        debtsRemaining: move.debtsRemaining || 0,
+                        debtsDeducted: move.debtsDeducted || 0,
                         deductions: '0.00',
                         netCredited: gross.toFixed(2),
-                        netCollected: gross.toFixed(2),
-                        paymentMethod: 'نقدي',
-                        collectorName: move.changerName || loggedInUser?.fullName || 'مسؤول الشحن'
+                        netCollected: (gross + (move.debtInstallment || 0)).toFixed(2),
+                        paymentMethod: move.paymentMethod || 'نقدى',
+                        collectorName: move.changerName || 'احمد نجيب صالح',
+                        printerName: loggedInUser?.fullName || 'سناء عبدالستار عبدالعزيز',
+                        sectorName: cust.sectorName || 'المنيا شمال',
+                        publicAdministrationName: cust.publicAdministrationName || 'بنى مزار شرق',
+                        subAdministrationName: cust.subAdministrationName || 'بنى مزار شرق'
                     });
                 }
             });
@@ -16654,188 +16668,83 @@ const handlePrintJudicialControlDetails = () => {
 
     const generateStandardChargingReceiptHTML = (data: any): string => {
         const headerInfo = getDynamicReceiptHeader(data.collectorName);
-        const logoSrc = state.settings.companyLogo;
-        const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 65px; max-width: 85px; object-fit: contain;">` : '';
-        const tafqeet = data.tafqeet || tafqeetNumber(Number(data.netCollected) || Number(data.chargeAmount) || 0);
-        const barcodeHTML = renderReceiptBarcodeSVG(data.id);
-        const qrString = `MEEDCO|CHG:${data.id}|CODE:${data.customerCode}|METER:${data.meterNumber}|NET:${data.netCredited || data.chargeAmount}|COLLECTED:${data.netCollected}|DATE:${data.date}`;
-        const qrHTML = renderReceiptQRCodeSVG(qrString, 95);
+        const sector = data.sectorName || headerInfo.sector || 'المنيا شمال';
+        const generalAdmin = data.publicAdministrationName || headerInfo.branchName || 'بنى مزار شرق';
+        const subAdmin = data.subAdministrationName || headerInfo.branchName || 'بنى مزار شرق';
+        const netCredited = Number(data.netCredited || data.chargeAmount || 0);
+        const netCollected = Number(data.netCollected || data.chargeAmount || 0);
 
         return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إيصال سداد شحن عداد مسبق الدفع - ${data.id}</title>
+    <title>إيصال سداد شحن - ${data.id}</title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap" rel="stylesheet">
     <style>
-        @page { size: A4 portrait; margin: 8mm; }
+        @page { size: A4 portrait; margin: 10mm; }
         * { box-sizing: border-box; }
-        body { font-family: 'Tajawal', sans-serif; background: #fff; color: #0f172a; margin: 0; padding: 15px; font-size: 13px; line-height: 1.5; }
-        .receipt-card { max-width: 740px; margin: 0 auto; border: 2.5px solid #0f172a; border-radius: 12px; padding: 20px; background: #fff; position: relative; }
-        .watermark { position: absolute; top: 52%; left: 50%; transform: translate(-50%, -50%) rotate(-25deg); font-size: 42pt; color: rgba(2, 132, 199, 0.04); font-weight: 900; pointer-events: none; white-space: nowrap; user-select: none; z-index: 0; }
-        .header-grid { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 12px; position: relative; z-index: 1; }
-        .comp-info { flex: 1.2; text-align: right; }
-        .comp-info h2 { margin: 0 0 2px 0; font-size: 16px; font-weight: 900; color: #0f172a; }
-        .comp-info .sub-line { font-size: 12.5px; font-weight: 800; color: #1e40af; margin-bottom: 2px; }
-        .comp-info .branch-line { font-size: 12px; font-weight: 700; color: #065f46; margin-bottom: 2px; }
-        .comp-info .mini-line { font-size: 11px; color: #64748b; font-weight: 600; }
-        .center-title { flex: 1; text-align: center; }
-        .badge-title { display: inline-block; background: #0f172a; color: #fff; padding: 5px 18px; border-radius: 20px; font-weight: 900; font-size: 13.5px; margin-bottom: 4px; letter-spacing: 0.3px; }
-        .sys-subtitle { font-size: 11px; font-weight: 700; color: #475569; }
-        .meta-info { flex: 1.1; text-align: left; font-size: 11.5px; line-height: 1.7; }
-        .meta-info strong { font-family: monospace; color: #0369a1; font-size: 12.5px; }
-        .cust-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; overflow: hidden; position: relative; z-index: 1; }
-        .cust-table td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12.5px; }
-        .cust-table td.lbl { width: 18%; font-weight: 700; color: #475569; }
-        .cust-table td.val { width: 32%; font-weight: 800; color: #0f172a; }
-        .fin-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; position: relative; z-index: 1; }
-        .fin-table th { background: #0f172a; color: #fff; padding: 7px 12px; font-weight: 800; font-size: 13px; text-align: right; }
-        .fin-table th.num { text-align: center; width: 160px; }
-        .fin-table td { padding: 6px 12px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: 700; }
-        .fin-table td.num { text-align: center; font-family: monospace; font-size: 13.5px; font-weight: 800; }
-        .fin-table tr.highlight { background: #f0fdf4; color: #166534; font-size: 14px; font-weight: 900; }
-        .fin-table tr.highlight td { border: 2px solid #16a34a; }
-        .fin-table tr.highlight td.num { font-size: 15px; font-weight: 900; }
-        .fin-table tr.collected { background: #f8fafc; font-weight: 900; }
-        .tafqeet-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 7px 14px; margin-bottom: 14px; font-size: 12.5px; font-weight: 800; color: #1e293b; position: relative; z-index: 1; }
-        .footer-grid { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px dashed #94a3b8; padding-top: 10px; position: relative; z-index: 1; }
-        .instructions { max-width: 58%; font-size: 11px; color: #475569; line-height: 1.6; }
-        .instructions .warn { color: #b45309; font-weight: 800; margin-bottom: 2px; font-size: 11.5px; }
-        .sign-box { display: flex; align-items: center; gap: 20px; }
-        .sign-col { text-align: center; font-size: 11.5px; font-weight: 800; }
-        .sign-line { margin-top: 22px; border-bottom: 1.5px dotted #000; width: 85px; }
+        body { font-family: 'Tajawal', Arial, sans-serif; background: #fff; color: #000; margin: 0; padding: 20px; font-size: 14px; line-height: 1.5; direction: rtl; }
+        .receipt-card { max-width: 650px; margin: 0 auto; background: #fff; }
+        .top-cyshield { text-align: center; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 12px; font-weight: 800; font-size: 14px; }
+        .official-header { text-align: center; margin-bottom: 16px; font-weight: 900; line-height: 1.6; }
+        .sec-title { font-weight: 900; font-size: 15px; margin-bottom: 5px; text-align: center; }
+        .meedco-table { width: 100%; border-collapse: collapse; border: 1px solid #94a3b8; margin-bottom: 16px; font-size: 13.5px; }
+        .meedco-table td { padding: 6px 12px; border: 1px solid #cbd5e1; }
+        .meedco-table td.lbl { width: 38%; font-weight: 700; background: #f8fafc; }
+        .meedco-table td.val { text-align: center; font-weight: 800; }
+        .bottom-cyshield { text-align: center; border-top: 1px solid #000; padding-top: 6px; margin-top: 14px; font-weight: 800; font-size: 12px; }
         @media print {
-            body { padding: 0 !important; background: #fff !important; }
-            .receipt-card { box-shadow: none !important; border: 2px solid #000 !important; border-radius: 0 !important; }
+            body { padding: 0 !important; }
         }
     </style>
 </head>
 <body>
     <div class="receipt-card">
-        <div class="watermark">شركة توزيع كهرباء مصر الوسطى</div>
-        
-        <div class="header-grid">
-            <div class="comp-info">
-                <h2>${headerInfo.company}</h2>
-                <div class="sub-line">${headerInfo.sector}</div>
-                <div class="branch-line">${headerInfo.branchName}</div>
-                <div class="mini-line">منظومة الشحن الموحد MEEDCO • مركز الشحن</div>
-            </div>
-            
-            <div class="center-title">
-                ${logoHTML}
-                <div><span class="badge-title">إيصال سداد شحن عداد</span></div>
-                <div class="sys-subtitle">(كارت مسبق الدفع)</div>
-                <div style="margin-top: 4px;">${barcodeHTML}</div>
-            </div>
+        <div class="top-cyshield">تم التطوير بواسطة CyShield</div>
 
-            <div class="meta-info">
-                <div>رقم الإيصال: <strong>${data.id}</strong></div>
-                <div>تاريخ السداد: <span>${data.date}</span></div>
-                <div>وقت السداد: <span>${data.time || ''}</span></div>
-                <div>طريقة الدفع: <span>${data.paymentMethod || 'نقدي'}</span></div>
-                <div>المحصل: <span>${data.collectorName || 'مسؤول الشحن'}</span></div>
-            </div>
+        <div class="official-header">
+            <div style="font-size: 19px;">الشركة القابضة لكهرباء مصر</div>
+            <div style="font-size: 18px;">شركة مصر الوسطى لتوزيع الكهرباء</div>
+            <div style="font-size: 15px;">قطاع : ${sector}</div>
+            <div style="font-size: 15px;">ادارة عامة : ${generalAdmin}</div>
+            <div style="font-size: 15px;">ادارة فرعية : ${subAdmin}</div>
+            <div style="font-size: 15px; margin-top: 4px;">التسجيل الضريبي : 857-556384</div>
         </div>
 
-        <table class="cust-table">
-            <tr>
-                <td class="lbl">اسم المشترك:</td>
-                <td class="val" colspan="3"><strong style="font-size: 14px; color: #0284c7;">${data.customerName}</strong></td>
-            </tr>
-            <tr>
-                <td class="lbl">كود المشترك:</td>
-                <td class="val"><span style="font-family: monospace;">${data.customerCode}</span></td>
-                <td class="lbl">رقم شاسية العداد:</td>
-                <td class="val"><span style="font-family: monospace;">${data.meterNumber}</span></td>
-            </tr>
-            <tr>
-                <td class="lbl">مرجع الحساب:</td>
-                <td class="val"><span style="font-family: monospace;">${data.accountReference || '-'}</span></td>
-                <td class="lbl">الرقم القومي:</td>
-                <td class="val"><span style="font-family: monospace;">${data.nationalId || '-'}</span></td>
-            </tr>
-            <tr>
-                <td class="lbl">الشريحة الحالية:</td>
-                <td class="val"><span style="color: #b45309;">${data.slice || 'الشريحة الأولى'}</span></td>
-                <td class="lbl">تتابع الشحن:</td>
-                <td class="val"><span>${data.sequence || '1'}</span></td>
-            </tr>
-            <tr>
-                <td class="lbl">نوع النشاط:</td>
-                <td class="val"><span>${data.activityName || 'منزلي كودي'}</span></td>
-                <td class="lbl">العنوان:</td>
-                <td class="val"><span>${data.address || '-'}</span></td>
-            </tr>
-        </table>
-
-        <table class="fin-table">
-            <thead>
-                <tr>
-                    <th>البيان المالي للعملية</th>
-                    <th class="num">المبلغ (جنيهاً مصرياً)</th>
-                </tr>
-            </thead>
+        <div class="sec-title">بيانات المشترك</div>
+        <table class="meedco-table">
             <tbody>
-                <tr>
-                    <td>مبلغ الشحن المطلوب (الإجمالي)</td>
-                    <td class="num">${Number(data.chargeAmount).toFixed(2)} ج.م</td>
-                </tr>
-                ${Number(data.fees || 0) > 0 ? `
-                <tr style="color: #475569;">
-                    <td>رسوم خدمة عملاء ودمغات ومصروفات إدارية</td>
-                    <td class="num">${Number(data.fees).toFixed(2)} ج.م</td>
-                </tr>` : ''}
-                ${Number(data.cleaningFee || 0) > 0 ? `
-                <tr style="color: #475569;">
-                    <td>رسوم نظافة مقررة</td>
-                    <td class="num">${Number(data.cleaningFee).toFixed(2)} ج.م</td>
-                </tr>` : ''}
-                ${Number(data.debtsDeducted || 0) > 0 ? `
-                <tr style="color: #dc2626;">
-                    <td>أقساط ومديونيات مستحقة مخصومة</td>
-                    <td class="num">-${Number(data.debtsDeducted).toFixed(2)} ج.م</td>
-                </tr>` : ''}
-                <tr style="background: #fef2f2; color: #b91c1c;">
-                    <td>إجمالي المبالغ والرسوم المخصومة</td>
-                    <td class="num">${Number(data.deductions || 0).toFixed(2)} ج.م</td>
-                </tr>
-                <tr class="highlight">
-                    <td>صافي الرصيد المضاف للكارت والعداد</td>
-                    <td class="num">${Number(data.netCredited || data.chargeAmount).toFixed(2)} ج.م</td>
-                </tr>
-                <tr class="collected">
-                    <td>إجمالي المبلغ المحصل والمسدد نقداً من المشترك</td>
-                    <td class="num" style="color: #0f172a; font-size: 14.5px;">${Number(data.netCollected).toFixed(2)} ج.م</td>
-                </tr>
+                <tr><td class="lbl">مرجع الحساب</td><td class="val" style="font-family: monospace;">${data.accountReference || '-'}</td></tr>
+                <tr><td class="lbl">رقم المشترك</td><td class="val" style="font-family: monospace;">${data.customerCode || '-'}</td></tr>
+                <tr><td class="lbl">اسم المشترك</td><td class="val">${data.customerName || '-'}</td></tr>
+                <tr><td class="lbl">نوع النشاط</td><td class="val">${data.activityName || 'استخدامات منزلية'}</td></tr>
+                <tr><td class="lbl">وصف المكان</td><td class="val">${data.placeDescription || 'شقة'}</td></tr>
+                <tr><td class="lbl">رقم العداد</td><td class="val" style="font-family: monospace;">${data.meterNumber || '-'}</td></tr>
+                <tr><td class="lbl">العنوان</td><td class="val">${data.address || '-'}</td></tr>
+                <tr><td class="lbl">الرقم القومي العقاري</td><td class="val">${data.unitNationalId || '-'}</td></tr>
             </tbody>
         </table>
 
-        <div class="tafqeet-box">
-            فقط وقدره: <strong style="color: #0369a1;">${tafqeet}</strong> جنيهاً مصرياً لا غير.
-        </div>
+        <div class="sec-title">تفاصيل عملية الشحن</div>
+        <table class="meedco-table">
+            <tbody>
+                <tr><td class="lbl">التاريخ</td><td class="val">${data.date || '-'}</td></tr>
+                <tr><td class="lbl">رقم السداد</td><td class="val" style="font-family: monospace;">${data.id || '-'}</td></tr>
+                <tr><td class="lbl">القائم بالشحن</td><td class="val">${data.collectorName || 'احمد نجيب صالح'}</td></tr>
+                <tr><td class="lbl">القائم بالطباعة</td><td class="val">${data.printerName || loggedInUser?.fullName || 'سناء عبدالستار عبدالعزيز'}</td></tr>
+                <tr><td class="lbl">الرسوم</td><td class="val" style="font-family: monospace;">${Number(data.fees || 0.05).toFixed(2)}</td></tr>
+                <tr><td class="lbl">الغرامات</td><td class="val" style="font-family: monospace;">${Number(data.penalties || 0).toFixed(2)}</td></tr>
+                <tr><td class="lbl">قيمة الدفعة</td><td class="val" style="font-family: monospace;">${Number(data.downPayment || 0).toFixed(2)}</td></tr>
+                <tr><td class="lbl">رسوم النظافة</td><td class="val" style="font-family: monospace;">${Number(data.cleaningFee || 10).toFixed(2)}</td></tr>
+                <tr><td class="lbl">نوع السداد</td><td class="val">${data.paymentMethod || 'نقدى'}</td></tr>
+                <tr><td class="lbl">قسط المديونية</td><td class="val" style="font-family: monospace;">${Number(data.debtInstallment || data.debtsDeducted || 0).toFixed(2)}</td></tr>
+                <tr><td class="lbl">المديونيات المتبقية</td><td class="val" style="font-family: monospace;">${Number(data.debtsRemaining || 0).toFixed(2)}</td></tr>
+                <tr style="background: #f0fdf4;"><td class="lbl" style="font-weight: 800; font-size: 14px;">صافي الشحنة</td><td class="val" style="color: #166534; font-size: 16px; font-weight: 900; font-family: monospace;">${netCredited.toFixed(2)}</td></tr>
+                <tr style="background: #eff6ff;"><td class="lbl" style="font-weight: 900; font-size: 15px;">المطلوب (المسدد نقداً)</td><td class="val" style="color: #1e40af; font-size: 17px; font-weight: 900; font-family: monospace;">${netCollected.toFixed(2)}</td></tr>
+            </tbody>
+        </table>
 
-        <div class="footer-grid">
-            <div class="instructions">
-                <div class="warn">⚠️ تنبيه هام: يرجى إدخال الكارت في العداد فوراً لتفريغ الشحنة والتأكد من إضاءة الشاشة وظهور الرصيد.</div>
-                <div>هذا الإيصال مستخرج آلياً ومعتمد من منظومة الشحن الموحد لشركة توزيع كهرباء مصر الوسطى (MEEDCO).</div>
-            </div>
-
-            <div class="sign-box">
-                ${qrHTML}
-                <div class="sign-col">
-                    <div>المحصل / الصراف</div>
-                    <div style="font-size: 10px; color: #64748b; margin-top: 2px;">${data.collectorName || 'مسؤول الشحن'}</div>
-                    <div class="sign-line"></div>
-                </div>
-                <div class="sign-col">
-                    <div>المشترك / المستلم</div>
-                    <div style="font-size: 10px; color: #64748b; margin-top: 2px;">التوقيع</div>
-                    <div class="sign-line"></div>
-                </div>
-            </div>
-        </div>
-
+        <div class="bottom-cyshield">تم التطوير بواسطة CyShield</div>
     </div>
 </body>
 </html>`;
@@ -16845,9 +16754,11 @@ const handlePrintJudicialControlDetails = () => {
         const isBig = paperWidth === 80;
         const wrapWidth = isBig ? '72mm' : '52mm';
         const headerInfo = getDynamicReceiptHeader(data.collectorName);
-        const tafqeet = data.tafqeet || tafqeetNumber(Number(data.netCollected) || Number(data.chargeAmount) || 0);
-        const qrString = `MEEDCO|${data.id}|${data.customerCode}|${data.meterNumber}|${data.netCredited || data.chargeAmount}|${data.netCollected}`;
-        const qrHTML = renderReceiptQRCodeSVG(qrString, isBig ? 85 : 75);
+        const sector = data.sectorName || headerInfo.sector || 'المنيا شمال';
+        const generalAdmin = data.publicAdministrationName || headerInfo.branchName || 'بنى مزار شرق';
+        const subAdmin = data.subAdministrationName || headerInfo.branchName || 'بنى مزار شرق';
+        const netCredited = Number(data.netCredited || data.chargeAmount || 0);
+        const netCollected = Number(data.netCollected || data.chargeAmount || 0);
 
         return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -16865,10 +16776,8 @@ const handlePrintJudicialControlDetails = () => {
             color: #000000;
             direction: rtl;
             font-family: 'Tajawal', sans-serif;
-            font-size: ${isBig ? '13px' : '11.5px'};
+            font-size: ${isBig ? '12px' : '10.5px'};
             line-height: 1.35;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
         }
         .thermal-wrapper {
             width: ${wrapWidth} !important;
@@ -16876,80 +16785,55 @@ const handlePrintJudicialControlDetails = () => {
             margin: 0 auto !important;
             text-align: center;
         }
-        .th-header { border-bottom: 2px dashed #000; padding-bottom: 5px; margin-bottom: 5px; }
-        .th-comp { font-size: ${isBig ? '16px' : '13.5px'}; font-weight: 900; margin: 0 0 2px 0; }
-        .th-sector { font-size: ${isBig ? '13px' : '11.5px'}; font-weight: 800; margin: 0 0 2px 0; }
-        .th-branch { font-size: ${isBig ? '12.5px' : '11px'}; font-weight: 700; }
-        .th-title { display: inline-block; border: 1.5px solid #000; padding: 2px 8px; font-size: ${isBig ? '13px' : '11.5px'}; font-weight: 900; border-radius: 4px; margin: 3px 0; background: #000; color: #fff; }
-        .th-meta { display: flex; justify-content: space-between; font-size: ${isBig ? '12px' : '10.5px'}; font-weight: 800; border-bottom: 1px dashed #000; padding-bottom: 4px; margin-bottom: 5px; }
-        .th-table { width: 100%; border-collapse: collapse; text-align: right; margin: 4px 0; font-size: ${isBig ? '12.5px' : '11px'}; }
-        .th-table td { padding: 2px 1px; }
-        .th-table td.lbl { width: 40%; font-weight: 800; }
-        .th-table td.val { width: 60%; font-weight: 900; }
-        .th-fin-box { border: 1.5px solid #000; border-radius: 4px; padding: 5px 6px; margin: 5px 0; }
-        .th-fin-row { display: flex; justify-content: space-between; font-weight: 800; padding: 2px 0; }
-        .th-fin-highlight { border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; background: #000; color: #fff; padding: 4px 5px; margin: 3px 0; font-size: ${isBig ? '14px' : '12px'}; font-weight: 900; }
-        .th-fin-amt { font-size: ${isBig ? '18px' : '15px'}; font-weight: 900; font-family: monospace; }
-        .th-tafqeet { font-size: ${isBig ? '11.5px' : '10px'}; font-weight: 800; margin-top: 3px; }
-        .th-qr { margin: 6px auto; display: flex; justify-content: center; }
-        .th-footer { border-top: 1.5px dashed #000; padding-top: 5px; margin-top: 5px; font-size: ${isBig ? '11px' : '9.5px'}; font-weight: 800; }
-        .th-cut { margin-top: 6px; font-size: 10px; border-top: 1px dashed #666; padding-top: 4px; }
+        .th-cyshield { border-bottom: 1.5px solid #000; padding-bottom: 2px; margin-bottom: 4px; font-weight: 800; font-size: 11px; }
+        .th-comp { font-size: ${isBig ? '15px' : '13px'}; font-weight: 900; margin: 0; }
+        .th-sector { font-size: ${isBig ? '12px' : '10.5px'}; font-weight: 800; margin: 0; }
+        .th-tax { font-size: 10px; font-weight: bold; margin-bottom: 4px; }
+        .th-table { width: 100%; border-collapse: collapse; text-align: right; margin: 4px 0; font-size: ${isBig ? '11.5px' : '10px'}; border: 1px solid #000; }
+        .th-table td { padding: 3px 4px; border: 1px solid #000; }
+        .th-table td.lbl { width: 42%; font-weight: 800; background: #eee; }
+        .th-table td.val { width: 58%; font-weight: 900; text-align: center; }
+        .th-footer { border-top: 1px solid #000; padding-top: 4px; margin-top: 4px; font-size: 10px; font-weight: 800; }
     </style>
 </head>
 <body>
     <div class="thermal-wrapper">
-        <div class="th-header">
-            <div class="th-comp">${headerInfo.company}</div>
-            <div class="th-sector">${headerInfo.sector}</div>
-            <div class="th-branch">${headerInfo.branchName}</div>
-            <div><span class="th-title">إيصال سداد شحن فوري</span></div>
-            <div style="font-size: 10px; font-weight: bold;">منظومة الشحن الموحد MEEDCO</div>
-        </div>
+        <div class="th-cyshield">تم التطوير بواسطة CyShield</div>
+        <div class="th-comp">الشركة القابضة لكهرباء مصر</div>
+        <div class="th-comp" style="font-size: 13px;">شركة مصر الوسطى لتوزيع الكهرباء</div>
+        <div class="th-sector">قطاع : ${sector}</div>
+        <div class="th-sector">ادارة عامة : ${generalAdmin}</div>
+        <div class="th-sector">ادارة فرعية : ${subAdmin}</div>
+        <div class="th-tax">التسجيل الضريبي : 857-556384</div>
 
-        <div class="th-meta">
-            <span>الإيصال: <strong>${data.id}</strong></span>
-            <span>${data.date}</span>
-        </div>
-
+        <div style="font-weight: 900; font-size: 11px; margin: 2px 0;">بيانات المشترك</div>
         <table class="th-table">
-            <tr><td class="lbl">اسم المشترك:</td><td class="val">${data.customerName}</td></tr>
-            <tr><td class="lbl">كود المشترك:</td><td class="val">${data.customerCode}</td></tr>
-            <tr><td class="lbl">رقم العداد:</td><td class="val">${data.meterNumber}</td></tr>
-            <tr><td class="lbl">المرجع:</td><td class="val">${data.accountReference || '-'}</td></tr>
-            <tr><td class="lbl">الشريحة:</td><td class="val">${data.slice || '1'}</td></tr>
-            <tr><td class="lbl">التتابع:</td><td class="val">${data.sequence || '1'}</td></tr>
-            <tr><td class="lbl">المحصل:</td><td class="val">${data.collectorName || 'مسؤول الشحن'}</td></tr>
+            <tr><td class="lbl">مرجع الحساب</td><td class="val">${data.accountReference || '-'}</td></tr>
+            <tr><td class="lbl">رقم المشترك</td><td class="val">${data.customerCode || '-'}</td></tr>
+            <tr><td class="lbl">اسم المشترك</td><td class="val">${data.customerName || '-'}</td></tr>
+            <tr><td class="lbl">نوع النشاط</td><td class="val">${data.activityName || 'استخدامات منزلية'}</td></tr>
+            <tr><td class="lbl">وصف المكان</td><td class="val">${data.placeDescription || 'شقة'}</td></tr>
+            <tr><td class="lbl">رقم العداد</td><td class="val">${data.meterNumber || '-'}</td></tr>
+            <tr><td class="lbl">العنوان</td><td class="val">${data.address || '-'}</td></tr>
         </table>
 
-        <div class="th-fin-box">
-            <div class="th-fin-row">
-                <span>إجمالي الشحن:</span>
-                <strong>${Number(data.chargeAmount).toFixed(2)} ج.م</strong>
-            </div>
-            ${Number(data.deductions || 0) > 0 ? `
-            <div class="th-fin-row" style="color: #b91c1c;">
-                <span>الخصومات والديون:</span>
-                <span>-${Number(data.deductions).toFixed(2)} ج.م</span>
-            </div>` : ''}
-            <div class="th-fin-highlight">
-                <div>المبلغ المسدد نقداً</div>
-                <div class="th-fin-amt">${Number(data.netCollected).toFixed(2)} ج.م</div>
-            </div>
-            <div class="th-fin-row" style="font-size: 11px;">
-                <span>صافي شحن العداد:</span>
-                <strong>${Number(data.netCredited || data.chargeAmount).toFixed(2)} ج.م</strong>
-            </div>
-            <div class="th-tafqeet">فقط: ${tafqeet} لا غير</div>
-        </div>
+        <div style="font-weight: 900; font-size: 11px; margin: 2px 0;">تفاصيل عملية الشحن</div>
+        <table class="th-table">
+            <tr><td class="lbl">التاريخ</td><td class="val">${data.date || '-'}</td></tr>
+            <tr><td class="lbl">رقم السداد</td><td class="val">${data.id || '-'}</td></tr>
+            <tr><td class="lbl">القائم بالشحن</td><td class="val">${data.collectorName || 'احمد نجيب صالح'}</td></tr>
+            <tr><td class="lbl">القائم بالطباعة</td><td class="val">${data.printerName || loggedInUser?.fullName || 'سناء عبدالستار عبدالعزيز'}</td></tr>
+            <tr><td class="lbl">الرسوم</td><td class="val">${Number(data.fees || 0.05).toFixed(2)}</td></tr>
+            <tr><td class="lbl">الغرامات</td><td class="val">${Number(data.penalties || 0).toFixed(2)}</td></tr>
+            <tr><td class="lbl">رسوم النظافة</td><td class="val">${Number(data.cleaningFee || 10).toFixed(2)}</td></tr>
+            <tr><td class="lbl">نوع السداد</td><td class="val">${data.paymentMethod || 'نقدى'}</td></tr>
+            <tr><td class="lbl">قسط المديونية</td><td class="val">${Number(data.debtInstallment || data.debtsDeducted || 0).toFixed(2)}</td></tr>
+            <tr><td class="lbl">المديونيات المتبقية</td><td class="val">${Number(data.debtsRemaining || 0).toFixed(2)}</td></tr>
+            <tr style="background:#ddd;"><td class="lbl">صافي الشحنة</td><td class="val">${netCredited.toFixed(2)}</td></tr>
+            <tr style="background:#ccc;"><td class="lbl" style="font-weight:900;">المطلوب</td><td class="val" style="font-size:13px; font-weight:900;">${netCollected.toFixed(2)}</td></tr>
+        </table>
 
-        <div class="th-qr">${qrHTML}</div>
-
-        <div class="th-footer">
-            <div>⚠️ يرجى إدخال الكارت في العداد فوراً لتفعيل الشحنة</div>
-            <div>شكراً لتعاملكم معنا • ${data.time || ''}</div>
-        </div>
-
-        <div class="th-cut">---------------------------------------</div>
+        <div class="th-footer">تم التطوير بواسطة CyShield</div>
     </div>
 </body>
 </html>`;
@@ -16958,9 +16842,17 @@ const handlePrintJudicialControlDetails = () => {
     const printStandardChargingReceipt = (receiptData?: any) => {
         const data = receiptData || currentChargingReceiptData || lastChargingReceiptData;
         if (!data) {
-            showToast('لا توجد بيانات إيصال جاهزة للطباعة.', 'warning');
+            showToast('لا توجد بيانات إيصال محددة للطباعة.', 'warning');
             return;
         }
+
+        // If this receipt has an authentic MEEDCO chargeId, open official PDF directly!
+        if (data.chargeId && typeof data.chargeId === 'string' && data.chargeId.length > 20) {
+            const pdfUrl = `http://127.0.0.1:5002/api/customer/receipt-pdf?chargeId=${encodeURIComponent(data.chargeId)}&isThermal=false`;
+            window.open(pdfUrl, '_blank');
+            return;
+        }
+
         const html = generateStandardChargingReceiptHTML(data);
         const printWindow = window.open('', '_blank', 'width=800,height=900');
         if (printWindow) {
@@ -17032,55 +16924,39 @@ const handlePrintJudicialControlDetails = () => {
         const headerNet = document.getElementById('rcpt-header-net');
         if (headerNet) headerNet.textContent = netCredited.toFixed(2);
 
-        // Standard Preview Elements
+        // Standard Preview Elements (مطابقة لمنظومة MEEDCO بالضبط)
         const headerInfo = getDynamicReceiptHeader(data.collectorName);
-        const compTitle = document.getElementById('rcpt-comp-title');
-        if (compTitle) compTitle.textContent = headerInfo.company || 'شركة توزيع كهرباء مصر الوسطى';
-        const sectorTitle = document.getElementById('rcpt-sector-title');
-        if (sectorTitle) sectorTitle.textContent = headerInfo.sector;
-        const branchTitle = document.getElementById('rcpt-branch-title');
-        if (branchTitle) branchTitle.textContent = headerInfo.branchName;
+        const setText = (id: string, text: any) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = (text !== null && text !== undefined && String(text).trim() !== '') ? String(text) : '-';
+        };
 
-        const rcptId = document.getElementById('rcpt-id');
-        if (rcptId) rcptId.textContent = data.id || '-';
-        const rcptDate = document.getElementById('rcpt-date');
-        if (rcptDate) rcptDate.textContent = `${data.date || '-'} ${data.time ? ('- ' + data.time) : ''}`;
-        const rcptPayMethod = document.getElementById('rcpt-pay-method');
-        if (rcptPayMethod) rcptPayMethod.textContent = data.paymentMethod || 'نقدي';
-        const rcptCollector = document.getElementById('rcpt-collector');
-        if (rcptCollector) rcptCollector.textContent = data.collectorName || loggedInUser?.fullName || 'مسؤول الشحن';
+        setText('rcpt-sector-title', data.sectorName || headerInfo.sector || 'المنيا شمال');
+        setText('rcpt-branch-title', data.publicAdministrationName || headerInfo.branchName || 'بنى مزار شرق');
+        setText('rcpt-subadmin-title', data.subAdministrationName || headerInfo.branchName || 'بنى مزار شرق');
 
-        // Customer details
-        const rcptName = document.getElementById('rcpt-cust-name');
-        if (rcptName) rcptName.textContent = data.customerName || '-';
-        const rcptCode = document.getElementById('rcpt-cust-code');
-        if (rcptCode) rcptCode.textContent = data.customerCode || '-';
-        const rcptMeter = document.getElementById('rcpt-meter-num');
-        if (rcptMeter) rcptMeter.textContent = data.meterNumber || '-';
-        const rcptRef = document.getElementById('rcpt-account-ref');
-        if (rcptRef) rcptRef.textContent = data.accountReference || '-';
-        const rcptSlice = document.getElementById('rcpt-slice');
-        if (rcptSlice) rcptSlice.textContent = data.slice || 'الشريحة الأولى';
-        const rcptSeq = document.getElementById('rcpt-seq');
-        if (rcptSeq) rcptSeq.textContent = String(data.sequence || '1');
-        const rcptAddr = document.getElementById('rcpt-cust-addr');
-        if (rcptAddr) rcptAddr.textContent = data.address || '-';
+        setText('rcpt-account-ref', data.accountReference || '-');
+        setText('rcpt-cust-code', data.customerCode || '-');
+        setText('rcpt-cust-name', data.customerName || '-');
+        setText('rcpt-activity-name', data.activityName || 'استخدامات منزلية');
+        setText('rcpt-place-desc', data.placeDescription || 'شقة');
+        setText('rcpt-meter-num', data.meterNumber || '-');
+        setText('rcpt-cust-addr', data.address || '-');
+        setText('rcpt-unit-national-id', data.unitNationalId || '-');
 
-        // Financial table
-        const rcptAmt = document.getElementById('rcpt-charge-amt');
-        if (rcptAmt) rcptAmt.textContent = grossAmt.toFixed(2) + ' ج.م';
-        const rcptFees = document.getElementById('rcpt-fees-amt');
-        if (rcptFees) rcptFees.textContent = Number(data.fees || 0).toFixed(2) + ' ج.م';
-        const rcptCleaning = document.getElementById('rcpt-cleaning-amt');
-        if (rcptCleaning) rcptCleaning.textContent = Number(data.cleaningFee || 0).toFixed(2) + ' ج.م';
-        const rcptDebts = document.getElementById('rcpt-debts-amt');
-        if (rcptDebts) rcptDebts.textContent = Number(data.debtsDeducted || 0).toFixed(2) + ' ج.م';
-        const rcptDeduct = document.getElementById('rcpt-deductions');
-        if (rcptDeduct) rcptDeduct.textContent = totalDeductions.toFixed(2) + ' ج.م';
-        const rcptNetCredited = document.getElementById('rcpt-net-credited');
-        if (rcptNetCredited) rcptNetCredited.textContent = netCredited.toFixed(2) + ' ج.م';
-        const rcptNet = document.getElementById('rcpt-net-collected');
-        if (rcptNet) rcptNet.textContent = netCollected.toFixed(2) + ' ج.م';
+        setText('rcpt-date', data.date || new Date().toLocaleDateString('ar-EG'));
+        setText('rcpt-id', data.id || '-');
+        setText('rcpt-collector', data.collectorName || 'احمد نجيب صالح');
+        setText('rcpt-printer', data.printerName || loggedInUser?.fullName || 'سناء عبدالستار عبدالعزيز');
+        setText('rcpt-fees-amt', Number(data.fees !== undefined ? data.fees : 0.05).toFixed(2));
+        setText('rcpt-penalties', Number(data.penalties || 0).toFixed(2));
+        setText('rcpt-down-payment', Number(data.downPayment || 0).toFixed(2));
+        setText('rcpt-cleaning-amt', Number(data.cleaningFee !== undefined ? data.cleaningFee : 10).toFixed(2));
+        setText('rcpt-pay-method', data.paymentMethod || 'نقدى');
+        setText('rcpt-debt-installment', Number(data.debtInstallment || data.debtsDeducted || 0).toFixed(2));
+        setText('rcpt-debts-remaining', Number(data.debtsRemaining || 0).toFixed(2));
+        setText('rcpt-net-credited', netCredited.toFixed(2));
+        setText('rcpt-net-collected', netCollected.toFixed(2));
 
         // Tafqeet
         const rcptTafqeet = document.getElementById('rcpt-tafqeet-text');

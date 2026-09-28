@@ -2576,23 +2576,224 @@ async function getCustomerMeterMovementsLive(param) {
     if (!param) {
         return { success: false, message: 'يرجى تحديد المشترك أو رقم العداد' };
     }
-    let payload = {};
-    if (typeof param === 'object') {
-        payload = { customerId: param.customerId || 0, code: param.code || '' };
+
+    let customerId = null;
+    let customerCode = '';
+
+    if (typeof param === 'object' && param !== null) {
+        customerId = param.customerId || null;
+        customerCode = param.code || '';
     } else {
         const q = String(param).trim();
-        payload = { customerId: 0, code: q };
+        customerCode = q;
+
+        // 1. Try to search by meter number first via /Customer/GetCustomerByMeterNumber/{q}
+        try {
+            const mRes = await apiMeedcoRequest('/Customer/GetCustomerByMeterNumber/' + encodeURIComponent(q), 'GET');
+            if (mRes && mRes.data && (mRes.data.customerId || mRes.data.id || mRes.data.code)) {
+                customerId = mRes.data.customerId || mRes.data.id || null;
+                if (mRes.data.code) customerCode = mRes.data.code;
+            }
+        } catch (e) {
+            console.warn('[MEEDCO] GetCustomerByMeterNumber check notice:', e.message);
+        }
+
+        // 2. If not found by meter number, try /Customer/GetAll to resolve customer
+        if (!customerId) {
+            try {
+                const allRes = await apiMeedcoRequest('/Customer/GetAll', 'POST', {
+                    searchTerm: q,
+                    paginator: { page: 1, pageSize: 5 },
+                    filter: {},
+                    sorting: { column: 'id', direction: 'desc' },
+                    grouping: {}
+                });
+                if (allRes && allRes.data && Array.isArray(allRes.data.result) && allRes.data.result.length > 0) {
+                    const match = allRes.data.result.find(x =>
+                        String(x.code || '').trim() === q ||
+                        String(x.meterNumber || '').trim() === q ||
+                        String(x.codeNumber || '').trim() === q ||
+                        String(x.nationalId || '').trim() === q
+                    ) || allRes.data.result[0];
+
+                    if (match) {
+                        customerId = match.id || null;
+                        if (match.code) customerCode = match.code;
+                    }
+                }
+            } catch (e) {
+                console.warn('[MEEDCO] Search customer in GetAll notice:', e.message);
+            }
+        }
     }
 
     try {
+        const payload = {
+            customerId: customerId || null,
+            code: customerCode || ''
+        };
         const res = await apiMeedcoRequest('/Customer/GetCustomerMeterMovements/', 'POST', payload);
         if (res && res.data) {
+            // Format account reference if returned as an object
+            if (res.data.accountNumberCustomer && typeof res.data.accountNumberCustomer === 'object') {
+                const acc = res.data.accountNumberCustomer;
+                res.data.accountNumberCustomerFormatted = `${acc.accountNumberSubAdmin || '526'}/${acc.accountNumberRegion || '11'}/${acc.accountNumberDaily || '1'}/${acc.accountNumberAccount || '21'}/${acc.accountNumberSubAccount || '0'}/${acc.accountNumberActivity || '3'}`;
+            }
+
+            // Ensure codeNumber is set to the real meter number
+            if (!res.data.codeNumber && Array.isArray(res.data.meterMoves) && res.data.meterMoves.length > 0) {
+                res.data.codeNumber = res.data.meterMoves[0].meterNumber;
+            }
+
             return { success: true, data: res.data };
         }
         return { success: false, message: res?.message || 'لم يتم العثور على حركات للعداد' };
     } catch (err) {
         return { success: false, message: err.message };
     }
+}
+
+/**
+ * Fetch official Receipt PDF from MEEDCO API
+ * POST /ChargingReports/ReceiptPaymentPDF
+ */
+async function getReceiptPaymentPDFLive(chargeId, isThermalReciept = false) {
+    if (!chargeId) {
+        throw new Error('رقم الحركة (chargeId) مطلوب لتوليد إيصال MEEDCO');
+    }
+
+    let authToken = getActiveAuthToken();
+    if (!authToken) {
+        try {
+            await ensureValidSession(true);
+            authToken = getActiveAuthToken();
+        } catch (e) {}
+    }
+
+    const postData = JSON.stringify({
+        fromDate: null,
+        toDate: null,
+        CustomerTypeIds: null,
+        ProvinceIds: null,
+        sectorIds: null,
+        publicAdminIds: null,
+        commercialSectorIds: null,
+        purposesOfUseIds: null,
+        subAdminIds: null,
+        regionIds: null,
+        engineerCode: '',
+        accountRefrence: '',
+        SubscriptionTypesIds: null,
+        activityIds: null,
+        placeDescriptionIds: null,
+        meterCompanyIds: null,
+        meterIds: null,
+        customerNumber: '',
+        meterNumber: '',
+        customerName: '',
+        reChargeCenters: null,
+        paymentType: null,
+        receiptNumber: '',
+        chargeId: chargeId,
+        isThermalReciept: Boolean(isThermalReciept)
+    });
+
+    return new Promise((resolve, reject) => {
+        const req = https.request({
+            hostname: MEEDCO_API_HOST,
+            port: 443,
+            path: '/ChargingReports/ReceiptPaymentPDF',
+            method: 'POST',
+            rejectUnauthorized: false,
+            headers: {
+                'Authorization': 'Bearer ' + (authToken || ''),
+                'Origin': MEEDCO_APP_ORIGIN,
+                'Referer': MEEDCO_APP_ORIGIN + '/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        }, (res) => {
+            const chunks = [];
+            res.on('data', c => chunks.push(c));
+            res.on('end', () => {
+                const buf = Buffer.concat(chunks);
+                if (res.statusCode === 200 && buf.length > 200) {
+                    resolve({ success: true, buffer: buf, contentType: 'application/pdf' });
+                } else {
+                    let errMsg = 'فشل استخراج ملف الإيصال من المنظومة (كود ' + res.statusCode + ')';
+                    try {
+                        const parsed = JSON.parse(buf.toString('utf8'));
+                        errMsg = parsed.message || parsed.title || errMsg;
+                    } catch (e) {}
+                    resolve({ success: false, message: errMsg });
+                }
+            });
+        });
+        req.on('error', (e) => resolve({ success: false, message: e.message }));
+        req.setTimeout(15000, () => {
+            req.destroy();
+            resolve({ success: false, message: 'انتهت مهلة استخراج الإيصال من الخادم' });
+        });
+        req.write(postData);
+        req.end();
+    });
+}
+
+/**
+ * Fetch official Customer Meter Movements PDF from MEEDCO API
+ * GET /CustomersReports/CustomerMeterMovementsPDF/{customerId}
+ */
+async function getCustomerMeterMovementsPDFLive(customerId) {
+    if (!customerId) {
+        throw new Error('معرف المشترك مطلوب لتوليد تقرير الحركات');
+    }
+
+    let authToken = getActiveAuthToken();
+    if (!authToken) {
+        try {
+            await ensureValidSession(true);
+            authToken = getActiveAuthToken();
+        } catch (e) {}
+    }
+
+    return new Promise((resolve) => {
+        const req = https.request({
+            hostname: MEEDCO_API_HOST,
+            port: 443,
+            path: '/CustomersReports/CustomerMeterMovementsPDF/' + encodeURIComponent(customerId),
+            method: 'GET',
+            rejectUnauthorized: false,
+            headers: {
+                'Authorization': 'Bearer ' + (authToken || ''),
+                'Origin': MEEDCO_APP_ORIGIN,
+                'Referer': MEEDCO_APP_ORIGIN + '/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+            }
+        }, (res) => {
+            const chunks = [];
+            res.on('data', c => chunks.push(c));
+            res.on('end', () => {
+                const buf = Buffer.concat(chunks);
+                if (res.statusCode === 200 && buf.length > 200) {
+                    resolve({ success: true, buffer: buf, contentType: 'application/pdf' });
+                } else {
+                    let errMsg = 'فشل استخراج تقرير الحركات من المنظومة (كود ' + res.statusCode + ')';
+                    try {
+                        const parsed = JSON.parse(buf.toString('utf8'));
+                        errMsg = parsed.message || parsed.title || errMsg;
+                    } catch (e) {}
+                    resolve({ success: false, message: errMsg });
+                }
+            });
+        });
+        req.on('error', (e) => resolve({ success: false, message: e.message }));
+        req.setTimeout(20000, () => {
+            req.destroy();
+            resolve({ success: false, message: 'انتهت مهلة استخراج التقرير من الخادم' });
+        });
+        req.end();
+    });
 }
 
 
@@ -2667,6 +2868,8 @@ module.exports = {
     ensureValidSession,
     getMeedcoConfig,
     getCustomerMeterMovementsLive,
+    getReceiptPaymentPDFLive,
+    getCustomerMeterMovementsPDFLive,
     getActiveAuthToken,
     getUcsToken,
     apiMeedcoRequest,

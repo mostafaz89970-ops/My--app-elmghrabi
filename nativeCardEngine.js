@@ -1091,22 +1091,21 @@ async function getCustomerMeterMovements(term) {
         String(c.nationalId).trim() === q
     );
 
-    if (card) {
-        const moves = [
-            {
-                id: 101,
-                meterNumber: card.meterNumber,
-                changeType: 'شحن كارت',
-                chargeValue: Number(card.remainingBalance || 100).toFixed(2),
-                recieptNumber: 'CHG-20250926-01',
-                moveDate: new Date().toLocaleDateString('ar-EG') + ' 10:30 ص',
-                rechargeCenterCode: 'مركز شحن رئيسي',
-                changerName: 'مسؤول الشحن',
-                status: 'ناجح',
-                isCharging: true,
-                isNewCharge: false
-            }
-        ];
+    // Only return local card if it has actual saved charges
+    if (card && Array.isArray(card.charges) && card.charges.length > 0) {
+        const moves = card.charges.map((c, i) => ({
+            id: c.id || (100 + i),
+            meterNumber: card.meterNumber,
+            changeType: c.chargeType || 'شحن كارت',
+            chargeValue: Number(c.amount || 0).toFixed(2),
+            recieptNumber: c.receiptNumber || ('REC-' + (i + 1)),
+            moveDate: c.date || new Date().toLocaleDateString('ar-EG'),
+            rechargeCenterCode: c.centerName || 'مركز شحن رئيسي',
+            changerName: c.cashierName || 'مسؤول الشحن',
+            status: 'ناجح',
+            isCharging: true,
+            isNewCharge: false
+        }));
 
         return {
             success: true,
@@ -1119,12 +1118,12 @@ async function getCustomerMeterMovements(term) {
                 oldCode: card.oldCode || '-',
                 codeNumber: card.meterNumber,
                 unitNationalId: card.unitNationalId || '-',
-                sectorName: 'قطاع توزيع كهرباء بني سويف',
-                publicAdministrationName: 'الإدارة العامة للمبيعات',
-                subAdministrationName: 'هندسة غرب',
+                sectorName: card.sector || 'المنيا شمال',
+                publicAdministrationName: card.generalAdmin || 'بنى مزار شرق',
+                subAdministrationName: card.subAdmin || 'بنى مزار شرق',
                 activityName: card.activityName || 'منزلي كودي',
-                totalCharges: 1,
-                totalRechargeAmountOnMeter: card.remainingBalance || 100,
+                totalCharges: moves.length,
+                totalRechargeAmountOnMeter: moves.reduce((sum, m) => sum + Number(m.chargeValue || 0), 0),
                 accountNumberCustomer: card.accountReference || '-',
                 meterMoves: moves
             }
@@ -1133,8 +1132,24 @@ async function getCustomerMeterMovements(term) {
 
     return {
         success: false,
-        message: `لم يتم العثور على حركات للعداد: ${q}`
+        message: `لم يتم العثور على أي حركات مسجلة للعداد بالبحث: ${q}`
     };
+}
+
+async function getReceiptPDF(chargeId, isThermalReciept = false) {
+    const unifiedClient = require('./unifiedCardClient');
+    if (unifiedClient && typeof unifiedClient.getReceiptPaymentPDFLive === 'function') {
+        return await unifiedClient.getReceiptPaymentPDFLive(chargeId, isThermalReciept);
+    }
+    return { success: false, message: 'خدمة استخراج إيصال MEEDCO غير متوفرة' };
+}
+
+async function getCustomerMeterMovementsPDF(customerId) {
+    const unifiedClient = require('./unifiedCardClient');
+    if (unifiedClient && typeof unifiedClient.getCustomerMeterMovementsPDFLive === 'function') {
+        return await unifiedClient.getCustomerMeterMovementsPDFLive(customerId);
+    }
+    return { success: false, message: 'خدمة استخراج تقرير الحركات غير متوفرة' };
 }
 
 
@@ -1313,6 +1328,8 @@ module.exports = {
     getMeedcoStatus,
     getMeedcoHierarchy,
     getCustomerMeterMovements,
+    getReceiptPDF,
+    getCustomerMeterMovementsPDF,
     getReaderStatus,
     readSmartCard,
     readCustomerCard,

@@ -128,6 +128,47 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // 7.3 Customer Receipt Payment PDF (إيصال السداد الرسمي MEEDCO)
+            if (pathname === '/api/customer/receipt-pdf' || pathname === '/api/meedco/receipt-pdf') {
+                const body = await getBody();
+                const chargeId = url.searchParams.get('chargeId') || body.chargeId || url.searchParams.get('id') || body.id;
+                const isThermal = (url.searchParams.get('isThermal') === 'true' || url.searchParams.get('thermal') === 'true' || body.isThermal === true || body.isThermalReciept === true);
+                const result = await nativeEngine.getReceiptPDF(chargeId, isThermal);
+                if (result && result.success && result.buffer) {
+                    res.writeHead(200, {
+                        'Content-Type': 'application/pdf',
+                        'Content-Disposition': 'inline; filename="receipt-' + (chargeId || 'meedco') + '.pdf"',
+                        'Content-Length': result.buffer.length,
+                        'Access-Control-Allow-Origin': '*'
+                    });
+                    res.end(result.buffer);
+                    return;
+                }
+                res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify(result || { success: false, message: 'فشل استخراج ملف الإيصال' }));
+                return;
+            }
+
+            // 7.4 Customer Meter Movements Statement PDF (تقرير حركات العداد الرسمي MEEDCO)
+            if (pathname === '/api/customer/movements-pdf' || pathname === '/api/meedco/movements-pdf') {
+                const body = await getBody();
+                const customerId = url.searchParams.get('customerId') || body.customerId || url.searchParams.get('id') || body.id;
+                const result = await nativeEngine.getCustomerMeterMovementsPDF(customerId);
+                if (result && result.success && result.buffer) {
+                    res.writeHead(200, {
+                        'Content-Type': 'application/pdf',
+                        'Content-Disposition': 'inline; filename="meter-movements-' + (customerId || 'meedco') + '.pdf"',
+                        'Content-Length': result.buffer.length,
+                        'Access-Control-Allow-Origin': '*'
+                    });
+                    res.end(result.buffer);
+                    return;
+                }
+                res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify(result || { success: false, message: 'فشل استخراج تقرير حركات العداد' }));
+                return;
+            }
+
             // 7.1 Search Customer by Chassis / Code
             if (pathname === '/api/customer/search' || pathname === '/api/customer-search') {
                 const term = url.searchParams.get('term') || url.searchParams.get('q');
