@@ -2640,9 +2640,14 @@ async function getCustomerMeterMovementsLive(param) {
                 res.data.accountNumberCustomerFormatted = `${acc.accountNumberSubAdmin || '526'}/${acc.accountNumberRegion || '11'}/${acc.accountNumberDaily || '1'}/${acc.accountNumberAccount || '21'}/${acc.accountNumberSubAccount || '0'}/${acc.accountNumberActivity || '3'}`;
             }
 
-            // Ensure codeNumber is set to the real meter number
-            if (!res.data.codeNumber && Array.isArray(res.data.meterMoves) && res.data.meterMoves.length > 0) {
-                res.data.codeNumber = res.data.meterMoves[0].meterNumber;
+            // Ensure meterNumber and codeNumber are set to the real meter chassis number
+            const realMeterNumber = (Array.isArray(res.data.meterMoves) && res.data.meterMoves.length > 0 && res.data.meterMoves[0].meterNumber)
+                ? String(res.data.meterMoves[0].meterNumber).trim()
+                : null;
+            if (realMeterNumber) {
+                res.data.meterNumber = realMeterNumber;
+            } else if (res.data.codeNumber) {
+                res.data.meterNumber = String(res.data.codeNumber);
             }
 
             return { success: true, data: res.data };

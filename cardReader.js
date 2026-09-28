@@ -32,6 +32,9 @@ module.exports = {
     issueReplacementWithoutCharge: nativeEngine.issueReplacementWithoutCharge,
     issueReplacementWithCharge: nativeEngine.issueReplacementWithCharge,
     searchCustomer: nativeEngine.searchCustomer,
+    getCustomerMeterMovements: nativeEngine.getCustomerMeterMovements,
+    getCustomerMeterMovementsPDF: nativeEngine.getCustomerMeterMovementsPDF,
+    getReceiptPDF: nativeEngine.getReceiptPDF,
     getCardStore: nativeEngine.getCardStore,
     saveCardStore: nativeEngine.saveCardStore
 };

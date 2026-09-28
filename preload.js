@@ -32,3 +32,6 @@ contextBridge.exposeInMainWorld('issueReplacementWithoutCharge', (params) => ipc
 contextBridge.exposeInMainWorld('issueReplacementWithCharge', (params) => ipcRenderer.invoke('customer-card:replace-with-charge', params));
 contextBridge.exposeInMainWorld('getCustomerChargingDetails', (customerId) => ipcRenderer.invoke('customer-card:charging-details', customerId));
 contextBridge.exposeInMainWorld('searchCustomer', (term) => ipcRenderer.invoke('customer:search', term));
+contextBridge.exposeInMainWorld('getCustomerMeterMovements', (term) => ipcRenderer.invoke('customer:movements', term));
+contextBridge.exposeInMainWorld('getCustomerMeterMovementsPDF', (customerId) => ipcRenderer.invoke('customer:movements-pdf', customerId));
+contextBridge.exposeInMainWorld('getReceiptPDF', (chargeId, isThermal) => ipcRenderer.invoke('customer:receipt-pdf', chargeId, isThermal));

@@ -4983,27 +4983,41 @@ const handlePrintJudicialControlDetails = () => {
             banner.innerHTML = `
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="display:inline-block; width:16px; height:16px; border:2px solid #1e40af; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite;"></span>
-                    <span>يتم تحميل البيانات الآن... جاري استدعاء سجل حركات العداد من السيرفر</span>
+                    <span>يتم تحميل البيانات الآن... جاري استدعاء سجل حركات العداد من المنظومة الأساسية (MEEDCO)</span>
                 </div>
             `;
         }
 
         try {
             let res: any = null;
-            // 1. Check local backend server bridge (port 5002) which forwards to MEEDCO API
-            try {
-                res = await fetch('http://127.0.0.1:5002/api/customer/movements?term=' + encodeURIComponent(q)).then(r => r.json()).catch(() => null);
-            } catch (e) {
-                console.warn('Backend movements fetch notice:', e);
+
+            // 1. Try direct Electron IPC bridge first
+            if (typeof (window as any).getCustomerMeterMovements === 'function') {
+                try {
+                    res = await (window as any).getCustomerMeterMovements(q);
+                } catch (ipcErr: any) {
+                    console.warn('IPC getCustomerMeterMovements notice:', ipcErr);
+                }
+            }
+
+            // 2. If IPC not available or returned no data, check local backend server bridge (port 5002)
+            if (!res || !res.success || !res.data) {
+                try {
+                    const serverRes = await fetch('http://127.0.0.1:5002/api/customer/movements?term=' + encodeURIComponent(q)).then(r => r.json()).catch(() => null);
+                    if (serverRes && (serverRes.success || serverRes.data)) {
+                        res = serverRes;
+                    }
+                } catch (e) {
+                    console.warn('Backend movements fetch notice:', e);
+                }
             }
 
             let cust: any = res?.data || res?.customer;
 
-            // 2. If not found via server, lookup from local cardOperations (real saved operations)
+            // 3. Fallback only to real saved cardOperations in local database (charges, replacements)
+            // NEVER generate fake demo records from state.meters!
             if (!cust) {
                 const headerInfo = getDynamicReceiptHeader();
-
-                // Search in real saved cardOperations first (all charges, replacements, etc.)
                 const allCardOps: any[] = ((state as any).cardOperations || []);
                 const matchedOps = allCardOps.filter((op: any) =>
                     String(op.meterNumber || '').trim() === q ||
@@ -5012,20 +5026,10 @@ const handlePrintJudicialControlDetails = () => {
                     String(op.customerName || '').toLowerCase().includes(q.toLowerCase())
                 );
 
-                // Also search in state.meters to get customer info
-                const local = state.meters.find(m =>
-                    String(m.meterChassisNumber || '').trim() === q ||
-                    String(m.subscriptionCode || '').trim() === q ||
-                    String(m.id || '').trim() === q ||
-                    String(m.nationalId || '').trim() === q ||
-                    String(m.subscriberName || '').toLowerCase().includes(q.toLowerCase())
-                );
-
-                if (matchedOps.length > 0 || local) {
-                    // Build movements from real cardOperations
+                if (matchedOps.length > 0) {
                     const localMoves: any[] = matchedOps.map((op: any, idx: number) => ({
                         id: op.id || (100 + idx),
-                        meterNumber: op.meterNumber || (local?.meterChassisNumber) || q,
+                        meterNumber: op.meterNumber || q,
                         changeType: op.operationTypeName || (
                                     op.operationType === 'charge' ? 'شحن كارت' :
                                     op.operationType === 'replacement_no_charge' ? 'كارت بديل بدون شحن' :
@@ -5038,7 +5042,6 @@ const handlePrintJudicialControlDetails = () => {
                         status: op.status || 'ناجح',
                         isCharging: op.operationType === 'charge',
                         isNewCharge: false,
-                        // extra detail for receipt
                         fees: Number(op.fees || 0),
                         cleaningFee: Number(op.cleaningFee || 0),
                         debtsDeducted: Number(op.debtsDeducted || 0),
@@ -5047,35 +5050,34 @@ const handlePrintJudicialControlDetails = () => {
                         cardPrice: Number(op.cardPrice || 0)
                     }));
 
-                    const baseCustomer = local || (matchedOps.length > 0 ? matchedOps[0] : null);
-                    const meterNum = local?.meterChassisNumber || matchedOps[0]?.meterNumber || q;
-                    const custCode = local?.subscriptionCode || matchedOps[0]?.customerCode || q;
-                    const custName = local?.subscriberName || local?.codySecondName || matchedOps[0]?.customerName || 'مشترك';
+                    const baseOp = matchedOps[0];
                     const totalCharged = localMoves.reduce((sum: number, m: any) => sum + Number(m.chargeValue || 0), 0);
 
                     cust = {
-                        id: local?.id || custCode,
-                        name: custName,
-                        code: custCode,
-                        nationalId: local?.nationalId || matchedOps[0]?.nationalId || '-',
-                        address: local?.address || matchedOps[0]?.address || '-',
-                        oldCode: local?.oldCode || '-',
-                        codeNumber: meterNum,
-                        unitNationalId: local?.unitNationalId || '-',
-                        sectorName: local?.sector || headerInfo.sector,
-                        publicAdministrationName: local?.generalAdmin || 'الإدارة العامة للمبيعات',
-                        subAdministrationName: local?.subAdmin || headerInfo.branchName,
-                        activityName: local?.meterType || local?.activityName || matchedOps[0]?.activityName || 'منزلي كودي',
-                        totalCharges: localMoves.length,
+                        id: baseOp.id || baseOp.customerCode || q,
+                        name: baseOp.customerName || 'مشترك مسجل محلياً',
+                        code: baseOp.customerCode || q,
+                        nationalId: baseOp.nationalId || '-',
+                        address: baseOp.address || '-',
+                        oldCode: '-',
+                        codeNumber: baseOp.meterNumber || q,
+                        meterNumber: baseOp.meterNumber || q,
+                        unitNationalId: '-',
+                        sectorName: headerInfo.sector,
+                        publicAdministrationName: headerInfo.branchName,
+                        subAdministrationName: headerInfo.branchName,
+                        activityName: baseOp.activityName || 'منزلي كودي',
+                        totalCharges: totalCharged,
                         totalRechargeAmountOnMeter: totalCharged,
-                        accountNumberCustomer: local?.accountReference || `${local?.accountRefF || '00'}/${local?.accountRefH || '00'}/${local?.accountRefY || '00'}/${local?.accountRefM || '00'}`,
+                        accountNumberCustomer: '-',
+                        accountNumberCustomerFormatted: '-',
                         meterMoves: localMoves
                     };
                 }
             }
 
             if (!cust) {
-                const errMsg = `لم يتم العثور على أي بيانات أو حركات للعداد بالبحث: ${q}`;
+                const errMsg = `لم يتم العثور على أي حركات مسجلة للعداد بالمنظومة المركزية (MEEDCO). يرجى التأكد من صحة رقم العداد أو كود المشترك (${q}).`;
                 showToast(errMsg, 'error');
                 if (banner) {
                     banner.style.display = 'block';
@@ -5084,6 +5086,8 @@ const handlePrintJudicialControlDetails = () => {
                     banner.style.border = '1px solid #fecaca';
                     banner.textContent = errMsg;
                 }
+                resetMeterMovementsUI();
+                if (inp) inp.value = q;
                 return;
             }
 
@@ -5096,10 +5100,10 @@ const handlePrintJudicialControlDetails = () => {
                 banner.style.backgroundColor = '#f0fdf4';
                 banner.style.color = '#166534';
                 banner.style.border = '1px solid #bbf7d0';
-                banner.innerHTML = `<strong>تم جلب حركات العداد بنجاح!</strong> المشترك: ${cust.name || cust.code} | عدد العمليات والحركات: ${cust.meterMoves ? cust.meterMoves.length : 0}`;
+                banner.innerHTML = `<strong>تم جلب بيانات وحركات العداد بنجاح من المنظومة الأساسية!</strong> المشترك: <strong>${cust.name || cust.code}</strong> | عدد العمليات: <strong>${cust.meterMoves ? cust.meterMoves.length : 0}</strong>`;
             }
 
-            showToast(`تم عرض حركات العداد للمشترك: ${cust.name || cust.code}`, 'success');
+            showToast(`تم عرض حركات العداد الفعلية للمشترك: ${cust.name || cust.code}`, 'success');
 
         } catch (err: any) {
             console.error('Error in searchMeterMovements:', err);
@@ -5111,15 +5115,20 @@ const handlePrintJudicialControlDetails = () => {
         // Update input fields
         const setVal = (id: string, val: any) => {
             const el = document.getElementById(id) as HTMLInputElement | null;
-            if (el) el.value = (val !== null && val !== undefined && String(val).trim() !== '') ? String(val) : '-';
+            if (el) {
+                const s = (val !== null && val !== undefined) ? String(val).trim() : '';
+                el.value = (s !== '' && s !== '[object Object]') ? s : '-';
+            }
         };
+
+        const meterNum = cust.meterNumber || cust.meterMoves?.[0]?.meterNumber || cust.codeNumber;
 
         setVal('mm-cust-code', cust.code);
         setVal('mm-cust-name', cust.name);
         setVal('mm-cust-national-id', cust.nationalId);
         setVal('mm-cust-address', cust.address);
         setVal('mm-cust-old-code', cust.oldCode);
-        setVal('mm-meter-number', cust.codeNumber || cust.meterNumber);
+        setVal('mm-meter-number', meterNum);
         setVal('mm-unit-national-id', cust.unitNationalId);
         setVal('mm-sector-name', cust.sectorName);
         setVal('mm-public-admin', cust.publicAdministrationName);
@@ -5127,13 +5136,26 @@ const handlePrintJudicialControlDetails = () => {
         setVal('mm-activity-name', cust.activityName);
 
         const totalChargesEl = document.getElementById('mm-total-charges') as HTMLInputElement | null;
-        if (totalChargesEl) totalChargesEl.value = String(cust.totalCharges || 0);
+        if (totalChargesEl) {
+            totalChargesEl.value = Number(cust.totalCharges || 0).toFixed(2) + ' ج.م';
+        }
 
         const totalOnMeterEl = document.getElementById('mm-total-on-meter') as HTMLInputElement | null;
-        if (totalOnMeterEl) totalOnMeterEl.value = Number(cust.totalRechargeAmountOnMeter || 0).toFixed(2) + ' ج.م';
+        if (totalOnMeterEl) {
+            totalOnMeterEl.value = Number(cust.totalRechargeAmountOnMeter || 0).toFixed(2) + ' ج.م';
+        }
 
         const accRefSpan = document.getElementById('mm-account-ref');
-        if (accRefSpan) accRefSpan.textContent = cust.accountNumberCustomer || '-';
+        if (accRefSpan) {
+            let formattedRef = cust.accountNumberCustomerFormatted;
+            if (!formattedRef && typeof cust.accountNumberCustomer === 'string') {
+                formattedRef = cust.accountNumberCustomer;
+            } else if (!formattedRef && cust.accountNumberCustomer && typeof cust.accountNumberCustomer === 'object') {
+                const a = cust.accountNumberCustomer;
+                formattedRef = `${a.accountNumberSubAdmin || '526'}/${a.accountNumberRegion || '11'}/${a.accountNumberDaily || '1'}/${a.accountNumberAccount || '21'}/${a.accountNumberSubAccount || '0'}/${a.accountNumberActivity || '3'}`;
+            }
+            accRefSpan.textContent = (formattedRef && formattedRef !== '[object Object]') ? formattedRef : '-';
+        }
 
         // Render Table Rows
         const tbody = document.getElementById('mm-moves-tbody');
@@ -5154,6 +5176,17 @@ const handlePrintJudicialControlDetails = () => {
             return;
         }
 
+        const formatMoveDate = (d: any) => {
+            if (!d) return '-';
+            try {
+                const dt = new Date(d);
+                if (!isNaN(dt.getTime())) {
+                    return dt.toLocaleDateString('ar-EG') + ' ' + dt.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
+                }
+            } catch (e) {}
+            return String(d).replace('T', ' ').slice(0, 19);
+        };
+
         let rowsHtml = '';
         moves.forEach((m: any) => {
             const chgType = m.changeType || 'شحن كارت';
@@ -5162,7 +5195,7 @@ const handlePrintJudicialControlDetails = () => {
 
             rowsHtml += `
                 <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.15s ease;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
-                    <td style="padding: 10px 12px; font-weight: 800; font-family: monospace;">${m.meterNumber || cust.codeNumber || '-'}</td>
+                    <td style="padding: 10px 12px; font-weight: 800; font-family: monospace;">${m.meterNumber || meterNum || '-'}</td>
                     <td style="padding: 10px 12px;">
                         <span style="background: ${badgeBg}; color: ${badgeColor}; padding: 3px 8px; border-radius: 6px; font-weight: 800; font-size: 0.85rem;">
                             ${chgType}
@@ -5170,7 +5203,7 @@ const handlePrintJudicialControlDetails = () => {
                     </td>
                     <td style="padding: 10px 12px; font-family: monospace; font-weight: 800; color: #15803d; text-align: center;">${Number(m.chargeValue || 0).toFixed(2)} ج.م</td>
                     <td style="padding: 10px 12px; font-family: monospace; font-weight: 700; color: #0284c7;">${m.recieptNumber || '-'}</td>
-                    <td style="padding: 10px 12px; font-weight: 600;">${m.moveDate || '-'}</td>
+                    <td style="padding: 10px 12px; font-weight: 600;">${formatMoveDate(m.moveDate)}</td>
                     <td style="padding: 10px 12px;">${m.rechargeCenterCode || 'مركز شحن'}</td>
                     <td style="padding: 10px 12px; font-weight: 700;">${m.changerName || 'المحصل'}</td>
                     <td style="padding: 10px 12px; text-align: center;">
@@ -5206,8 +5239,8 @@ const handlePrintJudicialControlDetails = () => {
                         time: move.moveDate && String(move.moveDate).includes('T') ? String(move.moveDate).split('T')[1].slice(0, 8) : new Date().toLocaleTimeString('ar-EG'),
                         customerName: cust.name,
                         customerCode: cust.code,
-                        meterNumber: move.meterNumber || cust.codeNumber,
-                        accountReference: cust.accountNumberCustomerFormatted || cust.accountNumberCustomer || '-',
+                        meterNumber: move.meterNumber || meterNum,
+                        accountReference: cust.accountNumberCustomerFormatted || (typeof cust.accountNumberCustomer === 'string' ? cust.accountNumberCustomer : '-'),
                         address: cust.address || '-',
                         nationalId: cust.nationalId || '-',
                         unitNationalId: cust.unitNationalId || '-',
@@ -5270,13 +5303,42 @@ const handlePrintJudicialControlDetails = () => {
         }
     };
 
-    const printMeterMovementsReport = () => {
+    const printMeterMovementsReport = async () => {
         if (!currentMeterMovementsCustomer) {
             showToast('يرجى البحث عن مشترك أولاً لعرض وطباعة تقرير حركات العداد.', 'warning');
             return;
         }
 
         const cust = currentMeterMovementsCustomer;
+        const isMeedcoCustomer = typeof cust.id === 'string' && cust.id.length > 20;
+
+        // 1. Try to open the official MEEDCO PDF report first
+        if (isMeedcoCustomer) {
+            if (typeof (window as any).getCustomerMeterMovementsPDF === 'function') {
+                try {
+                    showToast('جاري استدعاء تقرير حركات العداد الرسمي من المنظومة المركزية...', 'info');
+                    const pdfRes = await (window as any).getCustomerMeterMovementsPDF(cust.id);
+                    if (pdfRes && pdfRes.success && pdfRes.buffer) {
+                        const blob = new Blob([new Uint8Array(pdfRes.buffer)], { type: 'application/pdf' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        window.open(blobUrl, '_blank');
+                        return;
+                    }
+                } catch (ipcErr) {
+                    console.warn('IPC getCustomerMeterMovementsPDF notice:', ipcErr);
+                }
+            }
+
+            try {
+                const pdfUrl = `http://127.0.0.1:5002/api/customer/movements-pdf?customerId=${encodeURIComponent(cust.id)}`;
+                const check = await fetch(pdfUrl, { method: 'HEAD' }).catch(() => null);
+                if (check && check.ok) {
+                    window.open(pdfUrl, '_blank');
+                    return;
+                }
+            } catch (e) {}
+        }
+
         const headerInfo = getDynamicReceiptHeader(loggedInUser?.fullName);
         const logoSrc = state.settings.companyLogo;
         const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 65px; max-width: 85px; object-fit: contain;">` : '';
@@ -5291,7 +5353,7 @@ const handlePrintJudicialControlDetails = () => {
             totalChargeSum += val;
             rowsHtml += `
                 <tr>
-                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1; font-family: monospace; font-weight: bold;">${m.meterNumber || cust.codeNumber}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1; font-family: monospace; font-weight: bold;">${m.meterNumber || cust.meterNumber || cust.codeNumber}</td>
                     <td style="padding: 6px 8px; border: 1px solid #cbd5e1; font-weight: bold;">${m.changeType}</td>
                     <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-family: monospace; font-weight: bold;">${val.toFixed(2)} ج.م</td>
                     <td style="padding: 6px 8px; border: 1px solid #cbd5e1; font-family: monospace;">${m.recieptNumber || '-'}</td>
@@ -16839,7 +16901,7 @@ const handlePrintJudicialControlDetails = () => {
 </html>`;
     };
 
-    const printStandardChargingReceipt = (receiptData?: any) => {
+    const printStandardChargingReceipt = async (receiptData?: any) => {
         const data = receiptData || currentChargingReceiptData || lastChargingReceiptData;
         if (!data) {
             showToast('لا توجد بيانات إيصال محددة للطباعة.', 'warning');
@@ -16848,9 +16910,31 @@ const handlePrintJudicialControlDetails = () => {
 
         // If this receipt has an authentic MEEDCO chargeId, open official PDF directly!
         if (data.chargeId && typeof data.chargeId === 'string' && data.chargeId.length > 20) {
-            const pdfUrl = `http://127.0.0.1:5002/api/customer/receipt-pdf?chargeId=${encodeURIComponent(data.chargeId)}&isThermal=false`;
-            window.open(pdfUrl, '_blank');
-            return;
+            // 1. Try IPC directly
+            if (typeof (window as any).getReceiptPDF === 'function') {
+                try {
+                    showToast('جاري استدعاء ملف الإيصال الرسمي المعتمد من المنظومة...', 'info');
+                    const pdfRes = await (window as any).getReceiptPDF(data.chargeId, false);
+                    if (pdfRes && pdfRes.success && pdfRes.buffer) {
+                        const blob = new Blob([new Uint8Array(pdfRes.buffer)], { type: 'application/pdf' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        window.open(blobUrl, '_blank');
+                        return;
+                    }
+                } catch (ipcErr) {
+                    console.warn('IPC getReceiptPDF notice:', ipcErr);
+                }
+            }
+
+            // 2. Try HTTP backend bridge (port 5002)
+            try {
+                const pdfUrl = `http://127.0.0.1:5002/api/customer/receipt-pdf?chargeId=${encodeURIComponent(data.chargeId)}&isThermal=false`;
+                const check = await fetch(pdfUrl, { method: 'HEAD' }).catch(() => null);
+                if (check && check.ok) {
+                    window.open(pdfUrl, '_blank');
+                    return;
+                }
+            } catch (e) {}
         }
 
         const html = generateStandardChargingReceiptHTML(data);

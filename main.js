@@ -356,6 +356,18 @@ ipcMain.handle('customer:search', async (event, term) => {
   return await cardReader.searchCustomer(term);
 });
 
+ipcMain.handle('customer:movements', async (event, term) => {
+  return await cardReader.getCustomerMeterMovements(term);
+});
+
+ipcMain.handle('customer:movements-pdf', async (event, customerId) => {
+  return await cardReader.getCustomerMeterMovementsPDF(customerId);
+});
+
+ipcMain.handle('customer:receipt-pdf', async (event, chargeId, isThermal) => {
+  return await cardReader.getReceiptPDF(chargeId, isThermal);
+});
+
 // أغلق التطبيق عند إغلاق جميع النوافذ (باستثناء macOS).
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
