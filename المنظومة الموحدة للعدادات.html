@@ -929,6 +929,7 @@
                             <li><a href="#" class="nav-link" data-target="clear-card" data-permission="manage_clear_card"><span>مسح كارت</span></a></li>
                             <li><a href="#" class="nav-link" data-target="new-card-no-charge" data-permission="manage_replacement_cards"><span>كارت بديل بدون شحن</span></a></li>
                             <li><a href="#" class="nav-link" data-target="new-card-with-charge" data-permission="manage_replacement_cards"><span>كارت بديل بشحن</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="reports" data-report-type="charging-report" data-permission="view_reports"><span>تقارير الشحن والكروت</span></a></li>
                             <li><a href="#" class="nav-link" data-target="meter-movements" data-permission="view_meter_movements"><span>حركات عداد</span></a></li>
                             <li><a href="#" class="nav-link" data-target="subscribers-all" data-permission="view_subscribers_all"><span>جميع المشتركين</span></a></li>
                             <li><a href="#" class="nav-link" data-target="subscriber-statement" data-permission="view_subscriber_statement"><span>الاستعلام عن مشترك</span></a></li>
@@ -3030,7 +3031,11 @@
                             <option value="technician-activity">تقرير نشاط الفنيين</option>
                             <option value="repairs">تقرير الإصلاحات</option>
                             <option value="memos">مذكرات الفقد</option>
-                            <option value="transformers">تقرير بيانات المحولات</option>
+                                                        <option value="charging-report">تقرير شحن كروت الطاقة</option>
+                            <option value="replacement-no-charge-report">تقرير الكروت البديلة (بدون شحن)</option>
+                            <option value="replacement-with-charge-report">تقرير الكروت البديلة (بشحن)</option>
+                            <option value="all-card-operations">تقرير حركة الشحن والكروت البديلة الشامل</option>
+<option value="transformers">تقرير بيانات المحولات</option>
                         </select>
                     </div>
                     <!-- Dynamic filters will be inserted here -->
@@ -4509,6 +4514,10 @@
                     
                     <!-- Left in RTL: Action buttons -->
                     <div style="display: flex; align-items: center; gap: 10px;">
+                        <button type="button" class="btn secondary" data-target="reports" data-report-type="charging-report" style="display: flex; align-items: center; gap: 6px; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #1e293b; cursor: pointer;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            <span>سجل وتقارير الشحن</span>
+                        </button>
                         <button type="button" id="btn-chg-read-card" class="btn" style="background: #f59e0b; color: #ffffff; font-weight: 700; font-size: 0.95rem; padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3); transition: all 0.2s;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
                             <span>قراءة الكارت</span>
@@ -4949,6 +4958,14 @@
                         <button type="button" id="btn-clr-execute" class="btn" style="background: #dc2626; color: #fff; padding: 9px 28px; font-weight: 700; font-size: 1.05rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.25);">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 3.371 5.07a1.82 1.82 0 0 1 0-1.785A1.783 1.783 0 0 1 4.927 2.4h9.846a1.83 1.83 0 0 1 1.57.885 1.785 1.785 0 0 1 .004 1.784L15 7.5"/><path d="M17 3.5v6h6"/><path d="m3 9 3-3-3-3"/></svg>
                             <span>مسح</span>
+                        </button>
+                        <button type="button" class="btn secondary" data-target="reports" data-report-type="replacement-no-charge-report" style="display: flex; align-items: center; gap: 6px; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #1e293b; cursor: pointer;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            <span>سجل الكروت البديلة</span>
+                        </button>
+                        <button type="button" class="btn secondary" data-target="reports" data-report-type="replacement-with-charge-report" style="display: flex; align-items: center; gap: 6px; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #1e293b; cursor: pointer;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            <span>سجل الكروت البديلة بشحن</span>
                         </button>
                         <button type="button" class="btn secondary btn-back-page" data-target="customer-management">رجوع لإدارة المشتركين</button>
                     </div>

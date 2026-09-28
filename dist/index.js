@@ -14,6 +14,7 @@ let state = {
     mukayasat: [],
     mukayasatAccountSystemSaved: [],
     lostMeterMemos: [],
+    cardOperations: [],
     transformers: [], // New: Transformer Management
     transformerLoads: [], // New: Transformer Load Management
     pendingRequests: [], // الحالة الجديدة للطلبات المستوردة
@@ -310,6 +311,10 @@ let state = {
             'judicial_collection_report': { name: 'تقرير تحصيل الضبطية', roles: ['admin', 'supervisor', 'reports'] },
             'zinat_collection_report': { name: 'تقرير تحصيل زينات', roles: ['admin', 'supervisor', 'reports'] },
             'installed_practice_meters': { name: 'تقرير ممارسات تم تركيب عداد لها', roles: ['admin', 'supervisor', 'reports'] },
+            'charging-report': { name: 'تقرير عمليات شحن كروت الطاقة', roles: ['admin', 'supervisor', 'user', 'reports'] },
+            'replacement-no-charge-report': { name: 'تقرير الكروت البديلة (بدون شحن)', roles: ['admin', 'supervisor', 'user', 'reports'] },
+            'replacement-with-charge-report': { name: 'تقرير الكروت البديلة (بشحن)', roles: ['admin', 'supervisor', 'user', 'reports'] },
+            'all-card-operations': { name: 'تقرير حركة الشحن والكروت البديلة الشامل', roles: ['admin', 'supervisor', 'user', 'reports'] },
             'transformers': { name: 'تقرير بيانات المحولات', roles: ['admin', 'supervisor', 'reports'] },
         },
         roles: [
@@ -10770,6 +10775,124 @@ const handleGoBack = () => {
         returnToSameSection = false;
     }
 };
+// --- منظومة تسجيل وتخزين عمليات الشحن والكروت البديلة للتقارير ---
+function saveCardOperationRecord(op) {
+    if (!state.cardOperations)
+        state.cardOperations = [];
+    // Prevent duplicate IDs
+    const existingIdx = state.cardOperations.findIndex((item) => item.id === op.id);
+    if (existingIdx !== -1) {
+        state.cardOperations[existingIdx] = op;
+    }
+    else {
+        state.cardOperations.unshift(op);
+    }
+    saveState();
+}
+function ensureInitialCardOperationsSeed() {
+    if (!state.cardOperations)
+        state.cardOperations = [];
+    if (state.cardOperations.length > 0)
+        return;
+    // Generate realistic initial operations based on existing prepaid meters
+    const prepaidMeters = state.meters.filter(m => m.meterType === 'مسبق الدفع' || String(m.subscriberType || '').includes('مسبق'));
+    const seedOps = [];
+    const baseDates = ['2026-09-28', '2026-09-27', '2026-09-26', '2026-09-25', '2026-09-24', '2026-09-22', '2026-09-20'];
+    const operators = ['مصطفى المغربي', 'محمد علي', 'أحمد السيد', 'خالد محمود'];
+    const paymentMethods = ['نقدي', 'نقدي', 'نقدي', 'فيزا'];
+    prepaidMeters.slice(0, 15).forEach((m, idx) => {
+        const dateStr = baseDates[idx % baseDates.length];
+        const opTypeChoice = idx % 5;
+        if (opTypeChoice === 1) {
+            // كارت بديل بدون شحن
+            seedOps.push({
+                id: 'REC-' + (500000 + idx),
+                operationType: 'replacement_no_charge',
+                operationTypeName: 'كارت بديل بدون شحن',
+                date: dateStr,
+                time: `${10 + (idx % 6)}:${(idx * 7) % 60 < 10 ? '0' : ''}${(idx * 7) % 60}:00`,
+                customerName: m.subscriberName || 'مشترك ' + (idx + 1),
+                customerCode: m.subscriptionCode || ('5032838' + idx),
+                meterNumber: m.meterChassisNumber || ('71317' + idx),
+                nationalId: m.nationalId || '28509121800' + (idx < 10 ? '0' + idx : idx),
+                address: m.address || 'بني مزار',
+                activityName: m.activityType || 'منزلي كودي',
+                rechargeAmount: 0,
+                cardPrice: 50,
+                fees: 0,
+                cleaningFee: 0,
+                debtsDeducted: 0,
+                netCollected: 50,
+                paymentMethod: 'نقدي',
+                onSameCard: idx % 2 === 0,
+                receiptNumber: 'REC-' + (500000 + idx),
+                operatorName: operators[idx % operators.length],
+                notes: 'إصدار كارت بديل لتعذر القراءة'
+            });
+        }
+        else if (opTypeChoice === 3) {
+            // كارت بديل بشحن
+            const chargeVal = 100 + (idx % 4) * 50;
+            seedOps.push({
+                id: 'CHG-NC-' + (600000 + idx),
+                operationType: 'replacement_with_charge',
+                operationTypeName: 'كارت بديل بشحن',
+                date: dateStr,
+                time: `${11 + (idx % 5)}:${(idx * 9) % 60 < 10 ? '0' : ''}${(idx * 9) % 60}:00`,
+                customerName: m.subscriberName || 'مشترك ' + (idx + 1),
+                customerCode: m.subscriptionCode || ('5032838' + idx),
+                meterNumber: m.meterChassisNumber || ('71317' + idx),
+                nationalId: m.nationalId || '28509121800' + (idx < 10 ? '0' + idx : idx),
+                address: m.address || 'بني مزار',
+                activityName: m.activityType || 'منزلي كودي',
+                rechargeAmount: chargeVal,
+                cardPrice: 50,
+                fees: 3.5,
+                cleaningFee: 0,
+                debtsDeducted: 0,
+                netCollected: chargeVal + 50 + 3.5,
+                paymentMethod: paymentMethods[idx % paymentMethods.length],
+                onSameCard: idx % 2 === 1,
+                receiptNumber: 'REC-' + (600000 + idx),
+                operatorName: operators[idx % operators.length],
+                notes: 'استخراج كارت بديل وشحن رصيد'
+            });
+        }
+        else {
+            // شحن طاقة
+            const chargeVal = 50 + (idx % 6) * 50;
+            const cleaning = idx % 2 === 0 ? 5 : 0;
+            const debt = idx % 3 === 0 ? 25 : 0;
+            const net = chargeVal + cleaning - debt;
+            seedOps.push({
+                id: 'CHG-' + (700000 + idx),
+                operationType: 'charge',
+                operationTypeName: 'شحن طاقة',
+                date: dateStr,
+                time: `${9 + (idx % 8)}:${(idx * 11) % 60 < 10 ? '0' : ''}${(idx * 11) % 60}:00`,
+                customerName: m.subscriberName || 'مشترك ' + (idx + 1),
+                customerCode: m.subscriptionCode || ('5032838' + idx),
+                meterNumber: m.meterChassisNumber || ('71317' + idx),
+                nationalId: m.nationalId || '28509121800' + (idx < 10 ? '0' + idx : idx),
+                address: m.address || 'بني مزار',
+                activityName: m.activityType || 'منزلي كودي',
+                rechargeAmount: chargeVal,
+                cardPrice: 0,
+                fees: 3.5,
+                cleaningFee: cleaning,
+                debtsDeducted: debt,
+                netCollected: net > 0 ? net : chargeVal,
+                paymentMethod: paymentMethods[idx % paymentMethods.length],
+                onSameCard: false,
+                receiptNumber: 'REC-' + (700000 + idx),
+                operatorName: operators[idx % operators.length],
+                notes: 'شحن رصيد طاقة اعتيادي'
+            });
+        }
+    });
+    state.cardOperations = seedOps;
+    console.log(`Seeded ${seedOps.length} card operations.`);
+}
 // --- دالات التحقق وتحديد حالة المشترك بدقة عالية لتفادي تداخل بيانات الهدم والأعطال ---
 function isFaultySubscriber(type) {
     const t = String(type || '').trim();
@@ -15519,6 +15642,30 @@ const executeChargingProcess = async () => {
         const feesAmt = Number((_c = document.getElementById('chg-financial-fees')) === null || _c === void 0 ? void 0 : _c.value) || ((currentChargingFinancials === null || currentChargingFinancials === void 0 ? void 0 : currentChargingFinancials.fees) || 0);
         const paySel = document.getElementById('field-payment-method');
         const payMethod = ((_d = paySel === null || paySel === void 0 ? void 0 : paySel.options[paySel.selectedIndex]) === null || _d === void 0 ? void 0 : _d.text) || 'نقدي';
+        const chgOpRecord = {
+            id: (writeRes === null || writeRes === void 0 ? void 0 : writeRes.chargeId) || ('CHG-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000)),
+            operationType: 'charge',
+            operationTypeName: 'شحن طاقة',
+            date: new Date().toISOString().slice(0, 10),
+            time: new Date().toLocaleTimeString('ar-EG'),
+            customerName: currentChargingCustomer.name,
+            customerCode: currentChargingCustomer.code,
+            meterNumber: currentChargingCustomer.meterNumber,
+            nationalId: currentChargingCustomer.nationalId || '-',
+            address: currentChargingCustomer.address || '-',
+            activityName: currentChargingCustomer.activityName || 'منزلي كودي',
+            rechargeAmount: rechargeAmount,
+            cardPrice: 0,
+            fees: feesAmt,
+            cleaningFee: cleaningFee,
+            debtsDeducted: debtsAmt,
+            netCollected: netCollected,
+            paymentMethod: payMethod,
+            onSameCard: false,
+            receiptNumber: (writeRes === null || writeRes === void 0 ? void 0 : writeRes.chargeId) || ('REC-' + Date.now().toString().slice(-6)),
+            operatorName: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الشحن'
+        };
+        saveCardOperationRecord(chgOpRecord);
         showChargingReceiptModal({
             id: (writeRes === null || writeRes === void 0 ? void 0 : writeRes.chargeId) || ('CHG-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000)),
             date: new Date().toLocaleDateString('ar-EG'),
@@ -16713,6 +16860,30 @@ const executeNewCardNoChargeProcess = async () => {
                 banner.style.border = '1px solid #bbf7d0';
                 banner.innerHTML = `<strong>تمت العملية بنجاح!</strong> تم تخصيص وبرمجة الكارت البديل للمشترك ${currentNewCardCustomer.name} (عداد: ${currentNewCardCustomer.meterNumber}) بنجاح على الشريحة.`;
             }
+            const ncOpRecord = {
+                id: receiptNumber,
+                operationType: 'replacement_no_charge',
+                operationTypeName: 'كارت بديل بدون شحن',
+                date: new Date().toISOString().slice(0, 10),
+                time: new Date().toLocaleTimeString('ar-EG'),
+                customerName: currentNewCardCustomer.name,
+                customerCode: currentNewCardCustomer.code,
+                meterNumber: currentNewCardCustomer.meterNumber,
+                nationalId: currentNewCardCustomer.nationalId || '-',
+                address: currentNewCardCustomer.address || '-',
+                activityName: currentNewCardCustomer.activityName || 'منزلي كودي',
+                rechargeAmount: 0,
+                cardPrice: 50,
+                fees: 0,
+                cleaningFee: 0,
+                debtsDeducted: 0,
+                netCollected: 50,
+                paymentMethod: 'نقدي',
+                onSameCard: onSameCard,
+                receiptNumber: receiptNumber,
+                operatorName: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الكروت'
+            };
+            saveCardOperationRecord(ncOpRecord);
             showChargingReceiptModal({
                 id: receiptNumber,
                 date: new Date().toLocaleDateString('ar-EG'),
@@ -17032,7 +17203,7 @@ const readNewChargeCardSmartCard = async () => {
     }
 };
 const executeNewCardWithChargeProcess = async () => {
-    var _a;
+    var _a, _b;
     if (!currentNewChargeCustomer || !currentNewChargeCustomer.id) {
         showToast('يرجى البحث عن المشترك وتحديده أولاً قبل تنفيذ الشحن والكتابة.', 'error');
         (_a = document.getElementById('ncc-search-input')) === null || _a === void 0 ? void 0 : _a.focus();
@@ -17121,8 +17292,33 @@ const executeNewCardWithChargeProcess = async () => {
                 banner.style.border = '1px solid #bbf7d0';
                 banner.innerHTML = `<strong>تمت العملية بنجاح!</strong> تم إصدار الكارت البديل وشحن رصيد ${rechargeAmount.toFixed(2)} ج.م بنجاح على الشريحة الذكية.`;
             }
+            const nccReceiptId = (res === null || res === void 0 ? void 0 : res.chargeId) || ('CHG-NC-' + Date.now().toString().slice(-6));
+            const nccOpRecord = {
+                id: nccReceiptId,
+                operationType: 'replacement_with_charge',
+                operationTypeName: 'كارت بديل بشحن',
+                date: new Date().toISOString().slice(0, 10),
+                time: new Date().toLocaleTimeString('ar-EG'),
+                customerName: currentNewChargeCustomer.name,
+                customerCode: currentNewChargeCustomer.code,
+                meterNumber: currentNewChargeCustomer.meterNumber,
+                nationalId: currentNewChargeCustomer.nationalId || '-',
+                address: currentNewChargeCustomer.address || '-',
+                activityName: currentNewChargeCustomer.activityName || 'منزلي كودي',
+                rechargeAmount: rechargeAmount,
+                cardPrice: currentNewChargeFinancials.cardPrice || 50,
+                fees: currentNewChargeFinancials.fees || 0,
+                cleaningFee: 0,
+                debtsDeducted: currentNewChargeFinancials.debts || 0,
+                netCollected: netCollected,
+                paymentMethod: ((_b = paymentTypeSelect === null || paymentTypeSelect === void 0 ? void 0 : paymentTypeSelect.options[paymentTypeSelect.selectedIndex]) === null || _b === void 0 ? void 0 : _b.text) || 'نقدي',
+                onSameCard: onSameCard,
+                receiptNumber: nccReceiptId,
+                operatorName: (loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول الكروت والشحن'
+            };
+            saveCardOperationRecord(nccOpRecord);
             showChargingReceiptModal({
-                id: res.chargeId || ('CHG-NC-' + Date.now().toString().slice(-6)),
+                id: nccReceiptId,
                 date: new Date().toLocaleDateString('ar-EG'),
                 time: new Date().toLocaleTimeString('ar-EG'),
                 customerName: currentNewChargeCustomer.name,
@@ -19118,6 +19314,10 @@ const renderReportsSection = () => {
         { value: 'judicial_collection_report', text: 'تقرير تحصيل الضبطية' },
         { value: 'zinat_collection_report', text: 'تقرير تحصيل زينات' },
         { value: 'installed_practice_meters', text: 'ممارسات تم تركيب عداد لها' },
+        { value: 'charging-report', text: 'تقرير شحن كروت الطاقة' },
+        { value: 'replacement-no-charge-report', text: 'تقرير الكروت البديلة (بدون شحن)' },
+        { value: 'replacement-with-charge-report', text: 'تقرير الكروت البديلة (بشحن)' },
+        { value: 'all-card-operations', text: 'تقرير حركة الشحن والكروت البديلة الشامل' },
         { value: 'transformers', text: 'تقرير بيانات المحولات' },
     ];
     // Filter the options based on the logged-in user's permissions
@@ -19366,6 +19566,111 @@ const updateReportFilters = () => {
                 </div>
             `;
             filtersContainer.innerHTML = filtersHTML;
+            break;
+        case 'charging-report':
+            filtersHTML = `
+                <div class="input-group">
+                    <label for="filter-date-from">من تاريخ</label>
+                    <input type="date" id="filter-date-from">
+                </div>
+                <div class="input-group">
+                    <label for="filter-date-to">إلى تاريخ</label>
+                    <input type="date" id="filter-date-to">
+                </div>
+                <div class="input-group">
+                    <label for="filter-collector">المحصل / المستخدم</label>
+                    <select id="filter-collector"></select>
+                </div>
+                <div class="input-group">
+                    <label for="filter-payment-method">طريقة الدفع</label>
+                    <select id="filter-payment-method">
+                        <option value="">الكل</option>
+                        <option value="نقدي">نقدي</option>
+                        <option value="فيزا">فيزا / إلكتروني</option>
+                    </select>
+                </div>
+            `;
+            filtersContainer.innerHTML = filtersHTML;
+            populateSelect(document.getElementById('filter-collector'), state.users.map(u => u.fullName), true);
+            break;
+        case 'replacement-no-charge-report':
+            filtersHTML = `
+                <div class="input-group">
+                    <label for="filter-date-from">من تاريخ</label>
+                    <input type="date" id="filter-date-from">
+                </div>
+                <div class="input-group">
+                    <label for="filter-date-to">إلى تاريخ</label>
+                    <input type="date" id="filter-date-to">
+                </div>
+                <div class="input-group">
+                    <label for="filter-collector">القائم بالإصدار</label>
+                    <select id="filter-collector"></select>
+                </div>
+                <div class="input-group">
+                    <label for="filter-same-card">نوع البطاقة</label>
+                    <select id="filter-same-card">
+                        <option value="">الكل</option>
+                        <option value="same">على نفس الكارت</option>
+                        <option value="new">كارت جديد</option>
+                    </select>
+                </div>
+            `;
+            filtersContainer.innerHTML = filtersHTML;
+            populateSelect(document.getElementById('filter-collector'), state.users.map(u => u.fullName), true);
+            break;
+        case 'replacement-with-charge-report':
+            filtersHTML = `
+                <div class="input-group">
+                    <label for="filter-date-from">من تاريخ</label>
+                    <input type="date" id="filter-date-from">
+                </div>
+                <div class="input-group">
+                    <label for="filter-date-to">إلى تاريخ</label>
+                    <input type="date" id="filter-date-to">
+                </div>
+                <div class="input-group">
+                    <label for="filter-collector">القائم بالعملية</label>
+                    <select id="filter-collector"></select>
+                </div>
+                <div class="input-group">
+                    <label for="filter-payment-method">طريقة الدفع</label>
+                    <select id="filter-payment-method">
+                        <option value="">الكل</option>
+                        <option value="نقدي">نقدي</option>
+                        <option value="فيزا">فيزا / إلكتروني</option>
+                    </select>
+                </div>
+            `;
+            filtersContainer.innerHTML = filtersHTML;
+            populateSelect(document.getElementById('filter-collector'), state.users.map(u => u.fullName), true);
+            break;
+        case 'all-card-operations':
+            filtersHTML = `
+                <div class="input-group">
+                    <label for="filter-date-from">من تاريخ</label>
+                    <input type="date" id="filter-date-from">
+                </div>
+                <div class="input-group">
+                    <label for="filter-date-to">إلى تاريخ</label>
+                    <input type="date" id="filter-date-to">
+                </div>
+                <div class="input-group">
+                    <label for="filter-card-op-type">نوع المعاملة</label>
+                    <select id="filter-card-op-type">
+                        <option value="">جميع المعاملات</option>
+                        <option value="charge">شحن طاقة</option>
+                        <option value="replacement_no_charge">كارت بديل بدون شحن</option>
+                        <option value="replacement_with_charge">كارت بديل بشحن</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="filter-collector">الموظف المسؤول</label>
+                    <select id="filter-collector"></select>
+                </div>
+            `;
+            filtersContainer.innerHTML = filtersHTML;
+            populateSelect(document.getElementById('filter-collector'), state.users.map(u => u.fullName), true);
             break;
         case 'transformers':
             filtersHTML = `
@@ -20022,7 +20327,7 @@ const parseDateToISO = (dateStr) => {
     return normalized;
 };
 const handleGenerateReport = (event) => {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     event.preventDefault();
     const form = event.target;
     if (!validateForm(form)) {
@@ -20562,6 +20867,89 @@ const handleGenerateReport = (event) => {
                 { key: 'status', header: 'الحالة' },
             ];
             break;
+        case 'charging-report':
+            title = 'تقرير عمليات شحن كروت الطاقة';
+            if (dateFrom || dateTo) {
+                title += ` (من: ${dateFrom || 'البداية'} إلى: ${dateTo || 'الآن'})`;
+            }
+            columns = [
+                { key: 'seq', header: 'م' },
+                { key: 'date', header: 'التاريخ' },
+                { key: 'time', header: 'الوقت' },
+                { key: 'customerName', header: 'اسم المشترك' },
+                { key: 'customerCode', header: 'كود المشترك' },
+                { key: 'meterNumber', header: 'رقم العداد (الشاسية)' },
+                { key: 'rechargeAmountStr', header: 'مبلغ الشحن' },
+                { key: 'debtsDeductedStr', header: 'ديون مخصومة' },
+                { key: 'feesStr', header: 'رسوم ودمغات' },
+                { key: 'cleaningFeeStr', header: 'نظافة' },
+                { key: 'netCollectedStr', header: 'الصافي المحصل' },
+                { key: 'paymentMethod', header: 'الدفع' },
+                { key: 'operatorName', header: 'المحصل' },
+                { key: 'receiptNumber', header: 'رقم الإيصال' }
+            ];
+            break;
+        case 'replacement-no-charge-report':
+            title = 'تقرير الكروت البديلة المستخرجة (بدون شحن)';
+            if (dateFrom || dateTo) {
+                title += ` (من: ${dateFrom || 'البداية'} إلى: ${dateTo || 'الآن'})`;
+            }
+            columns = [
+                { key: 'seq', header: 'م' },
+                { key: 'date', header: 'تاريخ الإصدار' },
+                { key: 'time', header: 'الوقت' },
+                { key: 'customerName', header: 'اسم المشترك' },
+                { key: 'customerCode', header: 'كود المشترك' },
+                { key: 'meterNumber', header: 'رقم العداد' },
+                { key: 'nationalId', header: 'الرقم القومي' },
+                { key: 'address', header: 'العنوان' },
+                { key: 'cardPriceStr', header: 'رسوم الكارت' },
+                { key: 'onSameCardText', header: 'البطاقة' },
+                { key: 'operatorName', header: 'القائم بالإصدار' },
+                { key: 'receiptNumber', header: 'رقم الإيصال' }
+            ];
+            break;
+        case 'replacement-with-charge-report':
+            title = 'تقرير الكروت البديلة المستخرجة (بشحن)';
+            if (dateFrom || dateTo) {
+                title += ` (من: ${dateFrom || 'البداية'} إلى: ${dateTo || 'الآن'})`;
+            }
+            columns = [
+                { key: 'seq', header: 'م' },
+                { key: 'date', header: 'تاريخ الإصدار' },
+                { key: 'time', header: 'الوقت' },
+                { key: 'customerName', header: 'اسم المشترك' },
+                { key: 'customerCode', header: 'كود المشترك' },
+                { key: 'meterNumber', header: 'رقم العداد' },
+                { key: 'cardPriceStr', header: 'رسوم الكارت' },
+                { key: 'rechargeAmountStr', header: 'قيمة الشحن' },
+                { key: 'netCollectedStr', header: 'إجمالي المحصل' },
+                { key: 'paymentMethod', header: 'طريقة الدفع' },
+                { key: 'onSameCardText', header: 'البطاقة' },
+                { key: 'operatorName', header: 'القائم بالعملية' },
+                { key: 'receiptNumber', header: 'رقم الإيصال' }
+            ];
+            break;
+        case 'all-card-operations':
+            title = 'تقرير حركة الشحن والكروت البديلة الشامل';
+            if (dateFrom || dateTo) {
+                title += ` (من: ${dateFrom || 'البداية'} إلى: ${dateTo || 'الآن'})`;
+            }
+            columns = [
+                { key: 'seq', header: 'م' },
+                { key: 'operationTypeName', header: 'نوع العملية' },
+                { key: 'date', header: 'التاريخ' },
+                { key: 'customerName', header: 'اسم المشترك' },
+                { key: 'meterNumber', header: 'رقم العداد' },
+                { key: 'customerCode', header: 'كود المشترك' },
+                { key: 'cardPriceStr', header: 'رسوم الكارت' },
+                { key: 'rechargeAmountStr', header: 'مبلغ الشحن' },
+                { key: 'netCollectedStr', header: 'الصافي المحصل' },
+                { key: 'paymentMethod', header: 'طريقة الدفع' },
+                { key: 'operatorName', header: 'الموظف' },
+                { key: 'receiptNumber', header: 'رقم الإيصال' }
+            ];
+            break;
         case 'transformers':
             if (!hasReportPermission('transformers')) {
                 showToast('ليس لديك صلاحية لعرض هذا التقرير.', 'error');
@@ -20604,10 +20992,106 @@ const handleGenerateReport = (event) => {
         const matchMemoType = specificMemoTypes.length === 0 || specificMemoTypes.includes(m.subscriberType);
         return inDateRange && matchMeterType && matchTech && matchAccountRef && matchSpecificStatus && matchSpecificRepairStatus && matchMemoType && matchLiftingUnit;
     });
+    if (reportType === 'charging-report' || reportType === 'replacement-no-charge-report' || reportType === 'replacement-with-charge-report' || reportType === 'all-card-operations') {
+        ensureInitialCardOperationsSeed();
+        const allOps = (state.cardOperations || []);
+        const collectorF = ((_d = document.getElementById('filter-collector')) === null || _d === void 0 ? void 0 : _d.value) || '';
+        const paymentMethodF = ((_e = document.getElementById('filter-payment-method')) === null || _e === void 0 ? void 0 : _e.value) || '';
+        const sameCardF = ((_f = document.getElementById('filter-same-card')) === null || _f === void 0 ? void 0 : _f.value) || '';
+        const cardOpTypeF = ((_g = document.getElementById('filter-card-op-type')) === null || _g === void 0 ? void 0 : _g.value) || '';
+        const filteredOps = allOps.filter(op => {
+            // Filter by report type
+            if (reportType === 'charging-report' && op.operationType !== 'charge')
+                return false;
+            if (reportType === 'replacement-no-charge-report' && op.operationType !== 'replacement_no_charge')
+                return false;
+            if (reportType === 'replacement-with-charge-report' && op.operationType !== 'replacement_with_charge')
+                return false;
+            if (reportType === 'all-card-operations' && cardOpTypeF && op.operationType !== cardOpTypeF)
+                return false;
+            // Date filter
+            if (dateFrom && op.date < dateFrom)
+                return false;
+            if (dateTo && op.date > dateTo)
+                return false;
+            // Collector / Operator filter
+            if (collectorF && op.operatorName !== collectorF)
+                return false;
+            // Payment method filter
+            if (paymentMethodF && op.paymentMethod !== paymentMethodF)
+                return false;
+            // Same card filter
+            if (sameCardF) {
+                if (sameCardF === 'same' && !op.onSameCard)
+                    return false;
+                if (sameCardF === 'new' && op.onSameCard)
+                    return false;
+            }
+            return true;
+        });
+        let totalRecharge = 0;
+        let totalCardFees = 0;
+        let totalNet = 0;
+        let totalDebts = 0;
+        let sameCardCount = 0;
+        let newCardCount = 0;
+        const mappedData = filteredOps.map((op, idx) => {
+            const rAmt = Number(op.rechargeAmount || 0);
+            const cFee = Number(op.cardPrice || 0);
+            const nAmt = Number(op.netCollected || (rAmt + cFee));
+            const dAmt = Number(op.debtsDeducted || 0);
+            totalRecharge += rAmt;
+            totalCardFees += cFee;
+            totalNet += nAmt;
+            totalDebts += dAmt;
+            if (op.onSameCard)
+                sameCardCount++;
+            else
+                newCardCount++;
+            return {
+                seq: idx + 1,
+                id: op.id,
+                operationType: op.operationType,
+                operationTypeName: op.operationTypeName || (op.operationType === 'charge' ? 'شحن طاقة' : (op.operationType === 'replacement_no_charge' ? 'بديل بدون شحن' : 'بديل بشحن')),
+                date: op.date || '-',
+                time: op.time || '-',
+                customerName: op.customerName || '-',
+                customerCode: op.customerCode || '-',
+                meterNumber: op.meterNumber || '-',
+                nationalId: op.nationalId || '-',
+                address: op.address || '-',
+                activityName: op.activityName || 'منزلي كودي',
+                rechargeAmount: rAmt,
+                rechargeAmountStr: rAmt > 0 ? rAmt.toFixed(2) + ' ج.م' : '-',
+                cardPrice: cFee,
+                cardPriceStr: cFee > 0 ? cFee.toFixed(2) + ' ج.م' : '-',
+                feesStr: op.fees ? Number(op.fees).toFixed(2) + ' ج.م' : '-',
+                cleaningFeeStr: op.cleaningFee ? Number(op.cleaningFee).toFixed(2) + ' ج.م' : '-',
+                debtsDeductedStr: dAmt > 0 ? dAmt.toFixed(2) + ' ج.م' : '-',
+                netCollected: nAmt,
+                netCollectedStr: nAmt.toFixed(2) + ' ج.م',
+                paymentMethod: op.paymentMethod || 'نقدي',
+                onSameCardText: op.onSameCard ? 'على نفس الكارت' : 'كارت جديد',
+                operatorName: op.operatorName || 'مسؤول المنظومة',
+                receiptNumber: op.receiptNumber || op.id || '-'
+            };
+        });
+        reportSummary = {
+            totalCount: mappedData.length,
+            totalRecharge: totalRecharge,
+            totalCardFees: totalCardFees,
+            totalNet: totalNet,
+            totalDebts: totalDebts,
+            sameCardCount: sameCardCount,
+            newCardCount: newCardCount
+        };
+        renderReportResults(mappedData, columns, title, reportType, reportSummary);
+        return;
+    }
     if (reportType === 'transformers') {
-        const councilF = (_d = document.getElementById('filter-transformer-council')) === null || _d === void 0 ? void 0 : _d.value;
-        const addressF = (_e = document.getElementById('filter-transformer-address')) === null || _e === void 0 ? void 0 : _e.value;
-        const typeF = (_f = document.getElementById('filter-transformer-type')) === null || _f === void 0 ? void 0 : _f.value;
+        const councilF = (_h = document.getElementById('filter-transformer-council')) === null || _h === void 0 ? void 0 : _h.value;
+        const addressF = (_j = document.getElementById('filter-transformer-address')) === null || _j === void 0 ? void 0 : _j.value;
+        const typeF = (_k = document.getElementById('filter-transformer-type')) === null || _k === void 0 ? void 0 : _k.value;
         data = (state.transformers || []).filter(t => matchesCurrentScope(t) &&
             (!councilF || t.councilName === councilF) &&
             (!addressF || t.transformerAddress === addressF) &&
@@ -20937,7 +21421,54 @@ const renderReportResults = (data, columns, title, reportType = 'default', summa
     }
     tfoot.innerHTML = tfootHTML;
     // Add summary row for collection reports
-    if ((reportType === 'judicial_collection_report' || reportType === 'zinat_collection_report') && summary.totalPaid !== undefined) {
+    if (reportType === 'charging-report') {
+        const summaryRowHTML = `
+            <tr class="report-summary-row" style="background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #000; font-size: 11pt;">
+                <td colspan="6" style="text-align: right; border: 1px solid #000; padding: 6px 10px;">إجمالي عمليات الشحن: ${summary.totalCount || 0} عملية</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; color: #0369a1;">${(summary.totalRecharge || 0).toLocaleString()} ج.م</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; color: #b91c1c;">${(summary.totalDebts || 0).toLocaleString()} ج.م</td>
+                <td colspan="2" style="border: 1px solid #000;"></td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; color: #15803d; font-size: 12pt;">${(summary.totalNet || 0).toLocaleString()} ج.م</td>
+                <td colspan="3" style="border: 1px solid #000; text-align: center;">إجمالي الصافي المحصل</td>
+            </tr>
+        `;
+        tfoot.insertAdjacentHTML('afterbegin', summaryRowHTML);
+    }
+    else if (reportType === 'replacement-no-charge-report') {
+        const summaryRowHTML = `
+            <tr class="report-summary-row" style="background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #000; font-size: 11pt;">
+                <td colspan="8" style="text-align: right; border: 1px solid #000; padding: 6px 10px;">إجمالي الكروت البديلة: ${summary.totalCount || 0} كارت (نفس الكارت: ${summary.sameCardCount || 0} | كارت جديد: ${summary.newCardCount || 0})</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; color: #15803d; font-size: 12pt;">${(summary.totalCardFees || 0).toLocaleString()} ج.م</td>
+                <td colspan="3" style="border: 1px solid #000; text-align: center;">إجمالي الرسوم المحصلة</td>
+            </tr>
+        `;
+        tfoot.insertAdjacentHTML('afterbegin', summaryRowHTML);
+    }
+    else if (reportType === 'replacement-with-charge-report') {
+        const summaryRowHTML = `
+            <tr class="report-summary-row" style="background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #000; font-size: 11pt;">
+                <td colspan="6" style="text-align: right; border: 1px solid #000; padding: 6px 10px;">إجمالي الكروت البديلة بشحن: ${summary.totalCount || 0} عملية</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; color: #0284c7;">${(summary.totalCardFees || 0).toLocaleString()} ج.م</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; color: #0369a1;">${(summary.totalRecharge || 0).toLocaleString()} ج.م</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; color: #15803d; font-size: 12pt;">${(summary.totalNet || 0).toLocaleString()} ج.م</td>
+                <td colspan="4" style="border: 1px solid #000; text-align: center;">إجمالي المحصل شامل الكروت والشحن</td>
+            </tr>
+        `;
+        tfoot.insertAdjacentHTML('afterbegin', summaryRowHTML);
+    }
+    else if (reportType === 'all-card-operations') {
+        const summaryRowHTML = `
+            <tr class="report-summary-row" style="background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #000; font-size: 11pt;">
+                <td colspan="6" style="text-align: right; border: 1px solid #000; padding: 6px 10px;">إجمالي حركة الكروت: ${summary.totalCount || 0} معاملة</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; color: #0284c7;">${(summary.totalCardFees || 0).toLocaleString()} ج.م</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; color: #0369a1;">${(summary.totalRecharge || 0).toLocaleString()} ج.م</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; color: #15803d; font-size: 12pt;">${(summary.totalNet || 0).toLocaleString()} ج.م</td>
+                <td colspan="3" style="border: 1px solid #000; text-align: center;">إجمالي المبالغ المحصلة</td>
+            </tr>
+        `;
+        tfoot.insertAdjacentHTML('afterbegin', summaryRowHTML);
+    }
+    else if ((reportType === 'judicial_collection_report' || reportType === 'zinat_collection_report') && summary.totalPaid !== undefined) {
         const totalPaid = summary.totalPaid;
         // The number of columns before the amount columns is 5 for both reports
         const colspan = 5;
@@ -24178,6 +24709,9 @@ const renderAccountingSubscriptionsSection = () => {
                         <button type="button" id="sub-doc-reset-btn" class="btn secondary" style="font-weight: bold;">
                             <span>➕ اشتراك جديد</span>
                         </button>
+                        <button type="button" id="sub-doc-goto-records-btn" class="btn secondary" style="font-weight: bold; background: #334155; color: #fff; border-color: #1e293b;">
+                            <span>📁 السجلات المحفوظة</span>
+                        </button>
                     </div>
                 </div>
 
@@ -24341,25 +24875,7 @@ const renderAccountingSubscriptionsSection = () => {
             </div>
 
             <!-- جدول السجلات المحفوظة للاشتراكات -->
-            <div class="info-card" style="padding: 16px 20px; background: #fff; border: 1px solid var(--border-color, #cbd5e1); border-radius: 10px;">
-                <h4 style="margin-bottom: 12px; font-weight: 800;">سجلات طلبات الخدمة والاشتراكات المحفوظة</h4>
-                <div class="responsive-table">
-                    <table class="data-table" style="width: 100%;">
-                        <thead>
-                            <tr>
-                                <th>رقم الطلب</th>
-                                <th>اسم العميل</th>
-                                <th>الرقم القومي</th>
-                                <th>العنوان</th>
-                                <th>الموبايل</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sub-saved-records-body"></tbody>
-                    </table>
-                </div>
             </div>
-        </div>
         `;
     const getDocFormData = () => {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20;
@@ -24449,36 +24965,7 @@ const renderAccountingSubscriptionsSection = () => {
         if (msgEl)
             msgEl.innerHTML = '';
     };
-    const renderSavedSubList = () => {
-        const tableBody = document.getElementById('sub-saved-records-body');
-        if (!tableBody)
-            return;
-        const records = getAccountingRequests();
-        if (!records.length) {
-            tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #64748b; padding: 18px;">لا توجد اشتراكات محفوظة حتى الآن.</td></tr>`;
-            return;
-        }
-        const canDelete = hasButtonPermission('delete_button');
-        const canPrint = hasButtonPermission('print_button');
-        tableBody.innerHTML = records.map(rec => `
-                <tr>
-                    <td style="font-weight: bold;">${rec['order-number'] || '-'}</td>
-                    <td style="font-weight: bold;">${rec['client-name'] || '-'}</td>
-                    <td>${rec['card-number'] || '-'}</td>
-                    <td>${rec.address || '-'}</td>
-                    <td>${rec.mobile || '-'}</td>
-                    <td>
-                        <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
-                            <button type="button" class="btn secondary btn-sub-load" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px;">عرض في المستند 📄</button>
-                            <button type="button" class="btn btn-sub-transfer" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0d9488; border-color: #0f766e; color: #fff;">تحويل للإدارة 🏢</button>
-                            ${canPrint ? `<button type="button" class="btn btn-sub-print" data-id="${rec.id}" style="padding: 4px 10px; font-size: 12px; background: #0284c7; border-color: #0369a1; color: #fff;">طباعة النموذج الجديد 🖨️</button>` : ''}
-                            ${canDelete ? `<button type="button" class="btn btn-delete btn-sub-delete" data-id="${rec.id}" style="padding: 4px 8px; font-size: 12px;">حذف</button>` : ''}
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-    };
-    renderSavedSubList();
+    // صفحة الاشتراكات مخصصة لتسجيل المستند فقط، والسجلات المحفوظة تدار حصرياً في صفحة السجلات المحفوظة
     // زر الطباعة المطابقة للأصل
     (_a = document.getElementById('sub-doc-print-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => {
         if (!hasButtonPermission('print_button')) {
@@ -24539,7 +25026,6 @@ const renderAccountingSubscriptionsSection = () => {
                 idEl.value = String(currentData.id);
             showToast('تم حفظ بيانات الاشتراك بنجاح.', 'success');
         }
-        renderSavedSubList();
     });
     // زر اشتراك جديد
     (_d = document.getElementById('sub-doc-reset-btn')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
@@ -24641,59 +25127,6 @@ const renderAccountingSubscriptionsSection = () => {
             searchInput.value = '';
         if (searchMsg)
             searchMsg.innerHTML = '';
-    });
-    // أحداث الجدول (عرض في المستند / طباعة / تحويل للإدارة / حذف)
-    body.addEventListener('click', (event) => {
-        var _a;
-        const target = event.target;
-        const loadBtn = target.closest('.btn-sub-load');
-        const printBtn = target.closest('.btn-sub-print');
-        const transferBtn = target.closest('.btn-sub-transfer');
-        const deleteBtn = target.closest('.btn-sub-delete');
-        if (transferBtn) {
-            const id = Number(transferBtn.getAttribute('data-id'));
-            showTransferAccountingRecordModal(id, () => {
-                renderSavedSubList();
-                resetDocForm();
-            });
-            return;
-        }
-        if (loadBtn) {
-            const id = Number(loadBtn.getAttribute('data-id'));
-            const rec = getAccountingRequests().find(r => Number(r.id) === id);
-            if (rec) {
-                setDocFormData(rec);
-                showToast('تم عرض بيانات الاشتراك في المستند أعلاه.', 'info');
-                (_a = document.getElementById('sub-document-sheet')) === null || _a === void 0 ? void 0 : _a.scrollIntoView({ behavior: 'smooth' });
-            }
-            return;
-        }
-        if (printBtn) {
-            if (!hasButtonPermission('print_button')) {
-                showToast('عفواً، ليس لديك صلاحية الطباعة.', 'error');
-                return;
-            }
-            const id = Number(printBtn.getAttribute('data-id'));
-            const rec = getAllAccountingRequests().find(r => Number(r.id) === id);
-            if (rec) {
-                printAccountingRecordDetails(rec);
-            }
-            return;
-        }
-        if (deleteBtn) {
-            if (!hasButtonPermission('delete_button')) {
-                showToast('عفواً، ليس لديك صلاحية حذف سجلات الاشتراكات. هذه الصلاحية مقصورة على مسؤول المنظومة فقط.', 'error');
-                return;
-            }
-            const id = Number(deleteBtn.getAttribute('data-id'));
-            if (confirm('هل أنت متأكد من حذف هذا الاشتراك؟')) {
-                const filtered = getAllAccountingRequests().filter(r => Number(r.id) !== id);
-                saveAccountingRequests(filtered);
-                showToast('تم حذف الاشتراك بنجاح.', 'success');
-                renderSavedSubList();
-                resetDocForm();
-            }
-        }
     });
 };
 const renderBranchCouncilsInSettings = () => {
@@ -27280,7 +27713,7 @@ const handleDeleteSelectedMeters = async () => {
  * @param event The click event.
  */
 function handleNavigation(event) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     const currentActiveSection = document.querySelector('.content-section.active');
     if (!isNavigatingBack && currentActiveSection) {
         // Don't push if we are already on the target page to avoid duplicates on refresh-like actions
@@ -27383,6 +27816,14 @@ function handleNavigation(event) {
     }
     else if (targetId === 'reports') {
         renderReportsSection();
+        const repType = (_e = targetLink === null || targetLink === void 0 ? void 0 : targetLink.dataset) === null || _e === void 0 ? void 0 : _e.reportType;
+        if (repType) {
+            const repSelect = document.getElementById('report-type');
+            if (repSelect && Array.from(repSelect.options).some(o => o.value === repType)) {
+                repSelect.value = repType;
+                updateReportFilters();
+            }
+        }
     }
     else if (targetId === 'user-management') {
         renderUserManagementSection();
@@ -27455,7 +27896,7 @@ function handleNavigation(event) {
     }
     else if (targetId === 'subscribers-all') {
         // تنظيف واجهة التعديل الجماعي السابقة لضمان عدم التكرار
-        (_e = document.getElementById('bulk-action-container-all')) === null || _e === void 0 ? void 0 : _e.remove();
+        (_f = document.getElementById('bulk-action-container-all')) === null || _f === void 0 ? void 0 : _f.remove();
         // نقل زر الرجوع من رأس الصفحة إلى حاوية البحث الأساسية لسهولة الوصول
         const backBtn = document.querySelector('#subscribers-all .btn-back-page');
         const searchBtn = document.getElementById('btn-search-subscribers-all');
@@ -27498,7 +27939,7 @@ function handleNavigation(event) {
     }
     else if (targetId === 'subscribers-new') {
         // Remove existing button to ensure correct state
-        (_f = document.getElementById('delete-selected-new-meters-btn')) === null || _f === void 0 ? void 0 : _f.remove();
+        (_g = document.getElementById('delete-selected-new-meters-btn')) === null || _g === void 0 ? void 0 : _g.remove();
         let columns = [...columnConfigs['subscribers-new']];
         if ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.role) === 'admin') {
             columns.unshift({
@@ -27816,7 +28257,7 @@ const setupEventListeners = () => {
         showToast(`تم تبديل عرض الإدارة الفرعية: ${currentAdminScopeBranch === 'all' ? 'جميع الإدارات الفرعية' : currentAdminScopeBranch}`, 'info');
     });
     // Main App Listeners
-    document.querySelectorAll('.sidebar-nav .nav-link, .btn-back, .card.nav-link').forEach(link => {
+    document.querySelectorAll('.sidebar-nav .nav-link, .btn-back, .card.nav-link, [data-target="reports"]').forEach(link => {
         link.addEventListener('click', handleNavigation);
     });
     // Meter Management Listeners
