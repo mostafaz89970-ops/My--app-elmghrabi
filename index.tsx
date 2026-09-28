@@ -1794,6 +1794,17 @@ const loadState = async () => {
         ensureDefaultPermissions(mergedState.settings);
         state = mergedState;
 
+        // تنظيف أي بيانات قديمة موروثة بها تداخل في بيانات الهدم مع الأعطال
+        if (state.meters && Array.isArray(state.meters)) {
+            state.meters.forEach(meter => {
+                if (isFaultySubscriber(meter.subscriberType)) {
+                    if (meter.demolitionType) delete (meter as any).demolitionType;
+                    if (meter.demolitionDate) delete (meter as any).demolitionDate;
+                    if (meter.meterReceivedBy) delete (meter as any).meterReceivedBy;
+                }
+            });
+        }
+
         // After successfully loading, save back to IndexedDB to complete migration
         // and remove from localStorage to prevent re-migration.
         await saveToIndexedDB('appState', state);
@@ -11429,6 +11440,41 @@ const handlePrintJudicialControlDetails = () => {
         }
     };
 
+    // --- دالات التحقق وتحديد حالة المشترك بدقة عالية لتفادي تداخل بيانات الهدم والأعطال ---
+    function isFaultySubscriber(type: any): boolean {
+        const t = String(type || '').trim();
+        return ['مرفوع أعطال', 'مرفوع اعطال', 'عطل', 'أعطال'].includes(t) || t.includes('أعطال') || t.includes('اعطال');
+    }
+
+    function isDemolitionSubscriber(type: any): boolean {
+        const t = String(type || '').trim();
+        if (isFaultySubscriber(t)) return false;
+        return ['هدم', 'استغناء', 'مرفوع هدم', 'رفع هدم'].includes(t) || t.includes('هدم') || t.includes('استغناء');
+    }
+
+    function isReplacementSubscriber(type: any): boolean {
+        const t = String(type || '').trim();
+        if (isFaultySubscriber(t) || isDemolitionSubscriber(t)) return false;
+        return ['مرفوع إحلال', 'مرفوع احلال', 'استبدال', 'تم استبداله', 'تم تغير العداد'].includes(t) || t.includes('إحلال') || t.includes('احلال') || t.includes('استبدال');
+    }
+
+    function isRepairedSubscriber(type: any): boolean {
+        const t = String(type || '').trim();
+        if (isFaultySubscriber(t) || isDemolitionSubscriber(t) || isReplacementSubscriber(t)) return false;
+        return ['تم الإصلاح', 'تم الاصلاح', 'لا يمكن إصلاحه', 'لا يمكن اصلاحه'].includes(t) || t.includes('إصلاح') || t.includes('اصلاح');
+    }
+
+    function isNewSubscriberType(type: any): boolean {
+        const t = String(type || '').trim();
+        return t === 'جديد';
+    }
+
+    function isChangeContractSubscriber(type: any): boolean {
+        const t = String(type || '').trim();
+        if (isFaultySubscriber(t) || isDemolitionSubscriber(t) || isReplacementSubscriber(t) || isRepairedSubscriber(t)) return false;
+        return t === 'تغير عقد اشتراك' || t.includes('عقد');
+    }
+
     const updateMeterFormVisibility = (formPrefix: string = '') => {
         const meterTypeSelect = document.getElementById(`${formPrefix}meterType`) as HTMLSelectElement;
         const subscriberTypeSelect = document.getElementById(`${formPrefix}subscriberType`) as HTMLSelectElement;
@@ -11439,12 +11485,12 @@ const handlePrintJudicialControlDetails = () => {
 
         const subscriberType = (subscriberTypeSelect.value || '').trim();
         const meterType = meterTypeSelect ? meterTypeSelect.value : '';
-        const isNewSubscriber = subscriberType === 'جديد';
-        const isReplacement = ['مرفوع إحلال', 'استبدال', 'تم استبداله', 'تم تغير العداد'].includes(subscriberType);
-        const isFaulty = subscriberType === 'مرفوع أعطال';
-        const isDemolition = ['هدم', 'استغناء'].includes(subscriberType);
-        const isChangeContract = subscriberType === 'تغير عقد اشتراك';
-        const isRepaired = ['تم الإصلاح', 'لا يمكن إصلاحه'].includes(subscriberType);
+        const isNewSubscriber = isNewSubscriberType(subscriberType);
+        const isReplacement = isReplacementSubscriber(subscriberType);
+        const isFaulty = isFaultySubscriber(subscriberType);
+        const isDemolition = isDemolitionSubscriber(subscriberType);
+        const isChangeContract = isChangeContractSubscriber(subscriberType);
+        const isRepaired = isRepairedSubscriber(subscriberType);
         const isImported = subscriberType.includes('مستورد');
 
         // --- Hide/show fields based on 'جديد' status ---
@@ -11505,7 +11551,7 @@ const handlePrintJudicialControlDetails = () => {
 
         const hasDemolitionData = !!(
             (document.getElementById(`${formPrefix}demolitionDate`) as HTMLInputElement)?.value ||
-            (document.getElementById(`${formPrefix}demolitionType`) as HTMLSelectElement)?.value ||
+            ((document.getElementById(`${formPrefix}demolitionType`) as HTMLSelectElement)?.value && (document.getElementById(`${formPrefix}demolitionType`) as HTMLSelectElement)?.value !== 'غير محدد') ||
             (document.getElementById(`${formPrefix}meterReceivedBy`) as HTMLSelectElement)?.value
         );
 
@@ -11566,14 +11612,12 @@ const handlePrintJudicialControlDetails = () => {
             showDemolition = false;
             showChangeSubscription = false;
         } else if (isImported) {
-            // For imported records with unspecified subtype, show whichever fieldsets actually have recorded data
             showRemoval = hasRemovalData;
             showInstallation = hasInstallData;
             showDemolition = hasDemolitionData;
             showChangeSubscription = hasChangeSubData;
             showRepairedInfo = hasRepairedData;
         } else {
-            // Fallback for custom or untyped statuses
             showRemoval = hasRemovalData;
             showInstallation = hasInstallData;
             showDemolition = hasDemolitionData;
@@ -11583,14 +11627,20 @@ const handlePrintJudicialControlDetails = () => {
 
         // Apply visibility to containers
         const removalFields = document.getElementById(`${formPrefix}removal-fields`);
-        if (removalFields) removalFields.classList.toggle('hidden', !showRemoval);
+        if (removalFields) {
+            removalFields.classList.toggle('hidden', !showRemoval);
+            const legend = removalFields.querySelector('legend');
+            if (legend) {
+                legend.textContent = isFaulty ? 'بيانات رفع العطل' : (isReplacement ? 'بيانات رفع الإحلال' : 'بيانات الرفع');
+            }
+        }
 
         const installationFields = document.getElementById(`${formPrefix}installation-fields`);
         if (installationFields) {
             installationFields.classList.toggle('hidden', !showInstallation);
             const legend = installationFields.querySelector('legend');
             if (legend) {
-                legend.textContent = isReplacement ? 'بيانات تركيب العداد الجديد / البديل' : 'بيانات التركيب';
+                legend.textContent = isReplacement ? 'بيانات تركيب العداد البديل / الجديد' : 'بيانات التركيب';
             }
         }
 
@@ -11805,7 +11855,7 @@ const handlePrintJudicialControlDetails = () => {
         const printedByText = `تمت الطباعة بواسطة: ${loggedInUser?.fullName || 'مستخدم'} | ${printDate}`;
 
         const createRow = (label: string, value: any) => {
-            if (!value) return '';
+            if (!value || value === 'غير محدد') return '';
             return `
             <div class="detail-item">
                 <label>${label}</label>
@@ -11828,23 +11878,25 @@ const handlePrintJudicialControlDetails = () => {
             createRow('ملاحظات', meter.notes)
         ].join('');
 
-        const isNewRecord = meter.subscriberType === 'جديد';
-        const isFaultyRecord = meter.subscriberType === 'مرفوع أعطال';
-        const isDemolitionRecord = ['هدم', 'استغناء'].includes(meter.subscriberType);
-        const isReplacementRecord = ['مرفوع إحلال', 'استبدال', 'تم استبداله', 'تم تغير العداد'].includes(meter.subscriberType);
-        const isRepairedRecord = ['تم الإصلاح', 'لا يمكن إصلاحه'].includes(meter.subscriberType);
+        const isNewRecord = isNewSubscriberType(meter.subscriberType);
+        const isFaultyRecord = isFaultySubscriber(meter.subscriberType);
+        const isDemolitionRecord = isDemolitionSubscriber(meter.subscriberType);
+        const isReplacementRecord = isReplacementSubscriber(meter.subscriberType);
+        const isRepairedRecord = isRepairedSubscriber(meter.subscriberType);
+        const isChangeContractRecord = isChangeContractSubscriber(meter.subscriberType);
 
-        const hasNewMeterData = !!(meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement) && !isNewRecord;
+        const hasNewMeterData = !!(meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement) && isReplacementRecord;
 
         const meterItems = [
             createRow(hasNewMeterData ? 'شاسية العداد القديم' : 'شاسية العداد', meter.meterChassisNumber),
             createRow(hasNewMeterData ? 'نوع العداد القديم' : 'نوع العداد', meter.meterType),
             createRow('قدرة العداد', meter.meterCapacity),
+            createRow('شركة توريد العداد', meter.meterSupplyCompany),
             (meter.meterType === 'مسبق الدفع' ? createRow('حالة الكارت', meter.cardStatus) : '')
         ].join('');
 
-        // Install items: ONLY for new subscribers, replacement records, or records genuinely having install data (never for faulty or demolition)
-        const shouldShowInstallInPrint = isNewRecord || isReplacementRecord || (!isFaultyRecord && !isDemolitionRecord && !isRepairedRecord && (meter.installationDate || meter.installedBy || hasNewMeterData));
+        // Install items: ONLY for new subscribers or replacement records (NEVER for faulty or demolition)
+        const shouldShowInstallInPrint = isNewRecord || isReplacementRecord;
         const installItems = shouldShowInstallInPrint ? [
             (isNewRecord ? createRow('شاسية العداد', meter.meterChassisNumber || meter.newMeterChassisNumber) : (hasNewMeterData ? createRow('شاسية العداد الجديد', meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement) : '')),
             (isNewRecord ? createRow('نوع العداد', meter.meterType || meter.newMeterType) : (hasNewMeterData ? createRow('نوع العداد الجديد', meter.newMeterType) : '')),
@@ -11854,17 +11906,17 @@ const handlePrintJudicialControlDetails = () => {
             createRow('حالة التركيب', meter.installationStatus)
         ].join('') : '';
 
-        // Removal items: ONLY for faulty, replacement, repaired, or when removal date exists (never for new or demolition)
+        // Removal items: ONLY for faulty, replacement, repaired, or when removal date genuinely exists (NEVER for new or demolition)
         const shouldShowRemovalInPrint = isFaultyRecord || isReplacementRecord || isRepairedRecord || (!isNewRecord && !isDemolitionRecord && (meter.removalDate || meter.removalReason));
         const removalItems = shouldShowRemovalInPrint ? [
-            createRow('تاريخ الرفع', meter.removalDate),
             createRow('سبب الرفع', meter.removalReason),
+            createRow('تاريخ الرفع', meter.removalDate),
             createRow('القائم بالرفع', meter.removedBy),
             createRow('القراءة عند الرفع', meter.readingAtRemoval)
         ].join('') : '';
 
         let repairItems = '';
-        if (isRepairedRecord || meter.repairStatus || meter.repairDate) {
+        if (isRepairedRecord) {
             let durationRow = '';
             const start = meter.removalDate;
             const end = meter.reinstallationDate || meter.installationDateForReplacement;
@@ -11885,24 +11937,28 @@ const handlePrintJudicialControlDetails = () => {
             ].join('');
         }
 
-        const demolitionItems = (isDemolitionRecord || (meter.demolitionDate || meter.demolitionType)) ? [
+        // Demolition items: ONLY when record is actually Demolition / Relinquishment (STRICTLY NEVER for faulty records)
+        const demolitionItems = isDemolitionRecord ? [
             createRow(meter.subscriberType === 'استغناء' ? 'تاريخ الاستغناء' : 'تاريخ الهدم', meter.demolitionDate),
             createRow(meter.subscriberType === 'استغناء' ? 'نوع الاستغناء' : 'نوع الهدم', meter.demolitionType),
             createRow('القائم بالاستلام', meter.meterReceivedBy)
         ].join('') : '';
 
-        const contractItems = (meter.subscriberType === 'تغير عقد اشتراك' || meter.newSubscriberName || meter.contractDate) ? [
+        const contractItems = (isChangeContractRecord && (meter.newSubscriberName || meter.contractDate)) ? [
             createRow('اسم المشترك الجديد', meter.newSubscriberName),
             createRow('تاريخ التعاقد', meter.contractDate)
         ].join('') : '';
+
+        const removalLegend = isFaultyRecord ? 'بيانات رفع العطل' : (isReplacementRecord ? 'بيانات رفع الإحلال' : 'بيانات الرفع');
+        const installLegend = isReplacementRecord ? 'بيانات تركيب العداد البديل / الجديد' : 'بيانات التركيب';
 
         const content = `
         <div class="statement-result-card">
             <div class="details-grid">
                 ${basicItems ? `<fieldset><legend>البيانات الأساسية</legend>${basicItems}</fieldset>` : ''}
                 ${meterItems ? `<fieldset><legend>بيانات العداد</legend>${meterItems}</fieldset>` : ''}
-                ${installItems ? `<fieldset><legend>بيانات التركيب</legend>${installItems}</fieldset>` : ''}
-                ${removalItems ? `<fieldset><legend>بيانات الرفع</legend>${removalItems}</fieldset>` : ''}
+                ${installItems ? `<fieldset><legend>${installLegend}</legend>${installItems}</fieldset>` : ''}
+                ${removalItems ? `<fieldset><legend>${removalLegend}</legend>${removalItems}</fieldset>` : ''}
                 ${repairItems ? `<fieldset><legend>بيانات الإصلاح</legend>${repairItems}</fieldset>` : ''}
                 ${demolitionItems ? `<fieldset><legend>${meter.subscriberType === 'استغناء' ? 'بيانات الاستغناء' : 'بيانات الهدم'}</legend>${demolitionItems}</fieldset>` : ''}
                 ${contractItems ? `<fieldset><legend>بيانات تغيير التعاقد</legend>${contractItems}</fieldset>` : ''}
@@ -11958,25 +12014,48 @@ const handlePrintJudicialControlDetails = () => {
                 border-bottom: none;
             }
             .detail-item label {
-                font-weight: 500;
-                color: #333;
-            }
-            .detail-item .value {
+                font-weight: bold;
                 color: #555;
             }
-        </style></head><body>
-        <div class="print-header">
-            <div class="header-content">
-                <div class="header-right">${companyName}</div>
-                <div class="header-center">
-                    <h2 style="margin: 0; font-size: 18px;">تفاصيل المشترك</h2>
-                    <div style="font-size: 10px; margin-top: 5px;">${printedByText}</div>
+            .detail-item .value {
+                text-align: left;
+                direction: ltr; /* For numbers/codes */
+                display: inline-block;
+            }
+            /* Reset direction for text values */
+            .detail-item:has(label:contains('اسم')) .value,
+            .detail-item:has(label:contains('العنوان')) .value,
+            .detail-item:has(label:contains('نوع')) .value,
+            .detail-item:has(label:contains('حالة')) .value,
+            .detail-item:has(label:contains('ملاحظات')) .value {
+                direction: rtl;
+                text-align: right;
+            }
+        </style>
+        </head><body>
+            <div class="print-header">
+                <div class="header-content">
+                    <div class="header-right">
+                        <div>${companyName}</div>
+                        <div>المنظومة الموحدة لادارة العدادات 2025</div>
+                    </div>
+                    <div class="header-center">
+                        <h2>تقرير تفاصيل المشترك</h2>
+                    </div>
+                    <div class="header-left">
+                        ${logoHTML}
+                    </div>
                 </div>
-                <div class="header-left">${logoHTML}</div>
             </div>
-        </div>
-        ${content}<div class="print-footer"><p>تاريخ الطباعة: ${printDate}</p></div></body></html>
-        `;
+            
+            ${content}
+            
+            <div class="print-footer">
+                ${printedByText}
+            </div>
+        </body></html>
+      `;
+
         executePrintHtmlContent(printSubscriberDoc);
     };
 
@@ -12287,8 +12366,12 @@ const handlePrintJudicialControlDetails = () => {
                 (group as HTMLElement).style.display = isRegistered ? '' : 'none';
             });
 
-            // فحص المجموعات (fieldsets): إخفاء أي مجموعة لا تحتوي على أي حقل مسجل وظاهر
+            // فحص المجموعات (fieldsets): احترام الحالات المخفية بواسطة updateMeterFormVisibility
             form.querySelectorAll('fieldset').forEach(fs => {
+                if (fs.classList.contains('hidden')) {
+                    (fs as HTMLElement).style.display = 'none';
+                    return;
+                }
                 const visibleChildGroups = Array.from(fs.querySelectorAll('.input-group')).filter(g => (g as HTMLElement).style.display !== 'none' && !g.classList.contains('hidden'));
                 (fs as HTMLElement).style.display = visibleChildGroups.length > 0 ? '' : 'none';
             });
@@ -12328,10 +12411,53 @@ const handlePrintJudicialControlDetails = () => {
             }
         }
 
-        // If subscriber type is changed to 'New', map data from installation fields.
-        if (updatedData.subscriberType === 'جديد') {
-            updatedData.meterChassisNumber = updatedData.newMeterChassisNumber;
-            updatedData.meterType = updatedData.newMeterType;
+        // تنظيف الحقول لتفادي تداخل بيانات الهدم مع الأعطال أو التركيب
+        if (isFaultySubscriber(updatedData.subscriberType)) {
+            updatedData.demolitionType = '';
+            updatedData.demolitionDate = '';
+            updatedData.meterReceivedBy = '';
+            updatedData.newMeterChassisNumber = '';
+            updatedData.newMeterType = '';
+            updatedData.installationDate = '';
+            updatedData.installedBy = '';
+            updatedData.installationStatus = '';
+            updatedData.repairStatus = '';
+            updatedData.repairDate = '';
+            updatedData.reinstallationDate = '';
+            updatedData.newMeterChassisNumberForReplacement = '';
+            updatedData.installationDateForReplacement = '';
+            updatedData.newSubscriberName = '';
+            updatedData.contractDate = '';
+        } else if (isDemolitionSubscriber(updatedData.subscriberType)) {
+            updatedData.newMeterChassisNumber = '';
+            updatedData.newMeterType = '';
+            updatedData.installationDate = '';
+            updatedData.installedBy = '';
+            updatedData.installationStatus = '';
+            updatedData.repairStatus = '';
+            updatedData.repairDate = '';
+            updatedData.reinstallationDate = '';
+            updatedData.newMeterChassisNumberForReplacement = '';
+            updatedData.installationDateForReplacement = '';
+            updatedData.newSubscriberName = '';
+            updatedData.contractDate = '';
+        } else if (isNewSubscriberType(updatedData.subscriberType)) {
+            updatedData.meterChassisNumber = updatedData.newMeterChassisNumber || updatedData.meterChassisNumber;
+            updatedData.meterType = updatedData.newMeterType || updatedData.meterType;
+            updatedData.removalDate = '';
+            updatedData.removalReason = '';
+            updatedData.removedBy = '';
+            updatedData.readingAtRemoval = '';
+            updatedData.demolitionType = '';
+            updatedData.demolitionDate = '';
+            updatedData.meterReceivedBy = '';
+            updatedData.repairStatus = '';
+            updatedData.repairDate = '';
+            updatedData.reinstallationDate = '';
+            updatedData.newMeterChassisNumberForReplacement = '';
+            updatedData.installationDateForReplacement = '';
+            updatedData.newSubscriberName = '';
+            updatedData.contractDate = '';
         }
 
         const originalMeter = { ...state.meters[meterIndex] }; // Make a copy before updating
@@ -12844,19 +12970,26 @@ const handlePrintJudicialControlDetails = () => {
                     meter.newMeterType ? createDetailItem('نوع العداد الجديد', meter.newMeterType, 'newMeterType') : ''
                 ].join('');
 
-                const isFaulty = meter.subscriberType === 'مرفوع أعطال';
-                const isDemolition = ['هدم', 'استغناء'].includes(meter.subscriberType);
-                const isReplacement = meter.subscriberType === 'مرفوع إحلال';
+                const isFaulty = isFaultySubscriber(meter.subscriberType);
+                const isDemolition = isDemolitionSubscriber(meter.subscriberType);
+                const isReplacement = isReplacementSubscriber(meter.subscriberType);
+                const isRepaired = isRepairedSubscriber(meter.subscriberType);
+                const isNew = isNewSubscriberType(meter.subscriberType);
+                const isChangeContract = isChangeContractSubscriber(meter.subscriberType);
+                const isMechanical = meter.meterType === 'ميكانيكي';
 
                 let installOrContractFieldset = '';
 
                 if (isReplacement) {
-                    const contractItems = [
-                        createDetailItem('نوع النشاط', meter.activityType, 'activityType'),
-                        createDetailItem('وصف المكان', meter.locationDescription, 'locationDescription')
+                    const replInstallItems = [
+                        createDetailItem('شاسية العداد البديل', meter.newMeterChassisNumber || meter.newMeterChassisNumberForReplacement, 'newMeterChassisNumber'),
+                        createDetailItem('نوع العداد البديل', meter.newMeterType, 'newMeterType'),
+                        createDetailItem('تاريخ التركيب', meter.installationDate || meter.installationDateForReplacement, 'installationDate'),
+                        createDetailItem('القائم بالتركيب', meter.installedBy, 'installedBy'),
+                        createDetailItem('حالة التركيب', meter.installationStatus, 'installationStatus')
                     ].join('');
-                    if (contractItems) installOrContractFieldset = `<fieldset><legend>بيانات التعاقد</legend>${contractItems}</fieldset>`;
-                } else if (!isFaulty && !isDemolition) {
+                    if (replInstallItems) installOrContractFieldset = `<fieldset><legend>بيانات تركيب العداد البديل</legend>${replInstallItems}</fieldset>`;
+                } else if (isNew) {
                     const installItems = [
                         createDetailItem('تاريخ التركيب', meter.installationDate, 'installationDate'),
                         createDetailItem('القائم بالتركيب', meter.installedBy, 'installedBy'),
@@ -12865,13 +12998,10 @@ const handlePrintJudicialControlDetails = () => {
                     if (installItems) installOrContractFieldset = `<fieldset><legend>بيانات التركيب</legend>${installItems}</fieldset>`;
                 }
 
-                const isNew = meter.subscriberType === 'جديد';
-                const isMechanical = meter.meterType === 'ميكانيكي';
-
                 const removalItems = (isNew || isDemolition) ? '' : [
+                    createDetailItem('سبب الرفع', meter.removalReason, 'removalReason'),
                     createDetailItem('تاريخ الرفع', meter.removalDate, 'removalDate'),
                     createDetailItem('القائم بالرفع', meter.removedBy, 'removedBy'),
-                    createDetailItem('سبب الرفع', meter.removalReason, 'removalReason'),
                     (isMechanical ? createDetailItem('القراءة عند الرفع', meter.readingAtRemoval, 'readingAtRemoval') : '')
                 ].join('');
 
@@ -12882,12 +13012,20 @@ const handlePrintJudicialControlDetails = () => {
                     (isMechanical ? createDetailItem('القراءة عند الرفع', meter.readingAtRemoval, 'readingAtRemoval') : '')
                 ].join('') : '';
 
-                const repairItems = [
+                const repairItems = isRepaired ? [
                     createDetailItem('حالة الإصلاح', meter.repairStatus, 'repairStatus'),
-                    createDetailItem('شاسية عداد بديل (إصلاح)', meter.newMeterChassisNumberForReplacement, 'newMeterChassisNumberForReplacement'),
-                    createDetailItem('تاريخ تركيب البديل', meter.installationDateForReplacement, 'installationDateForReplacement'),
-                    createDetailItem('تاريخ الرجوع للتركيب', meter.reinstallationDate, 'reinstallationDate')
-                ].join('');
+                    createDetailItem('تاريخ الإصلاح', meter.repairDate, 'repairDate'),
+                    createDetailItem('تاريخ الرجوع للتركيب', meter.reinstallationDate, 'reinstallationDate'),
+                    createDetailItem('شاسية عداد بديل (إصلاح)', meter.newMeterChassisNumberForReplacement, 'newMeterChassisNumberForReplacement')
+                ].join('') : '';
+
+                const contractFieldset = (isChangeContract && (meter.newSubscriberName || meter.contractDate)) ? `
+                    <fieldset><legend>بيانات تغيير التعاقد</legend>
+                        ${createDetailItem('اسم المشترك الجديد', meter.newSubscriberName, 'newSubscriberName')}
+                        ${createDetailItem('تاريخ التعاقد', meter.contractDate, 'contractDate')}
+                    </fieldset>` : '';
+
+                const removalLegend = isFaulty ? 'بيانات رفع العطل' : (isReplacement ? 'بيانات رفع الإحلال' : 'بيانات الرفع');
 
                 const card = document.createElement('div');
                 card.className = 'statement-result-card';
@@ -12900,9 +13038,10 @@ const handlePrintJudicialControlDetails = () => {
                     ${(basicItems || hasAccountRef) ? `<fieldset><legend>البيانات الأساسية</legend>${basicItems}${accountRefHtml}</fieldset>` : ''}
                     ${meterItems ? `<fieldset><legend>بيانات العداد</legend>${meterItems}</fieldset>` : ''}
                     ${installOrContractFieldset}
-                    ${removalItems ? `<fieldset><legend>بيانات الرفع</legend>${removalItems}</fieldset>` : ''}
+                    ${removalItems ? `<fieldset><legend>${removalLegend}</legend>${removalItems}</fieldset>` : ''}
                     ${demolitionItems ? `<fieldset><legend>${meter.subscriberType === 'استغناء' ? 'بيانات الاستغناء' : 'بيانات الهدم'}</legend>${demolitionItems}</fieldset>` : ''}
-                    ${repairItems ? `<fieldset><legend>بيانات الإصلاح/الاستبدال</legend>${repairItems}</fieldset>` : ''}
+                    ${repairItems ? `<fieldset><legend>بيانات الإصلاح</legend>${repairItems}</fieldset>` : ''}
+                    ${contractFieldset}
                 </div>
             `;
                 resultsContainer.appendChild(card);

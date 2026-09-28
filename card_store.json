@@ -125,23 +125,40 @@
       "status": "مفعل",
       "readAt": "٢٧‏/٩‏/٢٠٢٦، ٤:٣٢:٢١ م",
       "meterData": []
+    },
+    "55267369": {
+      "id": "b2a5533e-df19-48d4-b3c3-17f88751aa86",
+      "cardId": "55267369",
+      "technicianCode": 12258,
+      "technicianName": "وحيد فاروق كامل",
+      "controlOperationTypeName": "كارت فتح و غلق مفتاح التوصيل",
+      "controlOperationType": 5,
+      "companyName": "المصرية",
+      "meterTypeName": "احادى 2024",
+      "cardIssueDate": "27‏‏/9‏‏/2026 4:53:28 م",
+      "activationDate": "٢٧‏/٩‏/٢٠٢٦",
+      "expiryDate": "٤‏/١٠‏/٢٠٢٦",
+      "issueUsername": "سناء عبدالستار عبدالعزيز",
+      "status": "مفعل",
+      "readAt": "٢٧‏/٩‏/٢٠٢٦، ٥:٠٨:٣٩ م",
+      "meterData": []
     }
   },
   "activeControlCard": {
-    "id": "c952e299-644c-4603-8114-0ba0139b65e2",
-    "cardId": "55267366",
+    "id": "b2a5533e-df19-48d4-b3c3-17f88751aa86",
+    "cardId": "55267369",
     "technicianCode": 12258,
     "technicianName": "وحيد فاروق كامل",
     "controlOperationTypeName": "كارت فتح و غلق مفتاح التوصيل",
     "controlOperationType": 5,
     "companyName": "المصرية",
     "meterTypeName": "احادى 2024",
-    "cardIssueDate": "27‏‏/9‏‏/2026 4:32:09 م",
-    "activationDate": "18‏‏/1‏‏/2013 4:32:09 م",
-    "expiryDate": "4‏‏/10‏‏/2026 4:32:09 م",
+    "cardIssueDate": "27‏‏/9‏‏/2026 4:53:28 م",
+    "activationDate": "18‏‏/1‏‏/2013 4:53:28 م",
+    "expiryDate": "4‏‏/10‏‏/2026 4:53:28 م",
     "issueUsername": "سناء عبدالستار عبدالعزيز",
     "status": "مفعل",
-    "readAt": "٢٧‏/٩‏/٢٠٢٦، ٤:٣٢:٢١ م",
+    "readAt": "٢٧‏/٩‏/٢٠٢٦، ٥:٠٨:٣٩ م",
     "meterData": []
   }
 }
