@@ -775,7 +775,7 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                     status: 'timeout',
                     message: 'استغرقت عملية التحديث وقتاً أطول من المتوقع. تأكد من ثبات كارت التحكم داخل القارئ.'
                 });
-            }, 12000);
+            }, 8000);
 
             try {
                 ws = new WebSocket(WS_URL);
@@ -995,6 +995,18 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                     status: 'error',
                     message: 'انقطع الاتصال بقارئ الكروت.'
                 });
+            };
+
+            ws.onclose = (e) => {
+                // If WS closes before we finish (e.g. service restarted or timeout on service side)
+                // Resolve with error so the UI never hangs
+                if (!finished) {
+                    finish({
+                        success: false,
+                        status: 'error',
+                        message: 'أُغلق الاتصال بقارئ الكروت قبل اكتمال العملية. يرجى المحاولة مرة أخرى.'
+                    });
+                }
             };
         });
 

@@ -15619,10 +15619,11 @@ const handleRenewControlCard = async () => {
             result = await window.renewControlCard(cardIdToRenew, genToRenew, vendorToRenew);
         }
         else {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            let fetchRes;
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000);
-                const res = await fetch('http://127.0.0.1:5002/api/renew-control-card', {
+                fetchRes = await fetch('http://127.0.0.1:5002/api/renew-control-card', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -15633,12 +15634,13 @@ const handleRenewControlCard = async () => {
                     signal: controller.signal
                 });
                 clearTimeout(timeoutId);
-                result = await res.json();
+                result = await fetchRes.json();
             }
             catch (bridgeErr) {
-                const errMsg = bridgeErr.name === 'AbortError' ? 'انتهت مهلة التحديث' : 'تعذر الاتصال بخدمة كروت التحكم المحلية.';
-                showToast(errMsg, 'error');
-                return;
+                clearTimeout(timeoutId);
+                const errMsg = bridgeErr.name === 'AbortError' ? 'انتهت مهلة التحديث (15 ثانية)' : 'تعذر الاتصال بخدمة كروت التحكم المحلية.';
+                // Throw so finally block runs and re-enables the button
+                throw new Error(errMsg);
             }
         }
         if (result && result.success) {
