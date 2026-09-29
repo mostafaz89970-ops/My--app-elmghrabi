@@ -281,11 +281,33 @@ async function readCustomerCard() {
 
     let record = store.cards[uid];
     if (!record) {
-        // Check if store has any saved cards
-        const keys = Object.keys(store.cards);
-        if (keys.length > 0) {
-            record = store.cards[keys[0]];
-        }
+        try {
+            const custFile = path.join(__dirname, 'customers_store.json');
+            if (fs.existsSync(custFile)) {
+                const custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+                const matchingCust = custs.find(c => c.cardUid === uid || (c.lastReadUid && c.lastReadUid === uid));
+                if (matchingCust) {
+                    const sysSeq = Number(matchingCust.chargeSequence != null ? matchingCust.chargeSequence : 1);
+                    const meterSeq = Number(matchingCust.chargeSequenceOnMeter != null ? matchingCust.chargeSequenceOnMeter : (matchingCust.meterChargeSequence || matchingCust.sequenceOnMeter || sysSeq));
+                    record = {
+                        meterNumber: matchingCust.meterNumber,
+                        customerName: matchingCust.name || matchingCust.customerName,
+                        subscriptionCode: matchingCust.code,
+                        nationalId: matchingCust.nationalId,
+                        address: matchingCust.address,
+                        activityName: matchingCust.activityName,
+                        customerTypeName: matchingCust.customerTypeName,
+                        meterCompanyName: matchingCust.meterCompanyName,
+                        remainingBalance: Number(matchingCust.balance || 0),
+                        chargeSequence: meterSeq,
+                        sequenceOnMeter: meterSeq,
+                        totalSystemCharges: sysSeq,
+                        totalMeterCharges: meterSeq,
+                        lastChargeDate: matchingCust.lastChargeDate
+                    };
+                }
+            }
+        } catch(e) {}
     }
 
     if (!record) {
@@ -663,11 +685,66 @@ async function issueReplacementWithCharge(params = {}) {
 
 // 7.1 Search Customer by Chassis Number or Customer Code
 async function searchCustomer(term) {
+    const q = String(term || '').trim();
+    if (!q) {
+        return { success: false, message: 'مصطلح البحث مطلوب' };
+    }
+
+    // 1. Try Live MEEDCO Search First
     try {
         const unifiedClient = require('./unifiedCardClient');
         if (unifiedClient && typeof unifiedClient.searchCustomerLive === 'function') {
-            const liveRes = await unifiedClient.searchCustomerLive(term);
-            if (liveRes && liveRes.success) {
+            const liveRes = await unifiedClient.searchCustomerLive(q);
+            if (liveRes && liveRes.success && liveRes.customer) {
+                const liveCust = liveRes.customer;
+                const sysSeq = Number(liveCust.chargeSequence != null ? liveCust.chargeSequence : 1);
+                const meterSeq = Number(liveCust.chargeSequenceOnMeter != null ? liveCust.chargeSequenceOnMeter : (liveCust.meterChargeSequence || liveCust.sequenceOnMeter || liveCust.chargeSequence || 1));
+
+                // Sync with local customers_store.json
+                try {
+                    const custFile = path.join(__dirname, 'customers_store.json');
+                    let custs = [];
+                    if (fs.existsSync(custFile)) {
+                        custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+                    }
+                    let found = custs.find(c => 
+                        (liveCust.id && String(c.id) === String(liveCust.id)) ||
+                        (liveCust.code && String(c.code) === String(liveCust.code)) ||
+                        (liveCust.meterNumber && String(c.meterNumber) === String(liveCust.meterNumber))
+                    );
+                    if (found) {
+                        found.chargeSequence = sysSeq;
+                        found.chargeSequenceOnMeter = meterSeq;
+                        found.meterChargeSequence = meterSeq;
+                        found.sequenceOnMeter = meterSeq;
+                        found.totalRechargeAmount = liveCust.totalRechargeAmount != null ? Number(liveCust.totalRechargeAmount) : found.totalRechargeAmount;
+                        found.totalMeterRechargeAmount = liveCust.totalMeterRechargeAmount != null ? Number(liveCust.totalMeterRechargeAmount) : found.totalMeterRechargeAmount;
+                    } else {
+                        custs.push({
+                            id: liveCust.id || liveCust.code || liveCust.meterNumber,
+                            code: liveCust.code || liveCust.codeNumber,
+                            name: liveCust.name || liveCust.customerName,
+                            nationalId: liveCust.nationalId || '-',
+                            meterNumber: liveCust.meterNumber,
+                            address: liveCust.address || '-',
+                            chargeSequence: sysSeq,
+                            chargeSequenceOnMeter: meterSeq,
+                            meterChargeSequence: meterSeq,
+                            sequenceOnMeter: meterSeq,
+                            totalRechargeAmount: Number(liveCust.totalRechargeAmount || 0),
+                            totalMeterRechargeAmount: Number(liveCust.totalMeterRechargeAmount || 0),
+                            balance: 0
+                        });
+                    }
+                    fs.writeFileSync(custFile, JSON.stringify(custs, null, 2), 'utf8');
+                } catch(e) {}
+
+                liveRes.customer.chargeSequence = sysSeq;
+                liveRes.customer.chargeSequenceOnMeter = meterSeq;
+                liveRes.customer.meterChargeSequence = meterSeq;
+                liveRes.customer.sequenceOnMeter = meterSeq;
+                liveRes.customer.totalSystemCharges = sysSeq;
+                liveRes.customer.totalMeterCharges = meterSeq;
                 return liveRes;
             }
         }
@@ -675,7 +752,51 @@ async function searchCustomer(term) {
         console.warn('Live searchCustomer notice:', e.message);
     }
 
-    const q = String(term || '').trim();
+    // 2. Search Local Verified Store (customers_store.json)
+    try {
+        const custFile = path.join(__dirname, 'customers_store.json');
+        if (fs.existsSync(custFile)) {
+            const custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+            const c = custs.find(item => 
+                String(item.meterNumber || '').trim() === q ||
+                String(item.code || '').trim() === q ||
+                String(item.codeNumber || '').trim() === q ||
+                String(item.id || '').trim() === q ||
+                String(item.nationalId || '').trim() === q ||
+                String(item.name || item.customerName || '').trim().includes(q)
+            );
+            if (c) {
+                const sysSeq = Number(c.chargeSequence != null ? c.chargeSequence : 1);
+                const meterSeq = Number(c.chargeSequenceOnMeter != null ? c.chargeSequenceOnMeter : (c.meterChargeSequence != null ? c.meterChargeSequence : (c.sequenceOnMeter != null ? c.sequenceOnMeter : sysSeq)));
+                return {
+                    success: true,
+                    customer: {
+                        id: c.id || c.code || c.meterNumber,
+                        name: c.name || c.customerName || c.subscriberName,
+                        code: c.code || c.codeNumber,
+                        meterNumber: c.meterNumber,
+                        meterCompanyName: c.meterCompanyName || 'المصرية',
+                        nationalId: c.nationalId || '-',
+                        address: c.address || '-',
+                        activityName: c.activityName || 'استخدامات منزلية',
+                        customerTypeName: c.customerTypeName || 'أهالي (صغار مشتركين)',
+                        chargeSequence: sysSeq,
+                        chargeSequenceOnMeter: meterSeq,
+                        meterChargeSequence: meterSeq,
+                        sequenceOnMeter: meterSeq,
+                        totalSystemCharges: sysSeq,
+                        totalMeterCharges: meterSeq,
+                        totalRechargeAmount: Number(c.totalRechargeAmount || 0),
+                        totalMeterRechargeAmount: Number(c.totalMeterRechargeAmount || 0),
+                        remainingBalance: Number(c.balance || c.currentBalance || 0)
+                    },
+                    financials: { debts: 0, fees: 0, credits: 0, abuses: 0, minCharge: 10 }
+                };
+            }
+        }
+    } catch(e) {}
+
+    // 3. Fallback to card_store.json
     const store = getCardStore();
     const card = Object.values(store.cards || {}).find(c =>
         String(c.meterNumber).trim() === q ||
@@ -856,54 +977,145 @@ async function clearControlCard() {
     };
 }
 
-// 9. Customer Charging Details by ID / Code
+// 9. Customer Charging Details by ID / Code (البيانات الفعلية الحية من MEEDCO وقاعدة البيانات المعتمدة)
 async function getCustomerChargingDetails(customerId) {
-    const store = getCardStore();
-    const debtsStore = getDebtsStore();
+    const cid = String(customerId || '').trim();
+    if (!cid) {
+        return { success: false, message: 'معرف أو كود المشترك مطلوب' };
+    }
 
-    // Look for customer in cards or debts
-    let cardRecord = Object.values(store.cards).find(c => 
-        String(c.subscriptionCode) === String(customerId) ||
-        String(c.meterNumber) === String(customerId)
-    ) || store.cards["EF74A35F"];
+    // 1. Try Live MEEDCO Backend First (Fetches 100% genuine sequence & financials)
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getCustomerChargingDetailsLive === 'function') {
+            let liveRes = await unifiedClient.getCustomerChargingDetailsLive(cid);
+            if (!liveRes || !liveRes.success || !liveRes.customer) {
+                liveRes = await unifiedClient.searchCustomerLive(cid);
+            }
+            if (liveRes && liveRes.success && liveRes.customer && (liveRes.customer.name || liveRes.customer.customerName)) {
+                const liveCust = liveRes.customer;
+                const sysSeq = Number(liveCust.chargeSequence != null ? liveCust.chargeSequence : 1);
+                const meterSeq = Number(liveCust.chargeSequenceOnMeter != null ? liveCust.chargeSequenceOnMeter : (liveCust.meterChargeSequence || liveCust.sequenceOnMeter || liveCust.chargeSequence || 1));
 
-    const custDebts = debtsStore.debts.filter(d => 
-        String(d.customerId) === String(customerId) || 
-        String(d.subscriptionCode) === String(customerId) || 
-        String(d.meterNumber) === String(cardRecord?.meterNumber)
-    );
+                // Sync with local customers_store.json to keep cache fresh with actual live sequences
+                try {
+                    const custFile = path.join(__dirname, 'customers_store.json');
+                    if (fs.existsSync(custFile)) {
+                        let custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+                        let found = custs.find(c => 
+                            (liveCust.id && String(c.id) === String(liveCust.id)) ||
+                            (liveCust.code && String(c.code) === String(liveCust.code)) ||
+                            (liveCust.meterNumber && String(c.meterNumber) === String(liveCust.meterNumber))
+                        );
+                        if (found) {
+                            found.chargeSequence = sysSeq;
+                            found.chargeSequenceOnMeter = meterSeq;
+                            found.meterChargeSequence = meterSeq;
+                            found.sequenceOnMeter = meterSeq;
+                            found.totalRechargeAmount = liveCust.totalRechargeAmount != null ? Number(liveCust.totalRechargeAmount) : found.totalRechargeAmount;
+                            found.totalMeterRechargeAmount = liveCust.totalMeterRechargeAmount != null ? Number(liveCust.totalMeterRechargeAmount) : found.totalMeterRechargeAmount;
+                            fs.writeFileSync(custFile, JSON.stringify(custs, null, 2), 'utf8');
+                        }
+                    }
+                } catch(e) {}
 
-    const totalRemaining = custDebts.reduce((sum, d) => sum + (Number(d.remainingAmount) || 0), 0);
-    const monthlyInstallment = custDebts
-        .filter(d => d.status === 'PaymentInProgress' || d.status === 'مستحق فوري')
-        .reduce((sum, d) => sum + (Number(d.installmentAmount) || 0), 0);
+                return {
+                    success: true,
+                    customer: {
+                        ...liveCust,
+                        chargeSequence: sysSeq,
+                        chargeSequenceOnMeter: meterSeq,
+                        meterChargeSequence: meterSeq,
+                        sequenceOnMeter: meterSeq,
+                        totalSystemCharges: sysSeq,
+                        totalMeterCharges: meterSeq,
+                        totalRechargeAmount: Number(liveCust.totalRechargeAmount || 0),
+                        totalMeterRechargeAmount: Number(liveCust.totalMeterRechargeAmount || 0)
+                    },
+                    financials: liveRes.financials || {
+                        debts: 0,
+                        monthlyInstallment: 0,
+                        fees: 0,
+                        credits: 0,
+                        abuses: 0,
+                        minCharge: 10
+                    }
+                };
+            }
+        }
+    } catch(err) {
+        console.warn('Live getCustomerChargingDetails notice:', err.message);
+    }
+
+    // 2. Verified Local Store (customers_store.json)
+    try {
+        const custFile = path.join(__dirname, 'customers_store.json');
+        if (fs.existsSync(custFile)) {
+            const custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+            const c = custs.find(item => 
+                (item.id && String(item.id).trim() === cid) ||
+                (item.customerId && String(item.customerId).trim() === cid) ||
+                (item.code && String(item.code).trim() === cid) ||
+                (item.codeNumber && String(item.codeNumber).trim() === cid) ||
+                (item.meterNumber && String(item.meterNumber).trim() === cid)
+            );
+            if (c) {
+                const sysSeq = Number(c.chargeSequence != null ? c.chargeSequence : 1);
+                const meterSeq = Number(c.chargeSequenceOnMeter != null ? c.chargeSequenceOnMeter : (c.meterChargeSequence != null ? c.meterChargeSequence : (c.sequenceOnMeter != null ? c.sequenceOnMeter : sysSeq)));
+                
+                const debtsStore = getDebtsStore();
+                const custDebts = debtsStore.debts.filter(d => 
+                    String(d.customerId) === String(c.id) || 
+                    String(d.subscriptionCode) === String(c.code) || 
+                    String(d.meterNumber) === String(c.meterNumber)
+                );
+                const totalRemaining = custDebts.reduce((sum, d) => sum + (Number(d.remainingAmount) || 0), 0);
+                const monthlyInstallment = custDebts
+                    .filter(d => d.status === 'PaymentInProgress' || d.status === 'مستحق فوري')
+                    .reduce((sum, d) => sum + (Number(d.installmentAmount) || 0), 0);
+
+                return {
+                    success: true,
+                    customer: {
+                        id: c.id || c.code || c.meterNumber,
+                        code: c.code || c.codeNumber,
+                        name: c.name || c.customerName || c.subscriberName,
+                        nationalId: c.nationalId || '-',
+                        address: c.address || '-',
+                        activityName: c.activityName || 'استخدامات منزلية',
+                        customerTypeName: c.customerTypeName || 'أهالي (صغار مشتركين)',
+                        meterNumber: c.meterNumber,
+                        meterCompanyName: c.meterCompanyName || 'المصرية',
+                        chargeSequence: sysSeq,
+                        chargeSequenceOnMeter: meterSeq,
+                        meterChargeSequence: meterSeq,
+                        sequenceOnMeter: meterSeq,
+                        totalSystemCharges: sysSeq,
+                        totalMeterCharges: meterSeq,
+                        totalRechargeAmount: Number(c.totalRechargeAmount || 0),
+                        totalMeterRechargeAmount: Number(c.totalMeterRechargeAmount || 0),
+                        balance: Number(c.balance || c.currentBalance || 0),
+                        lastChargeDate: c.lastChargeDate || 'اليوم',
+                        isChargeStop: !!c.isChargeStop,
+                        accountNumberReferenceCustomer: c.accountNumberReferenceCustomer || c.accountRefrence || '-'
+                    },
+                    financials: {
+                        debts: Number(totalRemaining.toFixed(2)),
+                        monthlyInstallment: Number(monthlyInstallment.toFixed(2)),
+                        fees: 0,
+                        credits: 0,
+                        abuses: 0,
+                        minCharge: 10,
+                        detailedDebts: custDebts
+                    }
+                };
+            }
+        }
+    } catch(e) {}
 
     return {
-        success: true,
-        customer: {
-            id: cardRecord.subscriptionCode,
-            code: cardRecord.subscriptionCode,
-            name: cardRecord.customerName,
-            nationalId: cardRecord.nationalId,
-            identityNumber: cardRecord.nationalId,
-            address: cardRecord.address,
-            activityName: cardRecord.activityName,
-            customerTypeName: cardRecord.customerTypeName,
-            meterNumber: cardRecord.meterNumber,
-            meterCompanyName: cardRecord.meterCompanyName,
-            chargeSequence: cardRecord.chargeSequence,
-            lastChargeDate: cardRecord.lastChargeDate,
-            isChargeStop: !!cardRecord.isStop
-        },
-        financials: {
-            debts: Number(totalRemaining.toFixed(2)),
-            monthlyInstallment: Number(monthlyInstallment.toFixed(2)),
-            fees: 15.00,
-            credits: 0.00,
-            abuses: Number(cardRecord.meterDebit || 0),
-            minCharge: 20.00,
-            detailedDebts: custDebts
-        }
+        success: false,
+        message: `لم يتم العثور على بيانات المشترك أو مسلسلات الشحن للمعرف: ${cid}`
     };
 }
 

@@ -1889,8 +1889,19 @@ async function readCustomerCardLive() {
 async function getCustomerChargingDetailsLive(customerId) {
     if (!customerId) return { success: false, message: 'معرف المشترك مطلوب' };
     try {
-        const custRes = await getCustomerDetailsLive(customerId);
-        const cust = custRes?.data || custRes;
+        let custRes = await getCustomerDetailsLive(customerId);
+        if (!custRes || !custRes.success || !custRes.data) {
+            // customerId might be meter number, subscription code, or nationalId
+            const sRes = await searchCustomerLive(customerId);
+            if (sRes && sRes.success && sRes.customer && sRes.customer.id && sRes.customer.id !== customerId) {
+                return getCustomerChargingDetailsLive(sRes.customer.id);
+            }
+            if (sRes && sRes.success && sRes.customer) {
+                return sRes;
+            }
+            return { success: false, message: custRes?.message || 'تعذر العثور على بيانات المشترك.' };
+        }
+        const cust = custRes.data;
 
         let debts = 0;
         let debtsDetails = [];

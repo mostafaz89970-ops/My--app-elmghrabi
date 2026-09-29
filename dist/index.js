@@ -17381,17 +17381,17 @@ const openCustomerOperationModal = (action, customer) => {
 
                                 <div>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
-                                        <label style="font-size: 0.85rem; font-weight: 800; color: #0284c7;">تسلسل الشحنة (بالنظام) *</label>
-                                        <span style="font-size:0.75rem; color:#64748b;">قاعدة بيانات النظام</span>
+                                        <label style="font-size: 0.85rem; font-weight: 800; color: #0284c7;">تسلسل الشحنة (بالنظام الفعلي) *</label>
+                                        <span style="font-size:0.75rem; color:#64748b;">قاعدة بيانات المنظومة</span>
                                     </div>
-                                    <input type="number" id="op-seq-system" value="${customer.chargeSequence || customer.meterChargeSequence || 1}" min="1" style="width: 100%; padding: 9px 12px; border: 2px solid #0284c7; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 1.05rem; box-sizing: border-box;">
+                                    <input type="number" id="op-seq-system" value="${customer.chargeSequence != null ? customer.chargeSequence : (customer.meterChargeSequence || 1)}" min="0" style="width: 100%; padding: 9px 12px; border: 2px solid #0284c7; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 1.05rem; box-sizing: border-box;">
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
                                         <label style="font-size: 0.85rem; font-weight: 800; color: #059669;">تسلسل الشحنة على العداد (الفعلي) *</label>
-                                        <span style="font-size:0.75rem; color:#059669; font-weight:700;">المسجل على العداد</span>
+                                        <span style="font-size:0.75rem; color:#059669; font-weight:700;">المسجل على العداد الفعلي</span>
                                     </div>
-                                    <input type="number" id="op-seq-meter" value="${customer.meterChargeSequence || customer.sequenceOnMeter || customer.chargeSequence || 1}" min="1" style="width: 100%; padding: 9px 12px; border: 2px solid #059669; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 1.05rem; box-sizing: border-box;">
+                                    <input type="number" id="op-seq-meter" value="${customer.chargeSequenceOnMeter != null ? customer.chargeSequenceOnMeter : (customer.meterChargeSequence != null ? customer.meterChargeSequence : (customer.sequenceOnMeter != null ? customer.sequenceOnMeter : (customer.chargeSequence || 1)))}" min="0" style="width: 100%; padding: 9px 12px; border: 2px solid #059669; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 1.05rem; box-sizing: border-box;">
                                 </div>
                             </div>
 
@@ -17425,8 +17425,8 @@ const openCustomerOperationModal = (action, customer) => {
                 const statusBox = document.getElementById('op-seq-status-box');
                 if (!statusBox)
                     return;
-                const sysVal = Math.max(1, Number(((_a = document.getElementById('op-seq-system')) === null || _a === void 0 ? void 0 : _a.value) || 1));
-                const meterVal = Math.max(1, Number(((_b = document.getElementById('op-seq-meter')) === null || _b === void 0 ? void 0 : _b.value) || 1));
+                const sysVal = Math.max(0, Number(((_a = document.getElementById('op-seq-system')) === null || _a === void 0 ? void 0 : _a.value) || 0));
+                const meterVal = Math.max(0, Number(((_b = document.getElementById('op-seq-meter')) === null || _b === void 0 ? void 0 : _b.value) || 0));
                 const nextChargeSeq = meterVal + 1;
                 if (sysVal === meterVal) {
                     statusBox.style.background = '#f0fdf4';
@@ -17436,7 +17436,7 @@ const openCustomerOperationModal = (action, customer) => {
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <span style="font-size:1.2rem;">✓</span>
                                 <div>
-                                    <div style="font-weight:800;">تطابق تام بين العداد والنظام (المسلسل: ${meterVal})</div>
+                                    <div style="font-weight:800;">تطابق تام بين العداد الفعلي والنظام (المسلسل: ${meterVal})</div>
                                     <div style="font-size:0.8rem; opacity:0.9;">العداد متوافق وسيقبل الشحنة القادمة رقم: <strong>${nextChargeSeq}</strong></div>
                                 </div>
                             </div>
@@ -17453,7 +17453,7 @@ const openCustomerOperationModal = (action, customer) => {
                                 <span style="font-size:1.2rem;">⚠️</span>
                                 <div>
                                     <div style="font-weight:800;">عدم تطابق في المسلسل (فارق ${diff} شحنة)! العداد الفعلي: <strong>${meterVal}</strong> | النظام: <strong>${sysVal}</strong></div>
-                                    <div style="font-size:0.8rem; opacity:0.9;">تحذير: إذا لم يتم ضبط المسلسل ليطابق الفعلي، سيرفض العداد الكارت ("شحنة ملغاة"). اضغط حفظ لضبط المسلسل.</div>
+                                    <div style="font-size:0.8rem; opacity:0.9;">الشحنة ستكتب برقم العداد الفعلي + 1 (${nextChargeSeq}) لضمان قبول العداد للشحنة. اضغط حفظ لضبط المسلسل.</div>
                                 </div>
                             </div>
                             <div style="background:#fee2e2; color:#b91c1c; padding:4px 10px; border-radius:6px; font-weight:800;">يتطلب الضبط ⚠️</div>
@@ -17463,13 +17463,13 @@ const openCustomerOperationModal = (action, customer) => {
             updateCompBanner();
             (_b = document.getElementById('op-seq-system')) === null || _b === void 0 ? void 0 : _b.addEventListener('input', updateCompBanner);
             (_c = document.getElementById('op-seq-meter')) === null || _c === void 0 ? void 0 : _c.addEventListener('input', updateCompBanner);
-            // Auto-read from inserted card if available on modal open
+            // Auto-read from inserted card if available on modal open or fetch live from server
             const readActualFromCard = async (silent = false) => {
                 var _a;
                 const readBtn = document.getElementById('btn-read-meter-actual-seq');
                 if (readBtn && !silent) {
                     readBtn.disabled = true;
-                    readBtn.innerHTML = `<span>جاري قراءة الكارت الفعلي...</span>`;
+                    readBtn.innerHTML = `<span>جاري فحص وقراءة المسلسل الفعلي...</span>`;
                 }
                 try {
                     let res = null;
@@ -17490,15 +17490,41 @@ const openCustomerOperationModal = (action, customer) => {
                             if (!silent) {
                                 showToast(`تمت قراءة المسلسل الفعلي من العداد/الكارت بنجاح: ${actualSeq}`, 'success');
                             }
+                            return;
+                        }
+                    }
+                    // If physical card not inserted or silent sync, query live MEEDCO server by meter / code
+                    const liveFetch = await fetch(`http://127.0.0.1:5002/api/customer/search?q=${encodeURIComponent(customer.meterNumber || customer.code)}`).then(r => r.json()).catch(() => null);
+                    if (liveFetch && liveFetch.success && liveFetch.customer) {
+                        const liveCust = liveFetch.customer;
+                        const liveSys = liveCust.chargeSequence != null ? Number(liveCust.chargeSequence) : null;
+                        const liveMeter = (liveCust.chargeSequenceOnMeter != null ? Number(liveCust.chargeSequenceOnMeter) : (liveCust.meterChargeSequence != null ? Number(liveCust.meterChargeSequence) : liveSys));
+                        if (liveSys != null) {
+                            const sysInp = document.getElementById('op-seq-system');
+                            if (sysInp)
+                                sysInp.value = String(liveSys);
+                            customer.chargeSequence = liveSys;
+                        }
+                        if (liveMeter != null) {
+                            const meterInp = document.getElementById('op-seq-meter');
+                            if (meterInp)
+                                meterInp.value = String(liveMeter);
+                            customer.chargeSequenceOnMeter = liveMeter;
+                            customer.meterChargeSequence = liveMeter;
+                            customer.sequenceOnMeter = liveMeter;
+                        }
+                        updateCompBanner();
+                        if (!silent) {
+                            showToast(`تم استرداد المسلسل الفعلي من المنظومة (العداد: ${liveMeter} | النظام: ${liveSys})`, 'success');
                         }
                     }
                     else if (!silent) {
-                        showToast((res === null || res === void 0 ? void 0 : res.message) || 'لم يتم العثور على كارت في القارئ. يرجى وضع كارت المشترك على القارئ.', 'error');
+                        showToast((res === null || res === void 0 ? void 0 : res.message) || 'لم يتم العثور على كارت في القارئ. يرجى وضع كارت المشترك على القارئ.', 'warning');
                     }
                 }
                 catch (e) {
                     if (!silent)
-                        showToast('تعذر قراءة الكارت: ' + e.message, 'error');
+                        showToast('تعذر قراءة المسلسل: ' + e.message, 'error');
                 }
                 finally {
                     if (readBtn && !silent) {
@@ -17513,8 +17539,8 @@ const openCustomerOperationModal = (action, customer) => {
             // Save button
             (_e = document.getElementById('btn-save-meter-sequence')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', async () => {
                 var _a, _b;
-                const seqSys = Math.max(1, Number(((_a = document.getElementById('op-seq-system')) === null || _a === void 0 ? void 0 : _a.value) || 1));
-                const seqMeter = Math.max(1, Number(((_b = document.getElementById('op-seq-meter')) === null || _b === void 0 ? void 0 : _b.value) || 1));
+                const seqSys = Math.max(0, Number(((_a = document.getElementById('op-seq-system')) === null || _a === void 0 ? void 0 : _a.value) || 0));
+                const seqMeter = Math.max(0, Number(((_b = document.getElementById('op-seq-meter')) === null || _b === void 0 ? void 0 : _b.value) || 0));
                 customer.chargeSequence = seqSys;
                 customer.meterChargeSequence = seqMeter;
                 customer.sequenceOnMeter = seqMeter;
@@ -19760,7 +19786,7 @@ const updateChargingCardFields = (cust, card, fin) => {
     const meterChg = (card === null || card === void 0 ? void 0 : card.meterChargeAmount) != null ? Number(card.meterChargeAmount) : ((card === null || card === void 0 ? void 0 : card.remainingBalance) != null ? Number(card.remainingBalance) : 0);
     setVal('field-last-charge', lastChg.toFixed(0));
     setVal('field-meter-charge', meterChg.toFixed(0));
-    const actualMeterSeq = (card === null || card === void 0 ? void 0 : card.sequenceOnMeter) != null ? Number(card.sequenceOnMeter) : ((cust === null || cust === void 0 ? void 0 : cust.meterChargeSequence) != null ? Number(cust.meterChargeSequence) : ((cust === null || cust === void 0 ? void 0 : cust.sequenceOnMeter) != null ? Number(cust.sequenceOnMeter) : (Number(cust === null || cust === void 0 ? void 0 : cust.chargeSequence) || 0)));
+    const actualMeterSeq = (card === null || card === void 0 ? void 0 : card.sequenceOnMeter) != null ? Number(card.sequenceOnMeter) : ((cust === null || cust === void 0 ? void 0 : cust.chargeSequenceOnMeter) != null ? Number(cust.chargeSequenceOnMeter) : ((cust === null || cust === void 0 ? void 0 : cust.meterChargeSequence) != null ? Number(cust.meterChargeSequence) : ((cust === null || cust === void 0 ? void 0 : cust.sequenceOnMeter) != null ? Number(cust.sequenceOnMeter) : (Number(cust === null || cust === void 0 ? void 0 : cust.chargeSequence) || 0))));
     const sysSeq = (cust === null || cust === void 0 ? void 0 : cust.chargeSequence) != null ? Number(cust.chargeSequence) : ((card === null || card === void 0 ? void 0 : card.totalSystemCharges) != null ? Number(card.totalSystemCharges) : actualMeterSeq);
     setVal('field-total-system-charges', sysSeq > 0 ? String(sysSeq) : '0');
     setVal('field-total-meter-charges', actualMeterSeq > 0 ? String(actualMeterSeq) : '0');
@@ -19891,22 +19917,30 @@ const loadChargingCustomer = async (customerId) => {
             fin = res.financials || {};
         }
         else {
-            // Offline fallback from local state.meters database
-            const local = state.meters.find(m => String(m.id) === String(customerId) || String(m.subscriptionCode || '') === String(customerId) || String(m.meterChassisNumber || '') === String(customerId));
+            // Offline fallback from local customerState.items or state.meters database
+            const local = customerState.items.find(m => String(m.id) === String(customerId) || String(m.code || '') === String(customerId) || String(m.meterNumber || '') === String(customerId)) ||
+                state.meters.find(m => String(m.id) === String(customerId) || String(m.subscriptionCode || '') === String(customerId) || String(m.meterChassisNumber || '') === String(customerId));
             if (local) {
+                const sysSeq = Number(local.chargeSequence != null ? local.chargeSequence : 1);
+                const meterSeq = Number(local.chargeSequenceOnMeter != null ? local.chargeSequenceOnMeter : (local.meterChargeSequence != null ? local.meterChargeSequence : (local.sequenceOnMeter != null ? local.sequenceOnMeter : sysSeq)));
                 cust = {
                     id: local.id,
-                    name: local.subscriberName || 'مشترك مسجل بالمنظومة',
-                    code: local.subscriptionCode || '-',
-                    meterNumber: local.meterChassisNumber || '-',
-                    meterCompanyName: local.meterType || 'السويدي',
-                    chargeSequence: 1,
-                    lastChargeDate: null,
-                    isChargeStop: false,
-                    accountNumberReferenceCustomer: local.accountRefM || local.accountRefH || '-',
+                    name: local.name || local.subscriberName || 'مشترك مسجل بالمنظومة',
+                    code: local.code || local.subscriptionCode || '-',
+                    meterNumber: local.meterNumber || local.meterChassisNumber || '-',
+                    meterCompanyName: local.meterCompanyName || local.meterType || 'المصرية',
+                    chargeSequence: sysSeq,
+                    chargeSequenceOnMeter: meterSeq,
+                    meterChargeSequence: meterSeq,
+                    sequenceOnMeter: meterSeq,
+                    totalSystemCharges: sysSeq,
+                    totalMeterCharges: meterSeq,
+                    lastChargeDate: local.lastChargeDate || null,
+                    isChargeStop: !!local.isChargeStop,
+                    accountNumberReferenceCustomer: local.accountNumberReferenceCustomer || local.accountRefM || local.accountRefH || '-',
                     nationalId: local.nationalId || '-',
-                    activityName: local.activityType || 'منزلي كودي',
-                    customerTypeName: 'أهالي',
+                    activityName: local.activityName || local.activityType || 'استخدامات منزلية',
+                    customerTypeName: local.customerTypeName || 'أهالي (صغار مشتركين)',
                     address: local.address || '-'
                 };
                 fin = {
@@ -20414,7 +20448,7 @@ const readChargingSmartCard = async () => {
         const fin = res.financials || {};
         const meterNumber = card.meterNumber || cust.meterNumber || '';
         const remainingBalance = card.remainingBalance != null ? Number(card.remainingBalance) : 0;
-        const seqOnMeter = card.sequenceOnMeter != null ? Number(card.sequenceOnMeter) : (cust.meterChargeSequence != null ? Number(cust.meterChargeSequence) : (cust.sequenceOnMeter != null ? Number(cust.sequenceOnMeter) : (Number(cust.chargeSequence) || 1)));
+        const seqOnMeter = card.sequenceOnMeter != null ? Number(card.sequenceOnMeter) : (cust.chargeSequenceOnMeter != null ? Number(cust.chargeSequenceOnMeter) : (cust.meterChargeSequence != null ? Number(cust.meterChargeSequence) : (cust.sequenceOnMeter != null ? Number(cust.sequenceOnMeter) : (Number(cust.chargeSequence) || 1))));
         const sysSeq = cust.chargeSequence != null ? Number(cust.chargeSequence) : (card.totalSystemCharges != null ? Number(card.totalSystemCharges) : seqOnMeter);
         const slice = card.slice ? ('الشريحة ' + card.slice) : (cust.consumptionSlice ? ('الشريحة ' + cust.consumptionSlice) : 'الشريحة 1');
         const lastDate = card.lastChargeDate || cust.lastChargeDate || 'اليوم';
