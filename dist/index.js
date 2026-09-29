@@ -15511,6 +15511,44 @@ const handleReadControlCard = async () => {
         }
     }
 };
+const clearControlCardUI = () => {
+    currentControlCardData = null;
+    const badgeEl = document.getElementById('ctrl-card-status-badge');
+    if (badgeEl) {
+        badgeEl.textContent = 'بانتظار كارت جديد';
+        badgeEl.style.backgroundColor = '#f1f5f9';
+        badgeEl.style.color = '#475569';
+        badgeEl.style.border = '1px solid #cbd5e1';
+    }
+    const fields = [
+        'ctrl-company-name', 'ctrl-meter-type', 'ctrl-card-id', 'ctrl-op-type',
+        'ctrl-tech-name', 'ctrl-tech-code', 'ctrl-issue-date', 'ctrl-active-date',
+        'ctrl-expiry-date', 'ctrl-issuer'
+    ];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el)
+            el.textContent = '-';
+    });
+    const countEl = document.getElementById('ctrl-meters-count');
+    if (countEl)
+        countEl.textContent = '0';
+    const tbody = document.getElementById('control-card-meters-tbody');
+    if (tbody) {
+        tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="padding: 2.2rem 1rem; text-align: center; color: #0284c7; font-weight: 600; font-size: 1rem;">
+                        <span style="font-size: 1.8rem; display: inline-block; margin-bottom: 6px;">💳</span><br>
+                        تم تحديث وتفعيل الكارت بنجاح وتم تفريغ القراءة.<br>
+                        <span style="color: #64748b; font-weight: 400; font-size: 0.85rem;">يرجى سحب الكارت وإدخال كارت تحكم آخر لتحديثه بسرعة.</span>
+                    </td>
+                </tr>
+            `;
+    }
+    const printBtn = document.getElementById('btn-print-control-card');
+    if (printBtn)
+        printBtn.disabled = true;
+};
 const openRenewControlCardSuccessModal = (result) => {
     const dlg = document.getElementById('dialog-renew-control-card-success');
     if (!dlg)
@@ -15534,19 +15572,28 @@ const openRenewControlCardSuccessModal = (result) => {
         actDateEl.textContent = actDate;
     if (expDateEl)
         expDateEl.textContent = expDate;
-    const badgeEl = document.getElementById('ctrl-card-status-badge');
-    if (badgeEl) {
-        badgeEl.textContent = 'كارت مفعل';
-        badgeEl.style.backgroundColor = '#dcfce7';
-        badgeEl.style.color = '#15803d';
-        badgeEl.style.border = '1px solid #86efac';
-    }
+    // Ensure fixed centered position
+    dlg.style.position = 'fixed';
+    dlg.style.top = '50%';
+    dlg.style.left = '50%';
+    dlg.style.transform = 'translate(-50%, -50%)';
+    dlg.style.margin = '0';
+    dlg.style.zIndex = '999999';
     if (typeof dlg.showModal === 'function') {
-        dlg.showModal();
+        try {
+            if (dlg.open)
+                dlg.close();
+            dlg.showModal();
+        }
+        catch (e) {
+            dlg.style.display = 'block';
+        }
     }
     else {
         dlg.style.display = 'block';
     }
+    // تفريغ شاشة القراءة فوراً لتجهيزها لكارت جديد وسرعة التحديث
+    clearControlCardUI();
 };
 const handleRenewControlCard = async () => {
     var _a, _b, _c;
@@ -16241,11 +16288,41 @@ const handleIssueControlCard = async (e) => {
                 meterTypeEl.textContent = payload.meterTypeName;
             if (expiryDateEl)
                 expiryDateEl.textContent = (expireDateInput === null || expireDateInput === void 0 ? void 0 : expireDateInput.value) || new Date().toLocaleDateString('ar-EG');
-            // Open dialog
+            // تفريغ جميع حقول نموذج إصدار كارت التحكم بعد الإصدار الناجح
+            if (meterNumberInput)
+                meterNumberInput.value = '';
+            if (numberOfMetersInput)
+                numberOfMetersInput.value = '10';
+            if (techCodeInput)
+                techCodeInput.value = '';
+            if (manualDatetimeInput)
+                manualDatetimeInput.value = '';
+            if (isManualDateCheckbox)
+                isManualDateCheckbox.checked = false;
+            issuedMetersList.length = 0;
+            renderIssuedMetersTags();
+            if (techSelect)
+                techSelect.selectedIndex = 0;
+            if (opSelect)
+                opSelect.selectedIndex = 0;
+            // Center & Open dialog
             const successDialog = document.getElementById('dialog-issue-control-card-success');
             if (successDialog) {
+                successDialog.style.position = 'fixed';
+                successDialog.style.top = '50%';
+                successDialog.style.left = '50%';
+                successDialog.style.transform = 'translate(-50%, -50%)';
+                successDialog.style.margin = '0';
+                successDialog.style.zIndex = '999999';
                 if (typeof successDialog.showModal === 'function') {
-                    successDialog.showModal();
+                    try {
+                        if (successDialog.open)
+                            successDialog.close();
+                        successDialog.showModal();
+                    }
+                    catch (e) {
+                        successDialog.style.display = 'block';
+                    }
                 }
                 else {
                     successDialog.style.display = 'block';
@@ -37485,6 +37562,8 @@ const setupEventListeners = () => {
             else
                 dlg.style.display = 'none';
         }
+        if (typeof clearControlCardUI === 'function')
+            clearControlCardUI();
     });
     // قراءة الكارت يدوياً من داخل نافذة التحديث في حال رغب المستخدم
     (_53 = document.getElementById('btn-manual-read-after-renew')) === null || _53 === void 0 ? void 0 : _53.addEventListener('click', () => {

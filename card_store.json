@@ -118,7 +118,40 @@
       "status": "مفعل",
       "readAt": "٢٧‏/٩‏/٢٠٢٦، ٥:٠٨:٣٩ م",
       "meterData": []
+    },
+    "09315858": {
+      "id": "2cee6ee2-f3e8-4c38-8160-55647e45cf93",
+      "cardId": "09315858",
+      "technicianCode": 12258,
+      "technicianName": "وحيد فاروق كامل",
+      "controlOperationTypeName": "إزالة تلاعبات و أخطاء",
+      "controlOperationType": 2,
+      "companyName": "جلوبال",
+      "meterTypeName": "جلوبال احادي",
+      "cardIssueDate": "29‏‏/9‏‏/2026 11:57:02 م",
+      "activationDate": "٢٩‏/٩‏/٢٠٢٦",
+      "expiryDate": "٦‏/١٠‏/٢٠٢٦",
+      "issueUsername": "سناء عبدالستار عبدالعزيز",
+      "status": "مفعل",
+      "readAt": "٢٩‏/٩‏/٢٠٢٦، ١١:٥٨:٢١ م",
+      "meterData": []
     }
   },
-  "activeControlCard": null
+  "activeControlCard": {
+    "id": "2cee6ee2-f3e8-4c38-8160-55647e45cf93",
+    "cardId": "09315858",
+    "technicianCode": 12258,
+    "technicianName": "وحيد فاروق كامل",
+    "controlOperationTypeName": "إزالة تلاعبات و أخطاء",
+    "controlOperationType": 2,
+    "companyName": "جلوبال",
+    "meterTypeName": "جلوبال احادي",
+    "cardIssueDate": "29‏‏/9‏‏/2026 11:57:02 م",
+    "activationDate": "17‏‏/5‏‏/2025 11:57:02 م",
+    "expiryDate": "6‏‏/10‏‏/2026 11:57:02 م",
+    "issueUsername": "سناء عبدالستار عبدالعزيز",
+    "status": "مفعل",
+    "readAt": "٢٩‏/٩‏/٢٠٢٦، ١١:٥٨:٢١ م",
+    "meterData": []
+  }
 }
