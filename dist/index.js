@@ -19064,8 +19064,8 @@ const renderPeakDebtSettingsSection = () => {
         autoCb.checked = settings.autoDeductDuringCharge !== false;
 };
 const initPeakDebtListeners = () => {
-    var _a;
-    (_a = document.getElementById('btn-save-peak-settings')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', async () => {
+    var _a, _b, _c, _d;
+    const savePeakSettings = async () => {
         const enabledCb = document.getElementById('peak-enabled-cb');
         const startInp = document.getElementById('peak-start-time');
         const endInp = document.getElementById('peak-end-time');
@@ -19089,6 +19089,15 @@ const initPeakDebtListeners = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(state.peakDebtSettings)
         }).catch(() => null);
+    };
+    (_a = document.getElementById('btn-save-peak-settings')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', savePeakSettings);
+    (_b = document.getElementById('btn-save-peak-bottom')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', savePeakSettings);
+    // Back / Close button handlers
+    (_c = document.getElementById('btn-back-peak-settings')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => {
+        handleGoBack();
+    });
+    (_d = document.getElementById('btn-back-peak-bottom')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
+        handleGoBack();
     });
 };
 // --- العدادات التي تم إصلاحها ---

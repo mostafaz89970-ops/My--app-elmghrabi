@@ -20118,7 +20118,7 @@ const handlePrintJudicialControlDetails = () => {
     };
 
     const initPeakDebtListeners = () => {
-        document.getElementById('btn-save-peak-settings')?.addEventListener('click', async () => {
+        const savePeakSettings = async () => {
             const enabledCb = document.getElementById('peak-enabled-cb') as HTMLInputElement | null;
             const startInp = document.getElementById('peak-start-time') as HTMLInputElement | null;
             const endInp = document.getElementById('peak-end-time') as HTMLInputElement | null;
@@ -20145,6 +20145,17 @@ const handlePrintJudicialControlDetails = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(state.peakDebtSettings)
             }).catch(() => null);
+        };
+
+        document.getElementById('btn-save-peak-settings')?.addEventListener('click', savePeakSettings);
+        document.getElementById('btn-save-peak-bottom')?.addEventListener('click', savePeakSettings);
+
+        // Back / Close button handlers
+        document.getElementById('btn-back-peak-settings')?.addEventListener('click', () => {
+            handleGoBack();
+        });
+        document.getElementById('btn-back-peak-bottom')?.addEventListener('click', () => {
+            handleGoBack();
         });
     };
 
