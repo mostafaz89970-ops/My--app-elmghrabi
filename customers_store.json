@@ -19,6 +19,28 @@
     "activityName": "استخدامات منزلية",
     "contractYear": "2026",
     "contractNumber": "100",
+    "installationDate": "2026-09-29"
+  },
+  {
+    "id": "CUST-0502043148",
+    "code": "0502043148",
+    "name": "احمد محمد فتحى فرجانى محمد",
+    "identityNumber": "29308152602542",
+    "nationalId": "29308152602542",
+    "meterNumber": "96756660",
+    "meterChassisNumber": "96756660",
+    "address": "شارع الشيخ فضل رقم 0 مدينة 0 حي 0",
+    "accountNumberReferenceCustomer": "526/10/55/4456/0/3",
+    "accountRefrence": "526/10/55/4456/0/3",
+    "sectorName": "المنيا شمال",
+    "publicAdministrationName": "بنى مزار شرق",
+    "subAdministrationName": "بنى مزار شرق",
+    "regionName": "بنى مزار شرق10",
+    "status": "مركب",
+    "customerType": "صغار مشتركين",
+    "activityName": "استخدامات منزلية",
+    "contractYear": "2026",
+    "contractNumber": "100",
     "installationDate": "2024-01-01"
   },
   {
