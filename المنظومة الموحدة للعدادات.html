@@ -6129,15 +6129,43 @@
             <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
                 <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f0fdf4;">
                     <h4 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #166534;">إضافة استثناء رسوم النظافة</h4>
-                    <button type="button" class="btn-close-modal" data-modal="modal-add-cleaning-exception" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
+                    <button type="button" id="btn-modal-ce-close" class="btn-close-modal" data-modal="modal-add-cleaning-exception" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
                 </div>
                 <form id="form-add-cleaning-exception" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
                     <div class="form-group" style="margin: 0;">
-                        <label style="font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">اختيار المشترك *</label>
-                        <select id="modal-ce-subscriber-select" class="form-control" required style="padding: 10px;">
-                            <option value="">-- اختر مشترك لتطبيق الاستثناء عليه --</option>
-                        </select>
+                        <label style="font-weight: bold; color: #1e293b; margin-bottom: 6px; display: block;">بحث عن المشترك (برقم الشاسية أو كود الاشتراك) *</label>
+                        <div style="display: flex; gap: 8px;">
+                            <div style="position: relative; flex: 1;">
+                                <input type="text" id="modal-ce-search-input" class="form-control" placeholder="أدخل رقم الشاسيه أو كود الاشتراك للبحث..." style="width: 100%; padding: 10px 38px 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.95rem;" />
+                                <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; pointer-events: none;">🔍</span>
+                            </div>
+                            <button type="button" id="btn-modal-ce-search" class="btn" style="background: #0284c7; color: #fff; padding: 0 18px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                بحث
+                            </button>
+                        </div>
+                        <small style="color: #64748b; margin-top: 4px; display: block;">ابحث برقم شاسيه العداد أو كود المشترك مباشرة دون الحاجة لقائمة منسدلة</small>
                     </div>
+
+                    <!-- نتائج البحث المتعددة -->
+                    <div id="modal-ce-search-results-box" style="display: none; max-height: 190px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; padding: 8px;"></div>
+
+                    <!-- بطاقة المشترك المحدد -->
+                    <div id="modal-ce-selected-subscriber-card" style="display: none; background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 8px; padding: 12px 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; gap: 6px; color: #065f46; font-weight: 800; font-size: 0.95rem;">
+                                <span style="background: #10b981; color: #fff; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px;">✓</span>
+                                <span id="modal-ce-card-name">اسم المشترك</span>
+                            </div>
+                            <button type="button" id="btn-modal-ce-clear-selected" style="background: none; border: none; color: #b91c1c; font-size: 0.8rem; font-weight: bold; cursor: pointer; text-decoration: underline;">إلغاء وتغيير المشترك</button>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.85rem; color: #047857;">
+                            <div><strong>كود المشترك:</strong> <span id="modal-ce-card-code" style="font-family: monospace; font-weight: bold;">-</span></div>
+                            <div><strong>رقم الشاسيه:</strong> <span id="modal-ce-card-meter" style="font-family: monospace; font-weight: bold;">-</span></div>
+                            <div style="grid-column: span 2;"><strong>العنوان:</strong> <span id="modal-ce-card-address">-</span></div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="modal-ce-selected-id" value="" />
                     <div class="form-group" style="margin: 0;">
                         <label style="font-weight: bold; color: #334155; margin-bottom: 4px; display: block;">سبب الاستثناء *</label>
                         <input type="text" id="modal-ce-reason" class="form-control" required placeholder="مثال: دور عبادة / وحدة مغلقة / استثناء إداري" />
@@ -6163,7 +6191,7 @@
                         </div>
                     </div>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                        <button type="button" class="btn secondary btn-close-modal" data-modal="modal-add-cleaning-exception">إلغاء</button>
+                        <button type="button" id="btn-modal-ce-cancel" class="btn secondary btn-close-modal" data-modal="modal-add-cleaning-exception">إلغاء</button>
                         <button type="submit" class="btn primary" style="background: #059669; border: none; font-weight: bold;">حفظ الاستثناء</button>
                     </div>
                 </form>

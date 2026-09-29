@@ -15411,6 +15411,18 @@ const handlePrintJudicialControlDetails = () => {
                             netCollected: '100.00'
                         });
                     }, 500);
+                } else if (action === 'cleaning-exception') {
+                    const ceNav = document.querySelector('.sidebar-nav .nav-link[data-target="cleaning-fee-exceptions"]') as HTMLElement | null;
+                    if (ceNav) ceNav.click();
+                    setTimeout(() => {
+                        openCleaningExceptionModal({
+                            id: customer.id,
+                            subscriberName: customer.name,
+                            subscriptionCode: customer.code,
+                            meterChassisNumber: customer.meterNumber,
+                            address: customer.address
+                        });
+                    }, 250);
                 } else {
                     showToast(`تم اختيار إجراء: ${item.textContent?.trim()} للمشترك: ${customer.name}`);
                 }
@@ -19705,6 +19717,211 @@ const handlePrintJudicialControlDetails = () => {
     // 4. قسم استثناءات رسوم النظافة (Cleaning Fee Exceptions)
     // =========================================================================
     let cleaningExceptionsInitialized = false;
+    let currentSelectedCeSubscriber: any = null;
+
+    const setSelectedCeSubscriber = (sub: any | null) => {
+        currentSelectedCeSubscriber = sub;
+        const card = document.getElementById('modal-ce-selected-subscriber-card');
+        const searchResultsBox = document.getElementById('modal-ce-search-results-box');
+        const selectedIdInput = document.getElementById('modal-ce-selected-id') as HTMLInputElement | null;
+        const nameEl = document.getElementById('modal-ce-card-name');
+        const codeEl = document.getElementById('modal-ce-card-code');
+        const meterEl = document.getElementById('modal-ce-card-meter');
+        const addressEl = document.getElementById('modal-ce-card-address');
+
+        if (searchResultsBox) {
+            searchResultsBox.innerHTML = '';
+            searchResultsBox.style.display = 'none';
+        }
+
+        if (sub) {
+            if (selectedIdInput) selectedIdInput.value = String(sub.id || sub.subscriptionCode || sub.meterChassisNumber);
+            if (nameEl) nameEl.textContent = sub.subscriberName || sub.customerName || sub.name || '-';
+            if (codeEl) codeEl.textContent = sub.subscriptionCode || sub.customerCode || sub.code || '-';
+            if (meterEl) meterEl.textContent = sub.meterChassisNumber || sub.meterNumber || '-';
+            if (addressEl) addressEl.textContent = sub.address || 'العنوان غير مسجل';
+            if (card) card.style.display = 'block';
+        } else {
+            if (selectedIdInput) selectedIdInput.value = '';
+            if (card) card.style.display = 'none';
+        }
+    };
+
+    const executeCeSearch = (term: string) => {
+        const resultsBox = document.getElementById('modal-ce-search-results-box');
+        if (!resultsBox) return;
+
+        const clean = (term || '').trim().toLowerCase();
+        if (!clean) {
+            resultsBox.style.display = 'block';
+            resultsBox.innerHTML = '<div style="color: #64748b; padding: 10px; text-align: center;">يرجى إدخال رقم الشاسية أو كود المشترك للبحث.</div>';
+            return;
+        }
+
+        let matches: any[] = [];
+        const seenIds = new Set<string>();
+
+        // 1. Search in state.meters
+        (state.meters || []).forEach(m => {
+            const chassis = String(m.meterChassisNumber || '').trim().toLowerCase();
+            const code = String(m.subscriptionCode || '').trim().toLowerCase();
+            const id = String(m.id || '').trim().toLowerCase();
+            if (chassis.includes(clean) || code.includes(clean) || id === clean) {
+                const uid = String(m.id || m.subscriptionCode || m.meterChassisNumber);
+                if (!seenIds.has(uid)) {
+                    seenIds.add(uid);
+                    matches.push({
+                        id: m.id,
+                        subscriberName: m.subscriberName,
+                        subscriptionCode: m.subscriptionCode,
+                        meterChassisNumber: m.meterChassisNumber,
+                        address: m.address
+                    });
+                }
+            }
+        });
+
+        // 2. Search in customerState.items if available
+        if (matches.length === 0 && customerState && customerState.items) {
+            customerState.items.forEach((c: any) => {
+                const chassis = String(c.meterNumber || '').trim().toLowerCase();
+                const code = String(c.code || '').trim().toLowerCase();
+                if (chassis.includes(clean) || code.includes(clean)) {
+                    const uid = String(c.id || c.code || c.meterNumber);
+                    if (!seenIds.has(uid)) {
+                        seenIds.add(uid);
+                        matches.push({
+                            id: c.id,
+                            subscriberName: c.name,
+                            subscriptionCode: c.code,
+                            meterChassisNumber: c.meterNumber,
+                            address: c.address
+                        });
+                    }
+                }
+            });
+        }
+
+        // 3. Search in state.debts
+        if (matches.length === 0 && state.debts) {
+            state.debts.forEach((d: any) => {
+                const chassis = String(d.meterNumber || '').trim().toLowerCase();
+                const code = String(d.subscriptionCode || d.customerId || '').trim().toLowerCase();
+                if (chassis.includes(clean) || code.includes(clean)) {
+                    const uid = String(d.customerId || d.subscriptionCode || d.meterNumber);
+                    if (!seenIds.has(uid)) {
+                        seenIds.add(uid);
+                        matches.push({
+                            id: d.customerId,
+                            subscriberName: d.customerName,
+                            subscriptionCode: d.subscriptionCode || d.customerId,
+                            meterChassisNumber: d.meterNumber,
+                            address: '-'
+                        });
+                    }
+                }
+            });
+        }
+
+        if (matches.length === 0) {
+            resultsBox.style.display = 'block';
+            resultsBox.innerHTML = `
+                <div style="color: #ef4444; padding: 12px; text-align: center; font-weight: bold;">
+                    ⚠️ لم يتم العثور على أي مشترك يطابق: "${term}"
+                    <div style="font-size: 0.8rem; font-weight: normal; color: #64748b; margin-top: 4px;">تأكد من كتابة رقم الشاسية أو كود الاشتراك بشكل صحيح.</div>
+                </div>
+            `;
+            return;
+        }
+
+        if (matches.length === 1) {
+            setSelectedCeSubscriber(matches[0]);
+            resultsBox.style.display = 'none';
+            showToast(`تم العثور على المشترك: ${matches[0].subscriberName}`, 'success');
+            return;
+        }
+
+        // Multiple results
+        resultsBox.style.display = 'block';
+        resultsBox.innerHTML = `
+            <div style="font-size: 0.82rem; font-weight: bold; color: #475569; margin-bottom: 6px; padding: 0 4px;">
+                تم العثور على (${matches.length}) مشتركين مطابقين - انقر لاختيار المشترك:
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                ${matches.map((m, idx) => `
+                    <div class="ce-search-item" data-idx="${idx}" style="background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease;">
+                        <div>
+                            <div style="font-weight: bold; color: #0f172a; font-size: 0.9rem;">${m.subscriberName || 'مشترك'}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">
+                                <span>شاسية: <strong style="font-family: monospace; color: #0284c7;">${m.meterChassisNumber || '-'}</strong></span>
+                                <span style="margin: 0 6px;">|</span>
+                                <span>كود: <strong style="font-family: monospace;">${m.subscriptionCode || '-'}</strong></span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm" style="background: #0284c7; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer;">اختيار</button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        resultsBox.querySelectorAll('.ce-search-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const idx = Number(item.getAttribute('data-idx'));
+                if (matches[idx]) {
+                    setSelectedCeSubscriber(matches[idx]);
+                    resultsBox.style.display = 'none';
+                    showToast(`تم اختيار المشترك: ${matches[idx].subscriberName}`, 'success');
+                }
+            });
+        });
+    };
+
+    const openCleaningExceptionModal = (preselectedSubscriber?: any) => {
+        const m = document.getElementById('modal-add-cleaning-exception');
+        if (!m) return;
+
+        (document.getElementById('form-add-cleaning-exception') as HTMLFormElement)?.reset();
+        const searchInput = document.getElementById('modal-ce-search-input') as HTMLInputElement | null;
+        if (searchInput) searchInput.value = '';
+        const searchResultsBox = document.getElementById('modal-ce-search-results-box');
+        if (searchResultsBox) {
+            searchResultsBox.innerHTML = '';
+            searchResultsBox.style.display = 'none';
+        }
+
+        if (preselectedSubscriber) {
+            setSelectedCeSubscriber(preselectedSubscriber);
+        } else {
+            setSelectedCeSubscriber(null);
+        }
+
+        const startInp = document.getElementById('modal-ce-start-date') as HTMLInputElement | null;
+        const endInp = document.getElementById('modal-ce-end-date') as HTMLInputElement | null;
+        const today = new Date().toISOString().split('T')[0];
+        if (startInp) startInp.value = today;
+        if (endInp) {
+            const nextYear = new Date();
+            nextYear.setFullYear(nextYear.getFullYear() + 1);
+            endInp.value = nextYear.toISOString().split('T')[0];
+        }
+
+        m.style.display = 'flex';
+        if (!preselectedSubscriber && searchInput) {
+            setTimeout(() => searchInput.focus(), 150);
+        }
+    };
+
+    const closeCleaningExceptionModal = () => {
+        const m = document.getElementById('modal-add-cleaning-exception');
+        if (m) m.style.display = 'none';
+        setSelectedCeSubscriber(null);
+        (document.getElementById('form-add-cleaning-exception') as HTMLFormElement)?.reset();
+        const resultsBox = document.getElementById('modal-ce-search-results-box');
+        if (resultsBox) {
+            resultsBox.innerHTML = '';
+            resultsBox.style.display = 'none';
+        }
+    };
 
     const renderCleaningFeeExceptionsSection = () => {
         initDebtsDefaultsIfNeeded();
@@ -19752,54 +19969,123 @@ const handlePrintJudicialControlDetails = () => {
     };
 
     const initCleaningExceptionsListeners = () => {
+        // Open modal
         document.getElementById('btn-open-add-cleaning-exception')?.addEventListener('click', () => {
-            const m = document.getElementById('modal-add-cleaning-exception');
-            const subSelect = document.getElementById('modal-ce-subscriber-select') as HTMLSelectElement | null;
-            if (subSelect) {
-                subSelect.innerHTML = '<option value="">-- اختر مشترك لتطبيق الاستثناء عليه --</option>';
-                state.meters.forEach(meter => {
-                    const opt = document.createElement('option');
-                    opt.value = String(meter.id);
-                    opt.textContent = `${meter.subscriberName} | عداد: ${meter.meterChassisNumber} (${meter.subscriptionCode})`;
-                    subSelect.appendChild(opt);
-                });
-            }
-            if (m) m.style.display = 'flex';
+            openCleaningExceptionModal();
         });
 
+        // Close buttons (Top &times; and bottom Cancel)
+        document.getElementById('btn-modal-ce-close')?.addEventListener('click', () => {
+            closeCleaningExceptionModal();
+        });
+        document.getElementById('btn-modal-ce-cancel')?.addEventListener('click', () => {
+            closeCleaningExceptionModal();
+        });
+
+        // Wire up all close buttons for this modal
+        document.querySelectorAll('#modal-add-cleaning-exception .btn-close-modal, [data-modal="modal-add-cleaning-exception"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                closeCleaningExceptionModal();
+            });
+        });
+
+        // Click outside on backdrop
+        document.getElementById('modal-add-cleaning-exception')?.addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeCleaningExceptionModal();
+            }
+        });
+
+        // Search trigger
+        const searchInput = document.getElementById('modal-ce-search-input') as HTMLInputElement | null;
+        document.getElementById('btn-modal-ce-search')?.addEventListener('click', () => {
+            if (searchInput) executeCeSearch(searchInput.value);
+        });
+
+        searchInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                executeCeSearch(searchInput.value);
+            }
+        });
+
+        // Clear selection button
+        document.getElementById('btn-modal-ce-clear-selected')?.addEventListener('click', () => {
+            setSelectedCeSubscriber(null);
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.focus();
+            }
+        });
+
+        // Escape key to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const ceModal = document.getElementById('modal-add-cleaning-exception');
+                if (ceModal && ceModal.style.display !== 'none') {
+                    closeCleaningExceptionModal();
+                }
+            }
+        });
+
+        // Global fallback for any .btn-close-modal
+        document.addEventListener('click', (e) => {
+            const btn = (e.target as HTMLElement)?.closest('.btn-close-modal');
+            if (btn) {
+                const modalId = btn.getAttribute('data-modal');
+                if (modalId === 'modal-add-cleaning-exception') {
+                    closeCleaningExceptionModal();
+                } else if (modalId) {
+                    const m = document.getElementById(modalId);
+                    if (m) m.style.display = 'none';
+                }
+            }
+        });
+
+        // Form submit
         document.getElementById('form-add-cleaning-exception')?.addEventListener('submit', async e => {
             e.preventDefault();
-            const subSelect = document.getElementById('modal-ce-subscriber-select') as HTMLSelectElement | null;
+            if (!currentSelectedCeSubscriber) {
+                showToast('يرجى أولاً البحث عن المشترك برقم الشاسية أو الكود واختياره.', 'warning');
+                document.getElementById('modal-ce-search-input')?.focus();
+                return;
+            }
+
             const reasonInp = document.getElementById('modal-ce-reason') as HTMLInputElement | null;
             const minInp = document.getElementById('modal-ce-min') as HTMLInputElement | null;
             const maxInp = document.getElementById('modal-ce-max') as HTMLInputElement | null;
             const startInp = document.getElementById('modal-ce-start-date') as HTMLInputElement | null;
             const endInp = document.getElementById('modal-ce-end-date') as HTMLInputElement | null;
 
-            if (!subSelect?.value) return;
-
-            const subscriber = state.meters.find(m => String(m.id) === String(subSelect.value));
+            const subscriber = currentSelectedCeSubscriber;
             const newEx = {
                 id: Date.now(),
-                customerId: subscriber?.subscriptionCode || String(subscriber?.id),
-                customerCode: subscriber?.subscriptionCode || '-',
-                customerName: subscriber?.subscriberName || 'مشترك',
-                meterNumber: subscriber?.meterChassisNumber || '-',
-                reason: reasonInp?.value || 'استثناء إداري',
+                customerId: subscriber.subscriptionCode || String(subscriber.id),
+                customerCode: subscriber.subscriptionCode || subscriber.code || '-',
+                customerName: subscriber.subscriberName || subscriber.name || 'مشترك',
+                meterNumber: subscriber.meterChassisNumber || subscriber.meterNumber || '-',
+                reason: reasonInp?.value?.trim() || 'استثناء إداري',
                 minFee: Number(minInp?.value) || 0.00,
                 maxFee: Number(maxInp?.value) || 0.00,
-                startDate: startInp?.value || '2026-01-01',
+                startDate: startInp?.value || new Date().toISOString().split('T')[0],
                 endDate: endInp?.value || '2026-12-31',
                 active: true
             };
 
+            state.cleaningFeeExceptions = state.cleaningFeeExceptions || [];
             state.cleaningFeeExceptions.push(newEx);
             await saveState();
             showToast('تم حفظ استثناء رسوم النظافة بنجاح', 'success');
-            const m = document.getElementById('modal-add-cleaning-exception');
-            if (m) m.style.display = 'none';
-            (document.getElementById('form-add-cleaning-exception') as HTMLFormElement)?.reset();
+            closeCleaningExceptionModal();
             renderCleaningExceptionsTable();
+
+            // Sync with bridge if running
+            fetch('http://127.0.0.1:5002/api/cleaning-exceptions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newEx)
+            }).catch(() => null);
         });
     };
 

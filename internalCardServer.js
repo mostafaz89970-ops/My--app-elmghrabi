@@ -378,6 +378,15 @@ function startInternalServer(port = 5002) {
 
             if (pathname === '/api/cleaning-exceptions') {
                 const store = getDebtsStore();
+                if (req.method === 'POST') {
+                    const body = await getBody();
+                    store.cleaningExceptions = store.cleaningExceptions || [];
+                    store.cleaningExceptions.push(body);
+                    saveDebtsStore(store);
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ success: true, message: 'Saved exception', data: body }));
+                    return;
+                }
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true, data: store.cleaningExceptions }));
                 return;
