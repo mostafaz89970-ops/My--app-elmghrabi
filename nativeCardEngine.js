@@ -921,12 +921,21 @@ async function getControlCardMetadata() {
 }
 
 async function getMeterTypesForCompany(companyId) {
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getMeterTypesForCompany === 'function') {
+            const res = await unifiedClient.getMeterTypesForCompany(companyId);
+            if (res && res.data && res.data.length > 0) {
+                return res;
+            }
+        }
+    } catch(e) {}
     const types = [
-        { id: 1, name: "أحادي مباشر سوجويف 2024" },
-        { id: 2, name: "ثلاثى مباشر سوجويف 2024" },
-        { id: 3, name: "ثلاثي محولات CT" },
-        { id: 4, name: "احادى 2024" },
-        { id: 5, name: "أحادي إلكتروني نمطي" }
+        { id: 'b0ff615c-b076-489b-bb81-0b10d1fd3739', name: "عداد احادى 2022" },
+        { id: '51af34b3-59b6-457e-885f-082794b8423c', name: "عداد ثلاثي 2022" },
+        { id: 'aa383ba9-9699-4813-a2ed-c58eb614d9fa', name: "عداد احادي 2020" },
+        { id: 'dae9e00f-8654-4389-88de-1c47994c946b', name: "عداد احادي 2016" },
+        { id: '50003ef1-6f5d-465d-a204-0edb26ba7cb5', name: "عداد ثلاثى 2016" }
     ];
     return { success: true, data: types };
 }

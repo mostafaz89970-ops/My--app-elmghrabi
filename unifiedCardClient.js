@@ -1557,15 +1557,26 @@ async function issueControlCardLive(params) {
         expireDateStr = new Date(expireDateStr).toISOString();
     }
 
+    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let validMeterTypeId = params.meterTypeId;
+    if (!validMeterTypeId || !guidRegex.test(String(validMeterTypeId))) {
+        validMeterTypeId = 'b0ff615c-b076-489b-bb81-0b10d1fd3739';
+    }
+
+    let validCompanyId = params.meterCompanyId;
+    if (!validCompanyId || !guidRegex.test(String(validCompanyId))) {
+        validCompanyId = '32e12578-cf4c-4304-8af9-cefe059e1c50';
+    }
+
     const writeParam = {
         cardType: 2, // Control
         id: params.techId,
-        meterTypeId: params.meterTypeId,
+        meterTypeId: validMeterTypeId,
         expireDate: expireDateStr,
-        meterCompanyId: params.meterCompanyId,
+        meterCompanyId: validCompanyId,
         controlOperationType: Number(params.controlOperationType),
         techId: params.techId,
-        tampers: Array.isArray(params.tampers) ? params.tampers : (params.tampers ? [Number(params.tampers)] : null),
+        tampers: Array.isArray(params.tampers) ? params.tampers : (params.tampers ? [Number(params.tampers)] : [0]),
         isIssue: true,
         GenerationType: generationType,
         isManualDate: Boolean(params.isManualDate),
@@ -1574,9 +1585,9 @@ async function issueControlCardLive(params) {
         controlTypeMeter: Number(params.controlTypeMeter || 0),
         meterNumber: params.meterNumber || "",
         meterNumbers: Array.isArray(params.meterNumbers) ? params.meterNumbers : (params.meterNumbers ? [params.meterNumbers] : []),
-        numberOfMeters: Number(params.numberOfMeters || 1),
+        numberOfMeters: Number(params.numberOfMeters || 10),
         cardId: null,
-        vendorCode: null,
+        vendorCode: Number(cardVendorId) || 1,
         controlCardActivationDate: new Date().toISOString()
     };
 
@@ -1594,8 +1605,13 @@ async function issueControlCardLive(params) {
         };
     }
 
-    if (!bkResult || (bkResult.status !== 1 && bkResult.status !== 200)) {
-        const errMsg = bkResult?.message || bkResult?.errorSupport?.title || 'فشل تسجيل كارت التحكم في المنظومة.';
+    if (!bkResult || (bkResult.status !== 1 && bkResult.status !== 200 && bkResult.status !== 202)) {
+        let errMsg = bkResult?.message || bkResult?.errorSupport?.title;
+        if (!errMsg && bkResult?.errors) {
+            const errValues = Object.values(bkResult.errors).flat();
+            if (errValues.length > 0) errMsg = errValues.join(' - ');
+        }
+        if (!errMsg) errMsg = 'فشل تسجيل كارت التحكم في المنظومة.';
         return {
             success: false,
             status: 'backend_error',
