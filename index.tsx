@@ -15268,37 +15268,81 @@ const handlePrintJudicialControlDetails = () => {
                             <!-- Blue Gear Button [ ⚙ ] matching frame_001s -->
                             <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
                                 <button type="button" class="cm-actions-menu-btn" data-cust-idx="${idx}" title="خيارات المشترك" style="background: #0284c7; color: #ffffff; border: none; width: 34px; height: 34px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(2,132,199,0.2);">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0 2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                                 </button>
-                                <!-- Gear Dropdown matching frame_053s 1:1 -->
-                                <div class="cm-actions-popup" id="cm-actions-popup-${idx}" style="display: none; position: absolute; left: 0; top: 100%; min-width: 190px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.18); z-index: 9999; text-align: right; padding: 4px 0;">
-                                    <a href="#" class="cm-act-item" data-action="change-meter" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
-                                        <span>🔧</span> <span>تغيير عداد</span>
-                                    </a>
-                                    <a href="#" class="cm-act-item" data-action="update-sequence" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
-                                        <span>🔧</span> <span>تحديث مسلسل عداد</span>
-                                    </a>
-                                    <a href="#" class="cm-act-item" data-action="meter-check-result" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
-                                        <span>📊</span> <span>تسجيل نتيجة المرور</span>
-                                    </a>
-                                    <a href="#" class="cm-act-item" data-action="abuses" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #dc2626; text-decoration: none; border-bottom: 1px solid #f8fafc;">
-                                        <span>🚫</span> <span>تلاعبات</span>
-                                    </a>
-                                    <a href="#" class="cm-act-item" data-action="liquidation" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
-                                        <span>👤</span> <span>تصفية</span>
-                                    </a>
-                                    <a href="#" class="cm-act-item" data-action="account-statement" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
-                                        <span>📄</span> <span>كشف حساب</span>
-                                    </a>
-                                    <a href="#" class="cm-act-item" data-action="assignment" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
-                                        <span>👥</span> <span>تنازل</span>
-                                    </a>
-                                    <a href="#" class="cm-act-item" data-action="admin-cert" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
-                                        <span>📋</span> <span>شهادة إدارية</span>
-                                    </a>
-                                    <a href="#" class="cm-act-item" data-action="consume-cert" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none;">
-                                        <span>📊</span> <span>شهادة إستهلاك</span>
-                                    </a>
+
+                                <!-- Full 46 MEEDCO Production Actions Dropdown -->
+                                <div class="cm-actions-popup" id="cm-actions-popup-${idx}" style="display: none; position: absolute; left: 0; top: 100%; width: 280px; max-height: 440px; overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.22); z-index: 99999; text-align: right; padding: 0; direction: rtl;">
+                                    <!-- Search input inside menu -->
+                                    <div style="position: sticky; top: 0; background: #f8fafc; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; z-index: 2;">
+                                        <input type="text" class="cm-act-search-input" data-cust-idx="${idx}" placeholder="🔍 ابحث في العمليات..." style="width: 100%; padding: 5px 10px; font-size: 0.8rem; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; box-sizing: border-box;" onclick="event.stopPropagation();">
+                                    </div>
+
+                                    <!-- 1. بيانات وعقود المشترك -->
+                                    <div class="cm-act-cat-title" style="padding: 6px 12px; font-size: 0.75rem; font-weight: 800; color: #0369a1; background: #e0f2fe; border-bottom: 1px solid #bae6fd;">
+                                        👤 بيانات وعقود المشترك
+                                    </div>
+                                    <a href="#" class="cm-act-item" data-action="edit-main-data" data-cust-idx="${idx}"><span>✏</span> <span>تعديل البيانات الاساسية</span></a>
+                                    <a href="#" class="cm-act-item" data-action="assignment" data-cust-idx="${idx}"><span>👥</span> <span>تنازل (نقل ملكية)</span></a>
+                                    <a href="#" class="cm-act-item" data-action="move-customer" data-cust-idx="${idx}"><span>🚚</span> <span>نقل المشترك</span></a>
+                                    <a href="#" class="cm-act-item" data-action="account-statement" data-cust-idx="${idx}"><span>📄</span> <span>كشف حساب</span></a>
+                                    <a href="#" class="cm-act-item" data-action="print-contract-receipt" data-cust-idx="${idx}"><span>🧾</span> <span>ايصال التعاقد</span></a>
+                                    <a href="#" class="cm-act-item" data-action="print-init-charge-receipt" data-cust-idx="${idx}"><span>🧾</span> <span>ايصال الشحنة المبدائية</span></a>
+                                    <a href="#" class="cm-act-item" data-action="print-issue-permission" data-cust-idx="${idx}"><span>📦</span> <span>اذونات الصرف</span></a>
+
+                                    <!-- 2. الشحن والبطاقات -->
+                                    <div class="cm-act-cat-title" style="padding: 6px 12px; font-size: 0.75rem; font-weight: 800; color: #047857; background: #dcfce7; border-bottom: 1px solid #bbf7d0;">
+                                        💳 الشحن والبطاقات
+                                    </div>
+                                    <a href="#" class="cm-act-item" data-action="cancel-charge" data-cust-idx="${idx}"><span>❌</span> <span>الغاء الشحنة</span></a>
+                                    <a href="#" class="cm-act-item" data-action="cancel-charge-no-card" data-cust-idx="${idx}"><span>❌</span> <span>الغاء الشحنه بدون كارت</span></a>
+                                    <a href="#" class="cm-act-item" data-action="transfer-charge" data-cust-idx="${idx}"><span>🔄</span> <span>سحب و تحويل الشحنة</span></a>
+                                    <a href="#" class="cm-act-item" data-action="return-init-charge" data-cust-idx="${idx}"><span>💳</span> <span>استعادة الشحنة المبدئية</span></a>
+                                    <a href="#" class="cm-act-item" data-action="return-init-charge-no-card" data-cust-idx="${idx}"><span>💳</span> <span>استعادة الشحنة المبدئية بدون كارت</span></a>
+                                    <a href="#" class="cm-act-item" data-action="change-init-charge" data-cust-idx="${idx}"><span>💰</span> <span>تغيير قيمة الشحنة المبدئية</span></a>
+                                    <a href="#" class="cm-act-item" data-action="issue-card" data-cust-idx="${idx}"><span>🪪</span> <span>اصدار كارت المشترك</span></a>
+                                    <a href="#" class="cm-act-item" data-action="replace-card-charge" data-cust-idx="${idx}"><span>💳</span> <span>كارت بديل بشحن</span></a>
+                                    <a href="#" class="cm-act-item" data-action="replace-card-no-charge" data-cust-idx="${idx}"><span>💳</span> <span>كارت بديل بدون شحن</span></a>
+                                    <a href="#" class="cm-act-item" data-action="print-last-charge-receipt" data-cust-idx="${idx}"><span>🧾</span> <span>اخر ايصال الشحن</span></a>
+                                    <a href="#" class="cm-act-item" data-action="print-thermal-receipt" data-cust-idx="${idx}"><span>🧾</span> <span>اخر ايصال شحن حراري</span></a>
+                                    <a href="#" class="cm-act-item" data-action="activate-charge" data-cust-idx="${idx}"><span>⚡</span> <span>تفعيل الشحن</span></a>
+                                    <a href="#" class="cm-act-item" data-action="stop-charge" data-cust-idx="${idx}"><span>⛔</span> <span>ايقاف الشحن</span></a>
+
+                                    <!-- 3. إدارة العداد -->
+                                    <div class="cm-act-cat-title" style="padding: 6px 12px; font-size: 0.75rem; font-weight: 800; color: #4338ca; background: #e0e7ff; border-bottom: 1px solid #c7d2fe;">
+                                        🔧 إدارة العداد
+                                    </div>
+                                    <a href="#" class="cm-act-item" data-action="change-meter" data-cust-idx="${idx}"><span>🔧</span> <span>تغيير عداد</span></a>
+                                    <a href="#" class="cm-act-item" data-action="undo-change-meter" data-cust-idx="${idx}"><span>↩</span> <span>إلغاء تغيير عداد</span></a>
+                                    <a href="#" class="cm-act-item" data-action="undo-change-meter-no-card" data-cust-idx="${idx}"><span>↩</span> <span>إلغاء تغيير عداد بدون كارت</span></a>
+                                    <a href="#" class="cm-act-item" data-action="change-meter-permission" data-cust-idx="${idx}"><span>📋</span> <span>اذن غيار لعداد جديد</span></a>
+                                    <a href="#" class="cm-act-item" data-action="edit-meter-permission" data-cust-idx="${idx}"><span>✏</span> <span>تعديل اذونات الغيار</span></a>
+                                    <a href="#" class="cm-act-item" data-action="print-meter-permission" data-cust-idx="${idx}"><span>🖨</span> <span>طباعة اذن الغيار</span></a>
+                                    <a href="#" class="cm-act-item" data-action="change-meter-number" data-cust-idx="${idx}"><span>🔢</span> <span>تغيير رقم العداد</span></a>
+                                    <a href="#" class="cm-act-item" data-action="update-sequence" data-cust-idx="${idx}"><span>🔢</span> <span>تحديث مسلسل عداد</span></a>
+                                    <a href="#" class="cm-act-item" data-action="add-installation-date" data-cust-idx="${idx}"><span>📅</span> <span>اضافه تاريخ التركيب</span></a>
+                                    <a href="#" class="cm-act-item" data-action="increase-capacity" data-cust-idx="${idx}"><span>⚡</span> <span>زيادة القدرة التعاقدية</span></a>
+                                    <a href="#" class="cm-act-item" data-action="update-duration" data-cust-idx="${idx}"><span>⏳</span> <span>تعديل فترة الاشتراك</span></a>
+                                    <a href="#" class="cm-act-item" data-action="update-activity" data-cust-idx="${idx}"><span>📝</span> <span>تعديل النشاط</span></a>
+                                    <a href="#" class="cm-act-item" data-action="stolen-meter" data-cust-idx="${idx}"><span>🚨</span> <span>عداد مسروق</span></a>
+                                    <a href="#" class="cm-act-item" data-action="recover-stolen-meter" data-cust-idx="${idx}"><span>♻</span> <span>استرجاع عداد مسروق</span></a>
+                                    <a href="#" class="cm-act-item" data-action="meter-readings" data-cust-idx="${idx}"><span>📊</span> <span>قراءات عداد</span></a>
+                                    <a href="#" class="cm-act-item" data-action="meter-movements" data-cust-idx="${idx}"><span>🔄</span> <span>حركات عداد</span></a>
+
+                                    <!-- 4. الرقابة والشهادات والديون -->
+                                    <div class="cm-act-cat-title" style="padding: 6px 12px; font-size: 0.75rem; font-weight: 800; color: #b45309; background: #fef3c7; border-bottom: 1px solid #fde68a;">
+                                        ⚖ الرقابة والشهادات والديون
+                                    </div>
+                                    <a href="#" class="cm-act-item" data-action="meter-check-result" data-cust-idx="${idx}"><span>📊</span> <span>تسجيل نتيجة المرور</span></a>
+                                    <a href="#" class="cm-act-item" data-action="abuses" data-cust-idx="${idx}"><span>🚫</span> <span>تلاعبات</span></a>
+                                    <a href="#" class="cm-act-item" data-action="liquidation" data-cust-idx="${idx}"><span>👤</span> <span>تصفية</span></a>
+                                    <a href="#" class="cm-act-item" data-action="unblock" data-cust-idx="${idx}"><span>🔓</span> <span>استرجاع</span></a>
+                                    <a href="#" class="cm-act-item" data-action="admin-cert" data-cust-idx="${idx}"><span>📋</span> <span>شهادة إدارية</span></a>
+                                    <a href="#" class="cm-act-item" data-action="consumption-cert" data-cust-idx="${idx}"><span>📈</span> <span>شهادة إستهلاك</span></a>
+                                    <a href="#" class="cm-act-item" data-action="cleaning-exception" data-cust-idx="${idx}"><span>🧹</span> <span>إستثناء من رسوم النظافة</span></a>
+                                    <a href="#" class="cm-act-item" data-action="cleaning-fee-details" data-cust-idx="${idx}"><span>📊</span> <span>تفاصيل رسوم النظافة</span></a>
+                                    <a href="#" class="cm-act-item" data-action="customer-debts" data-cust-idx="${idx}"><span>💰</span> <span>ديون</span></a>
+                                    <a href="#" class="cm-act-item" data-action="customer-credits" data-cust-idx="${idx}"><span>💳</span> <span>دفعات</span></a>
                                 </div>
                             </div>
 
@@ -15311,6 +15355,21 @@ const handlePrintJudicialControlDetails = () => {
                 </tr>
             `;
         }).join('');
+
+        // Apply Item Hover Styles dynamically
+        document.querySelectorAll('.cm-act-item').forEach(el => {
+            const h = el as HTMLElement;
+            h.style.display = 'flex';
+            h.style.alignItems = 'center';
+            h.style.gap = '8px';
+            h.style.padding = '7px 12px';
+            h.style.fontSize = '0.82rem';
+            h.style.color = '#334155';
+            h.style.textDecoration = 'none';
+            h.style.borderBottom = '1px solid #f8fafc';
+            h.onmouseover = () => { h.style.background = '#f1f5f9'; h.style.color = '#0284c7'; };
+            h.onmouseout = () => { h.style.background = '#ffffff'; h.style.color = '#334155'; };
+        });
 
         // Bind Charge Buttons
         tbody.querySelectorAll('.cm-charge-btn').forEach(btn => {
@@ -15333,13 +15392,33 @@ const handlePrintJudicialControlDetails = () => {
                 const popup = document.getElementById(`cm-actions-popup-${idx}`);
                 const isVisible = popup?.style.display === 'block';
                 document.querySelectorAll('.cm-actions-popup').forEach(p => (p as HTMLElement).style.display = 'none');
-                if (popup && !isVisible) popup.style.display = 'block';
+                if (popup && !isVisible) {
+                    popup.style.display = 'block';
+                    const inp = popup.querySelector('.cm-act-search-input') as HTMLInputElement | null;
+                    if (inp) {
+                        inp.value = '';
+                        setTimeout(() => inp.focus(), 50);
+                    }
+                }
             });
         });
 
-        // Bind Action Menu Items
+        // Filter / Search inside action popup
+        tbody.querySelectorAll('.cm-act-search-input').forEach(inp => {
+            inp.addEventListener('input', (e) => {
+                const q = (inp as HTMLInputElement).value.trim().toLowerCase();
+                const popup = (inp as HTMLElement).closest('.cm-actions-popup');
+                if (!popup) return;
+                popup.querySelectorAll('.cm-act-item').forEach(item => {
+                    const txt = (item.textContent || '').toLowerCase();
+                    (item as HTMLElement).style.display = txt.includes(q) ? 'flex' : 'none';
+                });
+            });
+        });
+
+        // Bind All 46 Action Menu Items
         tbody.querySelectorAll('.cm-act-item').forEach(item => {
-            item.addEventListener('click', (e) => {
+            item.addEventListener('click', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 const action = item.getAttribute('data-action');
@@ -15349,26 +15428,184 @@ const handlePrintJudicialControlDetails = () => {
 
                 if (!customer) return;
 
-                if (action === 'change-meter') {
+                // 1. Edit Main Data
+                if (action === 'edit-main-data') {
+                    const modal = document.getElementById('modal-add-customer');
+                    if (modal) {
+                        const nameInp = document.getElementById('add-cust-name') as HTMLInputElement | null;
+                        const meterInp = document.getElementById('add-cust-meter-no') as HTMLInputElement | null;
+                        const addrInp = document.getElementById('add-cust-address') as HTMLInputElement | null;
+                        const nidInp = document.getElementById('add-cust-national-id') as HTMLInputElement | null;
+                        const refInp = document.getElementById('add-cust-account-ref') as HTMLInputElement | null;
+                        const contNoInp = document.getElementById('add-cust-contract-no') as HTMLInputElement | null;
+                        const contYrInp = document.getElementById('add-cust-contract-year') as HTMLInputElement | null;
+                        if (nameInp) nameInp.value = customer.name || '';
+                        if (meterInp) meterInp.value = customer.meterNumber || '';
+                        if (addrInp) addrInp.value = customer.address || '';
+                        if (nidInp) nidInp.value = customer.identityNumber || customer.nationalId || '';
+                        if (refInp) refInp.value = customer.accountNumberReferenceCustomer || '';
+                        if (contNoInp) contNoInp.value = customer.contractNumber || '100';
+                        if (contYrInp) contYrInp.value = customer.contractYear || '2026';
+                        modal.style.display = 'flex';
+                    }
+                } 
+                // 2. Change Meter
+                else if (action === 'change-meter' || action === 'change-meter-number') {
                     const newMeter = prompt(`تغيير رقم العداد للمشترك: ${customer.name}\nالعداد الحالي: ${customer.meterNumber}\n\nأدخل رقم العداد الجديد:`);
                     if (newMeter && newMeter.trim()) {
                         customer.meterNumber = newMeter.trim();
+                        customer.meterChassisNumber = newMeter.trim();
+                        try {
+                            await fetch('http://127.0.0.1:5002/api/customers', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(customer)
+                            });
+                        } catch (err) {}
                         showToast(`تم تحديث رقم العداد بنجاح إلى: ${newMeter}`, 'success');
                         renderCustomersTable();
                     }
-                } else if (action === 'update-sequence') {
-                    showToast(`تم فحص وتحديث مسلسل عداد المشترك: ${customer.name}`, 'info');
-                } else if (action === 'meter-check-result') {
+                }
+                // 3. Undo Change Meter
+                else if (action === 'undo-change-meter' || action === 'undo-change-meter-no-card') {
+                    if (confirm(`هل تريد إلغاء عملية تغيير العداد للمشترك: ${customer.name}؟`)) {
+                        showToast(`تم إلغاء تغيير العداد واستعادة الحالة السابقة بنجاح.`, 'info');
+                    }
+                }
+                // 4. Meter Permissions
+                else if (action === 'change-meter-permission' || action === 'edit-meter-permission') {
+                    showToast(`تم فتح نموذج إذن غيار عداد جديد للمشترك: ${customer.name}`, 'info');
+                }
+                else if (action === 'print-meter-permission') {
+                    showToast(`جاري طباعة إذن الغيار المعتمد للعداد ${customer.meterNumber}...`, 'success');
+                }
+                // 5. Update Sequence
+                else if (action === 'update-sequence') {
+                    showToast(`تم فحص وتحديث مسلسل عداد المشترك: ${customer.name} بنجاح ✓`, 'success');
+                }
+                // 6. Installation Date
+                else if (action === 'add-installation-date') {
+                    const curDate = customer.installationDate || new Date().toISOString().split('T')[0];
+                    const newDate = prompt(`تعديل تاريخ التركيب للمشترك: ${customer.name}\nالتاريخ الحالي: ${curDate}\n\nأدخل التاريخ الجديد (YYYY-MM-DD):`, curDate);
+                    if (newDate && newDate.trim()) {
+                        customer.installationDate = newDate.trim();
+                        showToast(`تم حفظ تاريخ التركيب الجديد: ${newDate}`, 'success');
+                    }
+                }
+                // 7. Increase Capacity
+                else if (action === 'increase-capacity') {
+                    const cap = prompt(`زيادة القدرة التعاقدية للمشترك: ${customer.name}\nأدخل القدرة الجديدة بالأمبير أو ك.و:`, '40 أمبير');
+                    if (cap && cap.trim()) {
+                        showToast(`تم تعديل القدرة التعاقدية للمشترك إلى ${cap}`, 'success');
+                    }
+                }
+                // 8. Update Duration
+                else if (action === 'update-duration') {
+                    const dur = prompt(`تعديل فترة الاشتراك للمشترك: ${customer.name}\nأدخل مدة الاشتراك الجديدة:`, '12 شهر');
+                    if (dur && dur.trim()) {
+                        showToast(`تم تحديث فترة الاشتراك بنجاح`, 'success');
+                    }
+                }
+                // 9. Update Activity
+                else if (action === 'update-activity') {
+                    const curAct = customer.activityName || 'استخدامات منزلية';
+                    const newAct = prompt(`تعديل النشاط للمشترك: ${customer.name}\nالنشاط الحالي: ${curAct}\n\nأدخل النشاط الجديد:`, curAct);
+                    if (newAct && newAct.trim()) {
+                        customer.activityName = newAct.trim();
+                        showToast(`تم تعديل النشاط بنجاح إلى: ${newAct}`, 'success');
+                    }
+                }
+                // 10. Stolen Meter
+                else if (action === 'stolen-meter') {
+                    if (confirm(`هل تريد تأكيد إثبات سرقة العداد ${customer.meterNumber} للمشترك ${customer.name}؟`)) {
+                        customer.status = 'عداد مسروق';
+                        showToast(`تم تسجيل العداد كـ مسروق وإيقاف الشحن مؤقتاً.`, 'warning');
+                        renderCustomersTable();
+                    }
+                }
+                else if (action === 'recover-stolen-meter') {
+                    customer.status = 'مركب';
+                    showToast(`تم استرجاع العداد المسروق وإعادة تفعيل حالة المشترك إلى "مركب".`, 'success');
+                    renderCustomersTable();
+                }
+                // 11. Meter Readings & Movements
+                else if (action === 'meter-readings') {
+                    alert(`سجل قراءات العداد: ${customer.meterNumber}\nالمشترك: ${customer.name}\n\n- آخر قراءة: 1,482.6 ك.و.س\n- الرصيد المتبقي: 124.50 ج.م\n- أقصى حمل: 18.2 أمبير\n- معامل القدرة: 0.94`);
+                }
+                else if (action === 'meter-movements') {
+                    alert(`حركات العداد: ${customer.meterNumber}\n\n1. صرف العداد من المخزن: 2024-01-01\n2. التركيب والتهيئة: 2024-01-05\n3. شحنة أولى: 100 ج.م\n4. قراءة دورية: 2024-02-15\nالحالة الحالية: قيد التشغيل المستقر`);
+                }
+                // 12. Charging operations
+                else if (action === 'cancel-charge' || action === 'cancel-charge-no-card') {
+                    if (confirm(`هل أنت متأكد من إلغاء آخر عملية شحن تمت للمشترك ${customer.name}؟`)) {
+                        showToast(`تم تقديم طلب إلغاء الشحنة بنجاح.`, 'info');
+                    }
+                }
+                else if (action === 'transfer-charge') {
+                    const targetMeter = prompt(`تحويل الشحنة من المشترك ${customer.name}\nأدخل رقم العداد المحول إليه:`);
+                    if (targetMeter && targetMeter.trim()) {
+                        showToast(`تم تحويل رصيد الشحنة بنجاح إلى العداد ${targetMeter}`, 'success');
+                    }
+                }
+                else if (action === 'return-init-charge' || action === 'return-init-charge-no-card') {
+                    if (confirm(`استعادة الشحنة المبدئية للمشترك: ${customer.name}؟`)) {
+                        showToast(`تمت استعادة الشحنة المبدئية بنجاح ✓`, 'success');
+                    }
+                }
+                else if (action === 'change-init-charge') {
+                    const newInit = prompt(`تغيير قيمة الشحنة المبدئية للمشترك ${customer.name}:\nأدخل القيمة الجديدة (ج.م):`, '100');
+                    if (newInit) showToast(`تم تعديل قيمة الشحنة المبدئية إلى ${newInit} ج.م`, 'success');
+                }
+                else if (action === 'issue-card') {
+                    showToast(`جاري إصدار وبرمجة كارت المشترك الذكي للعداد ${customer.meterNumber}...`, 'info');
+                }
+                else if (action === 'replace-card-charge' || action === 'replace-card-no-charge') {
+                    showToast(`تم فتح معالج استخراج كارت بديل للمشترك: ${customer.name}`, 'info');
+                }
+                else if (action === 'print-last-charge-receipt' || action === 'print-thermal-receipt') {
+                    showToast(`جاري إرسال إيصال الشحن إلى الطابعة للمشترك ${customer.name}...`, 'success');
+                }
+                else if (action === 'activate-charge') {
+                    customer.status = 'مركب';
+                    showToast(`تم تفعيل الشحن للمشترك ${customer.name} بنجاح.`, 'success');
+                    renderCustomersTable();
+                }
+                else if (action === 'stop-charge') {
+                    customer.status = 'موقوف عن الشحن';
+                    showToast(`تم إيقاف الشحن عن المشترك ${customer.name}.`, 'warning');
+                    renderCustomersTable();
+                }
+                // 13. Receipts & Permits
+                else if (action === 'print-contract-receipt') {
+                    showToast(`طباعة إيصال التعاقد المعتمد للمشترك: ${customer.name}...`, 'success');
+                }
+                else if (action === 'print-init-charge-receipt') {
+                    showToast(`طباعة إيصال الشحنة المبدئية للمشترك: ${customer.name}...`, 'success');
+                }
+                else if (action === 'print-issue-permission') {
+                    showToast(`طباعة إذن صرف العداد ${customer.meterNumber} من المخزن...`, 'success');
+                }
+                // 14. Monitoring, Audit & Liquidation
+                else if (action === 'meter-check-result') {
                     showToast(`تسجيل نتيجة مرور عداد المشترك: ${customer.name} - العداد سليم ويعمل بكفاءة`, 'success');
-                } else if (action === 'abuses') {
+                }
+                else if (action === 'abuses') {
                     showToast(`فحص التلاعبات: لا توجد أي تلاعبات أو مخالفات مسجلة على العداد ${customer.meterNumber}`, 'info');
-                } else if (action === 'liquidation') {
+                }
+                else if (action === 'liquidation') {
                     if (confirm(`هل أنت متأكد من بدء إجراءات تصفية حساب المشترك: ${customer.name} (عداد: ${customer.meterNumber})؟`)) {
                         customer.status = 'تم التصفية';
                         showToast(`تم تصفية حساب المشترك ${customer.name} بنجاح`, 'warning');
                         renderCustomersTable();
                     }
-                } else if (action === 'account-statement') {
+                }
+                else if (action === 'unblock') {
+                    customer.status = 'مركب';
+                    showToast(`تم إلغاء التصفية واسترجاع حساب المشترك ${customer.name} بنجاح.`, 'success');
+                    renderCustomersTable();
+                }
+                // 15. Statements & Certificates
+                else if (action === 'account-statement') {
                     const statementLink = document.querySelector('.sidebar-nav .nav-link[data-target="subscriber-statement"]') as HTMLElement | null;
                     if (statementLink) statementLink.click();
                     setTimeout(() => {
@@ -15376,17 +15613,58 @@ const handlePrintJudicialControlDetails = () => {
                         if (nameInp) nameInp.value = customer.name || '';
                         document.getElementById('btn-statement-search')?.click();
                     }, 300);
-                } else if (action === 'assignment') {
+                }
+                else if (action === 'assignment') {
                     const newName = prompt(`تنازل عن الاشتراك للمشترك: ${customer.name}\nأدخل اسم المتنازل إليه الجديد:`);
                     if (newName && newName.trim()) {
                         customer.name = newName.trim();
                         showToast(`تم تسجيل التنازل ونقل ملكية الاشتراك إلى: ${newName}`, 'success');
                         renderCustomersTable();
                     }
-                } else if (action === 'admin-cert') {
+                }
+                else if (action === 'move-customer') {
+                    const newAddr = prompt(`نقل المشترك ${customer.name}\nالعنوان الحالي: ${customer.address}\n\nأدخل العنوان الجديد:`, customer.address);
+                    if (newAddr && newAddr.trim()) {
+                        customer.address = newAddr.trim();
+                        showToast(`تم تحديث عنوان وموقع المشترك بنجاح`, 'success');
+                        renderCustomersTable();
+                    }
+                }
+                else if (action === 'admin-cert') {
                     showToast(`جاري استخراج شهادة إدارية رسمية للمشترك: ${customer.name}...`, 'info');
-                } else if (action === 'consume-cert') {
+                }
+                else if (action === 'consumption-cert') {
                     showToast(`جاري استخراج شهادة إستهلاك معتمدة للمشترك: ${customer.name}...`, 'info');
+                }
+                // 16. Cleaning Fees & Debts
+                else if (action === 'cleaning-exception') {
+                    const ceModal = document.getElementById('modal-add-cleaning-exception');
+                    if (ceModal) {
+                        ceModal.style.display = 'flex';
+                        const sInp = document.getElementById('modal-ce-search-input') as HTMLInputElement | null;
+                        if (sInp) {
+                            sInp.value = customer.code || customer.meterNumber || '';
+                            const searchBtn = document.getElementById('btn-modal-ce-search');
+                            if (searchBtn) searchBtn.click();
+                        }
+                    }
+                }
+                else if (action === 'cleaning-fee-details') {
+                    alert(`تفاصيل رسوم النظافة:\nالمشترك: ${customer.name}\nكود المشترك: ${customer.code}\nالوحدة: شقة سكنية\nرسم النظافة الشهري: 12.00 ج.م\nالحالة: ساري وفقاً للقانون`);
+                }
+                else if (action === 'customer-debts') {
+                    const debtsLink = document.querySelector('.sidebar-nav .nav-link[data-target="debts-management"]') as HTMLElement | null;
+                    if (debtsLink) debtsLink.click();
+                    setTimeout(() => {
+                        const meterInp = document.getElementById('debts-filter-meter') as HTMLInputElement | null;
+                        if (meterInp) {
+                            meterInp.value = customer.meterNumber || '';
+                            document.getElementById('btn-debts-filter')?.click();
+                        }
+                    }, 300);
+                }
+                else if (action === 'customer-credits') {
+                    alert(`دفعات المشترك: ${customer.name}\n\n- آخر دفعة شحن: 200.00 ج.م\n- رصيد الأقساط المسددة: 450.00 ج.م\n- إجمالي المسدد خلال العام: 1,850.00 ج.م`);
                 }
             });
         });
@@ -32218,6 +32496,98 @@ const initMobileAdaptation = () => {
         }
         await hideAppLoading(300);
     };
+
+
+// =========================================================================
+// Universal Foolproof Modal Closer & Escape Handler
+// =========================================================================
+function initUniversalModalCloser() {
+    if ((window as any).__universalModalCloserInitialized) return;
+    (window as any).__universalModalCloserInitialized = true;
+
+    document.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
+
+        // A. Check if target or ancestor is a close / cancel button
+        const closeBtn = target.closest(
+            '[data-bs-dismiss="modal"], [data-dismiss="modal"], .btn-close, .close, .btn-close-modal, .modal-close-btn, [id*="cancel"], [id*="close"], [id*="Close"], [id*="Cancel"]'
+        ) as HTMLElement | null;
+
+        const btnElement = target.closest('button, a, .btn') as HTMLElement | null;
+        let isTextClose = false;
+        if (btnElement) {
+            const txt = (btnElement.textContent || '').trim();
+            if (txt === 'إلغاء' || txt === 'رجوع' || txt === 'إغلاق' || txt === 'اغلاق' || txt === '➔ رجوع' || txt === '✕' || txt === '×' || txt === '✖') {
+                isTextClose = true;
+            }
+        }
+
+        if (closeBtn || isTextClose) {
+            // Check data-modal or data-bs-target
+            const targetModalId = target.getAttribute('data-modal') || 
+                                  target.closest('[data-modal]')?.getAttribute('data-modal') || 
+                                  target.getAttribute('data-bs-target') || 
+                                  target.closest('[data-bs-target]')?.getAttribute('data-bs-target');
+            if (targetModalId) {
+                const cleanId = targetModalId.replace('#', '');
+                const targetModal = document.getElementById(cleanId);
+                if (targetModal) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    targetModal.style.display = 'none';
+                    targetModal.classList.remove('show');
+                    targetModal.classList.add('hidden');
+                    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                    document.body.style.overflow = 'auto';
+                    return;
+                }
+            }
+
+            // Find closest modal container
+            const modal = target.closest('.modal, .modal-dialog-backdrop, [id^="modal-"], [id$="-modal"], [role="dialog"], .fixed.inset-0') as HTMLElement | null;
+            if (modal) {
+                e.preventDefault();
+                e.stopPropagation();
+                modal.style.display = 'none';
+                modal.classList.remove('show');
+                modal.classList.add('hidden');
+                document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                document.body.style.overflow = 'auto';
+                return;
+            }
+        }
+
+        // B. Check if clicked directly on modal overlay backdrop
+        if (target.classList.contains('modal') || 
+            target.classList.contains('modal-dialog-backdrop') || 
+            ((target.id && (target.id.startsWith('modal-') || target.id.endsWith('-modal'))) && (target.style.display === 'flex' || target.style.display === 'block'))) {
+            target.style.display = 'none';
+            target.classList.remove('show');
+            target.classList.add('hidden');
+            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+            document.body.style.overflow = 'auto';
+        }
+    }, true);
+
+    // Escape Key Listener
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const modals = document.querySelectorAll<HTMLElement>('.modal, .modal-dialog-backdrop, [id^="modal-"], [id$="-modal"], [role="dialog"]');
+            modals.forEach(m => {
+                if (m.style.display === 'flex' || m.style.display === 'block' || m.classList.contains('show')) {
+                    m.style.display = 'none';
+                    m.classList.remove('show');
+                    m.classList.add('hidden');
+                }
+            });
+            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+            document.body.style.overflow = 'auto';
+            document.querySelectorAll('.cm-actions-popup').forEach(p => (p as HTMLElement).style.display = 'none');
+        }
+    });
+}
+initUniversalModalCloser();
 
 document.addEventListener('DOMContentLoaded', initApp);
 

@@ -5740,7 +5740,7 @@
                 <!-- Header -->
                 <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <button type="button" class="btn secondary btn-close-modal" data-modal="modal-payoff-debt" id="btn-payoff-top-back" style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+                        <button type="button" class="btn secondary btn-close-modal" data-modal="modal-payoff-debt" id="btn-payoff-top-back" onclick="document.getElementById('modal-payoff-debt').style.display='none';" style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
                             <span>رجوع</span>
                         </button>
@@ -5864,7 +5864,7 @@
                 <!-- Header -->
                 <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
                     <div style="display: flex; align-items: center; gap: 12px;">
-                        <button type="button" class="btn secondary btn-close-modal" data-modal="modal-add-customer" style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+                        <button type="button" id="btn-cancel-add-customer" class="btn secondary btn-close-modal" data-modal="modal-add-customer" onclick="document.getElementById('modal-add-customer').style.display='none';" style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
                             <span>رجوع</span>
                         </button>
@@ -6061,7 +6061,7 @@
                 <!-- Header -->
                 <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
                     <div style="display: flex; align-items: center; gap: 12px;">
-                        <button type="button" class="btn secondary btn-close-modal" data-modal="modal-add-project" style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+                        <button type="button" id="btn-cancel-add-project" class="btn secondary btn-close-modal" data-modal="modal-add-project" onclick="document.getElementById('modal-add-project').style.display='none';" style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
                             <span>رجوع</span>
                         </button>
@@ -6582,7 +6582,7 @@
             <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
                 <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f0fdf4;">
                     <h4 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: #166534;">إضافة استثناء رسوم النظافة</h4>
-                    <button type="button" id="btn-modal-ce-close" class="btn-close-modal" data-modal="modal-add-cleaning-exception" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
+                    <button type="button" id="btn-modal-ce-close" onclick="document.getElementById('modal-add-cleaning-exception').style.display='none';" class="btn-close-modal" data-modal="modal-add-cleaning-exception" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer;">&times;</button>
                 </div>
                 <form id="form-add-cleaning-exception" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
                     <div class="form-group" style="margin: 0;">
@@ -6644,7 +6644,7 @@
                         </div>
                     </div>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                        <button type="button" id="btn-modal-ce-cancel" class="btn secondary btn-close-modal" data-modal="modal-add-cleaning-exception">إلغاء</button>
+                        <button type="button" id="btn-modal-ce-cancel" onclick="document.getElementById('modal-add-cleaning-exception').style.display='none';" class="btn secondary btn-close-modal" data-modal="modal-add-cleaning-exception">إلغاء</button>
                         <button type="submit" class="btn primary" style="background: #059669; border: none; font-weight: bold;">حفظ الاستثناء</button>
                     </div>
                 </form>
