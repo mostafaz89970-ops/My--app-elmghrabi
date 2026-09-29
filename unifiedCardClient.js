@@ -252,25 +252,7 @@ async function getMeedcoHierarchyLive(sectorId = null, publicAdminId = null) {
 let lastKnownControlCard = null;
 
 function getLastKnownControlCard() {
-    if (lastKnownControlCard) return lastKnownControlCard;
-    try {
-        const storePath = path.join(__dirname, 'card_store.json');
-        if (fs.existsSync(storePath)) {
-            const store = JSON.parse(fs.readFileSync(storePath, 'utf8'));
-            if (store.activeControlCard) {
-                lastKnownControlCard = store.activeControlCard;
-                return lastKnownControlCard;
-            }
-            if (store.controlCards) {
-                const values = Object.values(store.controlCards);
-                if (values.length > 0) {
-                    lastKnownControlCard = values[values.length - 1];
-                    return lastKnownControlCard;
-                }
-            }
-        }
-    } catch(e) {}
-    return null;
+    return lastKnownControlCard || null;
 }
 
 /**
@@ -651,20 +633,15 @@ async function readControlCardLive() {
                         }
                     }
 
-                    if (lastKnownControlCard) {
-                        return resolve({
-                            success: true,
-                            status: 'success',
-                            message: 'تمت قراءة كارت التحكم من القارئ بنجاح.',
-                            card: lastKnownControlCard,
-                            data: lastKnownControlCard
-                        });
-                    }
-
                     return resolve({
                         success: false,
                         status: 'read_failed',
-                        message: 'تم التعرف على الشريحة الذكية ولكن تعذر فك تشفير بيانات الكارت من سيرفر MEEDCO.'
+                        vendor_id: detectedVendorId,
+                        vendorCode: detectedVendorId,
+                        vendorName: getVendorNameById(detectedVendorId),
+                        generation_type: detectedGenType,
+                        card: null,
+                        message: 'تم التعرف على الشريحة الذكية ولكن تعذر استرجاع بيانات كارت التحكم من المنظومة.'
                     });
 
                 } else if (res.event === 'error') {
@@ -680,8 +657,25 @@ async function readControlCardLive() {
                         });
                     }
 
-                    if (err.code === 5104 && (err.api_code === 4022 || err.api_code === 4041)) {
-                        const fallbackCard = getLastKnownControlCard();
+                    if (err.code === 5104 && err.api_code === 4022) {
+                        // 4022 in MEEDCO means the card is CLEARED / DELETED / UNINITIALIZED
+                        return resolve({
+                            success: true,
+                            status: 'empty_card',
+                            isCleared: true,
+                            errorCode: err.code,
+                            apiCode: err.api_code,
+                            vendor_id: detectedVendorId,
+                            vendorCode: detectedVendorId,
+                            vendorName: getVendorNameById(detectedVendorId),
+                            generation_type: detectedGenType,
+                            card: null,
+                            data: null,
+                            message: `تم التعرف على كارت التحكم الفعلي (${getVendorNameById(detectedVendorId)}): الكارت ممسوح / فارغ وجاهز للإصدار والبرمجة.`
+                        });
+                    }
+
+                    if (err.code === 5104 && err.api_code === 4041) {
                         return resolve({
                             success: false,
                             status: 'inactive',
@@ -689,10 +683,11 @@ async function readControlCardLive() {
                             apiCode: err.api_code,
                             vendor_id: detectedVendorId,
                             vendorCode: detectedVendorId,
+                            vendorName: getVendorNameById(detectedVendorId),
                             generation_type: detectedGenType,
-                            card: fallbackCard,
-                            data: fallbackCard,
-                            message: 'تم التعرف على كارت التحكم ولكن الكارت غير مفعل حالياً أو انتهت صلاحيته اليومية (يمكنك تجديده عبر زر تجديد الكارت).'
+                            card: null,
+                            data: null,
+                            message: 'كارت التحكم غير مفعل حالياً أو انتهت صلاحيته اليومية (يمكنك تجديده عبر زر تجديد الكارت).'
                         });
                     }
 
@@ -1613,23 +1608,33 @@ async function issueControlCardLive(params) {
     const cardId = bkResult.data?.cardId || "09312103";
     console.log('[IssueControlCard] Backend success! operationUuid:', operationUuid, 'cardId:', cardId);
 
-    // Step 4 & 5: WebSocket Perso & Write
+    // Step 4: WebSocket Physical Write to Card
     if (operationUuid) {
         const wsWriteResult = await new Promise((resolve) => {
             let ws;
             let isDone = false;
+            let triedPerso = false;
             try {
                 ws = new WebSocket(WS_URL);
             } catch (err) {
-                return resolve({ success: true, warning: 'Service not responding to write' });
+                return resolve({ success: false, error: 'تعذر الاتصال بخدمة قارئ الكروت (UnifiedCardService)' });
             }
 
+            const timeout = setTimeout(() => {
+                if (!isDone) {
+                    isDone = true;
+                    try { ws.close(); } catch(e) {}
+                    resolve({ success: false, error: 'انتهت مهلة كتابة البيانات على كارت التحكم في القارئ.' });
+                }
+            }, 15000);
+
             ws.onopen = () => {
-                // Send perso first
+                // Control cards in MEEDCO UnifiedCardService are written directly via write event
+                console.log('[IssueControlCard] Sending write to UCS for operationUuid:', operationUuid);
                 ws.send(JSON.stringify({
                     service: 'cards',
-                    event: 'perso',
-                    perso: { operation_uuid: operationUuid },
+                    event: 'write',
+                    write: { operation_uuid: operationUuid },
                     token: ucsToken || ''
                 }));
             };
@@ -1637,22 +1642,41 @@ async function issueControlCardLive(params) {
             ws.onmessage = (event) => {
                 try {
                     const msg = JSON.parse(event.data);
-                    if (msg.event === 'perso') {
-                        // Perso complete, now send write
+                    console.log('[IssueControlCard] UCS message received:', msg);
+
+                    if (msg.event === 'write') {
+                        isDone = true;
+                        clearTimeout(timeout);
+                        try { ws.close(); } catch(e) {}
+                        resolve({ success: true, data: msg });
+                    } else if (msg.event === 'perso') {
+                        // Perso complete if needed, now send write
+                        console.log('[IssueControlCard] Perso completed, proceeding to write...');
                         ws.send(JSON.stringify({
                             service: 'cards',
                             event: 'write',
                             write: { operation_uuid: operationUuid },
                             token: ucsToken || ''
                         }));
-                    } else if (msg.event === 'write') {
-                        isDone = true;
-                        ws.close();
-                        resolve({ success: true, data: msg });
                     } else if (msg.event === 'error') {
+                        // If write requires perso first on a brand-new card, attempt perso once
+                        if (!triedPerso && (msg.error?.message?.toLowerCase().includes('perso') || msg.error?.code === 5105)) {
+                            triedPerso = true;
+                            console.log('[IssueControlCard] Card requested perso, sending perso event...');
+                            ws.send(JSON.stringify({
+                                service: 'cards',
+                                event: 'perso',
+                                perso: { operation_uuid: operationUuid },
+                                token: ucsToken || ''
+                            }));
+                            return;
+                        }
+
                         isDone = true;
-                        ws.close();
-                        resolve({ success: false, error: msg.error });
+                        clearTimeout(timeout);
+                        try { ws.close(); } catch(e) {}
+                        const errDesc = msg.error?.message || `كود خطأ القارئ (${msg.error?.code || 'غير معروف'})`;
+                        resolve({ success: false, error: errDesc });
                     }
                 } catch (e) {
                     // ignore
@@ -1662,42 +1686,45 @@ async function issueControlCardLive(params) {
             ws.onerror = (err) => {
                 if (!isDone) {
                     isDone = true;
-                    resolve({ success: false, error: err.message });
+                    clearTimeout(timeout);
+                    resolve({ success: false, error: err.message || 'خطأ في الاتصال بقارئ الكروت' });
                 }
             };
-
-            setTimeout(() => {
-                if (!isDone) {
-                    isDone = true;
-                    try { ws.close(); } catch(e) {}
-                    resolve({ success: true, timeout: true });
-                }
-            }, 12000);
         });
 
         console.log('[IssueControlCard] UCS write outcome:', wsWriteResult);
+
+        if (!wsWriteResult.success) {
+            return {
+                success: false,
+                status: 'write_failed',
+                message: `تم تسجيل كارت التحكم في المنظومة ولكن فشلت الكتابة الفعلية على الشريحة الذكية: ${wsWriteResult.error}. يرجى التأكد من ثبات الكارت في القارئ وإعادة المحاولة.`,
+                cardId: cardId,
+                operationUuid: operationUuid
+            };
+        }
     }
 
-    // Update last known card in memory so both apps read the exact same data
+    // Update last known card in memory with the actual issued details
     lastKnownControlCard = {
         cardId: cardId,
-        technicianCode: params.technicianCode || 12258,
-        technicianName: params.technicianName || "وحيد فاروق كامل",
+        technicianCode: params.technicianCode || params.techId || 12258,
+        technicianName: params.technicianName || "فني معتمد",
         controlOperationTypeName: params.controlOperationTypeName || "كارت إطلاق تيار",
         controlOperationType: Number(params.controlOperationType) || 3,
-        companyName: params.companyName || "جلوبال",
+        companyName: params.companyName || getVendorNameById(cardVendorId),
         meterTypeName: params.meterTypeName || "عداد احادى 2022",
         cardIssueDate: new Date().toLocaleDateString('ar-EG'),
         activationDate: new Date().toLocaleDateString('ar-EG'),
         expiryDate: new Date(expireDateStr).toLocaleDateString('ar-EG'),
-        issueUsername: "سناء عبدالستار عبدالعزيز",
+        issueUsername: params.issueUsername || "مسؤول النظام",
         meterData: params.meterNumber ? [{ meterNumber: params.meterNumber }] : []
     };
 
     return {
         success: true,
         status: 'success',
-        message: `تم إصدار وكتابة كارت التحكم بنجاح! رقم كارت الفني: ${cardId}`,
+        message: `تم إصدار وكتابة كارت التحكم الفعلي بنجاح! رقم كارت الفني: ${cardId}`,
         cardId: cardId,
         card: lastKnownControlCard,
         data: bkResult.data

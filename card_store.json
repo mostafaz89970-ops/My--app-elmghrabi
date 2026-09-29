@@ -120,21 +120,5 @@
       "meterData": []
     }
   },
-  "activeControlCard": {
-    "id": "b2a5533e-df19-48d4-b3c3-17f88751aa86",
-    "cardId": "55267369",
-    "technicianCode": 12258,
-    "technicianName": "وحيد فاروق كامل",
-    "controlOperationTypeName": "كارت فتح و غلق مفتاح التوصيل",
-    "controlOperationType": 5,
-    "companyName": "المصرية",
-    "meterTypeName": "احادى 2024",
-    "cardIssueDate": "27‏‏/9‏‏/2026 4:53:28 م",
-    "activationDate": "18‏‏/1‏‏/2013 4:53:28 م",
-    "expiryDate": "4‏‏/10‏‏/2026 4:53:28 م",
-    "issueUsername": "سناء عبدالستار عبدالعزيز",
-    "status": "مفعل",
-    "readAt": "٢٧‏/٩‏/٢٠٢٦، ٥:٠٨:٣٩ م",
-    "meterData": []
-  }
+  "activeControlCard": null
 }

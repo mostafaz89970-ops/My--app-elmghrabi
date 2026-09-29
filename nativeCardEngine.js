@@ -848,6 +848,11 @@ async function readControlCard() {
                     message: liveRes.message || 'تمت قراءة كارت التحكم الفعلي بنجاح ومطابقته مع سيرفر MEEDCO.'
                 };
             } else if (liveRes) {
+                if (liveRes.isCleared || liveRes.status === 'empty_card') {
+                    const store = getCardStore();
+                    store.activeControlCard = null;
+                    saveCardStore(store);
+                }
                 return liveRes;
             }
         }

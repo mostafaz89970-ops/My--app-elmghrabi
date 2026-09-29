@@ -73,7 +73,7 @@
     "meterSingleOrTripple": "احادى",
     "initialCapacityAndMethod": "80  أمبير",
     "initialRechargeAmount": 200,
-    "totalRechargeAmount": 0,
+    "totalRechargeAmount": 200,
     "totalMeterRechargeAmount": 0,
     "chargeSequence": 1,
     "meterChargeSequence": 1,

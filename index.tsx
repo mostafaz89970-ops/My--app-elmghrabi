@@ -27251,73 +27251,55 @@ const handlePrintJudicialControlDetails = () => {
 
 
         if (badgeEl) {
-
-            if (cardData.status === 'inactive' || (typeof cardData.status === 'string' && cardData.status.includes('غير مفعل'))) {
-
+            if (cardData.isCleared || cardData.status === 'empty_card' || cardData.status === 'كارت ممسوح / فارغ') {
+                badgeEl.textContent = 'كارت تحكم ممسوح / فارغ (جاهز للإصدار)';
+                badgeEl.style.backgroundColor = '#e0f2fe';
+                badgeEl.style.color = '#0369a1';
+                badgeEl.style.border = '1px solid #7dd3fc';
+            } else if (cardData.status === 'inactive' || (typeof cardData.status === 'string' && cardData.status.includes('غير مفعل'))) {
                 badgeEl.textContent = 'الكارت غير مفعل (اضغط "تحديث الكارت")';
-
                 badgeEl.style.backgroundColor = '#fef3c7';
-
                 badgeEl.style.color = '#b45309';
-
                 badgeEl.style.border = '1px solid #fcd34d';
-
             } else {
-
                 badgeEl.textContent = 'كارت مفعل';
-
                 badgeEl.style.backgroundColor = '#dcfce7';
-
                 badgeEl.style.color = '#15803d';
-
                 badgeEl.style.border = '1px solid #86efac';
-
             }
-
         }
-
-
 
         if (printBtn) {
-
-            printBtn.disabled = false;
-
+            printBtn.disabled = Boolean(cardData.isCleared || cardData.status === 'empty_card');
         }
 
-
-
         // Meters list
-
         const meters: any[] = cardData.meterData || cardData.meters || cardData.meterReadings || cardData.metersReadings || [];
-
         if (countEl) countEl.textContent = String(meters.length);
 
-
-
         const tbody = document.getElementById('control-card-meters-tbody');
-
         if (!tbody) return;
 
-
+        if (cardData.isCleared || cardData.status === 'empty_card') {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="padding: 2rem; text-align: center; color: #0284c7; font-weight: 600;">
+                        تم التعرف على كارت التحكم الفعلي: الكارت ممسوح / فارغ وجاهز للإصدار الجديد والبرمجة.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
 
         if (meters.length === 0) {
-
             tbody.innerHTML = `
-
                 <tr>
-
                     <td colspan="8" style="padding: 2rem; text-align: center; color: #64748b;">
-
                         تمت قراءة كارت التحكم بنجاح! لا توجد قراءات عدادات مسجلة حالياً على هذا الكارت.
-
                     </td>
-
                 </tr>
-
             `;
-
             return;
-
         }
 
 
@@ -27494,54 +27476,58 @@ const handlePrintJudicialControlDetails = () => {
 
 
 
+            if (result.isCleared || result.status === 'empty_card') {
+                const vendorName = result.vendorName || (result.vendor_id === 1 || result.vendorCode === 1 ? 'السويدي (El Sewedy)' : (result.vendor_id === 3 || result.vendorCode === 3 ? 'المصرية' : 'جلوبالترونكس'));
+                const emptyData = {
+                    cardId: '-',
+                    vendorCode: result.vendor_id || result.vendorCode || 1,
+                    vendorName: vendorName,
+                    companyName: vendorName,
+                    generationType: result.generation_type || 'g1',
+                    technicianName: '-',
+                    technicianCode: '-',
+                    controlOperationTypeName: '-',
+                    meterTypeName: '-',
+                    issueDate: '-',
+                    activationDate: '-',
+                    expiryDate: '-',
+                    status: 'كارت ممسوح / فارغ',
+                    isCleared: true,
+                    meterData: []
+                };
+                currentControlCardData = emptyData;
+                updateControlCardUI(emptyData);
+
+                showToast(result.message || `تم التعرف على كارت التحكم الفعلي (${vendorName}): الكارت ممسوح / فارغ وجاهز للإصدار والبرمجة.`, 'info');
+                return;
+            }
+
             if (!result.success) {
-
-                if (result.status === 'inactive' || result.card_status === 'needs_renewal' || result.errorCode === 5104 || result.errorCode === 4022) {
-
+                if (result.status === 'inactive' || result.card_status === 'needs_renewal' || result.errorCode === 4041 || result.apiCode === 4041) {
                     const badgeEl = document.getElementById('ctrl-card-status-badge');
-
                     if (badgeEl) {
-
                         badgeEl.textContent = 'الكارت غير مفعل / يحتاج تجديد صلاحية';
-
                         badgeEl.style.backgroundColor = '#fef3c7';
-
                         badgeEl.style.color = '#b45309';
-
                         badgeEl.style.border = '1px solid #fcd34d';
-
                     }
 
+                    const vendorName = result.vendorName || (result.vendor_id === 1 || result.vendorCode === 1 ? 'السويدي (El Sewedy)' : 'جلوبالترونكس');
                     const data = result.data || result.card || {
-
-                        cardId: result.cardId || '55267369',
-
+                        cardId: result.cardId || '-',
                         vendorCode: result.vendor_id || result.vendorCode || 1,
-
                         generationType: result.generation_type || 'g1',
-
-                        companyName: 'جلوبالترونكس (Globaltronics)',
-
+                        companyName: vendorName,
                         status: 'غير مفعل'
-
                     };
-
                     currentControlCardData = data;
-
                     updateControlCardUI(data);
 
-
-
-                    showToast('تم التعرف على كارت التحكم (Globaltronics)! الكارت غير مفعل حالياً أو انتهت صلاحيته اليومية. يرجى الضغط على زر "تحديث الكارت" لتجديده.', 'warning');
-
+                    showToast(result.message || 'كارت التحكم غير مفعل حالياً أو انتهت صلاحيته اليومية. يمكنك تجديده عبر زر "تحديث الكارت".', 'warning');
                 } else {
-
                     showToast(result.message || 'فشل في فك تشفير أو قراءة كارت التحكم.', 'error');
-
                 }
-
                 return;
-
             }
 
 
