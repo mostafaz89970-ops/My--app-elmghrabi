@@ -510,6 +510,27 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // 11.10 Stop Charge API (إيقاف الشحن / تفعيل الشحن للمشترك)
+            if (pathname === '/api/customer/stop-charge' || pathname === '/api/customer-stop-charge') {
+                const body = await getBody();
+                const targetId = body.customerId || body.id || body.meterNumber || body.code || url.searchParams.get('id');
+                const isStop = body.isStop !== undefined ? body.isStop : (body.isChargeStop !== undefined ? body.isChargeStop : undefined);
+                const reason = body.reason || body.stopChargeReason || '';
+                const result = await nativeEngine.toggleCustomerStopCharge(targetId, isStop, reason);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            // 11.11 Refund / Cancel Charge API (استرجاع وإلغاء الشحنة)
+            if (pathname === '/api/customer/refund-charge' || pathname === '/api/customer-refund-charge') {
+                const body = await getBody();
+                const result = await nativeEngine.refundCustomerCharge(body);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
             // 12. Customers List & Filter API
             if (pathname === '/api/customers') {
                 const body = await getBody();

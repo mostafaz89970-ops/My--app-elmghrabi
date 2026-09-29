@@ -1958,6 +1958,154 @@ async function updateCustomerSequence(targetId, seqSys, seqMeter) {
     };
 }
 
+async function toggleCustomerStopCharge(customerId, isStop, reason = '') {
+    const cid = String(customerId || '').trim();
+    if (!cid) return { success: false, message: 'معرف أو كود المشترك مطلوب' };
+
+    const custFile = path.join(__dirname, 'customers_store.json');
+    let custFound = null;
+    if (fs.existsSync(custFile)) {
+        try {
+            let custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+            custFound = custs.find(c => 
+                String(c.id).trim() === cid ||
+                String(c.customerId).trim() === cid ||
+                String(c.code).trim() === cid ||
+                String(c.codeNumber).trim() === cid ||
+                String(c.meterNumber).trim() === cid
+            );
+            if (custFound) {
+                custFound.isChargeStop = (isStop !== undefined && isStop !== null) ? Boolean(isStop) : !custFound.isChargeStop;
+                custFound.status = custFound.isChargeStop ? 'موقوف عن الشحن' : 'مركب';
+                custFound.stopChargeReason = reason || (custFound.isChargeStop ? 'بناءً على طلب الإدارة / فحص العداد' : '');
+                custFound.updatedAt = new Date().toISOString();
+                fs.writeFileSync(custFile, JSON.stringify(custs, null, 2), 'utf8');
+            }
+        } catch(e) {
+            console.error('Error updating stop charge in customers_store.json:', e);
+        }
+    }
+
+    try {
+        const store = getCardStore();
+        for (const [key, card] of Object.entries(store.cards || {})) {
+            if (String(card.meterNumber).trim() === cid || String(card.subscriptionCode).trim() === cid || key === cid) {
+                card.isStop = custFound ? custFound.isChargeStop : Boolean(isStop);
+                card.updatedAt = new Date().toISOString();
+                break;
+            }
+        }
+        saveCardStore(store);
+    } catch(e) {}
+
+    const stopState = custFound ? custFound.isChargeStop : Boolean(isStop);
+    return {
+        success: true,
+        isChargeStop: stopState,
+        status: stopState ? 'موقوف عن الشحن' : 'مركب',
+        message: stopState 
+            ? 'تم إيقاف الشحن للمشترك بنجاح ⛔ (لن تتمكن أي نافذة شحن من قبول الكارت)' 
+            : 'تم رفع إيقاف الشحن وإعادة تفعيل المشترك بنجاح 🔓 (جاهز للشحن الطبيعي)'
+    };
+}
+
+async function refundCustomerCharge(params = {}) {
+    const targetId = String(params.customerId || params.meterNumber || params.code || '').trim();
+    if (!targetId) return { success: false, message: 'معرف المشترك أو رقم العداد مطلوب لإلغاء الشحنة' };
+
+    const refundAmount = Number(params.amount || params.chargeAmount || 0);
+    const reason = params.reason || 'إلغاء شحنة خاطئة واسترجاع القيمة المالية للمشترك';
+    const receiptNo = params.receiptNumber || ('REF-' + Date.now().toString().slice(-6));
+
+    let updatedCust = null;
+    const custFile = path.join(__dirname, 'customers_store.json');
+    if (fs.existsSync(custFile)) {
+        try {
+            let custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+            updatedCust = custs.find(c => 
+                String(c.id).trim() === targetId ||
+                String(c.customerId).trim() === targetId ||
+                String(c.code).trim() === targetId ||
+                String(c.codeNumber).trim() === targetId ||
+                String(c.meterNumber).trim() === targetId
+            );
+            if (updatedCust) {
+                const currentSeq = Number(updatedCust.chargeSequence || 1);
+                const currentMeterSeq = Number(updatedCust.chargeSequenceOnMeter || updatedCust.meterChargeSequence || currentSeq);
+                const newSysSeq = Math.max(0, currentSeq - 1);
+                const newMeterSeq = Math.max(0, currentMeterSeq - 1);
+                updatedCust.chargeSequence = newSysSeq;
+                updatedCust.chargeSequenceOnMeter = newMeterSeq;
+                updatedCust.meterChargeSequence = newMeterSeq;
+                updatedCust.sequenceOnMeter = newMeterSeq;
+
+                const currentBal = Number(updatedCust.balance || updatedCust.currentBalance || 0);
+                const newBal = Math.max(0, Number((currentBal - refundAmount).toFixed(2)));
+                updatedCust.balance = newBal;
+                updatedCust.currentBalance = newBal;
+
+                if (updatedCust.totalRechargeAmount) {
+                    updatedCust.totalRechargeAmount = Math.max(0, Number((updatedCust.totalRechargeAmount - refundAmount).toFixed(2)));
+                }
+                if (updatedCust.totalMeterRechargeAmount) {
+                    updatedCust.totalMeterRechargeAmount = Math.max(0, Number((updatedCust.totalMeterRechargeAmount - refundAmount).toFixed(2)));
+                }
+
+                if (!updatedCust.meterMoves) updatedCust.meterMoves = [];
+                updatedCust.meterMoves.unshift({
+                    id: 'mov-' + Date.now(),
+                    date: new Date().toLocaleDateString('ar-EG') + ' ' + new Date().toLocaleTimeString('ar-EG'),
+                    operationType: 'إلغاء شحنة (مسترجعة)',
+                    operationTypeName: 'إلغاء شحنة مسترجعة',
+                    amount: -refundAmount,
+                    chargeAmount: -refundAmount,
+                    sequence: newMeterSeq,
+                    balanceAfter: newBal,
+                    receiptNumber: receiptNo,
+                    notes: reason,
+                    operator: params.operator || 'مسؤول المنظومة'
+                });
+
+                updatedCust.updatedAt = new Date().toISOString();
+                fs.writeFileSync(custFile, JSON.stringify(custs, null, 2), 'utf8');
+            }
+        } catch(e) {
+            console.error('Error saving refund in customers_store.json:', e);
+        }
+    }
+
+    try {
+        const store = getCardStore();
+        for (const [key, card] of Object.entries(store.cards || {})) {
+            if (String(card.meterNumber).trim() === targetId || String(card.subscriptionCode).trim() === targetId || key === targetId) {
+                card.chargeSequence = Math.max(0, Number(card.chargeSequence || 1) - 1);
+                card.sequenceOnMeter = card.chargeSequence;
+                card.remainingBalance = Math.max(0, Number(((card.remainingBalance || 0) - refundAmount).toFixed(2)));
+                card.lastChargeAmount = -refundAmount;
+                card.lastReceiptNumber = receiptNo;
+                card.updatedAt = new Date().toISOString();
+                break;
+            }
+        }
+        saveCardStore(store);
+    } catch(e) {}
+
+    return {
+        success: true,
+        message: `تم إلغاء واسترجاع الشحنة بنجاح بمبلغ ${refundAmount.toFixed(2)} ج.م وتحديث مسلسل العداد والنظام ✓`,
+        data: {
+            meterNumber: updatedCust?.meterNumber || targetId,
+            refundAmount: refundAmount,
+            receiptNumber: receiptNo,
+            newBalance: updatedCust?.balance || 0,
+            chargeSequence: updatedCust?.chargeSequence || 0,
+            meterChargeSequence: updatedCust?.chargeSequenceOnMeter || 0,
+            reason: reason,
+            refundDate: new Date().toLocaleDateString('ar-EG')
+        }
+    };
+}
+
 module.exports = {
     getLiveDebtTypes,
     getCustomerDebts,
@@ -1994,6 +2142,8 @@ module.exports = {
     getCustomerChargingDetails,
     updateCustomerCardData,
     updateCustomerSequence,
+    toggleCustomerStopCharge,
+    refundCustomerCharge,
     getCardStore,
     saveCardStore
 };

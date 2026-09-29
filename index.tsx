@@ -9831,15 +9831,10 @@ const handlePrintJudicialControlDetails = () => {
 
 
         if (customerIdOrCode) {
-
             searchMeterMovements(customerIdOrCode);
-
-        } else if (!currentMeterMovementsCustomer) {
-
+        } else {
             resetMeterMovementsUI();
-
         }
-
     };
 
 
@@ -10424,15 +10419,22 @@ const handlePrintJudicialControlDetails = () => {
 
                     </td>
 
-                    <td style="padding: 10px 12px; text-align: center;">
+                    <td style="padding: 10px 12px; text-align: center; white-space: nowrap;">
 
-                        <button type="button" class="btn btn-sm btn-print-move-rcpt" data-move-id="${m.id}" style="background: #0284c7; color: #ffffff; padding: 5px 12px; border-radius: 6px; font-weight: 800; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);" title="طباعة إيصال السداد لهذه الحركة">
+                        <button type="button" class="btn btn-sm btn-print-move-rcpt" data-move-id="${m.id}" style="background: #0284c7; color: #ffffff; padding: 5px 10px; border-radius: 6px; font-weight: 800; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);" title="طباعة إيصال السداد لهذه الحركة">
 
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
 
                             <span>طباعة الايصال</span>
 
                         </button>
+
+                        ${Number(m.chargeValue || 0) > 0 && !String(chgType).includes('إلغاء') && !String(chgType).includes('استرجاع') ? `
+                        <button type="button" class="btn btn-sm btn-refund-move-rcpt" data-move-id="${m.id}" data-charge-val="${m.chargeValue}" style="background: #ea580c; color: #ffffff; padding: 5px 10px; border-radius: 6px; font-weight: 800; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(234, 88, 12, 0.25); margin-right: 6px;" title="إلغاء / استرجاع هذه الشحنة">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                            <span>إلغاء الشحنة</span>
+                        </button>
+                        ` : ''}
 
                     </td>
 
@@ -10534,6 +10536,40 @@ const handlePrintJudicialControlDetails = () => {
 
             });
 
+        });
+
+        // Attach listeners to row refund buttons
+        tbody.querySelectorAll('.btn-refund-move-rcpt').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const moveId = btn.getAttribute('data-move-id');
+                const val = Number(btn.getAttribute('data-charge-val')) || 0;
+                if (!confirm(`هل أنت متأكد من إلغاء واسترجاع الشحنة بمبلغ ${val} ج.م؟ سيتم خصم الرصيد وترجيع رقم مسلسل الشحنة.`)) {
+                    return;
+                }
+                const reason = prompt('يرجى كتابة سبب إلغاء الشحنة:', 'خطأ في عملية الشحن أو طلب المشترك') || 'إلغاء شحنة بواسطة المستخدم';
+                try {
+                    const res = await fetch('http://127.0.0.1:5002/api/customer/refund-charge', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            customerId: cust.id || cust.code || cust.meterNumber,
+                            meterNumber: cust.meterNumber || meterNum,
+                            refundAmount: val,
+                            chargeSequence: cust.meterMoves?.length || 1,
+                            reason: reason
+                        })
+                    });
+                    const data = await res.json();
+                    if (data && data.success) {
+                        showToast(`تم استرجاع وإلغاء الشحنة بنجاح! المسلسل الجديد: #${data.newChargeSequence}`, 'success');
+                        searchMeterMovements(cust.code || cust.meterNumber);
+                    } else {
+                        showToast('فشل إلغاء الشحنة: ' + (data?.message || 'خطأ غير معروف'), 'error');
+                    }
+                } catch (e: any) {
+                    showToast('خطأ أثناء إلغاء الشحنة: ' + (e.message || e), 'error');
+                }
+            });
         });
 
     };
@@ -32593,7 +32629,155 @@ const handlePrintJudicialControlDetails = () => {
 
             }
 
+            case 'toggle-stop-charge': {
+                const isCurrentlyStopped = !!customer.isChargeStop;
+                titleEl.textContent = isCurrentlyStopped ? 'إلغاء إيقاف الشحن للمشترك (تفعيل الشحن)' : 'إيقاف الشحن للمشترك';
+                if (printBtn) printBtn.style.display = 'none';
 
+                contentEl.innerHTML = `
+                    <div style="display:flex; flex-direction:column; gap:16px; font-size:0.9rem; padding:8px;">
+                        <div style="background:${isCurrentlyStopped ? '#f0fdf4' : '#fef2f2'}; border:1px solid ${isCurrentlyStopped ? '#86efac' : '#fecaca'}; border-radius:8px; padding:12px;">
+                            <div style="font-weight:700; color:${isCurrentlyStopped ? '#166534' : '#991b1b'}; margin-bottom:4px;">
+                                ${isCurrentlyStopped ? '🔄 حالة المشترك الحالية: الشحن موقوف حالياً' : '⚠️ حالة المشترك الحالية: الشحن نشط'}
+                            </div>
+                            <div style="color:#475569; font-size:0.84rem;">
+                                المشترك: <b>${customer.name || '-'}</b> | كود: <b>${customer.code || '-'}</b> | رقم العداد: <b>${customer.meterNumber || '-'}</b>
+                            </div>
+                            ${isCurrentlyStopped && customer.stopChargeReason ? `<div style="margin-top:6px; font-size:0.82rem; color:#dc2626;">سبب الإيقاف السابق: <b>${customer.stopChargeReason}</b></div>` : ''}
+                        </div>
+
+                        <div>
+                            <label style="display:block; font-weight:700; margin-bottom:6px; color:#1e293b;">
+                                ${isCurrentlyStopped ? 'سبب إعادة تفعيل الشحن:' : 'سبب إيقاف الشحن للمشترك:'}
+                            </label>
+                            <input type="text" id="cm-stop-charge-reason" style="width:100%; padding:9px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;" 
+                                placeholder="${isCurrentlyStopped ? 'مثال: تم تسوية الخلاف / استيفاء المستندات' : 'مثال: تلاعب بالعداد / عدم سداد متأخرات / قرار لجنة'}" />
+                        </div>
+
+                        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                            <button type="button" id="btn-cancel-stop-charge" style="padding:8px 16px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:6px; font-weight:600; cursor:pointer;">إلغاء</button>
+                            <button type="button" id="btn-save-toggle-stop-charge" style="padding:8px 18px; border:none; background:${isCurrentlyStopped ? '#16a34a' : '#dc2626'}; color:#fff; border-radius:6px; font-weight:700; cursor:pointer;">
+                                ${isCurrentlyStopped ? 'تأكيد تفعيل الشحن للمشترك' : 'تأكيد إيقاف الشحن للمشترك'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('btn-cancel-stop-charge')?.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+
+                document.getElementById('btn-save-toggle-stop-charge')?.addEventListener('click', async () => {
+                    const reason = (document.getElementById('cm-stop-charge-reason') as HTMLInputElement)?.value.trim() || (isCurrentlyStopped ? 'تم تفعيل الشحن' : 'بقرار إداري');
+                    const newStopState = !isCurrentlyStopped;
+                    try {
+                        const res = await fetch('http://127.0.0.1:5002/api/customer/stop-charge', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                customerId: customer.id || customer.code || customer.meterNumber,
+                                isStop: newStopState,
+                                reason: reason
+                            })
+                        });
+                        const data = await res.json();
+                        if (data && data.success) {
+                            customer.isChargeStop = newStopState;
+                            customer.stopChargeReason = newStopState ? reason : '';
+                            showToast(newStopState ? `تم إيقاف الشحن للمشترك (${customer.name}) بنجاح` : `تم إلغاء إيقاف الشحن وتفعيل المشترك (${customer.name}) بنجاح`, 'success');
+                            modal.style.display = 'none';
+                            const searchBtn = document.getElementById('cm-search-btn');
+                            if (searchBtn) searchBtn.click();
+                        } else {
+                            showToast('فشل في تعديل حالة إيقاف الشحن: ' + (data?.message || 'خطأ غير معروف'), 'error');
+                        }
+                    } catch (e: any) {
+                        showToast('خطأ أثناء الاتصال بالخادم: ' + (e.message || e), 'error');
+                    }
+                });
+                break;
+            }
+
+            case 'refund-charge': {
+                titleEl.textContent = 'استرجاع شحنة / إلغاء شحنة (معتمدة)';
+                if (printBtn) printBtn.style.display = 'none';
+
+                const lastCharge = customer.lastChargeAmount || customer.lastCharge || 100;
+                const chargeSeq = customer.chargeSequence || customer.meterChargeSequence || 1;
+
+                contentEl.innerHTML = `
+                    <div style="display:flex; flex-direction:column; gap:16px; font-size:0.9rem; padding:8px;">
+                        <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:12px;">
+                            <div style="font-weight:700; color:#b45309; margin-bottom:4px;">
+                                ⚠️ تحذير: إلغاء / استرجاع شحنة المشترك
+                            </div>
+                            <div style="color:#475569; font-size:0.84rem; line-height:1.5;">
+                                المشترك: <b>${customer.name || '-'}</b> | رقم العداد: <b>${customer.meterNumber || '-'}</b><br>
+                                آخر مبلغ شحن مسجل: <b style="color:#0284c7;">${lastCharge} ج.م</b> | مسلسل الشحنات الحالي: <b style="color:#0284c7;">#${chargeSeq}</b>
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                            <div>
+                                <label style="display:block; font-weight:700; margin-bottom:6px; color:#1e293b;">مبلغ الشحنة المراد استرجاعها (ج.م):</label>
+                                <input type="number" id="cm-refund-amount" value="${lastCharge}" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;" />
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:700; margin-bottom:6px; color:#1e293b;">مسلسل الشحنة الملغاة:</label>
+                                <input type="number" id="cm-refund-seq" value="${chargeSeq}" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style="display:block; font-weight:700; margin-bottom:6px; color:#1e293b;">سبب استرجاع أو إلغاء الشحنة:</label>
+                            <input type="text" id="cm-refund-reason" placeholder="مثال: خطأ في إدخال المبلغ / طلب المشترك إلغاء الشحنة الفورية" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;" />
+                        </div>
+
+                        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                            <button type="button" id="btn-cancel-refund-charge" style="padding:8px 16px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:6px; font-weight:600; cursor:pointer;">إلغاء</button>
+                            <button type="button" id="btn-save-refund-charge" style="padding:8px 18px; border:none; background:#ea580c; color:#fff; border-radius:6px; font-weight:700; cursor:pointer;">
+                                تأكيد إلغاء واسترجاع الشحنة 🔄
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('btn-cancel-refund-charge')?.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+
+                document.getElementById('btn-save-refund-charge')?.addEventListener('click', async () => {
+                    const refundAmt = Number((document.getElementById('cm-refund-amount') as HTMLInputElement)?.value) || lastCharge;
+                    const refundSeq = Number((document.getElementById('cm-refund-seq') as HTMLInputElement)?.value) || chargeSeq;
+                    const reason = (document.getElementById('cm-refund-reason') as HTMLInputElement)?.value.trim() || 'إلغاء شحنة بواسطة المستخدم';
+
+                    try {
+                        const res = await fetch('http://127.0.0.1:5002/api/customer/refund-charge', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                customerId: customer.id || customer.code || customer.meterNumber,
+                                meterNumber: customer.meterNumber,
+                                refundAmount: refundAmt,
+                                chargeSequence: refundSeq,
+                                reason: reason
+                            })
+                        });
+                        const data = await res.json();
+                        if (data && data.success) {
+                            showToast(`تم استرجاع وإلغاء الشحنة بنجاح (المبلغ: ${refundAmt} ج.م، المسلسل الجديد: #${data.newChargeSequence})`, 'success');
+                            modal.style.display = 'none';
+                            const searchBtn = document.getElementById('cm-search-btn');
+                            if (searchBtn) searchBtn.click();
+                        } else {
+                            showToast('فشل استرجاع الشحنة: ' + (data?.message || 'خطأ غير معروف'), 'error');
+                        }
+                    } catch (e: any) {
+                        showToast('خطأ أثناء تنفيذ الاسترجاع: ' + (e.message || e), 'error');
+                    }
+                });
+                break;
+            }
 
             case 'print-contract-receipt':
 
@@ -32883,6 +33067,8 @@ const handlePrintJudicialControlDetails = () => {
                                 <div class="cm-actions-popup" id="cm-actions-popup-${idx}" style="display: none; position: absolute; left: 0; top: 100%; width: 235px; max-height: 420px; overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.08); z-index: 999999; text-align: right; padding: 4px 0; direction: rtl;">
                                     <a href="#" class="cm-act-item" data-action="replace-card-charge" data-cust-idx="${idx}"><span>💳</span> <span>كارت بديل بشحن</span></a>
                                     <a href="#" class="cm-act-item" data-action="replace-card-no-charge" data-cust-idx="${idx}"><span>💳</span> <span>كارت بديل بدون شحن</span></a>
+                                    <a href="#" class="cm-act-item" data-action="toggle-stop-charge" data-cust-idx="${idx}" style="color: ${cust.isChargeStop ? '#15803d' : '#b91c1c'}; font-weight: 700;"><span>${cust.isChargeStop ? '🔓' : '⛔'}</span> <span>${cust.isChargeStop ? 'إلغاء إيقاف الشحن (تفعيل)' : 'إيقاف الشحن للمشترك'}</span></a>
+                                    <a href="#" class="cm-act-item" data-action="refund-charge" data-cust-idx="${idx}" style="color: #b45309; font-weight: 700;"><span>↩</span> <span>استرجاع / إلغاء شحنة</span></a>
                                     <a href="#" class="cm-act-item" data-action="print-init-charge-receipt" data-cust-idx="${idx}"><span>📄</span> <span>ايصال الشحنة المبدائية</span></a>
                                     <a href="#" class="cm-act-item" data-action="change-meter" data-cust-idx="${idx}"><span>🔧</span> <span>تغيير عداد</span></a>
                                     <a href="#" class="cm-act-item" data-action="update-meter-sequence" data-cust-idx="${idx}"><span>🔧</span> <span>تحديث مسلسل عداد</span></a>
@@ -34395,23 +34581,47 @@ const handlePrintJudicialControlDetails = () => {
 
             if (banner) {
 
-                banner.style.backgroundColor = '#f0fdf4';
+                if (cust?.isChargeStop) {
 
-                banner.style.color = '#166534';
+                    banner.style.backgroundColor = '#fef2f2';
 
-                banner.style.border = '1px solid #bbf7d0';
+                    banner.style.color = '#991b1b';
 
-                banner.innerHTML = `
+                    banner.style.border = '2px solid #ef4444';
 
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                    banner.innerHTML = `
 
-                        <span>تم جلب بيانات المشترك بنجاح (${cust.name}). جاهز لتحديد المبلغ وحفظ الشحن.</span>
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-weight: bold;">
 
-                        <span style="font-weight: bold; font-family: monospace;">الحد الأدنى: ${currentChargingFinancials.minCharge} ج.م</span>
+                            <span>⛔ تحذير: تم إيقاف الشحن لهذا المشترك (${cust.name})! سبب الإيقاف: ${cust.stopChargeReason || 'بقرار إداري'}</span>
 
-                    </div>
+                            <span style="background: #dc2626; color: #fff; padding: 3px 10px; border-radius: 4px; font-size: 0.85rem;">الشحن موقوف</span>
 
-                `;
+                        </div>
+
+                    `;
+
+                } else {
+
+                    banner.style.backgroundColor = '#f0fdf4';
+
+                    banner.style.color = '#166534';
+
+                    banner.style.border = '1px solid #bbf7d0';
+
+                    banner.innerHTML = `
+
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+
+                            <span>تم جلب بيانات المشترك بنجاح (${cust.name}). جاهز لتحديد المبلغ وحفظ الشحن.</span>
+
+                            <span style="font-weight: bold; font-family: monospace;">الحد الأدنى: ${currentChargingFinancials.minCharge} ج.م</span>
+
+                        </div>
+
+                    `;
+
+                }
 
             }
 
@@ -35437,6 +35647,14 @@ const handlePrintJudicialControlDetails = () => {
         if (!currentChargingCustomer || !currentChargingCustomer.id) {
 
             showToast('يجب تحديد المشترك أولاً أو قراءة الكارت من القارئ.', 'error');
+
+            return;
+
+        }
+
+        if (currentChargingCustomer?.isChargeStop) {
+
+            showToast(`عفواً، تم إيقاف الشحن لهذا المشترك (${currentChargingCustomer.stopChargeReason || 'بقرار إداري'}). لا يمكن إتمام عملية الشحن!`, 'error');
 
             return;
 
@@ -62635,14 +62853,15 @@ const setupOrgHierarchyEvents = () => {
 
 
         // Show active section
-
         document.querySelectorAll('.content-section.active').forEach(section => {
-
             section.classList.remove('active');
-
             (section as HTMLElement).style.removeProperty('display');
-
         });
+
+        // Always clear and empty fields if leaving meter-movements section
+        if (targetId !== 'meter-movements') {
+            try { resetMeterMovementsUI(); } catch(e) {}
+        }
 
         const targetSection = document.getElementById(targetId);
 
