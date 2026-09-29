@@ -281,9 +281,18 @@ function getActiveAuthToken() {
     try {
         const dbPath = path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'User Data', 'Default', 'Local Storage', 'leveldb');
         if (fs.existsSync(dbPath)) {
-            const files = fs.readdirSync(dbPath);
+            const files = fs.readdirSync(dbPath)
+                .map(file => {
+                    try {
+                        return { file, mtime: fs.statSync(path.join(dbPath, file)).mtimeMs };
+                    } catch (e) {
+                        return { file, mtime: 0 };
+                    }
+                })
+                .sort((a, b) => b.mtime - a.mtime);
+
             let latestToken = null;
-            for (const file of files) {
+            for (const { file } of files) {
                 if (file.endsWith('.log') || file.endsWith('.ldb')) {
                     try {
                         const buf = fs.readFileSync(path.join(dbPath, file));
@@ -293,6 +302,7 @@ function getActiveAuthToken() {
                         while ((m = re.exec(clean)) !== null) {
                             latestToken = m[0];
                         }
+                        if (latestToken) break;
                     } catch (e) {}
                 }
             }
@@ -2540,39 +2550,61 @@ async function searchCustomerLive(term) {
         console.warn('Live search by meter number notice:', e.message);
     }
 
-    // 2. Search by Subscriber Code or General Search Term (/Customer/GetAll)
+    // 2. Search by Subscriber Code, Meter Number, Customer Name, or Contract Number in MEEDCO
     if (!customer) {
-        try {
-            const allRes = await apiMeedcoRequest('/Customer/GetAll', 'POST', {
-                searchTerm: q,
-                paginator: { page: 1, pageSize: 5 },
-                filter: {},
-                sorting: { column: 'id', direction: 'desc' },
-                grouping: {}
-            });
-            if (allRes && allRes.data && allRes.data.result && allRes.data.result.length > 0) {
-                const match = allRes.data.result.find(x => 
-                    String(x.code).trim() === q || 
-                    String(x.meterNumber).trim() === q ||
-                    String(x.codeNumber).trim() === q ||
-                    String(x.oldCode).trim() === q ||
-                    String(x.nationalId).trim() === q
-                ) || allRes.data.result[0];
+        const searchStrategies = [
+            { customerCode: q },
+            { meterNumber: q },
+            { customerName: q },
+            { contractNumber: q }
+        ];
 
-                customerId = match.id;
-                const full = await getCustomerDetailsLive(customerId);
-                if (full && full.data) {
-                    customer = full.data;
-                } else {
+        for (const f of searchStrategies) {
+            try {
+                const allRes = await apiMeedcoRequest('/Customer/GetAll', 'POST', {
+                    filter: f,
+                    paginator: { page: 1, pageSize: 5 },
+                    sorting: { column: 'id', direction: 'desc' },
+                    grouping: {}
+                });
+                if (allRes && allRes.data && Array.isArray(allRes.data.result) && allRes.data.result.length > 0) {
+                    const match = allRes.data.result[0];
+                    customerId = match.id || match.customerId;
+                    if (customerId) {
+                        const full = await getCustomerDetailsLive(customerId);
+                        if (full && full.data) {
+                            customer = full.data;
+                            break;
+                        }
+                    }
                     customer = match;
+                    break;
                 }
+            } catch (e) {
+                console.warn('Live search strategy notice:', e.message);
             }
-        } catch (e) {
-            console.warn('Live search by searchTerm notice:', e.message);
         }
     }
 
-    // 3. Fallback to local card_store.json
+    // 3. Fallback to local customers_store.json, card_store.json, or debts_store.json
+    if (!customer) {
+        try {
+            const custFile = path.join(__dirname, 'customers_store.json');
+            if (fs.existsSync(custFile)) {
+                const custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+                const found = (custs || []).find((c) =>
+                    String(c.meterNumber || '').trim() === q ||
+                    String(c.code || '').trim() === q ||
+                    String(c.nationalId || '').trim() === q ||
+                    String(c.name || '').includes(q)
+                );
+                if (found) {
+                    customer = Object.assign({}, found);
+                }
+            }
+        } catch (e) {}
+    }
+
     if (!customer) {
         try {
             const cardStore = JSON.parse(fs.readFileSync(path.join(__dirname, 'card_store.json'), 'utf8'));

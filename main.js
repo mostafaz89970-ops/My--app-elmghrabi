@@ -352,6 +352,14 @@ ipcMain.handle('customer-card:charging-details', async (event, customerId) => {
   return await cardReader.getCustomerChargingDetails(customerId);
 });
 
+ipcMain.handle('customer:getAll', async (event, tableState) => {
+  return await cardReader.getAllCustomers(tableState);
+});
+
+ipcMain.handle('customer:details', async (event, id) => {
+  return await cardReader.getCustomerDetails(id);
+});
+
 ipcMain.handle('customer:search', async (event, term) => {
   return await cardReader.searchCustomer(term);
 });

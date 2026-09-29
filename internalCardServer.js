@@ -411,35 +411,67 @@ function startInternalServer(port = 5002) {
 
             // 11. Dropdowns
             if (pathname === '/api/customers-dropdown/sectors') {
+                const result = await nativeEngine.getSectorsDropdown();
                 res.writeHead(200);
-                res.end(JSON.stringify({ success: true, data: [{ id: 1, name: "قطاع المنيا شمال" }] }));
+                res.end(JSON.stringify(result));
                 return;
             }
 
             if (pathname.startsWith('/api/customers-dropdown/public-admins/')) {
+                const sectorId = pathname.replace('/api/customers-dropdown/public-admins/', '');
+                const result = await nativeEngine.getPublicAdminsDropdown(sectorId);
                 res.writeHead(200);
-                res.end(JSON.stringify({ success: true, data: [{ id: 1, name: "إدارة بني مزار" }] }));
+                res.end(JSON.stringify(result));
                 return;
             }
 
             if (pathname.startsWith('/api/customers-dropdown/sub-admins/')) {
+                const pubId = pathname.replace('/api/customers-dropdown/sub-admins/', '');
+                const result = await nativeEngine.getSubAdminsDropdown(pubId);
                 res.writeHead(200);
-                res.end(JSON.stringify({ success: true, data: [{ id: 1, name: "فرع بني مزار شرق" }] }));
+                res.end(JSON.stringify(result));
                 return;
             }
 
             if (pathname.startsWith('/api/customers-dropdown/regions/')) {
+                const subId = pathname.replace('/api/customers-dropdown/regions/', '');
+                const result = await nativeEngine.getRegionsDropdown(subId);
                 res.writeHead(200);
-                res.end(JSON.stringify({ success: true, data: [{ id: 1, name: "المنطقة الأولى" }] }));
+                res.end(JSON.stringify(result));
                 return;
             }
 
             if (pathname.startsWith('/api/customers-dropdown/dailys/')) {
+                const regId = pathname.replace('/api/customers-dropdown/dailys/', '');
+                const result = await nativeEngine.getDailysDropdown(regId);
                 res.writeHead(200);
-                res.end(JSON.stringify({ success: true, data: [{ id: 1, name: "يومية 1" }] }));
+                res.end(JSON.stringify(result));
                 return;
             }
 
+            if (pathname === '/api/customers-dropdown/types') {
+                const result = await nativeEngine.getCustomerTypesDropdown();
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            if (pathname.startsWith('/api/customers-dropdown/places/')) {
+                const actId = pathname.replace('/api/customers-dropdown/places/', '');
+                const result = await nativeEngine.getPlaceDescsDropdown(actId);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            // Customer Details Route
+            if (pathname === '/api/customer/details' || pathname === '/api/customer-details') {
+                const id = url.searchParams.get('id') || url.searchParams.get('code') || url.searchParams.get('meterNumber');
+                const result = await nativeEngine.getCustomerDetails(id);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
             
             // --- Direct MEEDCO Gateway Routes ---
             if (pathname === '/api/meedco/status') {
@@ -466,20 +498,21 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // 12. Customers List & Filter API
             if (pathname === '/api/customers') {
                 const body = await getBody();
-                let customers = [];
-                try {
-                    const custFile = path.join(__dirname, 'customers_store.json');
-                    if (fs.existsSync(custFile)) {
-                        customers = JSON.parse(fs.readFileSync(custFile, 'utf8'));
-                    }
-                } catch (e) {
-                    console.error('Error reading customers_store.json:', e);
-                }
 
                 // If adding new customer
-                if (body && (body.name || body.customerName) && !body.paginator) {
+                if (body && (body.name || body.customerName) && !body.paginator && !body.filter) {
+                    let customers = [];
+                    try {
+                        const custFile = path.join(__dirname, 'customers_store.json');
+                        if (fs.existsSync(custFile)) {
+                            customers = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+                        }
+                    } catch (e) {
+                        console.error('Error reading customers_store.json:', e);
+                    }
                     const newCust = {
                         id: 'CUST-' + (body.code || Date.now()),
                         code: body.code || ('050' + Math.floor(1000000 + Math.random() * 9000000)),
@@ -512,47 +545,31 @@ function startInternalServer(port = 5002) {
                     return;
                 }
 
-                // Otherwise it's a search / list request with paginator & filters
+                // Call nativeEngine.getAllCustomers (MEEDCO Live + Authentic Local Store)
                 const filter = body?.filter || {
                     meterNumber: url.searchParams.get('meterNumber') || '',
                     customerName: url.searchParams.get('customerName') || '',
+                    customerCode: url.searchParams.get('code') || url.searchParams.get('customerCode') || '',
                     identityNumber: url.searchParams.get('identityNumber') || '',
                     contractNumber: url.searchParams.get('contractNumber') || '',
                     contractYear: url.searchParams.get('contractYear') || '',
                     accountRefrence: url.searchParams.get('accountRefrence') || '',
                     status: url.searchParams.get('status') || ''
                 };
-                const searchTerm = String(body?.searchTerm || url.searchParams.get('q') || url.searchParams.get('searchTerm') || '').trim().toLowerCase();
+                const searchTerm = String(body?.searchTerm || url.searchParams.get('q') || url.searchParams.get('searchTerm') || '').trim();
                 const page = Number(body?.paginator?.page || url.searchParams.get('page') || 1);
                 const pageSize = Number(body?.paginator?.pageSize || url.searchParams.get('pageSize') || 10);
+                const sorting = body?.sorting || { column: 'id', direction: 'desc' };
 
-                let filtered = customers.filter(c => {
-                    if (searchTerm) {
-                        const hit = String(c.code || '').toLowerCase().includes(searchTerm) ||
-                                    String(c.name || '').toLowerCase().includes(searchTerm) ||
-                                    String(c.meterNumber || '').toLowerCase().includes(searchTerm) ||
-                                    String(c.identityNumber || '').toLowerCase().includes(searchTerm);
-                        if (!hit) return false;
-                    }
-                    if (filter.meterNumber && !String(c.meterNumber || '').includes(filter.meterNumber)) return false;
-                    if (filter.customerName && !String(c.name || '').includes(filter.customerName)) return false;
-                    if (filter.identityNumber && !String(c.identityNumber || '').includes(filter.identityNumber)) return false;
-                    if (filter.contractNumber && !String(c.contractNumber || '').includes(filter.contractNumber)) return false;
-                    if (filter.contractYear && !String(c.contractYear || '').includes(filter.contractYear)) return false;
-                    if (filter.accountRefrence && !String(c.accountNumberReferenceCustomer || '').includes(filter.accountRefrence)) return false;
-                    if (filter.status && filter.status !== '0' && c.status !== filter.status) return false;
-                    return true;
+                const result = await nativeEngine.getAllCustomers({
+                    filter,
+                    paginator: { page, pageSize },
+                    sorting,
+                    searchTerm
                 });
 
-                const startIndex = (page - 1) * pageSize;
-                const pageItems = filtered.slice(startIndex, startIndex + pageSize);
-
                 res.writeHead(200);
-                res.end(JSON.stringify({
-                    success: true,
-                    total: filtered.length,
-                    items: pageItems
-                }));
+                res.end(JSON.stringify(result));
                 return;
             }
 

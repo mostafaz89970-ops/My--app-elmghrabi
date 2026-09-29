@@ -881,59 +881,275 @@ async function getCustomerChargingDetails(customerId) {
 }
 
 // 10. Standalone Customer Management Helpers
+function normalizeCustomerRecord(c) {
+    if (!c) return c;
+    const name = String(c.name || c.customerName || c.subscriberName || '').trim();
+    const address = String(c.address || c.subscriberAddress || '').trim();
+    const meterNum = String(c.meterNumber || c.meterChassisNumber || c.codeNumber || '').trim();
+    const code = String(c.code || c.customerCode || c.subscriptionCode || '').trim();
+    const nationalId = String(c.nationalId || c.identityNumber || '').trim();
+
+    // Formatted account reference (MEEDCO 6 parts: 526/subAdmin/region/daily/acc/act)
+    let accRef = c.accountNumberReferenceCustomer || c.accountRefrence || c.accountReference || '';
+    if (!accRef && c.accountNumberCustomer && typeof c.accountNumberCustomer === 'object') {
+        const a = c.accountNumberCustomer;
+        accRef = `${a.accountNumberSubAdmin || '526'}/${a.accountNumberRegion || '1'}/${a.accountNumberDaily || '1'}/${a.accountNumberAccount || '1'}/${a.accountNumberSubAccount || '0'}/${a.accountNumberActivity || '3'}`;
+    }
+
+    // Status mapping
+    let statusText = 'مركب';
+    if (c.isChargeStop) {
+        statusText = 'موقوف عن الشحن';
+    } else if (c.status === 2 || c.status === '2' || c.status === 'مركب') {
+        statusText = 'مركب';
+    } else if (c.status === 1 || c.status === '1' || c.status === 'متعاقد') {
+        statusText = 'متعاقد';
+    } else if (c.status === 3 || c.status === '3' || c.status === 'مهيأ') {
+        statusText = 'مهيأ';
+    } else if (typeof c.status === 'string' && c.status) {
+        statusText = c.status;
+    } else if (c.statusName) {
+        statusText = c.statusName;
+    }
+
+    return {
+        id: c.id || c.customerId || code || meterNum,
+        customerId: c.customerId || c.id || code || meterNum,
+        code: code,
+        codeNumber: c.codeNumber || code,
+        oldCode: c.oldCode || '-',
+        name: name,
+        customerName: name,
+        subscriberName: name,
+        nationalId: nationalId || '-',
+        identityNumber: nationalId || '-',
+        meterNumber: meterNum,
+        meterChassisNumber: meterNum,
+        address: address || '-',
+        subscriberAddress: address || '-',
+        accountNumberReferenceCustomer: accRef || '-',
+        accountRefrence: accRef || '-',
+        sectorId: c.sectorId,
+        sectorName: c.sectorName || 'المنيا شمال',
+        sector: c.sectorName || 'المنيا شمال',
+        publicAdministrationId: c.publicAdministrationId,
+        publicAdministrationName: c.publicAdministrationName || 'بنى مزار شرق',
+        administration: c.publicAdministrationName || 'بنى مزار شرق',
+        subAdministrationId: c.subAdministrationId,
+        subAdministrationName: c.subAdministrationName || 'بنى مزار شرق',
+        subAdmin: c.subAdministrationName || 'بنى مزار شرق',
+        regionId: c.regionId,
+        regionName: c.regionName || 'بنى مزار شرق10',
+        region: c.regionName || 'بنى مزار شرق10',
+        dailyId: c.dailyId,
+        status: statusText,
+        isChargeStop: !!c.isChargeStop,
+        hasInitialCharge: !!c.hasInitialCharge,
+        customerTypeId: c.customerTypeId,
+        customerTypeName: c.customerTypeName || (c.customerTypeId === 46 ? 'أهالي (صغار مشتركين)' : c.customerTypeId === 47 ? 'تجاري / استثماري' : c.customerTypeId === 48 ? 'حكومي' : c.customerTypeId === 49 ? 'كبار مشتركين' : 'صغار مشتركين'),
+        customerType: c.customerType || (c.customerTypeId === 46 ? 'أهالي (صغار مشتركين)' : 'صغار مشتركين'),
+        activityId: c.activityId,
+        activityName: c.activityName || 'استخدامات منزلية',
+        activity: c.activityName || 'استخدامات منزلية',
+        placeDescriptionId: c.placeDescriptionId,
+        placeDescriptionName: c.placeDescriptionName || 'منزل',
+        meterCompanyName: c.meterCompanyName || 'المصرية',
+        meterSingleOrTripple: c.meterSingleOrTripple || 'احادى',
+        initialCapacityAndMethod: c.initialCapacityAndMethod || '80  أمبير',
+        initialRechargeAmount: c.initialRechargeAmount != null ? c.initialRechargeAmount : 100,
+        totalRechargeAmount: c.totalRechargeAmount != null ? c.totalRechargeAmount : 0,
+        totalMeterRechargeAmount: c.totalMeterRechargeAmount != null ? c.totalMeterRechargeAmount : 0,
+        chargeSequence: c.chargeSequence != null ? c.chargeSequence : 0,
+        currentBalance: c.currentBalance != null ? c.currentBalance : 0,
+        meterTotalDebit: c.meterTotalDebit != null ? c.meterTotalDebit : 0,
+        contractNumber: c.contractNumber || '-',
+        contractYear: c.contractYear || '2026',
+        contractDate: c.contractDate || '',
+        installationDate: c.installationDate || '2026-09-29'
+    };
+}
+
+function saveToCustomersStoreAsync(newItems) {
+    if (!Array.isArray(newItems) || newItems.length === 0) return;
+    try {
+        const custFile = path.join(__dirname, 'customers_store.json');
+        let existing = [];
+        if (fs.existsSync(custFile)) {
+            existing = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+        }
+        const map = new Map();
+        for (const item of existing) {
+            const key = String(item.code || item.meterNumber);
+            if (key) map.set(key, item);
+        }
+        for (const item of newItems) {
+            const key = String(item.code || item.meterNumber);
+            if (key) map.set(key, item);
+        }
+        fs.writeFileSync(custFile, JSON.stringify(Array.from(map.values()), null, 2), 'utf8');
+    } catch (e) {
+        console.warn('Error saving to customers_store:', e.message);
+    }
+}
+
 async function getAllCustomers(tableState = {}) {
+    const unifiedClient = require('./unifiedCardClient');
+    const searchTerm = String(tableState.searchTerm || '').trim();
+    const filter = Object.assign({}, tableState.filter || {});
+    const page = Number(tableState.paginator?.page || 1);
+    const pageSize = Number(tableState.paginator?.pageSize || 10);
+
+    // 1. Try Live MEEDCO Server
+    if (unifiedClient && typeof unifiedClient.getAllCustomersLive === 'function') {
+        try {
+            // Smart Search Resolution if user entered searchTerm
+            if (searchTerm && !filter.meterNumber && !filter.customerName && !filter.customerCode) {
+                const isNumeric = /^\d+$/.test(searchTerm);
+                if (isNumeric) {
+                    // Try meter lookup live
+                    try {
+                        const mRes = await unifiedClient.apiMeedcoRequest('/Customer/GetCustomerByMeterNumber/' + encodeURIComponent(searchTerm), 'GET');
+                        if (mRes && mRes.data && (mRes.data.customerId || mRes.data.id)) {
+                            const full = await unifiedClient.getCustomerDetailsLive(mRes.data.customerId || mRes.data.id);
+                            const cust = full?.data || mRes.data;
+                            const norm = normalizeCustomerRecord(cust);
+                            saveToCustomersStoreAsync([norm]);
+                            return { success: true, total: 1, items: [norm], page: 1, pageSize };
+                        }
+                    } catch (e) {}
+
+                    // Try customerCode filter
+                    const codeRes = await unifiedClient.getAllCustomersLive({
+                        filter: Object.assign({}, filter, { customerCode: searchTerm }),
+                        paginator: { page, pageSize },
+                        sorting: tableState.sorting || { column: 'id', direction: 'desc' }
+                    });
+                    if (codeRes && codeRes.success && codeRes.total > 0) {
+                        const normItems = (codeRes.items || []).map(normalizeCustomerRecord);
+                        saveToCustomersStoreAsync(normItems);
+                        return { success: true, total: codeRes.total, items: normItems, page, pageSize };
+                    }
+
+                    // Try meterNumber filter
+                    const meterRes = await unifiedClient.getAllCustomersLive({
+                        filter: Object.assign({}, filter, { meterNumber: searchTerm }),
+                        paginator: { page, pageSize },
+                        sorting: tableState.sorting || { column: 'id', direction: 'desc' }
+                    });
+                    if (meterRes && meterRes.success && meterRes.total > 0) {
+                        const normItems = (meterRes.items || []).map(normalizeCustomerRecord);
+                        saveToCustomersStoreAsync(normItems);
+                        return { success: true, total: meterRes.total, items: normItems, page, pageSize };
+                    }
+
+                    // Try contractNumber filter
+                    const contractRes = await unifiedClient.getAllCustomersLive({
+                        filter: Object.assign({}, filter, { contractNumber: searchTerm }),
+                        paginator: { page, pageSize },
+                        sorting: tableState.sorting || { column: 'id', direction: 'desc' }
+                    });
+                    if (contractRes && contractRes.success && contractRes.total > 0) {
+                        const normItems = (contractRes.items || []).map(normalizeCustomerRecord);
+                        saveToCustomersStoreAsync(normItems);
+                        return { success: true, total: contractRes.total, items: normItems, page, pageSize };
+                    }
+                } else {
+                    filter.customerName = searchTerm;
+                }
+            }
+
+            // Normal live MEEDCO query
+            const liveRes = await unifiedClient.getAllCustomersLive({
+                filter: filter,
+                paginator: { page, pageSize },
+                sorting: tableState.sorting || { column: 'id', direction: 'desc' },
+                searchTerm: filter.customerName ? '' : searchTerm
+            });
+
+            if (liveRes && liveRes.success && Array.isArray(liveRes.items) && liveRes.items.length > 0) {
+                const normItems = liveRes.items.map(normalizeCustomerRecord);
+                saveToCustomersStoreAsync(normItems);
+                return {
+                    success: true,
+                    total: liveRes.total != null ? liveRes.total : normItems.length,
+                    items: normItems,
+                    page: liveRes.page || page,
+                    pageSize: liveRes.pageSize || pageSize
+                };
+            }
+        } catch (err) {
+            console.warn('MEEDCO getAllCustomers live notice:', err.message);
+        }
+    }
+
+    // 2. Fallback to Local Authentic Store (customers_store.json + cards + debts)
+    const custFile = path.join(__dirname, 'customers_store.json');
+    let localCustomers = [];
+    try {
+        if (fs.existsSync(custFile)) {
+            localCustomers = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+        }
+    } catch (e) {}
+
     const store = getCardStore();
     const debtsStore = getDebtsStore();
-    
     const map = new Map();
+
+    for (const c of localCustomers) {
+        const norm = normalizeCustomerRecord(c);
+        const key = String(norm.code || norm.meterNumber);
+        if (key) map.set(key, norm);
+    }
+
     for (const card of Object.values(store.cards || {})) {
-        if (!card.subscriptionCode) continue;
-        map.set(String(card.subscriptionCode), {
-            id: card.subscriptionCode,
-            code: card.subscriptionCode,
-            name: card.customerName,
-            meterNumber: card.meterNumber,
-            nationalId: card.nationalId,
-            address: card.address,
-            activityName: card.activityName,
-            customerTypeName: card.customerTypeName,
-            meterCompanyName: card.meterCompanyName,
-            chargeSequence: card.chargeSequence,
-            lastChargeDate: card.lastChargeDate,
-            isChargeStop: !!card.isStop
-        });
+        if (!card.subscriptionCode && !card.meterNumber) continue;
+        const norm = normalizeCustomerRecord(card);
+        const key = String(norm.code || norm.meterNumber);
+        if (!map.has(key)) map.set(key, norm);
     }
 
     for (const d of (debtsStore.debts || [])) {
-        const code = String(d.subscriptionCode || d.customerId);
+        const code = String(d.subscriptionCode || d.customerId || d.meterNumber);
         if (!map.has(code)) {
-            map.set(code, {
+            const norm = normalizeCustomerRecord({
                 id: d.customerId || code,
-                code: code,
+                code: d.subscriptionCode || code,
                 name: d.customerName,
                 meterNumber: d.meterNumber,
-                nationalId: '',
-                address: '',
-                activityName: 'منزلي',
-                customerTypeName: 'أهالي',
-                meterCompanyName: 'السويدي',
+                nationalId: d.nationalId || '',
+                address: d.address || '',
+                activityName: 'استخدامات منزلية',
+                customerTypeName: 'صغار مشتركين',
+                meterCompanyName: 'المصرية',
                 chargeSequence: 1,
                 lastChargeDate: d.startDate || '',
-                isChargeStop: false
+                isChargeStop: false,
+                status: 'مركب'
             });
+            map.set(code, norm);
         }
     }
 
     const allList = Array.from(map.values());
-    const searchTerm = (tableState.searchTerm || '').trim().toLowerCase();
-    const filtered = searchTerm ? allList.filter(c => 
-        (c.name && c.name.toLowerCase().includes(searchTerm)) ||
-        (c.code && c.code.includes(searchTerm)) ||
-        (c.meterNumber && c.meterNumber.includes(searchTerm))
-    ) : allList;
+    const filtered = allList.filter(c => {
+        if (searchTerm) {
+            const s = searchTerm.toLowerCase();
+            const hit = String(c.code || '').toLowerCase().includes(s) ||
+                        String(c.name || '').toLowerCase().includes(s) ||
+                        String(c.meterNumber || '').toLowerCase().includes(s) ||
+                        String(c.nationalId || '').toLowerCase().includes(s) ||
+                        String(c.contractNumber || '').toLowerCase().includes(s) ||
+                        String(c.accountNumberReferenceCustomer || '').toLowerCase().includes(s);
+            if (!hit) return false;
+        }
+        if (filter.meterNumber && !String(c.meterNumber || '').includes(filter.meterNumber)) return false;
+        if (filter.customerName && !String(c.name || '').includes(filter.customerName)) return false;
+        if (filter.customerCode && !String(c.code || '').includes(filter.customerCode)) return false;
+        if (filter.contractNumber && !String(c.contractNumber || '').includes(filter.contractNumber)) return false;
+        if (filter.status && filter.status !== '0' && c.status !== filter.status) return false;
+        return true;
+    });
 
-    const page = tableState.paginator?.page || 1;
-    const pageSize = tableState.paginator?.pageSize || 10;
     const start = (page - 1) * pageSize;
     const items = filtered.slice(start, start + pageSize);
 
@@ -947,54 +1163,72 @@ async function getAllCustomers(tableState = {}) {
 }
 
 async function getCustomerDetails(id) {
-    const store = getCardStore();
-    const debtsStore = getDebtsStore();
-    const sid = String(id);
+    const sid = String(id || '').trim();
+    if (!sid) return { success: false, message: 'معرف المشترك مطلوب' };
 
+    // 1. Try Live MEEDCO
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getCustomerDetailsLive === 'function') {
+            const liveRes = await unifiedClient.getCustomerDetailsLive(sid);
+            if (liveRes && liveRes.success && liveRes.data) {
+                return { success: true, data: normalizeCustomerRecord(liveRes.data) };
+            }
+        }
+        // Try search live by meter number or code
+        if (unifiedClient && typeof unifiedClient.searchCustomerLive === 'function') {
+            const sRes = await unifiedClient.searchCustomerLive(sid);
+            if (sRes && sRes.success && sRes.customer) {
+                return { success: true, data: normalizeCustomerRecord(sRes.customer) };
+            }
+        }
+    } catch (e) {}
+
+    // 2. Check local stores
+    const custFile = path.join(__dirname, 'customers_store.json');
+    if (fs.existsSync(custFile)) {
+        try {
+            const custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+            const found = custs.find(c =>
+                String(c.id) === sid ||
+                String(c.code) === sid ||
+                String(c.meterNumber) === sid ||
+                String(c.nationalId) === sid
+            );
+            if (found) {
+                return { success: true, data: normalizeCustomerRecord(found) };
+            }
+        } catch (e) {}
+    }
+
+    const store = getCardStore();
     const card = Object.values(store.cards || {}).find(c => 
         String(c.subscriptionCode) === sid || 
         String(c.meterNumber) === sid || 
         String(c.nationalId) === sid
     );
     if (card) {
-        return { success: true, data: card };
+        return { success: true, data: normalizeCustomerRecord(card) };
     }
 
+    const debtsStore = getDebtsStore();
     const debt = (debtsStore.debts || []).find(d => 
         String(d.customerId) === sid || 
         String(d.subscriptionCode) === sid || 
         String(d.meterNumber) === sid
     );
     if (debt) {
-        return {
-            success: true,
-            data: {
-                id: debt.customerId || sid,
-                subscriptionCode: debt.subscriptionCode || sid,
-                customerName: debt.customerName,
-                meterNumber: debt.meterNumber,
-                nationalId: '',
-                address: '',
-                activityName: 'منزلي',
-                customerTypeName: 'أهالي',
-                meterCompanyName: 'السويدي'
-            }
-        };
+        return { success: true, data: normalizeCustomerRecord(debt) };
     }
 
     return {
         success: true,
-        data: {
+        data: normalizeCustomerRecord({
             id: sid,
-            subscriptionCode: sid,
+            code: sid,
             customerName: 'مشترك ' + sid,
-            meterNumber: sid,
-            nationalId: '',
-            address: '',
-            activityName: 'منزلي',
-            customerTypeName: 'أهالي',
-            meterCompanyName: 'السويدي'
-        }
+            meterNumber: sid
+        })
     };
 }
 
@@ -1005,7 +1239,7 @@ async function updateCustomerCardData(params) {
         Object.assign(store.cards[uid], params);
         saveCardStore(store);
     }
-    return { success: true, message: 'تم تحديث بيانات المشترك والكارت بنجاح.' };
+    return { success: true, message: 'تم تحديث بيانات كارت المشترك بنجاح.' };
 }
 
 async function getControlCardDetails(detailId) {
@@ -1025,26 +1259,88 @@ async function getControlCardDetails(detailId) {
 }
 
 async function getSectorsDropdown() {
-    return { success: true, data: [{ id: 1, name: "قطاع المنيا شمال" }, { id: 2, name: "قطاع المنيا جنوب" }] };
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getSectorsDropdownLive === 'function') {
+            const res = await unifiedClient.getSectorsDropdownLive();
+            if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+                return res;
+            }
+        }
+    } catch (e) {}
+    return { success: true, data: [{ id: '4dc7b305-c91d-41a0-81e4-9ace5c160c1d', name: "4  -->  المنيا شمال" }] };
 }
 
 async function getPublicAdminsDropdown(sectorId) {
-    return { success: true, data: [{ id: 1, name: "إدارة بني مزار" }, { id: 2, name: "إدارة مغاغة" }] };
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getPublicAdminsDropdownLive === 'function') {
+            const res = await unifiedClient.getPublicAdminsDropdownLive(sectorId);
+            if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+                return res;
+            }
+        }
+    } catch (e) {}
+    return { success: true, data: [
+        { id: '22d29793-5055-4068-8fcd-6eb0f74f78c6', name: "526  -->  بنى مزار شرق" },
+        { id: 'fbfacf15-6953-495a-8423-97e4dbb819b2', name: "524  -->  سمالوط غرب" },
+        { id: 'eb685c63-aebf-43f8-85fb-f5abfd9c4004', name: "525  -->  مطاى" }
+    ] };
 }
 
 async function getSubAdminsDropdown(publicAdminId) {
-    return { success: true, data: [{ id: 1, name: "فرع بني مزار شرق" }, { id: 2, name: "فرع بني مزار غرب" }] };
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getSubAdminsDropdownLive === 'function') {
+            const res = await unifiedClient.getSubAdminsDropdownLive(publicAdminId);
+            if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+                return res;
+            }
+        }
+    } catch (e) {}
+    return { success: true, data: [{ id: 'e294958c-cdf8-4c72-8a3d-16d71bde5cde', name: "526  -->  بنى مزار شرق" }] };
 }
 
 async function getRegionsDropdown(subAdminId) {
-    return { success: true, data: [{ id: 1, name: "المنطقة الأولى" }, { id: 2, name: "المنطقة الثانية" }] };
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getRegionsDropdownLive === 'function') {
+            const res = await unifiedClient.getRegionsDropdownLive(subAdminId);
+            if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+                return res;
+            }
+        }
+    } catch (e) {}
+    return { success: true, data: [
+        { id: '93ea2353-9f53-4b20-8ab1-738013797dfa', name: "بنى مزار شرق2" },
+        { id: '8e77a284-cd9e-4b68-b778-95568e21c815', name: "بنى مزار شرق10" },
+        { id: '716a41f6-cb03-4f93-b68f-c081e7d5cf20', name: "بنى مزار شرق13" }
+    ] };
 }
 
 async function getDailysDropdown(regionId) {
-    return { success: true, data: [{ id: 1, name: "يومية 1" }, { id: 2, name: "يومية 2" }] };
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getDailysDropdownLive === 'function') {
+            const res = await unifiedClient.getDailysDropdownLive(regionId);
+            if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+                return res;
+            }
+        }
+    } catch (e) {}
+    return { success: true, data: [{ id: '96b12e18-e66f-4232-89ba-7ca87c2e64be', name: "يومية 1" }] };
 }
 
 async function getCustomerTypesDropdown() {
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getCustomerTypesDropdownLive === 'function') {
+            const res = await unifiedClient.getCustomerTypesDropdownLive();
+            if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+                return res;
+            }
+        }
+    } catch (e) {}
     return {
         success: true,
         data: [
@@ -1057,17 +1353,25 @@ async function getCustomerTypesDropdown() {
 }
 
 async function getPlaceDescsDropdown(activityId) {
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.getPlaceDescsDropdownLive === 'function') {
+            const res = await unifiedClient.getPlaceDescsDropdownLive(activityId);
+            if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+                return res;
+            }
+        }
+    } catch (e) {}
     return {
         success: true,
         data: [
-            { id: 1, name: 'شقة سكنية' },
+            { id: 'a762052b-24f4-4829-879f-86ecff0fffc1', name: 'منزل' },
             { id: 2, name: 'محل تجاري' },
             { id: 3, name: 'مكتب إداري' },
             { id: 4, name: 'فيلا / منزل مستقل' }
         ]
     };
 }
-
 
 // 7.2 Get Customer Meter Movements (حركات عداد)
 async function getCustomerMeterMovements(term) {
