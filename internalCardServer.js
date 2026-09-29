@@ -498,11 +498,23 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // 11.9 Update Customer Sequence API (تسلسل العداد والنظام)
+            if (pathname === '/api/customer/update-sequence' || pathname === '/api/customer-sequence/update') {
+                const body = await getBody();
+                const targetId = body.customerId || body.id || body.meterNumber || body.code || url.searchParams.get('id') || url.searchParams.get('meterNumber');
+                const seqSys = body.chargeSequence || body.sequence || body.seqSys;
+                const seqMeter = body.meterChargeSequence || body.sequenceOnMeter || body.seqMeter;
+                const result = await nativeEngine.updateCustomerSequence(targetId, seqSys, seqMeter);
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
             // 12. Customers List & Filter API
             if (pathname === '/api/customers') {
                 const body = await getBody();
 
-                // If adding new customer
+                // If adding or updating customer
                 if (body && (body.name || body.customerName) && !body.paginator && !body.filter) {
                     let customers = [];
                     try {
@@ -513,6 +525,40 @@ function startInternalServer(port = 5002) {
                     } catch (e) {
                         console.error('Error reading customers_store.json:', e);
                     }
+
+                    let existingCust = customers.find(c => 
+                        (body.id && String(c.id) === String(body.id)) ||
+                        (body.code && String(c.code) === String(body.code)) ||
+                        (body.meterNumber && String(c.meterNumber) === String(body.meterNumber))
+                    );
+
+                    if (existingCust) {
+                        Object.assign(existingCust, body);
+                        if (body.chargeSequence != null) existingCust.chargeSequence = Number(body.chargeSequence);
+                        if (body.meterChargeSequence != null) {
+                            existingCust.meterChargeSequence = Number(body.meterChargeSequence);
+                            existingCust.sequenceOnMeter = Number(body.meterChargeSequence);
+                            existingCust.chargeSequenceOnMeter = Number(body.meterChargeSequence);
+                        }
+                        existingCust.updatedAt = new Date().toISOString();
+                        try {
+                            fs.writeFileSync(path.join(__dirname, 'customers_store.json'), JSON.stringify(customers, null, 2), 'utf8');
+                        } catch (e) {}
+
+                        // Also sync with card store and MEEDCO if needed
+                        if (body.meterChargeSequence != null || body.chargeSequence != null) {
+                            await nativeEngine.updateCustomerSequence(
+                                existingCust.meterNumber || existingCust.code,
+                                existingCust.chargeSequence,
+                                existingCust.meterChargeSequence
+                            );
+                        }
+
+                        res.writeHead(200);
+                        res.end(JSON.stringify({ success: true, message: 'تم تحديث بيانات المشترك ومسلسل العداد بنجاح', data: existingCust }));
+                        return;
+                    }
+
                     const newCust = {
                         id: 'CUST-' + (body.code || Date.now()),
                         code: body.code || ('050' + Math.floor(1000000 + Math.random() * 9000000)),
@@ -531,6 +577,9 @@ function startInternalServer(port = 5002) {
                         status: body.status || 'مركب',
                         customerType: body.customerType || 'صغار مشتركين',
                         activityName: body.activityName || 'استخدامات منزلية',
+                        chargeSequence: Number(body.chargeSequence) || 1,
+                        meterChargeSequence: Number(body.meterChargeSequence || body.chargeSequence) || 1,
+                        sequenceOnMeter: Number(body.meterChargeSequence || body.chargeSequence) || 1,
                         contractYear: body.contractYear || '2026',
                         contractNumber: body.contractNumber || '100',
                         installationDate: new Date().toISOString().split('T')[0]

@@ -401,6 +401,33 @@ async function writeCustomerCard(params = {}) {
 
     saveCardStore(store);
 
+    // Sync customers_store.json with updated sequence and balance
+    try {
+        const custFile = path.join(__dirname, 'customers_store.json');
+        if (fs.existsSync(custFile)) {
+            let custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+            let updated = false;
+            for (let c of custs) {
+                if (String(c.meterNumber) === String(record.meterNumber) || (record.subscriptionCode && String(c.code) === String(record.subscriptionCode))) {
+                    c.chargeSequence = newSeq;
+                    c.meterChargeSequence = newSeq;
+                    c.sequenceOnMeter = newSeq;
+                    c.balance = newBalance;
+                    c.currentBalance = newBalance;
+                    c.lastChargeDate = chargeDate;
+                    c.updatedAt = new Date().toISOString();
+                    updated = true;
+                    break;
+                }
+            }
+            if (updated) {
+                fs.writeFileSync(custFile, JSON.stringify(custs, null, 2), 'utf8');
+            }
+        }
+    } catch (e) {
+        console.warn('Sync customers_store on write notice:', e.message);
+    }
+
     // Sync debt deduction if an installment was deducted
     if (params.deductions && Number(params.deductions) > 0) {
         const debtsStore = getDebtsStore();
@@ -912,6 +939,23 @@ function normalizeCustomerRecord(c) {
         statusText = c.statusName;
     }
 
+    // Retrieve actual meter sequence from card store if recorded
+    let actualMeterSeq = c.meterChargeSequence != null ? Number(c.meterChargeSequence) : (c.sequenceOnMeter != null ? Number(c.sequenceOnMeter) : (c.chargeSequenceOnMeter != null ? Number(c.chargeSequenceOnMeter) : null));
+    if (actualMeterSeq == null || isNaN(actualMeterSeq) || actualMeterSeq === 0) {
+        try {
+            const cardStore = getCardStore();
+            const matchingCard = Object.values(cardStore.cards || {}).find(card => 
+                String(card.meterNumber).trim() === meterNum || 
+                (code && String(card.subscriptionCode).trim() === code)
+            );
+            if (matchingCard && matchingCard.chargeSequence != null) {
+                actualMeterSeq = Number(matchingCard.chargeSequence);
+            }
+        } catch(e) {}
+    }
+    const finalMeterSeq = (actualMeterSeq != null && !isNaN(actualMeterSeq) && actualMeterSeq > 0) ? actualMeterSeq : (Number(c.chargeSequence) || 1);
+    const finalSysSeq = (c.chargeSequence != null && !isNaN(Number(c.chargeSequence)) && Number(c.chargeSequence) > 0) ? Number(c.chargeSequence) : finalMeterSeq;
+
     return {
         id: c.id || c.customerId || code || meterNum,
         customerId: c.customerId || c.id || code || meterNum,
@@ -959,8 +1003,12 @@ function normalizeCustomerRecord(c) {
         initialRechargeAmount: c.initialRechargeAmount != null ? c.initialRechargeAmount : 100,
         totalRechargeAmount: c.totalRechargeAmount != null ? c.totalRechargeAmount : 0,
         totalMeterRechargeAmount: c.totalMeterRechargeAmount != null ? c.totalMeterRechargeAmount : 0,
-        chargeSequence: c.chargeSequence != null ? c.chargeSequence : 0,
-        currentBalance: c.currentBalance != null ? c.currentBalance : 0,
+        chargeSequence: finalSysSeq,
+        meterChargeSequence: finalMeterSeq,
+        sequenceOnMeter: finalMeterSeq,
+        chargeSequenceOnMeter: finalMeterSeq,
+        balance: c.balance != null ? Number(c.balance) : (c.currentBalance != null ? Number(c.currentBalance) : 0),
+        currentBalance: c.currentBalance != null ? Number(c.currentBalance) : (c.balance != null ? Number(c.balance) : 0),
         meterTotalDebit: c.meterTotalDebit != null ? c.meterTotalDebit : 0,
         contractNumber: c.contractNumber || '-',
         contractYear: c.contractYear || '2026',
@@ -1624,6 +1672,80 @@ async function createCustomerDebt(debtModel) {
 }
 
 
+async function updateCustomerSequence(targetId, seqSys, seqMeter) {
+    const tid = String(targetId || '').trim();
+    if (!tid) return { success: false, message: 'معرف المشترك أو رقم العداد مطلوب' };
+    const numSys = Math.max(1, Number(seqSys) || 1);
+    const numMeter = Math.max(1, Number(seqMeter) || 1);
+
+    // 1. Update customers_store.json
+    let custFile = path.join(__dirname, 'customers_store.json');
+    let custFound = false;
+    if (fs.existsSync(custFile)) {
+        try {
+            let custs = JSON.parse(fs.readFileSync(custFile, 'utf8'));
+            for (let c of custs) {
+                if (String(c.id) === tid || String(c.code) === tid || String(c.meterNumber) === tid || String(c.customerId) === tid) {
+                    c.chargeSequence = numSys;
+                    c.meterChargeSequence = numMeter;
+                    c.sequenceOnMeter = numMeter;
+                    c.chargeSequenceOnMeter = numMeter;
+                    c.updatedAt = new Date().toISOString();
+                    custFound = true;
+                    break;
+                }
+            }
+            if (custFound) {
+                fs.writeFileSync(custFile, JSON.stringify(custs, null, 2), 'utf8');
+            }
+        } catch (e) {
+            console.error('Error updating customers_store.json sequence:', e);
+        }
+    }
+
+    // 2. Update card_store.json
+    try {
+        const store = getCardStore();
+        for (const [key, card] of Object.entries(store.cards || {})) {
+            if (String(card.meterNumber).trim() === tid || String(card.subscriptionCode).trim() === tid || key === tid) {
+                card.chargeSequence = numMeter;
+                card.sequenceOnMeter = numMeter;
+                card.totalSystemCharges = numSys;
+                card.totalMeterCharges = numMeter;
+                card.updatedAt = new Date().toISOString();
+                break;
+            }
+        }
+        saveCardStore(store);
+    } catch (e) {
+        console.error('Error updating card_store.json sequence:', e);
+    }
+
+    // 3. Try forwarding to MEEDCO Backend live if available
+    try {
+        const unifiedClient = require('./unifiedCardClient');
+        if (unifiedClient && typeof unifiedClient.updateCustomerCardDataLive === 'function') {
+            await unifiedClient.updateCustomerCardDataLive({
+                id: tid,
+                chargeSequence: numSys,
+                sequenceOnMeter: numMeter
+            });
+        }
+    } catch (e) {
+        console.warn('MEEDCO live sequence update notice:', e.message);
+    }
+
+    return {
+        success: true,
+        message: 'تم ضبط وتحديث مسلسل الشحنة بنجاح (المسلسل على العداد: ' + numMeter + ' | المسلسل على النظام: ' + numSys + ')',
+        data: {
+            chargeSequence: numSys,
+            meterChargeSequence: numMeter,
+            sequenceOnMeter: numMeter
+        }
+    };
+}
+
 module.exports = {
     getLiveDebtTypes,
     getCustomerDebts,
@@ -1659,6 +1781,7 @@ module.exports = {
     getPlaceDescsDropdown,
     getCustomerChargingDetails,
     updateCustomerCardData,
+    updateCustomerSequence,
     getCardStore,
     saveCardStore
 };

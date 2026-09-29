@@ -30873,85 +30873,169 @@ const handlePrintJudicialControlDetails = () => {
 
 
                                 <div>
-
-                                    <label style="display: block; font-size: 0.85rem; font-weight: 800; color: #0284c7; margin-bottom: 5px;">تسلسل الشحنة *</label>
-
-                                    <input type="number" id="op-seq-system" value="${customer.chargeSequence || 53}" style="width: 100%; padding: 9px 12px; border: 2px solid #0284c7; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 1rem; box-sizing: border-box;">
-
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
+                                        <label style="font-size: 0.85rem; font-weight: 800; color: #0284c7;">تسلسل الشحنة (بالنظام) *</label>
+                                        <span style="font-size:0.75rem; color:#64748b;">قاعدة بيانات النظام</span>
+                                    </div>
+                                    <input type="number" id="op-seq-system" value="${customer.chargeSequence || customer.meterChargeSequence || 1}" min="1" style="width: 100%; padding: 9px 12px; border: 2px solid #0284c7; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 1.05rem; box-sizing: border-box;">
                                 </div>
-
                                 <div>
-
-                                    <label style="display: block; font-size: 0.85rem; font-weight: 800; color: #0284c7; margin-bottom: 5px;">تسلسل الشحنة علي العداد *</label>
-
-                                    <input type="number" id="op-seq-meter" value="${customer.meterChargeSequence || 52}" style="width: 100%; padding: 9px 12px; border: 2px solid #0284c7; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 1rem; box-sizing: border-box;">
-
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
+                                        <label style="font-size: 0.85rem; font-weight: 800; color: #059669;">تسلسل الشحنة على العداد (الفعلي) *</label>
+                                        <span style="font-size:0.75rem; color:#059669; font-weight:700;">المسجل على العداد</span>
+                                    </div>
+                                    <input type="number" id="op-seq-meter" value="${customer.meterChargeSequence || customer.sequenceOnMeter || customer.chargeSequence || 1}" min="1" style="width: 100%; padding: 9px 12px; border: 2px solid #059669; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 1.05rem; box-sizing: border-box;">
                                 </div>
-
                             </div>
 
+                            <!-- Live Comparison & Compatibility Banner -->
+                            <div id="op-seq-status-box" style="margin-top: 16px; padding: 12px 16px; border-radius: 8px; font-size: 0.88rem; font-weight: 700; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                                <!-- Dynamically updated -->
+                            </div>
                         </div>
 
-
-
-                        <!-- Bottom Action Buttons matching frame_015s -->
-
-                        <div style="display: flex; justify-content: flex-start; gap: 10px; margin-top: 10px;">
-
-                            <button type="button" id="btn-save-meter-sequence" style="background: #0284c7; color: #ffffff; border: none; padding: 9px 24px; border-radius: 6px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-
-                                <span>💾 حفظ</span>
-
-                            </button>
-
-                            <button type="button" class="btn secondary btn-close-modal" data-modal="modal-cm-operation-viewer" onclick="document.getElementById('modal-cm-operation-viewer').style.display='none';" style="background: #cbd5e1; color: #1e293b; border: none; padding: 9px 24px; border-radius: 6px; font-weight: 800; font-size: 0.95rem; cursor: pointer;">
-
-                                إلغاء
-
-                            </button>
-
+                        <!-- Action Buttons matching MEEDCO specifications -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                            <div style="display: flex; gap: 10px;">
+                                <button type="button" id="btn-save-meter-sequence" style="background: #0284c7; color: #ffffff; border: none; padding: 10px 24px; border-radius: 6px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(2,132,199,0.3);">
+                                    <span>💾 حفظ وضبط المسلسل</span>
+                                </button>
+                                <button type="button" class="btn secondary btn-close-modal" data-modal="modal-cm-operation-viewer" onclick="document.getElementById('modal-cm-operation-viewer').style.display='none';" style="background: #cbd5e1; color: #1e293b; border: none; padding: 10px 24px; border-radius: 6px; font-weight: 800; font-size: 0.95rem; cursor: pointer;">
+                                    إلغاء
+                                </button>
+                            </div>
+                            <div>
+                                <button type="button" id="btn-read-meter-actual-seq" style="background: #10b981; color: #ffffff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(16,185,129,0.3);">
+                                    <span>🔄 قراءة المسلسل الفعلي من الكارت/القارئ الآن</span>
+                                </button>
+                            </div>
                         </div>
-
                     </div>
-
                 `;
 
+                // Update Comparison Banner logic
+                const updateCompBanner = () => {
+                    const statusBox = document.getElementById('op-seq-status-box');
+                    if (!statusBox) return;
+                    const sysVal = Math.max(1, Number((document.getElementById('op-seq-system') as HTMLInputElement)?.value || 1));
+                    const meterVal = Math.max(1, Number((document.getElementById('op-seq-meter') as HTMLInputElement)?.value || 1));
+                    const nextChargeSeq = meterVal + 1;
 
+                    if (sysVal === meterVal) {
+                        statusBox.style.background = '#f0fdf4';
+                        statusBox.style.border = '1px solid #86efac';
+                        statusBox.style.color = '#15803d';
+                        statusBox.innerHTML = `
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:1.2rem;">✓</span>
+                                <div>
+                                    <div style="font-weight:800;">تطابق تام بين العداد والنظام (المسلسل: ${meterVal})</div>
+                                    <div style="font-size:0.8rem; opacity:0.9;">العداد متوافق وسيقبل الشحنة القادمة رقم: <strong>${nextChargeSeq}</strong></div>
+                                </div>
+                            </div>
+                            <div style="background:#dcfce7; padding:4px 10px; border-radius:6px; font-weight:800;">جاهز للشحن ✓</div>
+                        `;
+                    } else {
+                        const diff = Math.abs(sysVal - meterVal);
+                        statusBox.style.background = '#fffbeb';
+                        statusBox.style.border = '1px solid #fde68a';
+                        statusBox.style.color = '#b45309';
+                        statusBox.innerHTML = `
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:1.2rem;">⚠️</span>
+                                <div>
+                                    <div style="font-weight:800;">عدم تطابق في المسلسل (فارق ${diff} شحنة)! العداد الفعلي: <strong>${meterVal}</strong> | النظام: <strong>${sysVal}</strong></div>
+                                    <div style="font-size:0.8rem; opacity:0.9;">تحذير: إذا لم يتم ضبط المسلسل ليطابق الفعلي، سيرفض العداد الكارت ("شحنة ملغاة"). اضغط حفظ لضبط المسلسل.</div>
+                                </div>
+                            </div>
+                            <div style="background:#fee2e2; color:#b91c1c; padding:4px 10px; border-radius:6px; font-weight:800;">يتطلب الضبط ⚠️</div>
+                        `;
+                    }
+                };
 
+                updateCompBanner();
+
+                document.getElementById('op-seq-system')?.addEventListener('input', updateCompBanner);
+                document.getElementById('op-seq-meter')?.addEventListener('input', updateCompBanner);
+
+                // Auto-read from inserted card if available on modal open
+                const readActualFromCard = async (silent = false) => {
+                    const readBtn = document.getElementById('btn-read-meter-actual-seq') as HTMLButtonElement | null;
+                    if (readBtn && !silent) {
+                        readBtn.disabled = true;
+                        readBtn.innerHTML = `<span>جاري قراءة الكارت الفعلي...</span>`;
+                    }
+                    try {
+                        let res: any = null;
+                        if (typeof (window as any).readCustomerCard === 'function') {
+                            res = await (window as any).readCustomerCard().catch(() => null);
+                        }
+                        if (!res || !res.success) {
+                            res = await fetch('http://127.0.0.1:5002/api/customer-card/read').then(r => r.json()).catch(() => null);
+                        }
+                        if (res && res.success && res.data) {
+                            const actualSeq = Number(res.data.sequenceOnMeter || res.data.chargeSequence || res.customer?.sequenceOnMeter || 0);
+                            if (actualSeq > 0) {
+                                const meterInp = document.getElementById('op-seq-meter') as HTMLInputElement | null;
+                                if (meterInp) {
+                                    meterInp.value = String(actualSeq);
+                                }
+                                updateCompBanner();
+                                if (!silent) {
+                                    showToast(`تمت قراءة المسلسل الفعلي من العداد/الكارت بنجاح: ${actualSeq}`, 'success');
+                                }
+                            }
+                        } else if (!silent) {
+                            showToast(res?.message || 'لم يتم العثور على كارت في القارئ. يرجى وضع كارت المشترك على القارئ.', 'error');
+                        }
+                    } catch (e: any) {
+                        if (!silent) showToast('تعذر قراءة الكارت: ' + e.message, 'error');
+                    } finally {
+                        if (readBtn && !silent) {
+                            readBtn.disabled = false;
+                            readBtn.innerHTML = `<span>🔄 قراءة المسلسل الفعلي من الكارت/القارئ الآن</span>`;
+                        }
+                    }
+                };
+
+                document.getElementById('btn-read-meter-actual-seq')?.addEventListener('click', () => readActualFromCard(false));
+
+                // Silent auto-read attempt when entering modal
+                readActualFromCard(true);
+
+                // Save button
                 document.getElementById('btn-save-meter-sequence')?.addEventListener('click', async () => {
-
-                    const seqSys = Number((document.getElementById('op-seq-system') as HTMLInputElement)?.value || 53);
-
-                    const seqMeter = Number((document.getElementById('op-seq-meter') as HTMLInputElement)?.value || 52);
-
+                    const seqSys = Math.max(1, Number((document.getElementById('op-seq-system') as HTMLInputElement)?.value || 1));
+                    const seqMeter = Math.max(1, Number((document.getElementById('op-seq-meter') as HTMLInputElement)?.value || 1));
                     customer.chargeSequence = seqSys;
-
                     customer.meterChargeSequence = seqMeter;
+                    customer.sequenceOnMeter = seqMeter;
+                    customer.chargeSequenceOnMeter = seqMeter;
 
                     try {
-
-                        await fetch('http://127.0.0.1:5002/api/customers', {
-
+                        await fetch('http://127.0.0.1:5002/api/customer/update-sequence', {
                             method: 'POST',
-
                             headers: { 'Content-Type': 'application/json' },
-
-                            body: JSON.stringify(customer)
-
+                            body: JSON.stringify({
+                                customerId: customer.id || customer.code || customer.meterNumber,
+                                meterNumber: customer.meterNumber,
+                                chargeSequence: seqSys,
+                                meterChargeSequence: seqMeter
+                            })
                         });
-
                     } catch (e) {}
 
-                    showToast('تم تحديث مسلسل العداد بنجاح ✓', 'success');
+                    if (currentChargingCustomer && (currentChargingCustomer.meterNumber === customer.meterNumber || currentChargingCustomer.code === customer.code)) {
+                        currentChargingCustomer.chargeSequence = seqSys;
+                        currentChargingCustomer.meterChargeSequence = seqMeter;
+                        currentChargingCustomer.sequenceOnMeter = seqMeter;
+                    }
 
+                    showToast(`تم ضبط وتحديث مسلسل العداد بنجاح ✓ (العداد: ${seqMeter} | النظام: ${seqSys})`, 'success');
                     modal.style.display = 'none';
-
                     renderCustomersTable();
-
                 });
-
                 break;
-
             }
 
 
@@ -31259,89 +31343,123 @@ const handlePrintJudicialControlDetails = () => {
             case 'replace-card-no-charge': {
 
                 const withCharge = action === 'replace-card-charge';
-
                 titleEl.textContent = withCharge ? 'إصدار كارت بديل مع شحن (MEEDCO)' : 'إصدار كارت بديل بدون شحن (MEEDCO)';
 
+                const actualMeterSeq = Number(customer.meterChargeSequence || customer.sequenceOnMeter || customer.chargeSequenceOnMeter || customer.chargeSequence || 1);
+                const targetCardSeq = withCharge ? (actualMeterSeq + 1) : actualMeterSeq;
+
                 contentEl.innerHTML = `
-
                     <div style="display: flex; flex-direction: column; gap: 16px; text-align: right; direction: rtl;">
-
                         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; color: #166534; font-size: 0.88rem;">
+                            <strong>إصدار كارت بديل:</strong> يتم تجهيز وبرمجة كارت المشترك على القارئ الذكي وضبط مسلسل الشحنة ليطابق العداد الفعلي.
+                        </div>
 
-                            <strong>إصدار كارت بديل:</strong> يتم تجهيز وبرمجة كارت المشترك على القارئ الذكي وخصم رسوم الكارت تلقائياً.
-
+                        <!-- Sequence Comparison Banner for Replacement Card -->
+                        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div>
+                                <span style="font-weight: 700; color: #1e40af;">مسلسل الشحنة الفعلي على العداد:</span>
+                                <strong style="font-family: monospace; font-size: 1.1rem; color: #1e40af; margin-right: 6px;">${actualMeterSeq}</strong>
+                            </div>
+                            <div>
+                                <span style="font-weight: 700; color: #047857;">مسلسل الكارت البديل المبرمج:</span>
+                                <strong style="font-family: monospace; font-size: 1.1rem; color: #047857; margin-right: 6px;">${targetCardSeq}</strong>
+                                <span style="font-size: 0.8rem; color: #64748b;">(${withCharge ? 'شحنة جديدة = فعلي + 1' : 'مطابق للفعلي لقبول العداد'})</span>
+                            </div>
                         </div>
 
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
-
                             <div>
-
                                 <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">رقم العداد</label>
-
                                 <input type="text" value="${customer.meterNumber}" readonly style="width: 100%; padding: 8px 12px; background: #eef2f6; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; font-family: monospace; box-sizing: border-box;">
-
                             </div>
-
                             <div>
-
                                 <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">اسم المشترك</label>
-
                                 <input type="text" value="${customer.name}" readonly style="width: 100%; padding: 8px 12px; background: #eef2f6; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; box-sizing: border-box;">
-
                             </div>
-
                             <div>
-
                                 <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">رسوم الكارت البديل</label>
-
                                 <input type="text" value="50.00 ج.م" readonly style="width: 100%; padding: 8px 12px; background: #eef2f6; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; box-sizing: border-box;">
-
                             </div>
-
                             ${withCharge ? `
-
                             <div>
-
                                 <label style="display: block; font-size: 0.85rem; font-weight: 800; color: #0284c7; margin-bottom: 5px;">قيمة الشحنة المطلوبة (ج.م) *</label>
-
-                                <input type="number" id="op-replace-charge-amt" value="100" style="width: 100%; padding: 8px 12px; border: 2px solid #0284c7; border-radius: 6px; font-weight: 800; font-family: monospace; box-sizing: border-box;">
-
+                                <input type="number" id="op-replace-charge-amt" value="100" min="10" style="width: 100%; padding: 8px 12px; border: 2px solid #0284c7; border-radius: 6px; font-weight: 800; font-family: monospace; box-sizing: border-box;">
                             </div>
-
                             ` : ''}
-
                         </div>
 
                         <div style="display: flex; justify-content: flex-start; gap: 10px; margin-top: 10px;">
-
-                            <button type="button" id="btn-write-replace-card" style="background: #0284c7; color: #ffffff; border: none; padding: 9px 24px; border-radius: 6px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-
+                            <button type="button" id="btn-write-replace-card" style="background: #0284c7; color: #ffffff; border: none; padding: 10px 24px; border-radius: 6px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px;">
                                 <span>💳 برمجة وكتابة الكارت البديل</span>
-
                             </button>
-
-                            <button type="button" class="btn secondary btn-close-modal" data-modal="modal-cm-operation-viewer" onclick="document.getElementById('modal-cm-operation-viewer').style.display='none';" style="background: #cbd5e1; color: #1e293b; border: none; padding: 9px 24px; border-radius: 6px; font-weight: 800; cursor: pointer;">
-
+                            <button type="button" class="btn secondary btn-close-modal" data-modal="modal-cm-operation-viewer" onclick="document.getElementById('modal-cm-operation-viewer').style.display='none';" style="background: #cbd5e1; color: #1e293b; border: none; padding: 10px 24px; border-radius: 6px; font-weight: 800; cursor: pointer;">
                                 إلغاء
-
                             </button>
-
                         </div>
-
                     </div>
-
                 `;
 
-                document.getElementById('btn-write-replace-card')?.addEventListener('click', () => {
+                document.getElementById('btn-write-replace-card')?.addEventListener('click', async () => {
+                    const btn = document.getElementById('btn-write-replace-card') as HTMLButtonElement | null;
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerHTML = `<span>جاري البرمجة والكتابة على القارئ...</span>`;
+                    }
+                    try {
+                        const chargeAmt = withCharge ? Number((document.getElementById('op-replace-charge-amt') as HTMLInputElement)?.value || 100) : 0;
+                        const payload = {
+                            id: customer.id || customer.code || customer.meterNumber,
+                            meterNumber: customer.meterNumber,
+                            code: customer.code,
+                            customerName: customer.name,
+                            chargeSequence: targetCardSeq,
+                            rechargeAmount: chargeAmt,
+                            cardPrice: 50
+                        };
 
-                    showToast('تمت برمجة وتجهيز الكارت البديل بنجاح عبر القارئ الذكي ✓', 'success');
+                        let res: any = null;
+                        if (withCharge) {
+                            if (typeof (window as any).issueReplacementWithCharge === 'function') {
+                                res = await (window as any).issueReplacementWithCharge(payload).catch(() => null);
+                            }
+                            if (!res || !res.success) {
+                                res = await fetch('http://127.0.0.1:5002/api/customer-card/replace-with-charge', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(payload)
+                                }).then(r => r.json()).catch(() => null);
+                            }
+                        } else {
+                            if (typeof (window as any).issueReplacementWithoutCharge === 'function') {
+                                res = await (window as any).issueReplacementWithoutCharge(payload).catch(() => null);
+                            }
+                            if (!res || !res.success) {
+                                res = await fetch('http://127.0.0.1:5002/api/customer-card/replace-without-charge', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(payload)
+                                }).then(r => r.json()).catch(() => null);
+                            }
+                        }
 
-                    modal.style.display = 'none';
+                        // Update sequence in memory & local store
+                        customer.chargeSequence = targetCardSeq;
+                        customer.meterChargeSequence = targetCardSeq;
+                        customer.sequenceOnMeter = targetCardSeq;
 
+                        showToast(`تمت برمجة وتجهيز الكارت البديل بنجاح بالمسلسل الفعلي (${targetCardSeq}) ✓`, 'success');
+                        modal.style.display = 'none';
+                        renderCustomersTable();
+                    } catch (e: any) {
+                        showToast('حدث خطأ أثناء كتابة الكارت: ' + e.message, 'error');
+                    } finally {
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = `<span>💳 برمجة وكتابة الكارت البديل</span>`;
+                        }
+                    }
                 });
-
                 break;
-
             }
 
 
@@ -33165,8 +33283,14 @@ const handlePrintJudicialControlDetails = () => {
 
         if (totalRechargeEl) totalRechargeEl.textContent = cust.totalRechargeAmount != null ? `${cust.totalRechargeAmount} ج.م` : '0 ج.م';
 
-        if (chargeSeqEl) chargeSeqEl.textContent = cust.chargeSequence != null ? String(cust.chargeSequence) : '0';
-
+        const mSeq = cust.meterChargeSequence != null ? cust.meterChargeSequence : (cust.sequenceOnMeter != null ? cust.sequenceOnMeter : cust.chargeSequence);
+        if (chargeSeqEl) {
+            if (cust.chargeSequence != null && mSeq != null && Number(cust.chargeSequence) !== Number(mSeq)) {
+                chargeSeqEl.innerHTML = `<span style="color:#0284c7;" title="تسلسل النظام">نظام: ${cust.chargeSequence}</span> / <span style="color:#b45309; font-weight:800;" title="تسلسل العداد الفعلي">عداد: ${mSeq} ⚠️</span>`;
+            } else {
+                chargeSeqEl.textContent = String(mSeq || cust.chargeSequence || '1');
+            }
+        }
         if (chargeStatusEl) chargeStatusEl.textContent = cust.isChargeStop ? 'موقوف عن الشحن' : 'شحن طبيعي (نشط)';
 
 
@@ -33906,18 +34030,46 @@ const handlePrintJudicialControlDetails = () => {
 
 
         // Row 3
-
         const lastChg = card?.lastChargeAmount != null ? Number(card.lastChargeAmount) : (card?.lastCharge || 0);
-
         const meterChg = card?.meterChargeAmount != null ? Number(card.meterChargeAmount) : (card?.remainingBalance != null ? Number(card.remainingBalance) : 0);
-
         setVal('field-last-charge', lastChg.toFixed(0));
-
         setVal('field-meter-charge', meterChg.toFixed(0));
 
-        setVal('field-total-system-charges', card?.totalSystemCharges || cust?.totalRecharge || '0');
+        const actualMeterSeq = card?.sequenceOnMeter != null ? Number(card.sequenceOnMeter) : (cust?.meterChargeSequence != null ? Number(cust.meterChargeSequence) : (cust?.sequenceOnMeter != null ? Number(cust.sequenceOnMeter) : (Number(cust?.chargeSequence) || 0)));
+        const sysSeq = cust?.chargeSequence != null ? Number(cust.chargeSequence) : (card?.totalSystemCharges != null ? Number(card.totalSystemCharges) : actualMeterSeq);
 
-        setVal('field-total-meter-charges', card?.totalMeterCharges || '0');
+        setVal('field-total-system-charges', sysSeq > 0 ? String(sysSeq) : '0');
+        setVal('field-total-meter-charges', actualMeterSeq > 0 ? String(actualMeterSeq) : '0');
+
+        // Dynamic Sequence Comparison Badge on Charging Card
+        let seqBadge = document.getElementById('chg-seq-comparison-badge');
+        if (!seqBadge) {
+            const meterField = document.getElementById('field-total-meter-charges');
+            if (meterField && meterField.parentElement && meterField.parentElement.parentElement) {
+                seqBadge = document.createElement('div');
+                seqBadge.id = 'chg-seq-comparison-badge';
+                seqBadge.style.cssText = 'grid-column: 1 / -1; margin-top: 6px; font-size: 0.84rem; font-weight: 700; padding: 7px 14px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;';
+                meterField.parentElement.parentElement.appendChild(seqBadge);
+            }
+        }
+        if (seqBadge) {
+            const nextSeq = (actualMeterSeq > 0 ? actualMeterSeq : sysSeq) + 1;
+            if (actualMeterSeq === sysSeq && actualMeterSeq > 0) {
+                seqBadge.style.display = 'flex';
+                seqBadge.style.background = '#f0fdf4';
+                seqBadge.style.color = '#166534';
+                seqBadge.style.border = '1px solid #bbf7d0';
+                seqBadge.innerHTML = `<span>✓ تسلسل العداد والنظام متطابقان (${actualMeterSeq})</span> <span style="background:rgba(22,101,52,0.1); padding:2px 8px; border-radius:4px;">الشحنة القادمة رقم: <strong style="font-family:monospace; font-size:0.95rem;">${nextSeq}</strong></span>`;
+            } else if (actualMeterSeq > 0 || sysSeq > 0) {
+                seqBadge.style.display = 'flex';
+                seqBadge.style.background = '#fffbeb';
+                seqBadge.style.color = '#b45309';
+                seqBadge.style.border = '1px solid #fde68a';
+                seqBadge.innerHTML = `<span>⚠️ مقارنة المسلسل: العداد الفعلي (${actualMeterSeq}) والنظام (${sysSeq})</span> <span style="background:rgba(180,83,9,0.1); padding:2px 8px; border-radius:4px;">الشحنة ستكتب برقم العداد الفعلي + 1: <strong style="font-family:monospace; font-size:0.95rem; color:#b91c1c;">${nextSeq}</strong> (لضمان قبول العداد)</span>`;
+            } else {
+                seqBadge.style.display = 'none';
+            }
+        }
 
 
 
@@ -35150,45 +35302,30 @@ const handlePrintJudicialControlDetails = () => {
 
 
             const meterNumber = card.meterNumber || cust.meterNumber || '';
-
             const remainingBalance = card.remainingBalance != null ? Number(card.remainingBalance) : 0;
-
-            const seqOnMeter = card.sequenceOnMeter != null ? card.sequenceOnMeter : (cust.chargeSequence || 1);
-
+            const seqOnMeter = card.sequenceOnMeter != null ? Number(card.sequenceOnMeter) : (cust.meterChargeSequence != null ? Number(cust.meterChargeSequence) : (cust.sequenceOnMeter != null ? Number(cust.sequenceOnMeter) : (Number(cust.chargeSequence) || 1)));
+            const sysSeq = cust.chargeSequence != null ? Number(cust.chargeSequence) : (card.totalSystemCharges != null ? Number(card.totalSystemCharges) : seqOnMeter);
             const slice = card.slice ? ('الشريحة ' + card.slice) : (cust.consumptionSlice ? ('الشريحة ' + cust.consumptionSlice) : 'الشريحة 1');
-
             const lastDate = card.lastChargeDate || cust.lastChargeDate || 'اليوم';
 
-
-
             currentChargingCustomer = {
-
                 id: cust.id || card.id || 'cust-id',
-
                 name: cust.name || cust.codySecondName || 'مشترك',
-
                 code: cust.code || cust.codeNumber || card.meterCode || '-',
-
                 meterNumber: meterNumber,
-
                 meterCompanyName: cust.meterCompanyName || card.meterCompanyName || 'المصرية',
-
-                chargeSequence: Number(seqOnMeter),
-
+                chargeSequence: sysSeq,
+                meterChargeSequence: seqOnMeter,
+                sequenceOnMeter: seqOnMeter,
                 lastChargeDate: lastDate,
-
                 isChargeStop: Boolean(cust.isChargeStop),
-
                 accountNumberReferenceCustomer: cust.accountNumberReferenceCustomer || '-',
-
                 nationalId: cust.nationalId || '-',
-
                 activityName: cust.activityName || 'منزلي كودي',
-
                 customerTypeName: cust.customerTypeName || 'أهالي',
-
-                address: cust.address || '-'
-
+                address: cust.address || '-',
+                consumptionSlice: slice,
+                balance: remainingBalance
             };
 
 
@@ -35383,208 +35520,138 @@ const handlePrintJudicialControlDetails = () => {
 
 
 
+            const actualMeterSeq = Number(currentChargingCustomer.meterChargeSequence || currentChargingCustomer.sequenceOnMeter || currentChargingCustomer.chargeSequence || 0);
+            const nextSeq = (actualMeterSeq > 0 ? actualMeterSeq : 1) + 1;
+
             const payload = {
-
                 id: currentChargingCustomer.id,
-
+                meterNumber: currentChargingCustomer.meterNumber,
+                customerCode: currentChargingCustomer.code,
+                customerName: currentChargingCustomer.name,
+                chargeSequence: nextSeq,
+                sequence: String(nextSeq),
                 rechargeAmount: rechargeAmount,
-
                 paymentTypeId: Number(paymentTypeSelect?.value) || 1,
-
                 isDebitsDelay: isDebitsPostponedForCurrentSession,
-
                 netPrice: netCollected,
-
                 notes: notesInp?.value || ''
-
             };
-
-
 
             let writeRes: any = null;
-
             if (typeof (window as any).writeCustomerCard === 'function') {
-
                 try {
-
                     writeRes = await (window as any).writeCustomerCard(payload);
-
                 } catch (e: any) {
-
                     console.warn('Electron writeCustomerCard failed:', e);
-
                 }
-
             }
-
             if (!writeRes || !writeRes.success) {
-
                 writeRes = await fetch('http://127.0.0.1:5002/api/customer-card/write', {
-
                     method: 'POST',
-
                     headers: { 'Content-Type': 'application/json' },
-
                     body: JSON.stringify(payload)
-
                 }).then(r => r.json()).catch(() => null);
-
             }
 
-
-
-            showToast('تمت كتابة الشحنة بنجاح على الكارت وحفظ الإيصال بالمنظومة!', 'success');
-
-
+            showToast(`تمت كتابة الشحنة بنجاح على الكارت برقم المسلسل (${nextSeq}) وحفظ الإيصال!`, 'success');
 
             // Update balance on UI
-
             const balanceEl = document.getElementById('field-current-balance') as HTMLInputElement | null;
-
             const curBal = parseFloat(balanceEl?.value || '0');
-
             if (balanceEl) {
-
                 balanceEl.value = (curBal + rechargeAmount).toFixed(2) + ' ج.م';
-
             }
 
+            // Update customer sequence and balance
+            currentChargingCustomer.chargeSequence = nextSeq;
+            currentChargingCustomer.meterChargeSequence = nextSeq;
+            currentChargingCustomer.sequenceOnMeter = nextSeq;
+            currentChargingCustomer.balance = curBal + rechargeAmount;
+            updateChargingCardFields(currentChargingCustomer, null, currentChargingFinancials);
 
+            // Sync with backend sequence update
+            try {
+                fetch('http://127.0.0.1:5002/api/customer/update-sequence', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        customerId: currentChargingCustomer.id || currentChargingCustomer.code || currentChargingCustomer.meterNumber,
+                        meterNumber: currentChargingCustomer.meterNumber,
+                        chargeSequence: nextSeq,
+                        meterChargeSequence: nextSeq
+                    })
+                }).catch(() => {});
+            } catch(e) {}
 
             // Update local state if offline or connected
-
             const local = state.meters.find(m => String(m.id) === String(currentChargingCustomer.id) || String(m.subscriptionCode || '') === String(currentChargingCustomer.code) || String(m.meterChassisNumber || '') === String(currentChargingCustomer.meterNumber));
-
             if (local) {
-
                 local.balance = (parseFloat(String(local.balance || 0)) || 0) + rechargeAmount;
-
-                local.chargeCount = (Number(local.chargeCount) || 1) + 1;
-
+                local.chargeCount = nextSeq;
+                (local as any).chargeSequence = nextSeq;
+                (local as any).meterChargeSequence = nextSeq;
                 local.lastChargeDate = new Date().toLocaleDateString('ar-EG');
-
                 saveState();
-
             }
 
-
-
-            logActivity('شحن كارت مشترك', `تم شحن كارت العداد ${currentChargingCustomer.meterNumber} بمبلغ ${rechargeAmount.toFixed(2)} ج.م للمشترك ${currentChargingCustomer.name}`);
-
-
+            logActivity('شحن كارت مشترك', `تم شحن كارت العداد ${currentChargingCustomer.meterNumber} بمبلغ ${rechargeAmount.toFixed(2)} ج.م برقم المسلسل ${nextSeq} للمشترك ${currentChargingCustomer.name}`);
 
             // Show Receipt Modal
-
             const amtInp = (document.getElementById('field-charge-amount') || document.getElementById('chg-recharge-amount')) as HTMLInputElement | null;
-
             const grossCharge = Number(amtInp?.value) || rechargeAmount;
-
             const cleaningFee = Number((document.getElementById('chg-financial-cleaning') as HTMLInputElement)?.value) || 0;
-
             const debtsAmt = Number((document.getElementById('field-total-debts') as HTMLInputElement)?.value) || (currentChargingFinancials?.debts || 0);
-
             const feesAmt = Number((document.getElementById('chg-financial-fees') as HTMLInputElement)?.value) || (currentChargingFinancials?.fees || 0);
-
             const paySel = document.getElementById('field-payment-method') as HTMLSelectElement | null;
-
             const payMethod = paySel?.options[paySel.selectedIndex]?.text || 'نقدي';
 
-
-
             const chgOpRecord = {
-
                 id: writeRes?.chargeId || ('CHG-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000)),
-
                 operationType: 'charge',
-
                 operationTypeName: 'شحن طاقة',
-
                 date: new Date().toISOString().slice(0, 10),
-
                 time: new Date().toLocaleTimeString('ar-EG'),
-
                 customerName: currentChargingCustomer.name,
-
                 customerCode: currentChargingCustomer.code,
-
                 meterNumber: currentChargingCustomer.meterNumber,
-
                 nationalId: currentChargingCustomer.nationalId || '-',
-
                 address: currentChargingCustomer.address || '-',
-
                 activityName: currentChargingCustomer.activityName || 'منزلي كودي',
-
                 rechargeAmount: rechargeAmount,
-
                 cardPrice: 0,
-
                 fees: feesAmt,
-
                 cleaningFee: cleaningFee,
-
                 debtsDeducted: debtsAmt,
-
                 netCollected: netCollected,
-
                 paymentMethod: payMethod,
-
                 onSameCard: false,
-
                 receiptNumber: writeRes?.chargeId || ('REC-' + Date.now().toString().slice(-6)),
-
                 operatorName: loggedInUser?.fullName || 'مسؤول الشحن'
-
             };
-
             saveCardOperationRecord(chgOpRecord);
 
-
-
             showChargingReceiptModal({
-
                 id: writeRes?.chargeId || ('CHG-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.floor(1000 + Math.random() * 9000)),
-
                 date: new Date().toLocaleDateString('ar-EG'),
-
                 time: new Date().toLocaleTimeString('ar-EG'),
-
                 customerName: currentChargingCustomer.name,
-
                 customerCode: currentChargingCustomer.code,
-
                 meterNumber: currentChargingCustomer.meterNumber,
-
                 accountReference: currentChargingCustomer.accountNumberReferenceCustomer || '-',
-
                 address: currentChargingCustomer.address || '-',
-
                 nationalId: currentChargingCustomer.nationalId || '-',
-
                 slice: currentChargingCustomer.consumptionSlice || 'الشريحة الأولى',
-
                 activityName: currentChargingCustomer.activityName || 'منزلي كودي',
-
-                sequence: String((Number(currentChargingCustomer.chargeSequence) || 1) + 1),
-
+                sequence: String(nextSeq),
                 chargeAmount: grossCharge.toFixed(2),
-
                 fees: feesAmt,
-
                 cleaningFee: cleaningFee,
-
                 debtsDeducted: debtsAmt,
-
                 deductions: (grossCharge - rechargeAmount + (rechargeAmount - netCollected)).toFixed(2),
-
                 netCredited: rechargeAmount.toFixed(2),
-
                 netCollected: netCollected.toFixed(2),
-
                 paymentMethod: payMethod,
-
                 collectorName: loggedInUser?.fullName || 'مسؤول الشحن'
-
             });
 
 
