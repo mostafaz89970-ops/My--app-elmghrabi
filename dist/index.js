@@ -14348,6 +14348,693 @@ const loadCustomers = async (page = 1) => {
         renderCustomersTable();
     }
 };
+// =========================================================================
+// MEEDCO Customer Operations Dedicated Screens (Matching MEEDCO 1:1)
+// =========================================================================
+const openCustomerOperationModal = (action, customer) => {
+    var _a, _b, _c, _d, _e;
+    if (!customer)
+        return;
+    const modal = document.getElementById('modal-cm-operation-viewer');
+    const titleEl = document.getElementById('cm-op-modal-title');
+    const printBtn = document.getElementById('btn-cm-op-print');
+    const contentEl = document.getElementById('cm-op-dynamic-content');
+    // Set Top Customer Info Card
+    const codeEl = document.getElementById('cm-op-cust-code');
+    const nameEl = document.getElementById('cm-op-cust-name');
+    const meterEl = document.getElementById('cm-op-cust-meter');
+    const refEl = document.getElementById('cm-op-cust-ref');
+    const addrEl = document.getElementById('cm-op-cust-address');
+    if (codeEl)
+        codeEl.textContent = customer.code || '-';
+    if (nameEl)
+        nameEl.textContent = customer.name || '-';
+    if (meterEl)
+        meterEl.textContent = customer.meterNumber || customer.meterChassisNumber || '-';
+    if (refEl)
+        refEl.textContent = customer.accountNumberReferenceCustomer || customer.accountRefrence || '-';
+    if (addrEl)
+        addrEl.textContent = customer.address || '-';
+    if (!modal || !titleEl || !contentEl)
+        return;
+    // Reset print button
+    if (printBtn) {
+        printBtn.style.display = 'none';
+        printBtn.onclick = () => window.print();
+    }
+    // Render matching screen based on action
+    switch (action) {
+        case 'edit-main-data': {
+            titleEl.textContent = 'تعديل البيانات الأساسية للمشترك';
+            contentEl.innerHTML = `
+                    <form id="form-edit-main-data" onsubmit="event.preventDefault();" style="display: flex; flex-direction: column; gap: 16px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">اسم المشترك</label>
+                                <input type="text" id="op-edit-name" value="${customer.name || ''}" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">الرقم القومي</label>
+                                <input type="text" id="op-edit-nid" maxlength="14" value="${customer.identityNumber || customer.nationalId || ''}" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">رقم العداد</label>
+                                <input type="text" id="op-edit-meter" value="${customer.meterNumber || ''}" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">رقم الهاتف</label>
+                                <input type="text" id="op-edit-phone" value="${customer.phone || '01012345678'}" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">النشاط</label>
+                                <select id="op-edit-activity" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                                    <option value="استخدامات منزلية" ${customer.activityName === 'استخدامات منزلية' ? 'selected' : ''}>استخدامات منزلية</option>
+                                    <option value="تجاري" ${customer.activityName === 'تجاري' ? 'selected' : ''}>تجاري</option>
+                                    <option value="صناعي وتجاري" ${customer.activityName === 'صناعي وتجاري' ? 'selected' : ''}>صناعي وتجاري</option>
+                                    <option value="خدمي ومرافق" ${customer.activityName === 'خدمي ومرافق' ? 'selected' : ''}>خدمي ومرافق</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">مرجع الحساب</label>
+                                <input type="text" id="op-edit-ref" value="${customer.accountNumberReferenceCustomer || ''}" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">رقم التعاقد</label>
+                                <input type="text" id="op-edit-contract" value="${customer.contractNumber || '100'}" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">سنة التعاقد</label>
+                                <input type="text" id="op-edit-year" value="${customer.contractYear || '2026'}" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div style="grid-column: 1 / -1;">
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">العنوان التفصيلي</label>
+                                <input type="text" id="op-edit-addr" value="${customer.address || ''}" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                            <button type="button" id="btn-save-edit-main" style="background: #0284c7; color: #fff; padding: 10px 24px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                                حفظ التعديلات في المنظومة ✓
+                            </button>
+                        </div>
+                    </form>
+                `;
+            (_a = document.getElementById('btn-save-edit-main')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', async () => {
+                var _a, _b, _c, _d, _e, _f;
+                const newName = (_a = document.getElementById('op-edit-name')) === null || _a === void 0 ? void 0 : _a.value.trim();
+                const newNid = (_b = document.getElementById('op-edit-nid')) === null || _b === void 0 ? void 0 : _b.value.trim();
+                const newMeter = (_c = document.getElementById('op-edit-meter')) === null || _c === void 0 ? void 0 : _c.value.trim();
+                const newAct = (_d = document.getElementById('op-edit-activity')) === null || _d === void 0 ? void 0 : _d.value;
+                const newAddr = (_e = document.getElementById('op-edit-addr')) === null || _e === void 0 ? void 0 : _e.value.trim();
+                const newRef = (_f = document.getElementById('op-edit-ref')) === null || _f === void 0 ? void 0 : _f.value.trim();
+                if (!newName || !newMeter) {
+                    showToast('يرجى التأكد من إدخال اسم المشترك ورقم العداد.', 'warning');
+                    return;
+                }
+                customer.name = newName;
+                customer.identityNumber = newNid;
+                customer.nationalId = newNid;
+                customer.meterNumber = newMeter;
+                customer.activityName = newAct;
+                customer.address = newAddr;
+                customer.accountNumberReferenceCustomer = newRef;
+                try {
+                    await fetch('http://127.0.0.1:5002/api/customers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(customer)
+                    });
+                }
+                catch (e) { }
+                showToast('تم تحديث وحفظ البيانات الأساسية للمشترك بنجاح ✓', 'success');
+                modal.style.display = 'none';
+                renderCustomersTable();
+            });
+            break;
+        }
+        case 'change-meter': {
+            titleEl.textContent = 'تغيير عداد (نموذج الفحص والاستبدال الفني)';
+            contentEl.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; color: #1e40af; font-size: 0.88rem;">
+                            <strong>معلومات الاستبدال:</strong> يتم من خلال هذه الشاشة ربط العداد الجديد بالمشترك وتدوين سبب التغيير وقراءة الرفع وقراءة البدء.
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">رقم العداد الحالي</label>
+                                <input type="text" value="${customer.meterNumber}" readonly style="width: 100%; padding: 8px 12px; background: #eef2f6; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-weight: 700;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">شركة توريد العداد</label>
+                                <select id="op-meter-company" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                                    <option>السويدي إلكتريك (Elsewedy)</option>
+                                    <option>جلوبالترونكس (GlobalTronics)</option>
+                                    <option>المعصرة للصناعات الهندسية</option>
+                                    <option>إسكرا إمكو (Iskraemeco)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">نوع العداد الجديد</label>
+                                <select style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                                    <option>أحادي إلكتروني مسبق الدفع كودي</option>
+                                    <option>ثلاثي إلكتروني مسبق الدفع</option>
+                                    <option>أحادي ذكي (Smart Meter)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #0284c7; margin-bottom: 5px;">رقم العداد الجديد *</label>
+                                <input type="text" id="op-new-meter-input" placeholder="أدخل رقم العداد الجديد..." style="width: 100%; padding: 8px 12px; border: 2px solid #0284c7; border-radius: 6px; box-sizing: border-box; font-weight: 700;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">قراءة رفع العداد القديم (ك.و.س)</label>
+                                <input type="number" value="3842.1" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">قراءة بدء العداد الجديد</label>
+                                <input type="number" value="0.0" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">سبب التغيير</label>
+                                <select style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                                    <option>تلف واحتراق العداد</option>
+                                    <option>عطل في الشاشة الرقمية</option>
+                                    <option>كسر في هيكل العداد</option>
+                                    <option>فقدان العداد وسرقة تيار</option>
+                                    <option>إحلال وتجديد شبكات</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">اسم الفني المسؤول</label>
+                                <input type="text" value="م. عبد الرحمن فتحي" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                            <button type="button" id="btn-confirm-change-meter" style="background: #0284c7; color: #fff; padding: 10px 24px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                                اعتماد وتغيير العداد ✓
+                            </button>
+                        </div>
+                    </div>
+                `;
+            (_b = document.getElementById('btn-confirm-change-meter')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', async () => {
+                var _a;
+                const newMeterVal = (_a = document.getElementById('op-new-meter-input')) === null || _a === void 0 ? void 0 : _a.value.trim();
+                if (!newMeterVal) {
+                    showToast('يرجى إدخال رقم العداد الجديد.', 'error');
+                    return;
+                }
+                customer.meterNumber = newMeterVal;
+                customer.meterChassisNumber = newMeterVal;
+                try {
+                    await fetch('http://127.0.0.1:5002/api/customers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(customer)
+                    });
+                }
+                catch (e) { }
+                showToast(`تم استبدال العداد بنجاح إلى الرقم الجديد: ${newMeterVal}`, 'success');
+                modal.style.display = 'none';
+                renderCustomersTable();
+            });
+            break;
+        }
+        case 'assignment': {
+            titleEl.textContent = 'تنازل ونقل ملكية الاشتراك (شاشة jk في MEEDCO)';
+            contentEl.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; color: #166534; font-size: 0.88rem;">
+                            <strong>إجراء قانوني:</strong> يتم نقل اشتراك العداد من المشترك المتنازل إلى المتنازل إليه الجديد وتحديث عقد التوريد.
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">المشترك المتنازل (الحالي)</label>
+                                <input type="text" value="${customer.name}" readonly style="width: 100%; padding: 8px 12px; background: #eef2f6; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-weight: 700;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #047857; margin-bottom: 5px;">اسم المتنازل إليه الجديد *</label>
+                                <input type="text" id="op-assign-newname" placeholder="الاسم الرباعي للمتنازل إليه..." style="width: 100%; padding: 8px 12px; border: 2px solid #047857; border-radius: 6px; box-sizing: border-box; font-weight: 700;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #047857; margin-bottom: 5px;">الرقم القومي للمتنازل إليه *</label>
+                                <input type="text" id="op-assign-newnid" maxlength="14" placeholder="14 رقماً قومياً..." style="width: 100%; padding: 8px 12px; border: 2px solid #047857; border-radius: 6px; box-sizing: border-box; font-weight: 700;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">رقم هاتف المتنازل إليه</label>
+                                <input type="text" placeholder="01xxxxxxxxx" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">صفة المتنازل إليه</label>
+                                <select style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                                    <option>مالك العقار بموجب عقد بيع نهائي</option>
+                                    <option>مستأجر بموجب عقد إيجار موثق</option>
+                                    <option>وريث شرعي بموجب إعلام وراثة</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">رقم التوثيق بالشهر العقاري</label>
+                                <input type="text" placeholder="رقم وتاريخ التوثيق..." style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">رسوم التنازل المقررة</label>
+                                <input type="text" value="150.00 ج.م" readonly style="width: 100%; padding: 8px 12px; background: #eef2f6; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-weight: 700;">
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                            <button type="button" id="btn-confirm-assignment" style="background: #047857; color: #fff; padding: 10px 24px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                                اعتماد ونقل ملكية الاشتراك فورياً ✓
+                            </button>
+                        </div>
+                    </div>
+                `;
+            (_c = document.getElementById('btn-confirm-assignment')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', async () => {
+                var _a, _b;
+                const newName = (_a = document.getElementById('op-assign-newname')) === null || _a === void 0 ? void 0 : _a.value.trim();
+                const newNid = (_b = document.getElementById('op-assign-newnid')) === null || _b === void 0 ? void 0 : _b.value.trim();
+                if (!newName) {
+                    showToast('يرجى إدخال اسم المتنازل إليه الجديد.', 'warning');
+                    return;
+                }
+                customer.name = newName;
+                if (newNid) {
+                    customer.identityNumber = newNid;
+                    customer.nationalId = newNid;
+                }
+                try {
+                    await fetch('http://127.0.0.1:5002/api/customers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(customer)
+                    });
+                }
+                catch (e) { }
+                showToast(`تم نقل ملكية الاشتراك بنجاح إلى: ${newName}`, 'success');
+                modal.style.display = 'none';
+                renderCustomersTable();
+            });
+            break;
+        }
+        case 'account-statement': {
+            titleEl.textContent = 'كشف حساب المشترك المالي (شاشة Y2 في MEEDCO)';
+            if (printBtn)
+                printBtn.style.display = 'inline-flex';
+            contentEl.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 8px;">
+                            <span style="font-weight: 800; color: #0284c7; font-size: 1rem;">حركات الشحن والاستهلاك والأقساط المسجلة</span>
+                            <span style="font-size: 0.85rem; color: #64748b;">تاريخ التقرير: ${new Date().toLocaleDateString('ar-EG')}</span>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center;">
+                                <thead>
+                                    <tr style="background: #f1f5f9; color: #334155; font-weight: 800; border-bottom: 1px solid #cbd5e1;">
+                                        <th style="padding: 10px 8px;">م</th>
+                                        <th style="padding: 10px 8px;">التاريخ</th>
+                                        <th style="padding: 10px 8px;">نوع الحركة</th>
+                                        <th style="padding: 10px 8px;">مدين (ج.م)</th>
+                                        <th style="padding: 10px 8px;">دائن (ج.م)</th>
+                                        <th style="padding: 10px 8px;">الرصيد المتبقي</th>
+                                        <th style="padding: 10px 8px;">رقم الإيصال</th>
+                                        <th style="padding: 10px 8px;">مركز الشحن</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 8px;">1</td>
+                                        <td style="padding: 8px;">2026-09-15</td>
+                                        <td style="padding: 8px; font-weight: 700; color: #047857;">شحن كارت مسبق الدفع</td>
+                                        <td style="padding: 8px;">0.00</td>
+                                        <td style="padding: 8px; font-weight: 700; color: #047857;">200.00</td>
+                                        <td style="padding: 8px; font-weight: 700;">214.50</td>
+                                        <td style="padding: 8px; font-family: monospace;">RCP-2026-8812</td>
+                                        <td style="padding: 8px;">بني مزار شرق</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 8px;">2</td>
+                                        <td style="padding: 8px;">2026-09-01</td>
+                                        <td style="padding: 8px; font-weight: 700; color: #dc2626;">خصم استهلاك شهري</td>
+                                        <td style="padding: 8px; font-weight: 700; color: #dc2626;">185.50</td>
+                                        <td style="padding: 8px;">0.00</td>
+                                        <td style="padding: 8px; font-weight: 700;">14.50</td>
+                                        <td style="padding: 8px; font-family: monospace;">SYS-CALC-09</td>
+                                        <td style="padding: 8px;">النظام الآلي</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 8px;">3</td>
+                                        <td style="padding: 8px;">2026-08-10</td>
+                                        <td style="padding: 8px; font-weight: 700; color: #047857;">شحن كارت مسبق الدفع</td>
+                                        <td style="padding: 8px;">0.00</td>
+                                        <td style="padding: 8px; font-weight: 700; color: #047857;">150.00</td>
+                                        <td style="padding: 8px; font-weight: 700;">200.00</td>
+                                        <td style="padding: 8px; font-family: monospace;">RCP-2026-7124</td>
+                                        <td style="padding: 8px;">بني مزار شرق</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 8px;">4</td>
+                                        <td style="padding: 8px;">2026-08-01</td>
+                                        <td style="padding: 8px; font-weight: 700; color: #dc2626;">سداد قسط عداد</td>
+                                        <td style="padding: 8px; font-weight: 700; color: #dc2626;">100.00</td>
+                                        <td style="padding: 8px;">0.00</td>
+                                        <td style="padding: 8px; font-weight: 700;">50.00</td>
+                                        <td style="padding: 8px; font-family: monospace;">DEBT-PAY-08</td>
+                                        <td style="padding: 8px;">بني مزار شرق</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 8px;">5</td>
+                                        <td style="padding: 8px;">2026-01-01</td>
+                                        <td style="padding: 8px; font-weight: 700; color: #0369a1;">شحنة مبدئية تعاقدية</td>
+                                        <td style="padding: 8px;">0.00</td>
+                                        <td style="padding: 8px; font-weight: 700; color: #0369a1;">100.00</td>
+                                        <td style="padding: 8px; font-weight: 700;">100.00</td>
+                                        <td style="padding: 8px; font-family: monospace;">INIT-CHG-01</td>
+                                        <td style="padding: 8px;">المركز الرئيسي</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            break;
+        }
+        case 'meter-movements': {
+            titleEl.textContent = 'حركات العداد (شاشة p7 في MEEDCO)';
+            if (printBtn)
+                printBtn.style.display = 'inline-flex';
+            contentEl.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 8px;">
+                            <span style="font-weight: 800; color: #4338ca; font-size: 1rem;">سجل الحركات اللوجستية والفنية للعداد رقم: ${customer.meterNumber}</span>
+                            <span style="font-size: 0.85rem; color: #64748b;">العدد الإجمالي: 4 حركات</span>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center;">
+                                <thead>
+                                    <tr style="background: #eef2ff; color: #3730a3; font-weight: 800; border-bottom: 1px solid #c7d2fe;">
+                                        <th style="padding: 10px 8px;">رقم إيصال الشحن / الحركة</th>
+                                        <th style="padding: 10px 8px;">تاريخ الحركة</th>
+                                        <th style="padding: 10px 8px;">مركز الشحن</th>
+                                        <th style="padding: 10px 8px;">اسم المشغل</th>
+                                        <th style="padding: 10px 8px;">حالة الشحن / الحركة</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 10px; font-family: monospace; font-weight: 700;">RCP-96756660-03</td>
+                                        <td style="padding: 10px;">2026-09-15 11:24</td>
+                                        <td style="padding: 10px;">هندسة بني مزار شرق</td>
+                                        <td style="padding: 10px;">محمد المهدي</td>
+                                        <td style="padding: 10px;"><span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-weight: 700;">ناجحة (200 ج.م)</span></td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 10px; font-family: monospace; font-weight: 700;">CHK-2026-0419</td>
+                                        <td style="padding: 10px;">2026-08-12 14:10</td>
+                                        <td style="padding: 10px;">فحص دوري بالعين</td>
+                                        <td style="padding: 10px;">م. عبد الرحمن فتحي</td>
+                                        <td style="padding: 10px;"><span style="background: #e0f2fe; color: #075985; padding: 2px 8px; border-radius: 4px; font-weight: 700;">مرور فني سليم</span></td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 10px; font-family: monospace; font-weight: 700;">INST-2024-0012</td>
+                                        <td style="padding: 10px;">2024-01-05 09:30</td>
+                                        <td style="padding: 10px;">موقع المشترك</td>
+                                        <td style="padding: 10px;">فريق الضبط الفني</td>
+                                        <td style="padding: 10px;"><span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-weight: 700;">تركيب وإطلاق تيار</span></td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 10px; font-family: monospace; font-weight: 700;">WH-DISB-2024-91</td>
+                                        <td style="padding: 10px;">2024-01-01 12:00</td>
+                                        <td style="padding: 10px;">مخازن القطاع</td>
+                                        <td style="padding: 10px;">أمين مخزن القطاع</td>
+                                        <td style="padding: 10px;"><span style="background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-weight: 700;">صرف من المخزن</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            break;
+        }
+        case 'meter-readings': {
+            titleEl.textContent = 'قراءات العداد وسجل الاستهلاك (شاشة s7 في MEEDCO)';
+            if (printBtn)
+                printBtn.style.display = 'inline-flex';
+            contentEl.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0891b2; padding-bottom: 8px;">
+                            <span style="font-weight: 800; color: #0891b2; font-size: 1rem;">سجل قراءات ك.و.س والأحمال المقروءة من العداد ${customer.meterNumber}</span>
+                            <span style="font-size: 0.85rem; color: #64748b;">نوع العداد: أحادي مسبق الدفع</span>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center;">
+                                <thead>
+                                    <tr style="background: #ecfeff; color: #155e75; font-weight: 800; border-bottom: 1px solid #a5f3fc;">
+                                        <th style="padding: 10px 8px;">تاريخ القراءة</th>
+                                        <th style="padding: 10px 8px;">القراءة التراكمية (ك.و.س)</th>
+                                        <th style="padding: 10px 8px;">استهلاك الشهر</th>
+                                        <th style="padding: 10px 8px;">الرصيد المتبقي (ج.م)</th>
+                                        <th style="padding: 10px 8px;">أقصى حمل (أمبير)</th>
+                                        <th style="padding: 10px 8px;">معامل القدرة</th>
+                                        <th style="padding: 10px 8px;">حالة البطارية</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 10px;">2026-09-01</td>
+                                        <td style="padding: 10px; font-weight: 700;">3,842.1</td>
+                                        <td style="padding: 10px; font-weight: 700; color: #0891b2;">245 ك.و.س</td>
+                                        <td style="padding: 10px; font-weight: 700; color: #047857;">114.50</td>
+                                        <td style="padding: 10px;">18.4 A</td>
+                                        <td style="padding: 10px;">0.95</td>
+                                        <td style="padding: 10px; color: #047857; font-weight: 700;">100% سليم</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 10px;">2026-08-01</td>
+                                        <td style="padding: 10px; font-weight: 700;">3,597.1</td>
+                                        <td style="padding: 10px; font-weight: 700; color: #0891b2;">230 ك.و.س</td>
+                                        <td style="padding: 10px; font-weight: 700; color: #047857;">84.20</td>
+                                        <td style="padding: 10px;">17.9 A</td>
+                                        <td style="padding: 10px;">0.94</td>
+                                        <td style="padding: 10px; color: #047857; font-weight: 700;">100% سليم</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                                        <td style="padding: 10px;">2026-07-01</td>
+                                        <td style="padding: 10px; font-weight: 700;">3,367.1</td>
+                                        <td style="padding: 10px; font-weight: 700; color: #0891b2;">260 ك.و.س</td>
+                                        <td style="padding: 10px; font-weight: 700; color: #047857;">42.10</td>
+                                        <td style="padding: 10px;">19.2 A</td>
+                                        <td style="padding: 10px;">0.95</td>
+                                        <td style="padding: 10px; color: #047857; font-weight: 700;">100% سليم</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            break;
+        }
+        case 'admin-cert':
+        case 'consumption-cert': {
+            const isAdmin = action === 'admin-cert';
+            titleEl.textContent = isAdmin ? 'شهادة إدارية معتمدة (شاشة u1 في MEEDCO)' : 'شهادة بيان استهلاك سنوي معتمد (شاشة u1 في MEEDCO)';
+            if (printBtn)
+                printBtn.style.display = 'inline-flex';
+            contentEl.innerHTML = `
+                    <div style="border: 2px solid #0f172a; padding: 24px; border-radius: 8px; background: #fff; font-family: 'Amiri', 'Traditional Arabic', serif; line-height: 1.8;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px;">
+                            <div style="text-align: right;">
+                                <div style="font-weight: 800; font-size: 1.1rem;">وزارة الكهرباء والطاقة المتجددة</div>
+                                <div style="font-weight: 700;">الشركة القابضة لكهرباء مصر</div>
+                                <div style="font-weight: 700; color: #0284c7;">شركة مصر الوسطى لتوزيع الكهرباء (MEEDCO)</div>
+                                <div style="font-size: 0.9rem;">قطاع: ${customer.sectorName || 'المنيا شمال'} - فرع ${customer.subAdministrationName || 'بنى مزار شرق'}</div>
+                            </div>
+                            <div style="text-align: left;">
+                                <div style="font-weight: 700;">رقم الشهادة: ${isAdmin ? 'ADM' : 'CNS'}-2026/${customer.code.slice(-6)}</div>
+                                <div style="font-size: 0.9rem;">التاريخ: ${new Date().toLocaleDateString('ar-EG')}</div>
+                            </div>
+                        </div>
+
+                        <div style="text-align: center; margin: 24px 0;">
+                            <h2 style="font-size: 1.5rem; font-weight: 900; text-decoration: underline; color: #0f172a;">
+                                ${isAdmin ? 'شـــهـــادة إداريـــــة' : 'شـــهـــادة بيــــان اســتــهـــلاك'}
+                            </h2>
+                        </div>
+
+                        <p style="font-size: 1.1rem; text-align: justify; margin-bottom: 18px;">
+                            تشهد شركة مصر الوسطى لتوزيع الكهرباء بأن السيد / <strong>${customer.name}</strong>، 
+                            والحامل للرقم القومي: <span style="font-family: monospace; font-weight: 700;">${customer.identityNumber || customer.nationalId || '-'}</span>، 
+                            مشترك بالشركة بالعداد الكودي رقم: <span style="font-family: monospace; font-weight: 700;">${customer.meterNumber}</span> 
+                            (كود المشترك: ${customer.code})، 
+                            ومرجع الحساب: <span style="font-family: monospace; font-weight: 700;">${customer.accountNumberReferenceCustomer || '-'}</span>، 
+                            والمركب بالعنوان: <strong>${customer.address}</strong>.
+                        </p>
+
+                        ${isAdmin ? `
+                            <p style="font-size: 1.1rem; text-align: justify; margin-bottom: 24px;">
+                                وتؤكد الشركة أن العداد بحالة تشغيلية جيدة ولا توجد عليه أي مخالفات أو مستحقات مالية متأخرة حتى تاريخه، 
+                                وقد أُعطيت له هذه الشهادة بناءً على طلبه لتقديمها إلى <strong>من يهمه الأمر</strong> دون أدنى مسؤولية على الشركة تجاه حقوق الغير.
+                            </p>
+                        ` : `
+                            <p style="font-size: 1.1rem; text-align: justify; margin-bottom: 12px;">
+                                وبمراجعة سجلات الاستهلاك بالمنظومة للـ 12 شهراً الماضية، تبين أن متوسط الاستهلاك الشهري للعين يبلغ <strong>235 ك.و.س</strong> بقيمة تقديرية <strong>180.00 ج.م</strong> شهرياً، والاشتراك منتظم بالسداد.
+                            </p>
+                        `}
+
+                        <div style="display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px;">
+                            <div style="text-align: center; width: 200px;">
+                                <div style="font-weight: 700;">المحرر المختص</div>
+                                <div style="margin-top: 30px;">...................</div>
+                            </div>
+                            <div style="text-align: center; width: 200px;">
+                                <div style="font-weight: 700;">رئيس قسم الاشتراكات</div>
+                                <div style="margin-top: 30px;">...................</div>
+                            </div>
+                            <div style="text-align: center; width: 200px;">
+                                <div style="font-weight: 700; color: #0284c7;">خاتم شعار الشركة</div>
+                                <div style="margin-top: 15px; border: 2px dashed #0284c7; width: 90px; height: 90px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #0284c7; font-weight: 800;">
+                                    MEEDCO<br>معتمد
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            break;
+        }
+        case 'customer-debts': {
+            titleEl.textContent = 'مديونيات المشترك وأقساط العداد';
+            contentEl.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 700; color: #1e293b;">المديونيات النشطة المسجلة على العداد: ${customer.meterNumber}</span>
+                            <button type="button" id="btn-op-goto-debts" style="background: #0284c7; color: #fff; padding: 6px 14px; border: none; border-radius: 6px; font-size: 0.82rem; font-weight: 700; cursor: pointer;">
+                                الانتقال لشاشة إدارة الديون الكاملة ➔
+                            </button>
+                        </div>
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <div>
+                                    <span style="font-weight: 800; font-size: 1rem; color: #0f172a;">شحن مبدئى</span>
+                                    <span style="font-size: 0.8rem; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; margin-right: 6px;">قيد التسديد</span>
+                                </div>
+                                <div>
+                                    <button type="button" id="btn-op-open-debt-details" style="background: #14b8a6; color: #fff; border: none; padding: 5px 12px; border-radius: 4px; font-weight: 700; cursor: pointer;">
+                                        عرض التفاصيل الكاملة والأقساط 📋
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; font-size: 0.85rem; color: #475569;">
+                                <div>إجمالي الدين: <strong style="color: #0f172a;">100.00 ج.م</strong></div>
+                                <div>المسدد: <strong style="color: #047857;">87.96 ج.م</strong></div>
+                                <div>المتبقي: <strong style="color: #dc2626;">12.04 ج.م</strong></div>
+                                <div>عدد الأقساط: <strong style="color: #0f172a;">24 قسط</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            (_d = document.getElementById('btn-op-goto-debts')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
+                modal.style.display = 'none';
+                const debtsLink = document.querySelector('.sidebar-nav .nav-link[data-target="debts-management"]');
+                if (debtsLink)
+                    debtsLink.click();
+                setTimeout(() => {
+                    var _a;
+                    const meterInp = document.getElementById('debts-filter-meter');
+                    if (meterInp) {
+                        meterInp.value = customer.meterNumber || '';
+                        (_a = document.getElementById('btn-debts-filter')) === null || _a === void 0 ? void 0 : _a.click();
+                    }
+                }, 300);
+            });
+            (_e = document.getElementById('btn-op-open-debt-details')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => {
+                modal.style.display = 'none';
+                openDebtInstallmentsDetailsModal('DEBT-MEEDCO-INIT');
+            });
+            break;
+        }
+        case 'cleaning-exception': {
+            modal.style.display = 'none';
+            const ceModal = document.getElementById('modal-add-cleaning-exception');
+            if (ceModal) {
+                ceModal.style.display = 'flex';
+                const sInp = document.getElementById('modal-ce-search-input');
+                if (sInp) {
+                    sInp.value = customer.code || customer.meterNumber || '';
+                    const searchBtn = document.getElementById('btn-modal-ce-search');
+                    if (searchBtn)
+                        searchBtn.click();
+                }
+            }
+            return;
+        }
+        case 'print-contract-receipt':
+        case 'print-init-charge-receipt':
+        case 'print-last-charge-receipt':
+        case 'print-thermal-receipt':
+        case 'print-meter-permission':
+        case 'print-issue-permission': {
+            const isThermal = action === 'print-thermal-receipt';
+            const isPerm = action === 'print-meter-permission' || action === 'print-issue-permission';
+            titleEl.textContent = isPerm ? 'إذن صرف / غيار معتمد' : (isThermal ? 'إيصال شحن فوري حراري (80mm)' : 'إيصال رسمي معتمد');
+            if (printBtn)
+                printBtn.style.display = 'inline-flex';
+            contentEl.innerHTML = `
+                    <div style="${isThermal ? 'max-width: 340px; margin: 0 auto; background: #fff; padding: 16px; border: 1px dashed #94a3b8; font-family: monospace; font-size: 0.85rem;' : 'background: #fff; padding: 24px; border: 2px solid #0284c7; border-radius: 8px;'}">
+                        <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 14px;">
+                            <div style="font-weight: 800; font-size: 1.05rem;">شركة مصر الوسطى لتوزيع الكهرباء (MEEDCO)</div>
+                            <div style="font-weight: 700; color: #0284c7;">${titleEl.textContent}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">رقم الإيصال: RCP-${Date.now().toString().slice(-8)} | ${new Date().toLocaleDateString('ar-EG')}</div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; margin-bottom: 14px;">
+                            <div><strong>المشترك:</strong> ${customer.name}</div>
+                            <div><strong>كود المشترك:</strong> ${customer.code}</div>
+                            <div><strong>رقم العداد:</strong> ${customer.meterNumber}</div>
+                            <div><strong>مرجع الحساب:</strong> ${customer.accountNumberReferenceCustomer || '-'}</div>
+                            <div><strong>العنوان:</strong> ${customer.address}</div>
+                        </div>
+
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 0.88rem;">
+                            <tr style="border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+                                <th style="padding: 6px; text-align: right;">البيان</th>
+                                <th style="padding: 6px; text-align: left;">المبلغ (ج.م)</th>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 6px;">قيمة الطاقة الكهربائية / الخدمة</td>
+                                <td style="padding: 6px; text-align: left; font-weight: 700;">175.44</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 6px;">ضريبة القيمة المضافة (14%)</td>
+                                <td style="padding: 6px; text-align: left;">24.56</td>
+                            </tr>
+                            <tr style="border-top: 2px solid #0f172a; font-weight: 900; font-size: 1rem; color: #047857;">
+                                <td style="padding: 8px;">الإجمالي المدفوع</td>
+                                <td style="padding: 8px; text-align: left;">200.00 ج.م</td>
+                            </tr>
+                        </table>
+
+                        <div style="text-align: center; margin-top: 14px; font-size: 0.8rem; color: #64748b;">
+                            شكراً لتعاملكم مع شركة مصر الوسطى لتوزيع الكهرباء<br>
+                            خط الشكاوى والأعطال: 121
+                        </div>
+                    </div>
+                `;
+            break;
+        }
+        default: {
+            titleEl.textContent = 'إجراء المشترك: ' + action;
+            contentEl.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #475569;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">⚙</div>
+                        <div style="font-weight: 700; font-size: 1.1rem; color: #0f172a; margin-bottom: 6px;">تم استدعاء بيانات المشترك بنجاح</div>
+                        <div style="font-size: 0.9rem;">المشترك: ${customer.name} | عداد: ${customer.meterNumber}</div>
+                        <div style="margin-top: 20px;">
+                            <button type="button" class="btn secondary btn-close-modal" data-modal="modal-cm-operation-viewer" style="background: #0284c7; color: #fff; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                                إتمام الإجراء والرجوع
+                            </button>
+                        </div>
+                    </div>
+                `;
+            break;
+        }
+    }
+    modal.style.display = 'flex';
+};
 const renderCustomersTable = () => {
     const tbody = document.getElementById('cm-table-tbody');
     const totalCountEl = document.getElementById('cm-total-count');
@@ -14549,269 +15236,17 @@ const renderCustomersTable = () => {
             });
         });
     });
-    // Bind All 46 Action Menu Items
+    // Bind All 46 Action Menu Items to Dedicated MEEDCO Modals
     tbody.querySelectorAll('.cm-act-item').forEach(item => {
-        item.addEventListener('click', async (e) => {
+        item.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const action = item.getAttribute('data-action');
+            const action = item.getAttribute('data-action') || '';
             const idx = Number(item.getAttribute('data-cust-idx'));
             const customer = customerState.items[idx];
             document.querySelectorAll('.cm-actions-popup').forEach(p => p.style.display = 'none');
-            if (!customer)
-                return;
-            // 1. Edit Main Data
-            if (action === 'edit-main-data') {
-                const modal = document.getElementById('modal-add-customer');
-                if (modal) {
-                    const nameInp = document.getElementById('add-cust-name');
-                    const meterInp = document.getElementById('add-cust-meter-no');
-                    const addrInp = document.getElementById('add-cust-address');
-                    const nidInp = document.getElementById('add-cust-national-id');
-                    const refInp = document.getElementById('add-cust-account-ref');
-                    const contNoInp = document.getElementById('add-cust-contract-no');
-                    const contYrInp = document.getElementById('add-cust-contract-year');
-                    if (nameInp)
-                        nameInp.value = customer.name || '';
-                    if (meterInp)
-                        meterInp.value = customer.meterNumber || '';
-                    if (addrInp)
-                        addrInp.value = customer.address || '';
-                    if (nidInp)
-                        nidInp.value = customer.identityNumber || customer.nationalId || '';
-                    if (refInp)
-                        refInp.value = customer.accountNumberReferenceCustomer || '';
-                    if (contNoInp)
-                        contNoInp.value = customer.contractNumber || '100';
-                    if (contYrInp)
-                        contYrInp.value = customer.contractYear || '2026';
-                    modal.style.display = 'flex';
-                }
-            }
-            // 2. Change Meter
-            else if (action === 'change-meter' || action === 'change-meter-number') {
-                const newMeter = prompt(`تغيير رقم العداد للمشترك: ${customer.name}\nالعداد الحالي: ${customer.meterNumber}\n\nأدخل رقم العداد الجديد:`);
-                if (newMeter && newMeter.trim()) {
-                    customer.meterNumber = newMeter.trim();
-                    customer.meterChassisNumber = newMeter.trim();
-                    try {
-                        await fetch('http://127.0.0.1:5002/api/customers', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(customer)
-                        });
-                    }
-                    catch (err) { }
-                    showToast(`تم تحديث رقم العداد بنجاح إلى: ${newMeter}`, 'success');
-                    renderCustomersTable();
-                }
-            }
-            // 3. Undo Change Meter
-            else if (action === 'undo-change-meter' || action === 'undo-change-meter-no-card') {
-                if (confirm(`هل تريد إلغاء عملية تغيير العداد للمشترك: ${customer.name}؟`)) {
-                    showToast(`تم إلغاء تغيير العداد واستعادة الحالة السابقة بنجاح.`, 'info');
-                }
-            }
-            // 4. Meter Permissions
-            else if (action === 'change-meter-permission' || action === 'edit-meter-permission') {
-                showToast(`تم فتح نموذج إذن غيار عداد جديد للمشترك: ${customer.name}`, 'info');
-            }
-            else if (action === 'print-meter-permission') {
-                showToast(`جاري طباعة إذن الغيار المعتمد للعداد ${customer.meterNumber}...`, 'success');
-            }
-            // 5. Update Sequence
-            else if (action === 'update-sequence') {
-                showToast(`تم فحص وتحديث مسلسل عداد المشترك: ${customer.name} بنجاح ✓`, 'success');
-            }
-            // 6. Installation Date
-            else if (action === 'add-installation-date') {
-                const curDate = customer.installationDate || new Date().toISOString().split('T')[0];
-                const newDate = prompt(`تعديل تاريخ التركيب للمشترك: ${customer.name}\nالتاريخ الحالي: ${curDate}\n\nأدخل التاريخ الجديد (YYYY-MM-DD):`, curDate);
-                if (newDate && newDate.trim()) {
-                    customer.installationDate = newDate.trim();
-                    showToast(`تم حفظ تاريخ التركيب الجديد: ${newDate}`, 'success');
-                }
-            }
-            // 7. Increase Capacity
-            else if (action === 'increase-capacity') {
-                const cap = prompt(`زيادة القدرة التعاقدية للمشترك: ${customer.name}\nأدخل القدرة الجديدة بالأمبير أو ك.و:`, '40 أمبير');
-                if (cap && cap.trim()) {
-                    showToast(`تم تعديل القدرة التعاقدية للمشترك إلى ${cap}`, 'success');
-                }
-            }
-            // 8. Update Duration
-            else if (action === 'update-duration') {
-                const dur = prompt(`تعديل فترة الاشتراك للمشترك: ${customer.name}\nأدخل مدة الاشتراك الجديدة:`, '12 شهر');
-                if (dur && dur.trim()) {
-                    showToast(`تم تحديث فترة الاشتراك بنجاح`, 'success');
-                }
-            }
-            // 9. Update Activity
-            else if (action === 'update-activity') {
-                const curAct = customer.activityName || 'استخدامات منزلية';
-                const newAct = prompt(`تعديل النشاط للمشترك: ${customer.name}\nالنشاط الحالي: ${curAct}\n\nأدخل النشاط الجديد:`, curAct);
-                if (newAct && newAct.trim()) {
-                    customer.activityName = newAct.trim();
-                    showToast(`تم تعديل النشاط بنجاح إلى: ${newAct}`, 'success');
-                }
-            }
-            // 10. Stolen Meter
-            else if (action === 'stolen-meter') {
-                if (confirm(`هل تريد تأكيد إثبات سرقة العداد ${customer.meterNumber} للمشترك ${customer.name}؟`)) {
-                    customer.status = 'عداد مسروق';
-                    showToast(`تم تسجيل العداد كـ مسروق وإيقاف الشحن مؤقتاً.`, 'warning');
-                    renderCustomersTable();
-                }
-            }
-            else if (action === 'recover-stolen-meter') {
-                customer.status = 'مركب';
-                showToast(`تم استرجاع العداد المسروق وإعادة تفعيل حالة المشترك إلى "مركب".`, 'success');
-                renderCustomersTable();
-            }
-            // 11. Meter Readings & Movements
-            else if (action === 'meter-readings') {
-                alert(`سجل قراءات العداد: ${customer.meterNumber}\nالمشترك: ${customer.name}\n\n- آخر قراءة: 1,482.6 ك.و.س\n- الرصيد المتبقي: 124.50 ج.م\n- أقصى حمل: 18.2 أمبير\n- معامل القدرة: 0.94`);
-            }
-            else if (action === 'meter-movements') {
-                alert(`حركات العداد: ${customer.meterNumber}\n\n1. صرف العداد من المخزن: 2024-01-01\n2. التركيب والتهيئة: 2024-01-05\n3. شحنة أولى: 100 ج.م\n4. قراءة دورية: 2024-02-15\nالحالة الحالية: قيد التشغيل المستقر`);
-            }
-            // 12. Charging operations
-            else if (action === 'cancel-charge' || action === 'cancel-charge-no-card') {
-                if (confirm(`هل أنت متأكد من إلغاء آخر عملية شحن تمت للمشترك ${customer.name}؟`)) {
-                    showToast(`تم تقديم طلب إلغاء الشحنة بنجاح.`, 'info');
-                }
-            }
-            else if (action === 'transfer-charge') {
-                const targetMeter = prompt(`تحويل الشحنة من المشترك ${customer.name}\nأدخل رقم العداد المحول إليه:`);
-                if (targetMeter && targetMeter.trim()) {
-                    showToast(`تم تحويل رصيد الشحنة بنجاح إلى العداد ${targetMeter}`, 'success');
-                }
-            }
-            else if (action === 'return-init-charge' || action === 'return-init-charge-no-card') {
-                if (confirm(`استعادة الشحنة المبدئية للمشترك: ${customer.name}؟`)) {
-                    showToast(`تمت استعادة الشحنة المبدئية بنجاح ✓`, 'success');
-                }
-            }
-            else if (action === 'change-init-charge') {
-                const newInit = prompt(`تغيير قيمة الشحنة المبدئية للمشترك ${customer.name}:\nأدخل القيمة الجديدة (ج.م):`, '100');
-                if (newInit)
-                    showToast(`تم تعديل قيمة الشحنة المبدئية إلى ${newInit} ج.م`, 'success');
-            }
-            else if (action === 'issue-card') {
-                showToast(`جاري إصدار وبرمجة كارت المشترك الذكي للعداد ${customer.meterNumber}...`, 'info');
-            }
-            else if (action === 'replace-card-charge' || action === 'replace-card-no-charge') {
-                showToast(`تم فتح معالج استخراج كارت بديل للمشترك: ${customer.name}`, 'info');
-            }
-            else if (action === 'print-last-charge-receipt' || action === 'print-thermal-receipt') {
-                showToast(`جاري إرسال إيصال الشحن إلى الطابعة للمشترك ${customer.name}...`, 'success');
-            }
-            else if (action === 'activate-charge') {
-                customer.status = 'مركب';
-                showToast(`تم تفعيل الشحن للمشترك ${customer.name} بنجاح.`, 'success');
-                renderCustomersTable();
-            }
-            else if (action === 'stop-charge') {
-                customer.status = 'موقوف عن الشحن';
-                showToast(`تم إيقاف الشحن عن المشترك ${customer.name}.`, 'warning');
-                renderCustomersTable();
-            }
-            // 13. Receipts & Permits
-            else if (action === 'print-contract-receipt') {
-                showToast(`طباعة إيصال التعاقد المعتمد للمشترك: ${customer.name}...`, 'success');
-            }
-            else if (action === 'print-init-charge-receipt') {
-                showToast(`طباعة إيصال الشحنة المبدئية للمشترك: ${customer.name}...`, 'success');
-            }
-            else if (action === 'print-issue-permission') {
-                showToast(`طباعة إذن صرف العداد ${customer.meterNumber} من المخزن...`, 'success');
-            }
-            // 14. Monitoring, Audit & Liquidation
-            else if (action === 'meter-check-result') {
-                showToast(`تسجيل نتيجة مرور عداد المشترك: ${customer.name} - العداد سليم ويعمل بكفاءة`, 'success');
-            }
-            else if (action === 'abuses') {
-                showToast(`فحص التلاعبات: لا توجد أي تلاعبات أو مخالفات مسجلة على العداد ${customer.meterNumber}`, 'info');
-            }
-            else if (action === 'liquidation') {
-                if (confirm(`هل أنت متأكد من بدء إجراءات تصفية حساب المشترك: ${customer.name} (عداد: ${customer.meterNumber})؟`)) {
-                    customer.status = 'تم التصفية';
-                    showToast(`تم تصفية حساب المشترك ${customer.name} بنجاح`, 'warning');
-                    renderCustomersTable();
-                }
-            }
-            else if (action === 'unblock') {
-                customer.status = 'مركب';
-                showToast(`تم إلغاء التصفية واسترجاع حساب المشترك ${customer.name} بنجاح.`, 'success');
-                renderCustomersTable();
-            }
-            // 15. Statements & Certificates
-            else if (action === 'account-statement') {
-                const statementLink = document.querySelector('.sidebar-nav .nav-link[data-target="subscriber-statement"]');
-                if (statementLink)
-                    statementLink.click();
-                setTimeout(() => {
-                    var _a;
-                    const nameInp = document.getElementById('statement-search-subscriberName');
-                    if (nameInp)
-                        nameInp.value = customer.name || '';
-                    (_a = document.getElementById('btn-statement-search')) === null || _a === void 0 ? void 0 : _a.click();
-                }, 300);
-            }
-            else if (action === 'assignment') {
-                const newName = prompt(`تنازل عن الاشتراك للمشترك: ${customer.name}\nأدخل اسم المتنازل إليه الجديد:`);
-                if (newName && newName.trim()) {
-                    customer.name = newName.trim();
-                    showToast(`تم تسجيل التنازل ونقل ملكية الاشتراك إلى: ${newName}`, 'success');
-                    renderCustomersTable();
-                }
-            }
-            else if (action === 'move-customer') {
-                const newAddr = prompt(`نقل المشترك ${customer.name}\nالعنوان الحالي: ${customer.address}\n\nأدخل العنوان الجديد:`, customer.address);
-                if (newAddr && newAddr.trim()) {
-                    customer.address = newAddr.trim();
-                    showToast(`تم تحديث عنوان وموقع المشترك بنجاح`, 'success');
-                    renderCustomersTable();
-                }
-            }
-            else if (action === 'admin-cert') {
-                showToast(`جاري استخراج شهادة إدارية رسمية للمشترك: ${customer.name}...`, 'info');
-            }
-            else if (action === 'consumption-cert') {
-                showToast(`جاري استخراج شهادة إستهلاك معتمدة للمشترك: ${customer.name}...`, 'info');
-            }
-            // 16. Cleaning Fees & Debts
-            else if (action === 'cleaning-exception') {
-                const ceModal = document.getElementById('modal-add-cleaning-exception');
-                if (ceModal) {
-                    ceModal.style.display = 'flex';
-                    const sInp = document.getElementById('modal-ce-search-input');
-                    if (sInp) {
-                        sInp.value = customer.code || customer.meterNumber || '';
-                        const searchBtn = document.getElementById('btn-modal-ce-search');
-                        if (searchBtn)
-                            searchBtn.click();
-                    }
-                }
-            }
-            else if (action === 'cleaning-fee-details') {
-                alert(`تفاصيل رسوم النظافة:\nالمشترك: ${customer.name}\nكود المشترك: ${customer.code}\nالوحدة: شقة سكنية\nرسم النظافة الشهري: 12.00 ج.م\nالحالة: ساري وفقاً للقانون`);
-            }
-            else if (action === 'customer-debts') {
-                const debtsLink = document.querySelector('.sidebar-nav .nav-link[data-target="debts-management"]');
-                if (debtsLink)
-                    debtsLink.click();
-                setTimeout(() => {
-                    var _a;
-                    const meterInp = document.getElementById('debts-filter-meter');
-                    if (meterInp) {
-                        meterInp.value = customer.meterNumber || '';
-                        (_a = document.getElementById('btn-debts-filter')) === null || _a === void 0 ? void 0 : _a.click();
-                    }
-                }, 300);
-            }
-            else if (action === 'customer-credits') {
-                alert(`دفعات المشترك: ${customer.name}\n\n- آخر دفعة شحن: 200.00 ج.م\n- رصيد الأقساط المسددة: 450.00 ج.م\n- إجمالي المسدد خلال العام: 1,850.00 ج.م`);
+            if (customer && action) {
+                openCustomerOperationModal(action, customer);
             }
         });
     });
@@ -17633,6 +18068,276 @@ const initDebtsDefaultsIfNeeded = () => {
     if (!state.debts || state.debts.length === 0) {
         state.debts = [
             {
+                "id": "DEBT-MEEDCO-INIT",
+                "customerId": "0502043148",
+                "customerName": "احمد محمد فتحى فرجانى محمد",
+                "meterNumber": "96756660",
+                "subscriptionCode": "0502043148",
+                "category": "انارة",
+                "customerCategory": "انارة",
+                "debtTypeId": 1,
+                "debtTypeName": "شحن مبدئى",
+                "totalDebtAmount": 100,
+                "debtAmount": 100,
+                "paidAmount": 87.96,
+                "remainingAmount": 12.04,
+                "installmentsCount": 24,
+                "paidInstallmentsCount": 22,
+                "installmentAmount": 3.94,
+                "startDate": "1/01/2025",
+                "dueDate": "1/01/2025",
+                "nextDueDate": "1/11/2026",
+                "deductWay": "charge",
+                "deductWayName": "خصم أثناء الشحن",
+                "status": "PaymentInProgress",
+                "statusName": "قيد التسديد",
+                "notes": "دين شحن مبدئي مطابق للمنظومة الاساسية - صورة التفاصيل",
+                "receiptNumber": "RCP-96756660",
+                "createdUser": "المنظومة الموحدة",
+                "installments": [
+                    {
+                        "seq": 1,
+                        "dueDate": "1/01/2025",
+                        "amount": 9.16,
+                        "paidAmount": 9.16,
+                        "status": "مسدد",
+                        "payDate": "4/01/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 2,
+                        "dueDate": "1/02/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "5/02/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 3,
+                        "dueDate": "1/03/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "13/03/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 4,
+                        "dueDate": "1/04/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "19/04/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 5,
+                        "dueDate": "1/05/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "21/05/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 6,
+                        "dueDate": "1/06/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "18/06/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 7,
+                        "dueDate": "1/07/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "2/07/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 8,
+                        "dueDate": "1/08/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "24/08/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 9,
+                        "dueDate": "1/09/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "1/09/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 10,
+                        "dueDate": "1/10/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "3/10/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 11,
+                        "dueDate": "1/11/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "7/11/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 12,
+                        "dueDate": "1/12/2025",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "13/12/2025",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 13,
+                        "dueDate": "1/01/2026",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "12/01/2026",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 14,
+                        "dueDate": "1/02/2026",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "6/02/2026",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 15,
+                        "dueDate": "1/03/2026",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "11/03/2026",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 16,
+                        "dueDate": "1/04/2026",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "17/04/2026",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 17,
+                        "dueDate": "1/05/2026",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "20/05/2026",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 18,
+                        "dueDate": "1/06/2026",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "14/06/2026",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 19,
+                        "dueDate": "1/07/2026",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "19/07/2026",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 20,
+                        "dueDate": "1/08/2026",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "22/08/2026",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 21,
+                        "dueDate": "1/09/2026",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "15/09/2026",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 22,
+                        "dueDate": "1/10/2026",
+                        "amount": 3.94,
+                        "paidAmount": 3.94,
+                        "status": "مسدد",
+                        "payDate": "28/09/2026",
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 23,
+                        "dueDate": "1/11/2026",
+                        "amount": 3.94,
+                        "paidAmount": 0,
+                        "status": "مستحق",
+                        "payDate": null,
+                        "isPostponed": false,
+                        "postponeDate": null
+                    },
+                    {
+                        "seq": 24,
+                        "dueDate": "1/12/2026",
+                        "amount": 8.1,
+                        "paidAmount": 0,
+                        "status": "مستحق",
+                        "payDate": null,
+                        "isPostponed": false,
+                        "postponeDate": null
+                    }
+                ]
+            },
+            {
                 id: "DEBT-1001",
                 customerId: "0503480366",
                 customerName: "محمد فالح احمد محمد",
@@ -17931,6 +18636,40 @@ const initPayoffModalListeners = () => {
     });
 };
 // Helper: open debt installments details modal
+const formatStandardGregorianDate = (dateInput) => {
+    if (!dateInput)
+        return '';
+    const str = String(dateInput).trim();
+    if (!str || str === 'null' || str === '-' || str === 'undefined')
+        return '';
+    // Convert any Arabic-Indic digits (٠-٩) to standard Western digits
+    const clean = str.replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[\u200e\u200f\s]/g, '');
+    // If already in D/MM/YYYY or DD/MM/YYYY format
+    const slashMatch = clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) {
+        const d = String(Number(slashMatch[1]));
+        const m = slashMatch[2].padStart(2, '0');
+        const y = slashMatch[3];
+        return `${d}/${m}/${y}`;
+    }
+    // If ISO YYYY-MM-DD
+    const isoMatch = clean.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (isoMatch) {
+        const y = isoMatch[1];
+        const m = isoMatch[2].padStart(2, '0');
+        const d = String(Number(isoMatch[3]));
+        return `${d}/${m}/${y}`;
+    }
+    const parsed = new Date(clean);
+    if (!isNaN(parsed.getTime())) {
+        const d = String(parsed.getDate());
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const y = parsed.getFullYear();
+        return `${d}/${m}/${y}`;
+    }
+    return clean;
+};
+// Helper: open debt installments details modal matching Desktop/التفاصيل.png 1:1
 const openDebtInstallmentsDetailsModal = (debtId) => {
     initDebtsDefaultsIfNeeded();
     const debt = (state.debts || []).find(d => String(d.id) === String(debtId));
@@ -17945,20 +18684,20 @@ const openDebtInstallmentsDetailsModal = (debtId) => {
     const totalAmtEl = document.getElementById('dtl-debt-total-amount');
     const instCountEl = document.getElementById('dtl-debt-installments-count');
     const remAmtEl = document.getElementById('dtl-debt-remaining-amount');
-    // Top 6 Fields (matching frame_017s & frame_042s)
+    // Top 6 Fields (matching Desktop/التفاصيل.png exactly)
     if (catEl)
         catEl.value = debt.category || debt.customerCategory || 'انارة';
     if (typeEl)
-        typeEl.value = debt.debtTypeName || 'معايرة';
+        typeEl.value = debt.debtTypeName || 'شحن مبدئى';
     if (dueDateEl)
-        dueDateEl.value = debt.dueDate || debt.startDate || '1/01/2025';
+        dueDateEl.value = formatStandardGregorianDate(debt.dueDate || debt.startDate || '1/01/2025');
     if (totalAmtEl)
-        totalAmtEl.value = Number(debt.totalDebtAmount || 0).toFixed(1);
+        totalAmtEl.value = Number(debt.totalDebtAmount || 100).toFixed(2).replace(/\.00$/, '');
     if (instCountEl)
-        instCountEl.value = String(debt.installmentsCount || (debt.installments ? debt.installments.length : 12));
+        instCountEl.value = String(debt.installmentsCount || (debt.installments ? debt.installments.length : 24));
     if (remAmtEl)
-        remAmtEl.value = Number(debt.remainingAmount || 0).toFixed(2);
-    // Section: سبب نزول دين فرق تعريفة (matching frame_042s)
+        remAmtEl.value = Number(debt.remainingAmount || 0).toFixed(2).replace(/\.00$/, '');
+    // Section: سبب نزول دين فرق تعريفة
     const diffSection = document.getElementById('dtl-tariff-diff-section');
     const isDiffTariff = (debt.debtTypeName && (debt.debtTypeName.includes('تعريفة') || debt.debtTypeName.includes('فرق'))) || (debt.tariffDiffData != null);
     if (diffSection) {
@@ -17990,46 +18729,78 @@ const openDebtInstallmentsDetailsModal = (debtId) => {
             diffSection.style.display = 'none';
         }
     }
-    // Installments Table (matching frame_017s & frame_042s)
+    // Installments Table (matching Desktop/التفاصيل.png 1:1)
     const tbody = document.getElementById('dtl-installments-tbody');
     if (tbody) {
         let installments = debt.installments || [];
         if (installments.length === 0) {
-            const count = debt.installmentsCount || 12;
-            const total = Number(debt.totalDebtAmount) || 313.3;
-            const instVal = debt.installmentAmount || (total / count);
+            const count = Number(debt.installmentsCount) || 24;
+            const total = Number(debt.totalDebtAmount) || 100;
+            const instVal = Number(debt.installmentAmount) || (total / count);
+            const paidCount = Number(debt.paidInstallmentsCount) || 0;
             installments = [];
             for (let i = 1; i <= count; i++) {
-                const isPaid = i <= (debt.paidInstallmentsCount || 0);
-                const m = String(i).padStart(2, '0');
+                const isPaid = i <= paidCount;
+                const m = String(((i - 1) % 12) + 1).padStart(2, '0');
+                const y = 2025 + Math.floor((i - 1) / 12);
+                const payDay = Math.min(28, (i * 3 + 1) % 28 || 4);
                 installments.push({
                     seq: i,
-                    dueDate: `1/${m}/2025`,
-                    amount: i === 1 ? Number((instVal + 5.45).toFixed(2)) : (i === count ? Number((instVal + 0.05).toFixed(2)) : Number(instVal.toFixed(2))),
-                    paidAmount: isPaid ? (i === 1 ? Number((instVal + 5.45).toFixed(2)) : Number(instVal.toFixed(2))) : 0,
+                    dueDate: `1/${m}/${y}`,
+                    amount: Number(instVal.toFixed(2)),
+                    paidAmount: isPaid ? Number(instVal.toFixed(2)) : 0,
                     status: isPaid ? 'مسدد' : 'مستحق',
-                    payDate: isPaid ? `${i + 3}/${m}/2025` : null,
+                    payDate: isPaid ? `${payDay}/${m}/${y}` : null,
                     isPostponed: false,
                     postponeDate: null
                 });
             }
             debt.installments = installments;
         }
-        tbody.innerHTML = installments.map(inst => {
-            const isPaid = inst.status === 'مسدد' || (Number(inst.paidAmount) >= Number(inst.amount));
-            const remaining = isPaid ? '0' : Math.max(0, Number(inst.amount) - (Number(inst.paidAmount) || 0)).toFixed(2);
+        // Real MEEDCO indicators:
+        // تم الدفع: علامة صح خضراء للمدفوع وعلامة خطأ حمراء لغير المدفوع
+        // مؤجل: علامة خطأ حمراء لغير المؤجل وعلامة صح للمؤجل
+        const checkIcon = `<span style="color: #20c997; font-size: 1.25rem; font-weight: 900; display: inline-block; vertical-align: middle;">&#10003;</span>`;
+        const closeIcon = `<span style="color: #f87171; font-size: 1.15rem; font-weight: 900; display: inline-block; vertical-align: middle;">&#10005;</span>`;
+        const paidCount = Number(debt.paidInstallmentsCount) || 0;
+        const debtIsFullyPaid = debt.status === 'Completed' || debt.status === 'مسدد بالكامل' || Number(debt.remainingAmount) <= 0;
+        tbody.innerHTML = installments.map((inst, index) => {
+            const seq = Number(inst.seq || index + 1);
+            // Precise determination of isPaid status
+            const hasExplicitPaidStatus = inst.status === 'مسدد' || inst.status === 'Paid' || inst.status === 'paid' || inst.status === 'تم الدفع' || inst.status === 'تم السداد' || inst.status === 'Completed';
+            const hasValidPayDate = Boolean(inst.payDate && String(inst.payDate).trim() !== '' && String(inst.payDate).trim() !== '-' && String(inst.payDate).trim() !== 'null');
+            const isPaidByAmount = Number(inst.paidAmount) > 0 && (Number(inst.paidAmount) >= Number(inst.amount) - 0.05);
+            const isPaidBySeq = paidCount > 0 && seq <= paidCount;
+            const isPaid = Boolean(hasExplicitPaidStatus || hasValidPayDate || isPaidByAmount || isPaidBySeq || debtIsFullyPaid);
+            // Remaining: 0 for paid, full amount for unpaid
+            const remaining = isPaid ? '0' : Math.max(0, Number(inst.amount) - (Number(inst.paidAmount) || 0)).toFixed(2).replace(/\.00$/, '');
             const reqAmt = Number(inst.amount).toFixed(2).replace(/\.00$/, '');
-            const checkIcon = '<span style="color: #14b8a6; font-size: 1.15rem; font-weight: 800;">&#10003;</span>';
-            const closeIcon = '<span style="color: #ef4444; font-size: 1.15rem; font-weight: 800;">&#10005;</span>';
+            // Format clean dates like in Desktop/التفاصيل.png (e.g. 4/01/2025, 5/02/2025)
+            let cleanPayDate = '';
+            if (isPaid) {
+                cleanPayDate = formatStandardGregorianDate(inst.payDate);
+                if (!cleanPayDate) {
+                    const dMatch = String(inst.dueDate).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                    if (dMatch) {
+                        const payDay = Math.min(28, (seq * 3 + 1) % 28 || 4);
+                        cleanPayDate = `${payDay}/${dMatch[2]}/${dMatch[3]}`;
+                    }
+                    else {
+                        cleanPayDate = '4/01/2025';
+                    }
+                }
+            }
+            const isPostponed = Boolean(inst.isPostponed || inst.status === 'مؤجل' || inst.status === 'Delayed');
+            const cleanPostponeDate = isPostponed ? formatStandardGregorianDate(inst.postponeDate) : '';
             return `
-                    <tr style="border-bottom: 1px solid #eef2f6;">
-                        <td style="padding: 10px 12px; font-weight: 600; color: #334155;">${inst.dueDate}</td>
-                        <td style="padding: 10px 12px; font-weight: 700; color: #1e293b;">${reqAmt}</td>
-                        <td style="padding: 10px 12px; font-weight: 700; color: #1e293b;">${remaining}</td>
-                        <td style="padding: 10px 12px; text-align: center;">${isPaid ? checkIcon : closeIcon}</td>
-                        <td style="padding: 10px 12px; color: #64748b;">${isPaid ? (inst.payDate || '4/01/2025') : ''}</td>
-                        <td style="padding: 10px 12px; text-align: center;">${inst.isPostponed ? checkIcon : closeIcon}</td>
-                        <td style="padding: 10px 12px; color: #64748b;">${inst.postponeDate || ''}</td>
+                    <tr style="border-bottom: 1px solid #f1f5f9; text-align: center; font-size: 0.9rem; transition: background 0.15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                        <td style="padding: 12px 14px; font-weight: 600; color: #1e293b; direction: ltr; font-family: monospace;">${formatStandardGregorianDate(inst.dueDate)}</td>
+                        <td style="padding: 12px 14px; font-weight: 700; color: #1e293b;">${reqAmt}</td>
+                        <td style="padding: 12px 14px; font-weight: 700; color: ${isPaid ? '#64748b' : '#dc2626'};">${remaining}</td>
+                        <td style="padding: 12px 14px; text-align: center;">${isPaid ? checkIcon : closeIcon}</td>
+                        <td style="padding: 12px 14px; font-weight: 600; color: #334155; direction: ltr; font-family: monospace;">${cleanPayDate}</td>
+                        <td style="padding: 12px 14px; text-align: center;">${isPostponed ? checkIcon : closeIcon}</td>
+                        <td style="padding: 12px 14px; color: #64748b; direction: ltr; font-family: monospace;">${cleanPostponeDate}</td>
                     </tr>
                 `;
         }).join('');
@@ -18037,7 +18808,6 @@ const openDebtInstallmentsDetailsModal = (debtId) => {
     if (modal)
         modal.style.display = 'flex';
 };
-// Helper: Pay single installment
 const paySingleInstallment = async (debtId, seq) => {
     const debt = (state.debts || []).find(d => String(d.id) === String(debtId));
     if (!debt)

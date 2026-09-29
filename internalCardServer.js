@@ -330,7 +330,7 @@ function startInternalServer(port = 5002) {
                         if (inst) {
                             inst.status = 'مسدد';
                             inst.paidAmount = payAmt;
-                            inst.payDate = new Date().toLocaleDateString('ar-EG');
+                            const _d = new Date(); inst.payDate = `${_d.getDate()}/${String(_d.getMonth() + 1).padStart(2, '0')}/${_d.getFullYear()}`;
                             if (receiptNumber) inst.receiptNumber = receiptNumber;
                         }
                     }

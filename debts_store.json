@@ -154,6 +154,276 @@
   },
   "debts": [
     {
+      "id": "DEBT-MEEDCO-INIT",
+      "customerId": "0502043148",
+      "customerName": "احمد محمد فتحى فرجانى محمد",
+      "meterNumber": "96756660",
+      "subscriptionCode": "0502043148",
+      "category": "انارة",
+      "customerCategory": "انارة",
+      "debtTypeId": 1,
+      "debtTypeName": "شحن مبدئى",
+      "totalDebtAmount": 100,
+      "debtAmount": 100,
+      "paidAmount": 87.96,
+      "remainingAmount": 12.04,
+      "installmentsCount": 24,
+      "paidInstallmentsCount": 22,
+      "installmentAmount": 3.94,
+      "startDate": "1/01/2025",
+      "dueDate": "1/01/2025",
+      "nextDueDate": "1/11/2026",
+      "deductWay": "charge",
+      "deductWayName": "خصم أثناء الشحن",
+      "status": "PaymentInProgress",
+      "statusName": "قيد التسديد",
+      "notes": "دين شحن مبدئي مطابق للمنظومة الاساسية - صورة التفاصيل",
+      "receiptNumber": "RCP-96756660",
+      "createdUser": "المنظومة الموحدة",
+      "installments": [
+        {
+          "seq": 1,
+          "dueDate": "1/01/2025",
+          "amount": 9.16,
+          "paidAmount": 9.16,
+          "status": "مسدد",
+          "payDate": "4/01/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 2,
+          "dueDate": "1/02/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "5/02/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 3,
+          "dueDate": "1/03/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "13/03/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 4,
+          "dueDate": "1/04/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "19/04/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 5,
+          "dueDate": "1/05/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "21/05/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 6,
+          "dueDate": "1/06/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "18/06/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 7,
+          "dueDate": "1/07/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "2/07/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 8,
+          "dueDate": "1/08/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "24/08/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 9,
+          "dueDate": "1/09/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "1/09/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 10,
+          "dueDate": "1/10/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "3/10/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 11,
+          "dueDate": "1/11/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "7/11/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 12,
+          "dueDate": "1/12/2025",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "13/12/2025",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 13,
+          "dueDate": "1/01/2026",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "12/01/2026",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 14,
+          "dueDate": "1/02/2026",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "6/02/2026",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 15,
+          "dueDate": "1/03/2026",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "11/03/2026",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 16,
+          "dueDate": "1/04/2026",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "17/04/2026",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 17,
+          "dueDate": "1/05/2026",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "20/05/2026",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 18,
+          "dueDate": "1/06/2026",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "14/06/2026",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 19,
+          "dueDate": "1/07/2026",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "19/07/2026",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 20,
+          "dueDate": "1/08/2026",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "22/08/2026",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 21,
+          "dueDate": "1/09/2026",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "15/09/2026",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 22,
+          "dueDate": "1/10/2026",
+          "amount": 3.94,
+          "paidAmount": 3.94,
+          "status": "مسدد",
+          "payDate": "28/09/2026",
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 23,
+          "dueDate": "1/11/2026",
+          "amount": 3.94,
+          "paidAmount": 0,
+          "status": "مستحق",
+          "payDate": null,
+          "isPostponed": false,
+          "postponeDate": null
+        },
+        {
+          "seq": 24,
+          "dueDate": "1/12/2026",
+          "amount": 8.1,
+          "paidAmount": 0,
+          "status": "مستحق",
+          "payDate": null,
+          "isPostponed": false,
+          "postponeDate": null
+        }
+      ]
+    },
+    {
       "id": "DEBT-738953",
       "customerId": "1760087928245",
       "customerName": "محمد عبد الحليم عبد العظيم",
@@ -384,7 +654,7 @@
           "amount": 100,
           "paidAmount": 100,
           "status": "مسدد",
-          "payDate": "١٧‏/٩‏/٢٠٢٦"
+          "payDate": "17/9/2026"
         },
         {
           "seq": 4,
@@ -392,7 +662,7 @@
           "amount": 100,
           "paidAmount": 100,
           "status": "مسدد",
-          "payDate": "١٧‏/٩‏/٢٠٢٦"
+          "payDate": "17/9/2026"
         },
         {
           "seq": 5,
@@ -400,7 +670,7 @@
           "amount": 100,
           "paidAmount": 100,
           "status": "مسدد",
-          "payDate": "١٧‏/٩‏/٢٠٢٦"
+          "payDate": "17/9/2026"
         },
         {
           "seq": 6,
@@ -408,7 +678,7 @@
           "amount": 100,
           "paidAmount": 100,
           "status": "مسدد",
-          "payDate": "١٧‏/٩‏/٢٠٢٦"
+          "payDate": "17/9/2026"
         },
         {
           "seq": 7,
@@ -488,7 +758,7 @@
           "amount": 45.33,
           "paidAmount": 45.33,
           "status": "مسدد",
-          "payDate": "١٧‏/٩‏/٢٠٢٦"
+          "payDate": "17/9/2026"
         }
       ]
     },
