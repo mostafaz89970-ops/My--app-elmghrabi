@@ -32772,7 +32772,7 @@ const handlePrintJudicialControlDetails = () => {
 
 
 
-        tbody.innerHTML = customerState.items.map((cust, idx) => {
+        const rowsHtml = customerState.items.map((cust, idx) => {
 
             const meterNum = String(cust.meterNumber || cust.meterChassisNumber || cust.codeNumber || '-').trim();
 
@@ -32849,79 +32849,52 @@ const handlePrintJudicialControlDetails = () => {
 
                             <!-- Blue Gear Button [ ⚙ ] matching frame_001s -->
 
-                            <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
-
+                            <div class="dropdown-wrapper" style="position: relative; display: inline-block; overflow: visible;">
                                 <button type="button" class="cm-actions-menu-btn" data-cust-idx="${idx}" title="خيارات المشترك" style="background: #0284c7; color: #ffffff; border: none; width: 34px; height: 34px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(2,132,199,0.2);">
-
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0 2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-
                                 </button>
 
-
-
                                 <!-- MEEDCO Authentic Gear Dropdown Menu Matching Video frame_011s & frame_053s -->
-
-                                <div class="cm-actions-popup" id="cm-actions-popup-${idx}" style="display: none; position: absolute; left: 0; top: 100%; width: 235px; max-height: 420px; overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.22); z-index: 99999; text-align: right; padding: 4px 0; direction: rtl;">
-
+                                <div class="cm-actions-popup" id="cm-actions-popup-${idx}" style="display: none; position: absolute; left: 0; top: 100%; width: 235px; max-height: 420px; overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.08); z-index: 999999; text-align: right; padding: 4px 0; direction: rtl;">
                                     <a href="#" class="cm-act-item" data-action="replace-card-charge" data-cust-idx="${idx}"><span>💳</span> <span>كارت بديل بشحن</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="replace-card-no-charge" data-cust-idx="${idx}"><span>💳</span> <span>كارت بديل بدون شحن</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="print-init-charge-receipt" data-cust-idx="${idx}"><span>📄</span> <span>ايصال الشحنة المبدائية</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="change-meter" data-cust-idx="${idx}"><span>🔧</span> <span>تغيير عداد</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="update-meter-sequence" data-cust-idx="${idx}"><span>🔧</span> <span>تحديث مسلسل عداد</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="meter-check-result" data-cust-idx="${idx}"><span>📊</span> <span>تسجيل نتيجة المرور</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="customer-abuses" data-cust-idx="${idx}"><span>🚫</span> <span>تلاعبات</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="customer-liquidation" data-cust-idx="${idx}"><span>👥</span> <span>تصفية</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="account-statement" data-cust-idx="${idx}"><span>📄</span> <span>كشف حساب</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="assignment" data-cust-idx="${idx}"><span>👥</span> <span>تنازل</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="admin-cert" data-cust-idx="${idx}"><span>📋</span> <span>شهادة إدارية</span></a>
-
                                     <a href="#" class="cm-act-item" data-action="consumption-cert" data-cust-idx="${idx}"><span>📊</span> <span>شهادة إستهلاك</span></a>
-
                                     <div style="border-top: 1px solid #f1f5f9; margin-top: 4px; padding-top: 4px; background: #fafafa;">
-
                                         <a href="#" class="cm-act-item" data-action="edit-main-data" data-cust-idx="${idx}" style="color: #64748b; font-size: 0.8rem;"><span>✏</span> <span>تعديل البيانات الأساسية</span></a>
-
                                         <a href="#" class="cm-act-item" data-action="customer-debts" data-cust-idx="${idx}" style="color: #64748b; font-size: 0.8rem;"><span>💰</span> <span>مديونيات المشترك</span></a>
-
                                         <a href="#" class="cm-act-item" data-action="cleaning-exception" data-cust-idx="${idx}" style="color: #64748b; font-size: 0.8rem;"><span>🧹</span> <span>استثناء رسوم النظافة</span></a>
-
                                         <a href="#" class="cm-act-item" data-action="meter-movements" data-cust-idx="${idx}" style="color: #64748b; font-size: 0.8rem;"><span>🔄</span> <span>حركات العداد</span></a>
-
                                     </div>
-
                                 </div>
-
                             </div>
 
-
-
                             <!-- Teal Charge Button [ شحن ] matching frame_001s -->
-
                             <button type="button" class="btn btn-sm cm-charge-btn" data-cust-idx="${idx}" title="شحن كارت العداد" style="background: #14b8a6; color: #ffffff; padding: 6px 14px; font-size: 0.85rem; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 4px rgba(20,184,166,0.25);">
-
                                 <span>شحن</span>
-
                             </button>
-
                         </div>
-
                     </td>
-
                 </tr>
-
             `;
-
         }).join('');
+
+        // Provide ample downward expansion so popup menu is 100% visible even with 1 result
+        const spacerRow = (customerState.items.length > 0 && customerState.items.length <= 2) ? `
+            <tr style="height: 280px; background: transparent !important; border: none !important; pointer-events: none;">
+                <td colspan="11" style="border: none !important; background: transparent !important;"></td>
+            </tr>
+        ` : '';
+
+        tbody.innerHTML = rowsHtml + spacerRow;
 
 
 
@@ -32998,21 +32971,31 @@ const handlePrintJudicialControlDetails = () => {
                 document.querySelectorAll('.cm-actions-popup').forEach(p => (p as HTMLElement).style.display = 'none');
 
                 if (popup && !isVisible) {
-
                     popup.style.display = 'block';
 
-                    const inp = popup.querySelector('.cm-act-search-input') as HTMLInputElement | null;
-
-                    if (inp) {
-
-                        inp.value = '';
-
-                        setTimeout(() => inp.focus(), 50);
-
+                    // Smart auto-flip & positioning
+                    const btnRect = (btn as HTMLElement).getBoundingClientRect();
+                    const spaceBelow = window.innerHeight - btnRect.bottom;
+                    if (spaceBelow < 320 && btnRect.top > 320) {
+                        popup.style.top = 'auto';
+                        popup.style.bottom = '100%';
+                        popup.style.marginTop = '0';
+                        popup.style.marginBottom = '6px';
+                    } else {
+                        popup.style.top = '100%';
+                        popup.style.bottom = 'auto';
+                        popup.style.marginTop = '6px';
+                        popup.style.marginBottom = '0';
                     }
+                    popup.style.left = '0';
+                    popup.style.zIndex = '999999';
 
+                    const inp = popup.querySelector('.cm-act-search-input') as HTMLInputElement | null;
+                    if (inp) {
+                        inp.value = '';
+                        setTimeout(() => inp.focus(), 50);
+                    }
                 }
-
             });
 
         });

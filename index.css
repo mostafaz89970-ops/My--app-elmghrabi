@@ -3726,3 +3726,37 @@ body.dark-mode #modal-org-edit-item .form-control {
     color: #f8fafc !important;
     border-color: #475569 !important;
 }
+
+/* =========================================================================
+   اتساع صفحة إدارة المشتركين ومنع اختفاء قائمة إجراءات الترس
+   ========================================================================= */
+#customer-management {
+    min-height: calc(100vh - 120px) !important;
+    padding-bottom: 280px !important;
+}
+
+#customer-management .table-container {
+    min-height: 540px !important;
+    padding-bottom: 180px !important;
+    overflow: visible !important;
+}
+
+#customer-management .responsive-table,
+#customer-management #cm-responsive-table-wrapper {
+    min-height: 460px !important;
+    max-height: none !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    position: relative !important;
+    padding-bottom: 140px !important;
+    border-radius: 8px !important;
+}
+
+#customer-management #customers-table {
+    min-height: 360px !important;
+}
+
+#customer-management .cm-actions-popup {
+    z-index: 999999 !important;
+    box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+}
