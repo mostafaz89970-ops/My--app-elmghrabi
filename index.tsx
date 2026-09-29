@@ -18450,6 +18450,217 @@ const handlePrintJudicialControlDetails = () => {
     };
     // (Charging debts modal handled by authoritative openChargingDebtsModal above)
 
+    // Helper: Open Debt Payoff Modal (سداد دين - مطابق لمنظومة MEEDCO وفيديو الديون)
+    let currentPayoffDebtId: string | null = null;
+    let payoffModalListenersInitialized = false;
+
+    const openDebtPayoffModal = (debtId: string) => {
+        initDebtsDefaultsIfNeeded();
+        const debt = (state.debts || []).find(d => String(d.id) === String(debtId));
+        if (!debt) {
+            showToast('لم يتم العثور على الدين المحدد.', 'error');
+            return;
+        }
+
+        currentPayoffDebtId = String(debt.id);
+        const modal = document.getElementById('modal-payoff-debt');
+        if (!modal) return;
+
+        initPayoffModalListeners();
+
+        // Customer & Debt Info
+        const custCodeEl = document.getElementById('payoff-cust-code') as HTMLInputElement | null;
+        const custNameEl = document.getElementById('payoff-cust-name') as HTMLInputElement | null;
+        const meterNumEl = document.getElementById('payoff-meter-number') as HTMLInputElement | null;
+        const totalAmtEl = document.getElementById('payoff-total-amount') as HTMLInputElement | null;
+        const paidAmtEl = document.getElementById('payoff-paid-amount') as HTMLInputElement | null;
+        const remAmtEl = document.getElementById('payoff-rem-amount') as HTMLInputElement | null;
+        const remainCreditsEl = document.getElementById('payoff-remain-credits') as HTMLInputElement | null;
+        const amtInput = document.getElementById('payoff-amount') as HTMLInputElement | null;
+        const cbFull = document.getElementById('payoff-cb-full') as HTMLInputElement | null;
+        const cbCustCredits = document.getElementById('payoff-cb-customer-credits') as HTMLInputElement | null;
+        const methodSelect = document.getElementById('payoff-method') as HTMLSelectElement | null;
+        const payTypeSelect = document.getElementById('payoff-payment-type') as HTMLSelectElement | null;
+        const checkValid = document.getElementById('payoff-amount-valid-check');
+        const tbody = document.getElementById('payoff-installments-tbody');
+
+        if (custCodeEl) custCodeEl.value = debt.subscriptionCode || debt.customerId || '-';
+        if (custNameEl) custNameEl.value = debt.customerName || '-';
+        if (meterNumEl) meterNumEl.value = debt.meterNumber || '-';
+        if (totalAmtEl) totalAmtEl.value = Number(debt.totalDebtAmount || 0).toFixed(2);
+        if (paidAmtEl) paidAmtEl.value = Number(debt.paidAmount || 0).toFixed(2);
+        if (remAmtEl) remAmtEl.value = Number(debt.remainingAmount || 0).toFixed(2);
+        if (remainCreditsEl) remainCreditsEl.value = '0.00';
+
+        const rem = Number(debt.remainingAmount) || 0;
+        if (amtInput) amtInput.value = rem.toFixed(2);
+        if (cbFull) cbFull.checked = true;
+        if (cbCustCredits) cbCustCredits.checked = false;
+        if (methodSelect) methodSelect.value = 'سداد من الأشهر المقبلة';
+        if (payTypeSelect) payTypeSelect.value = 'نقدي';
+        if (checkValid) checkValid.style.display = rem > 0 ? 'inline-block' : 'none';
+
+        // Render Installments in Bottom Card
+        if (tbody) {
+            let installments = debt.installments || [];
+            if (installments.length === 0) {
+                const count = debt.installmentsCount || 1;
+                const instVal = debt.installmentAmount || (debt.totalDebtAmount / count);
+                installments = [];
+                for (let i = 1; i <= count; i++) {
+                    const isPaid = i <= (debt.paidInstallmentsCount || 0);
+                    installments.push({
+                        seq: i,
+                        dueDate: `2026-${String(i).padStart(2, '0')}-01`,
+                        amount: Number(instVal.toFixed(2)),
+                        paidAmount: isPaid ? Number(instVal.toFixed(2)) : 0,
+                        status: isPaid ? 'مسدد' : (i === (debt.paidInstallmentsCount || 0) + 1 ? 'مستحق' : 'قادم'),
+                        payDate: isPaid ? '04/01/2026 09:44 AM' : null
+                    });
+                }
+                debt.installments = installments;
+            }
+
+            tbody.innerHTML = installments.map(inst => {
+                const isPaid = inst.status === 'مسدد' || (Number(inst.paidAmount) >= Number(inst.amount));
+                const remainingInst = Math.max(0, Number(inst.amount) - (Number(inst.paidAmount) || 0));
+                return `
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 10px 12px; font-family: monospace;">${inst.dueDate}</td>
+                        <td style="padding: 10px 12px; font-weight: 700; font-family: monospace;">${Number(inst.amount).toFixed(2)}</td>
+                        <td style="padding: 10px 12px; font-family: monospace; font-weight: 700; color: ${isPaid ? '#16a34a' : '#dc2626'};">${remainingInst.toFixed(2)}</td>
+                        <td style="padding: 10px 12px;">${isPaid ? 'نقدي' : '-'}</td>
+                        <td style="padding: 10px 12px; font-family: monospace; color: #64748b;">${inst.receiptNumber || (isPaid ? (debt.receiptNumber || '10122024216281') : '-')}</td>
+                        <td style="padding: 10px 12px; font-size: 0.85rem; color: #475569;">${inst.payDate || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        modal.style.display = 'flex';
+    };
+
+    const initPayoffModalListeners = () => {
+        if (payoffModalListenersInitialized) return;
+        payoffModalListenersInitialized = true;
+
+        const cbFull = document.getElementById('payoff-cb-full') as HTMLInputElement | null;
+        const cbCustCredits = document.getElementById('payoff-cb-customer-credits') as HTMLInputElement | null;
+        const amtInput = document.getElementById('payoff-amount') as HTMLInputElement | null;
+        const methodSelect = document.getElementById('payoff-method') as HTMLSelectElement | null;
+        const payTypeSelect = document.getElementById('payoff-payment-type') as HTMLSelectElement | null;
+        const checkValid = document.getElementById('payoff-amount-valid-check');
+        const remAmtEl = document.getElementById('payoff-rem-amount') as HTMLInputElement | null;
+
+        cbFull?.addEventListener('change', () => {
+            if (cbFull.checked) {
+                if (cbCustCredits) cbCustCredits.checked = false;
+                if (methodSelect) methodSelect.value = 'سداد من الأشهر المقبلة';
+                if (payTypeSelect) payTypeSelect.value = 'نقدي';
+                if (amtInput && remAmtEl) {
+                    amtInput.value = remAmtEl.value;
+                }
+                if (checkValid) checkValid.style.display = 'inline-block';
+            }
+        });
+
+        cbCustCredits?.addEventListener('change', () => {
+            if (cbCustCredits.checked) {
+                if (cbFull) cbFull.checked = false;
+                if (payTypeSelect) payTypeSelect.value = 'دفعه';
+            } else {
+                if (payTypeSelect) payTypeSelect.value = 'نقدي';
+            }
+        });
+
+        amtInput?.addEventListener('input', () => {
+            const val = Number(amtInput.value);
+            const rem = Number(remAmtEl?.value) || 0;
+            if (checkValid) {
+                checkValid.style.display = (val > 0 && val <= rem + 0.01) ? 'inline-block' : 'none';
+            }
+        });
+
+        // Submit Payoff
+        document.getElementById('btn-submit-payoff')?.addEventListener('click', async () => {
+            if (!currentPayoffDebtId) return;
+            const debt = (state.debts || []).find(d => String(d.id) === String(currentPayoffDebtId));
+            if (!debt) return;
+
+            const amt = Number(amtInput?.value) || 0;
+            const rem = Number(debt.remainingAmount) || 0;
+
+            if (amt <= 0) {
+                showToast('يرجى إدخال مبلغ سداد صحيح أكبر من الصفر.', 'warning');
+                return;
+            }
+            if (amt > rem + 0.01) {
+                showToast(`مبلغ السداد (${amt.toFixed(2)} ج.م) أكبر من المبلغ المتبقي على الدين (${rem.toFixed(2)} ج.م).`, 'warning');
+                return;
+            }
+
+            const rcptNo = 'RCP-' + Date.now().toString().slice(-8);
+            const nowTime = new Date().toLocaleString('ar-EG');
+
+            // Distribute payoff across installments
+            let remainingToPay = amt;
+            let installments = debt.installments || [];
+            if (installments.length === 0) {
+                installments = [{
+                    seq: 1,
+                    dueDate: debt.startDate || new Date().toISOString().split('T')[0],
+                    amount: debt.totalDebtAmount,
+                    paidAmount: 0,
+                    status: 'مستحق',
+                    payDate: null
+                }];
+                debt.installments = installments;
+            }
+
+            for (const inst of installments) {
+                if (remainingToPay <= 0) break;
+                const instDue = Math.max(0, Number(inst.amount) - (Number(inst.paidAmount) || 0));
+                if (instDue > 0) {
+                    const payThis = Math.min(remainingToPay, instDue);
+                    inst.paidAmount = Number(((inst.paidAmount || 0) + payThis).toFixed(2));
+                    remainingToPay = Number((remainingToPay - payThis).toFixed(2));
+                    if (Number(inst.paidAmount) >= Number(inst.amount)) {
+                        inst.status = 'مسدد';
+                        inst.payDate = nowTime;
+                        inst.receiptNumber = rcptNo;
+                    }
+                }
+            }
+
+            debt.paidAmount = Number(((debt.paidAmount || 0) + amt).toFixed(2));
+            debt.remainingAmount = Number(Math.max(0, (debt.remainingAmount || 0) - amt).toFixed(2));
+            debt.receiptNumber = rcptNo;
+
+            if (debt.remainingAmount <= 0) {
+                debt.status = 'Completed';
+                debt.statusName = 'مسدد بالكامل';
+            }
+
+            await saveState();
+            showToast(`تم سداد مبلغ ${amt.toFixed(2)} ج.م بنجاح برقم إيصال ${rcptNo}`, 'success');
+            logActivity('سداد دين', `تم سداد مبلغ ${amt.toFixed(2)} ج.م للدين رقم ${debt.id} (${debt.debtTypeName}) للمشترك ${debt.customerName}`);
+
+            // Close modal
+            const modal = document.getElementById('modal-payoff-debt');
+            if (modal) modal.style.display = 'none';
+
+            // Sync with backend bridge
+            fetch('http://127.0.0.1:5002/api/debts/pay-installment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ debtId: debt.id, amount: amt, receiptNumber: rcptNo })
+            }).catch(() => null);
+
+            updateCustomerDebtsSummaryBox();
+            renderDebtsTable();
+        });
+    };
+
     // Helper: open debt installments details modal
     const openDebtInstallmentsDetailsModal = (debtId: string) => {
         initDebtsDefaultsIfNeeded();
@@ -18787,15 +18998,20 @@ const handlePrintJudicialControlDetails = () => {
                     <td style="padding: 12px 10px; white-space: nowrap; text-align: center;">${isScheduled ? checkSvg : closeSvg}</td>
                     <td style="padding: 12px 10px; white-space: nowrap; text-align: center;">
                         <div style="display: inline-flex; align-items: center; gap: 6px;">
-                            <button type="button" class="btn-table-payoff" data-debt-id="${d.id}" title="بيان وسداد أقساط الدين (MEEDCO Payoff)" style="background: #e1f0ff; color: #3699ff; border: none; padding: 5px 9px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                                <span>أقساط</span>
+                            ${Number(d.remainingAmount) > 0 ? `
+                                <button type="button" class="btn-table-payoff" data-debt-id="${d.id}" title="سداد الدين" style="background: #0284c7; color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(2,132,199,0.2);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                                    <span>سداد</span>
+                                </button>
+                            ` : `
+                                <span style="background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 700;">مسدد بالكامل</span>
+                            `}
+                            <button type="button" class="btn-table-details" data-debt-id="${d.id}" title="عرض تفاصيل وأقساط الدين" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 5px 10px; border-radius: 6px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                <span>تفاصيل</span>
                             </button>
-                            <button type="button" class="btn-table-delay" data-debt-id="${d.id}" title="تأجيل الدين" style="background: #fff4de; color: #ffa800; border: none; padding: 5px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; cursor: pointer;">
-                                تأجيل
-                            </button>
-                            <button type="button" class="btn-table-delete" data-debt-id="${d.id}" title="حذف الدين" style="background: #ffe2e5; color: #f64e60; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            <button type="button" class="btn-table-delete" data-debt-id="${d.id}" title="حذف الدين" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; padding: 5px 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                             </button>
                         </div>
                     </td>
@@ -18807,14 +19023,14 @@ const handlePrintJudicialControlDetails = () => {
         tbody.querySelectorAll('.btn-table-payoff').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const debtId = (e.currentTarget as HTMLElement).getAttribute('data-debt-id');
-                if (debtId) openDebtInstallmentsDetailsModal(debtId);
+                if (debtId) openDebtPayoffModal(debtId);
             });
         });
 
-        tbody.querySelectorAll('.btn-table-delay').forEach(btn => {
+        tbody.querySelectorAll('.btn-table-details').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const debtId = (e.currentTarget as HTMLElement).getAttribute('data-debt-id');
-                if (debtId) delayCustomerDebt(debtId);
+                if (debtId) openDebtInstallmentsDetailsModal(debtId);
             });
         });
 

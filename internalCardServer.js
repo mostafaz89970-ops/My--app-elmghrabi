@@ -344,6 +344,16 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            if (pathname.startsWith('/api/debts/') && req.method === 'DELETE') {
+                const debtId = decodeURIComponent(pathname.split('/').pop());
+                const store = getDebtsStore();
+                store.debts = store.debts.filter(d => String(d.id) !== String(debtId));
+                saveDebtsStore(store);
+                res.writeHead(200);
+                res.end(JSON.stringify({ success: true, message: 'تم حذف الدين بنجاح' }));
+                return;
+            }
+
             if (pathname === '/api/debts/delay' && req.method === 'POST') {
                 const { debtId, newDueDate } = await getBody();
                 const store = getDebtsStore();
