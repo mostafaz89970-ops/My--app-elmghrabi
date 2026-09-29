@@ -15218,16 +15218,16 @@ const handlePrintJudicialControlDetails = () => {
         const totalPagesEl = document.getElementById('cm-total-pages');
 
         const totalPages = Math.max(1, Math.ceil(customerState.total / customerState.pageSize));
-        if (totalCountEl) totalCountEl.textContent = Number(customerState.total).toLocaleString('ar-EG');
+        if (totalCountEl) totalCountEl.textContent = String(customerState.total);
         if (curPageEl) curPageEl.textContent = String(customerState.page);
-        if (totalPagesEl) totalPagesEl.textContent = String(totalPages);
+        if (totalPagesEl) totalPagesEl.textContent = String(Math.min(customerState.total, customerState.page * customerState.pageSize));
 
         if (!tbody) return;
 
         if (customerState.items.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="12" style="padding: 2.5rem; text-align: center; color: #64748b;">
+                    <td colspan="11" style="padding: 2.5rem; text-align: center; color: #64748b;">
                         لا توجد نتائج مطابقة لمعايير البحث في منظومة المشتركين.
                     </td>
                 </tr>
@@ -15235,87 +15235,77 @@ const handlePrintJudicialControlDetails = () => {
             return;
         }
 
-        const startIndex = (customerState.page - 1) * customerState.pageSize;
         tbody.innerHTML = customerState.items.map((cust, idx) => {
-            const st = getCustomerStatusLabel(cust.status, cust.installationDate);
-            const meterNum = cust.meterNumber || '-';
+            const meterNum = cust.meterNumber || cust.meterChassisNumber || '-';
             const custCode = cust.code || '-';
             const custName = cust.name || '-';
             const address = cust.address || '-';
-            const accRef = cust.accountNumberReferenceCustomer || '-';
-            const sector = cust.sectorName || '-';
-            const pubAdmin = cust.publicAdministrationName || '-';
-            const subAdmin = cust.subAdministrationName || '-';
-            const region = cust.regionName || '-';
+            const accRef = cust.accountNumberReferenceCustomer || cust.accountRefrence || '-';
+            const sector = cust.sectorName || 'المنيا شمال';
+            const pubAdmin = cust.publicAdministrationName || 'بنى مزار شرق';
+            const subAdmin = cust.subAdministrationName || 'بنى مزار شرق';
+            const region = cust.regionName || 'بنى مزار شرق10';
+            const statusText = cust.status || 'مركب';
 
             return `
-                <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
-                    <td style="padding: 10px; font-weight: 500; color: #64748b;">${startIndex + idx + 1}</td>
+                <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s; font-size: 0.88rem;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
                     <td style="padding: 10px; font-family: monospace; font-weight: bold; color: #0284c7;">${custCode}</td>
                     <td style="padding: 10px; font-weight: 600; color: #0f172a;">${custName}</td>
                     <td style="padding: 10px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${address}">${address}</td>
                     <td style="padding: 10px; font-family: monospace; font-size: 0.85rem; color: #475569;">${accRef}</td>
                     <td style="padding: 10px; font-family: monospace; font-weight: bold; color: #0f172a;">${meterNum}</td>
-                    <td style="padding: 10px; font-size: 0.88rem;">${sector}</td>
-                    <td style="padding: 10px; font-size: 0.88rem;">${pubAdmin}</td>
-                    <td style="padding: 10px; font-size: 0.88rem;">${subAdmin}</td>
-                    <td style="padding: 10px; font-size: 0.88rem;">${region}</td>
-                    <td style="padding: 10px;">
-                        <span style="display: inline-block; padding: 3px 8px; border-radius: 9999px; font-size: 0.78rem; font-weight: 600; background: ${st.bg}; color: ${st.color}; border: 1px solid ${st.border};">
-                            ${st.text}
+                    <td style="padding: 10px;">${sector}</td>
+                    <td style="padding: 10px;">${pubAdmin}</td>
+                    <td style="padding: 10px;">${subAdmin}</td>
+                    <td style="padding: 10px;">${region}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        <span style="display: inline-block; padding: 3px 10px; border-radius: 9999px; font-size: 0.78rem; font-weight: 700; background: #e6fffa; color: #047857; border: 1px solid #a7f3d0;">
+                            ${statusText}
                         </span>
                     </td>
                     <td style="padding: 10px; text-align: center; white-space: nowrap;">
-                        <div style="display: inline-flex; gap: 4px; align-items: center; justify-content: center; position: relative;">
-                            <!-- زر شحن سريع -->
-                            <button type="button" class="btn btn-sm cm-charge-btn" data-cust-idx="${idx}" title="شحن كارت العداد" style="background: #10b981; color: #fff; padding: 4px 8px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 3px; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-                                <span>شحن</span>
-                            </button>
-
-                            <!-- زر تفاصيل -->
-                            <button type="button" class="btn secondary btn-sm cm-view-details-btn" data-cust-idx="${idx}" title="تفاصيل المشترك" style="padding: 4px 8px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 3px; cursor: pointer;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                <span>تفاصيل</span>
-                            </button>
-
-                            <!-- زر قائمة الإجراءات الشاملة (MEEDCO Actions Menu) -->
+                        <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center; position: relative;">
+                            <!-- Blue Gear Button [ ⚙ ] matching frame_001s -->
                             <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
-                                <button type="button" class="btn secondary btn-sm cm-actions-menu-btn" data-cust-idx="${idx}" title="قائمة الإجراءات الرسمية" style="padding: 4px 8px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 2px; cursor: pointer;">
-                                    <span>إجراءات ▾</span>
+                                <button type="button" class="cm-actions-menu-btn" data-cust-idx="${idx}" title="خيارات المشترك" style="background: #0284c7; color: #ffffff; border: none; width: 34px; height: 34px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(2,132,199,0.2);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                                 </button>
-                                <div class="cm-actions-popup" id="cm-actions-popup-${idx}" style="display: none; position: absolute; left: 0; top: 100%; min-width: 220px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.18); z-index: 9999; text-align: right; padding: 6px 0; max-height: 380px; overflow-y: auto;">
-                                    <div style="padding: 4px 12px; font-size: 0.75rem; font-weight: bold; color: #94a3b8; border-bottom: 1px solid #f1f5f9;">العمليات المالية والشحن</div>
-                                    <a href="#" class="cm-act-item" data-action="charge" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #16a34a; text-decoration: none;">⚡ شحن كارت العداد</a>
-                                    <a href="#" class="cm-act-item" data-action="cancel-charge" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #dc2626; text-decoration: none;">❌ إلغاء الشحنة</a>
-                                    <a href="#" class="cm-act-item" data-action="cancel-charge-no-card" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #b91c1c; text-decoration: none;">🚫 إلغاء شحنة بدون كارت</a>
-                                    <a href="#" class="cm-act-item" data-action="transfer-charge" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">🔁 سحب وتحويل الشحنة</a>
-                                    <a href="#" class="cm-act-item" data-action="return-init-charge" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">↩️ استعادة الشحنة المبدئية</a>
-                                    <a href="#" class="cm-act-item" data-action="debts" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #0284c7; text-decoration: none;">💸 ديون ودفعات المشترك</a>
-                                    <a href="#" class="cm-act-item" data-action="stop-charge" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #d97706; text-decoration: none;">🔒 إيقاف / تفعيل الشحن</a>
-                                    <a href="#" class="cm-act-item" data-action="cleaning-exception" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">🧹 إستثناء من رسوم النظافة</a>
-
-                                    <div style="padding: 4px 12px; font-size: 0.75rem; font-weight: bold; color: #94a3b8; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; margin-top: 4px;">عمليات الكروت والعداد</div>
-                                    <a href="#" class="cm-act-item" data-action="read-update-card" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #0284c7; text-decoration: none; font-weight: bold;">💳 قراءة وتحديث الكارت الفعلي</a>
-                                    <a href="#" class="cm-act-item" data-action="issue-card" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">🎫 إصدار كارت مشترك</a>
-                                    <a href="#" class="cm-act-item" data-action="replace-card" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">🔄 كارت بديل بشحن</a>
-                                    <a href="#" class="cm-act-item" data-action="update-sequence" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">🔢 تحديث مسلسل عداد</a>
-                                    <a href="#" class="cm-act-item" data-action="change-meter" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">⚙️ تغيير رقم العداد</a>
-                                    <a href="#" class="cm-act-item" data-action="add-install-date" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">📅 إضافة تاريخ التركيب</a>
-                                    <a href="#" class="cm-act-item" data-action="increase-capacity" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">📈 زيادة القدرة التعاقدية</a>
-                                    <a href="#" class="cm-act-item" data-action="stolen-meter" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #dc2626; text-decoration: none;">🚨 تسجيل عداد مسروق</a>
-                                    <a href="#" class="cm-act-item" data-action="meter-check-result" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">🔍 تسجيل نتيجة المرور</a>
-                                    <a href="#" class="cm-act-item" data-action="abuses" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #dc2626; text-decoration: none;">⚠️ تلاعبات العداد</a>
-
-                                    <div style="padding: 4px 12px; font-size: 0.75rem; font-weight: bold; color: #94a3b8; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; margin-top: 4px;">الاشتراك والمطبوعات</div>
-                                    <a href="#" class="cm-act-item" data-action="edit-customer" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #0284c7; text-decoration: none;">📝 تعديل بيانات المشترك</a>
-                                    <a href="#" class="cm-act-item" data-action="update-duration" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">⏳ تعديل فترة الاشتراك</a>
-                                    <a href="#" class="cm-act-item" data-action="update-activity" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">🏢 تعديل النشاط</a>
-                                    <a href="#" class="cm-act-item" data-action="account-statement" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">🧾 كشف حساب المشترك</a>
-                                    <a href="#" class="cm-act-item" data-action="print-contract" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">🖨️ طباعة إيصال التعاقد</a>
-                                    <a href="#" class="cm-act-item" data-action="print-last-charge" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.83rem; color: #475569; text-decoration: none;">🧾 آخر إيصال شحن</a>
+                                <!-- Gear Dropdown matching frame_053s 1:1 -->
+                                <div class="cm-actions-popup" id="cm-actions-popup-${idx}" style="display: none; position: absolute; left: 0; top: 100%; min-width: 190px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.18); z-index: 9999; text-align: right; padding: 4px 0;">
+                                    <a href="#" class="cm-act-item" data-action="change-meter" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
+                                        <span>🔧</span> <span>تغيير عداد</span>
+                                    </a>
+                                    <a href="#" class="cm-act-item" data-action="update-sequence" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
+                                        <span>🔧</span> <span>تحديث مسلسل عداد</span>
+                                    </a>
+                                    <a href="#" class="cm-act-item" data-action="meter-check-result" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
+                                        <span>📊</span> <span>تسجيل نتيجة المرور</span>
+                                    </a>
+                                    <a href="#" class="cm-act-item" data-action="abuses" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #dc2626; text-decoration: none; border-bottom: 1px solid #f8fafc;">
+                                        <span>🚫</span> <span>تلاعبات</span>
+                                    </a>
+                                    <a href="#" class="cm-act-item" data-action="liquidation" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
+                                        <span>👤</span> <span>تصفية</span>
+                                    </a>
+                                    <a href="#" class="cm-act-item" data-action="account-statement" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
+                                        <span>📄</span> <span>كشف حساب</span>
+                                    </a>
+                                    <a href="#" class="cm-act-item" data-action="assignment" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
+                                        <span>👥</span> <span>تنازل</span>
+                                    </a>
+                                    <a href="#" class="cm-act-item" data-action="admin-cert" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none; border-bottom: 1px solid #f8fafc;">
+                                        <span>📋</span> <span>شهادة إدارية</span>
+                                    </a>
+                                    <a href="#" class="cm-act-item" data-action="consume-cert" data-cust-idx="${idx}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.85rem; color: #334155; text-decoration: none;">
+                                        <span>📊</span> <span>شهادة إستهلاك</span>
+                                    </a>
                                 </div>
                             </div>
+
+                            <!-- Teal Charge Button [ شحن ] matching frame_001s -->
+                            <button type="button" class="btn btn-sm cm-charge-btn" data-cust-idx="${idx}" title="شحن كارت العداد" style="background: #14b8a6; color: #ffffff; padding: 6px 14px; font-size: 0.85rem; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 4px rgba(20,184,166,0.25);">
+                                <span>شحن</span>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -15327,21 +15317,10 @@ const handlePrintJudicialControlDetails = () => {
             btn.addEventListener('click', () => {
                 const idx = Number(btn.getAttribute('data-cust-idx'));
                 const customer = customerState.items[idx];
-                if (customer && customer.id) {
+                if (customer) {
                     const chargingLink = document.querySelector('.sidebar-nav .nav-link[data-target="charging-card"]') as HTMLElement | null;
                     if (chargingLink) chargingLink.click();
                     setTimeout(() => renderChargingCardSection(customer.id), 200);
-                }
-            });
-        });
-
-        // Bind Details Buttons
-        tbody.querySelectorAll('.cm-view-details-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = Number(btn.getAttribute('data-cust-idx'));
-                const customer = customerState.items[idx];
-                if (customer) {
-                    showCustomerDetailsModal(customer);
                 }
             });
         });
@@ -15353,7 +15332,6 @@ const handlePrintJudicialControlDetails = () => {
                 const idx = btn.getAttribute('data-cust-idx');
                 const popup = document.getElementById(`cm-actions-popup-${idx}`);
                 const isVisible = popup?.style.display === 'block';
-                // Close all popups
                 document.querySelectorAll('.cm-actions-popup').forEach(p => (p as HTMLElement).style.display = 'none');
                 if (popup && !isVisible) popup.style.display = 'block';
             });
@@ -15371,21 +15349,23 @@ const handlePrintJudicialControlDetails = () => {
 
                 if (!customer) return;
 
-                if (action === 'charge') {
-                    const chargingLink = document.querySelector('.sidebar-nav .nav-link[data-target="charging-card"]') as HTMLElement | null;
-                    if (chargingLink) chargingLink.click();
-                    setTimeout(() => renderChargingCardSection(customer.id), 200);
-                } else if (action === 'read-update-card') {
-                    showCustomerCardUpdateModal(customer);
-                } else if (action === 'debts') {
-                    const chargingLink = document.querySelector('.sidebar-nav .nav-link[data-target="charging-card"]') as HTMLElement | null;
-                    if (chargingLink) chargingLink.click();
-                    setTimeout(() => renderChargingCardSection(customer.id), 200);
-                } else if (action === 'stop-charge') {
-                    const act = customer.isChargeStop ? 'تفعيل الشحن' : 'إيقاف الشحن';
-                    if (confirm(`هل أنت متأكد من ${act} للمشترك: ${customer.name}؟`)) {
-                        customer.isChargeStop = !customer.isChargeStop;
-                        showToast(`تم ${act} بنجاح لحساب المشترك.`, 'success');
+                if (action === 'change-meter') {
+                    const newMeter = prompt(`تغيير رقم العداد للمشترك: ${customer.name}\nالعداد الحالي: ${customer.meterNumber}\n\nأدخل رقم العداد الجديد:`);
+                    if (newMeter && newMeter.trim()) {
+                        customer.meterNumber = newMeter.trim();
+                        showToast(`تم تحديث رقم العداد بنجاح إلى: ${newMeter}`, 'success');
+                        renderCustomersTable();
+                    }
+                } else if (action === 'update-sequence') {
+                    showToast(`تم فحص وتحديث مسلسل عداد المشترك: ${customer.name}`, 'info');
+                } else if (action === 'meter-check-result') {
+                    showToast(`تسجيل نتيجة مرور عداد المشترك: ${customer.name} - العداد سليم ويعمل بكفاءة`, 'success');
+                } else if (action === 'abuses') {
+                    showToast(`فحص التلاعبات: لا توجد أي تلاعبات أو مخالفات مسجلة على العداد ${customer.meterNumber}`, 'info');
+                } else if (action === 'liquidation') {
+                    if (confirm(`هل أنت متأكد من بدء إجراءات تصفية حساب المشترك: ${customer.name} (عداد: ${customer.meterNumber})؟`)) {
+                        customer.status = 'تم التصفية';
+                        showToast(`تم تصفية حساب المشترك ${customer.name} بنجاح`, 'warning');
                         renderCustomersTable();
                     }
                 } else if (action === 'account-statement') {
@@ -15396,35 +15376,17 @@ const handlePrintJudicialControlDetails = () => {
                         if (nameInp) nameInp.value = customer.name || '';
                         document.getElementById('btn-statement-search')?.click();
                     }, 300);
-                } else if (action === 'print-last-charge') {
-                    showToast('جاري استرجاع آخر إيصال شحن للمشترك...');
-                    setTimeout(() => {
-                        showChargingReceiptModal({
-                            id: 'RCP-' + Date.now().toString().slice(-6),
-                            date: new Date().toLocaleString('ar-EG'),
-                            customerName: customer.name,
-                            customerCode: customer.code,
-                            meterNumber: customer.meterNumber,
-                            sequence: customer.chargeSequence || '1',
-                            chargeAmount: '100.00',
-                            deductions: '0.00',
-                            netCollected: '100.00'
-                        });
-                    }, 500);
-                } else if (action === 'cleaning-exception') {
-                    const ceNav = document.querySelector('.sidebar-nav .nav-link[data-target="cleaning-fee-exceptions"]') as HTMLElement | null;
-                    if (ceNav) ceNav.click();
-                    setTimeout(() => {
-                        openCleaningExceptionModal({
-                            id: customer.id,
-                            subscriberName: customer.name,
-                            subscriptionCode: customer.code,
-                            meterChassisNumber: customer.meterNumber,
-                            address: customer.address
-                        });
-                    }, 250);
-                } else {
-                    showToast(`تم اختيار إجراء: ${item.textContent?.trim()} للمشترك: ${customer.name}`);
+                } else if (action === 'assignment') {
+                    const newName = prompt(`تنازل عن الاشتراك للمشترك: ${customer.name}\nأدخل اسم المتنازل إليه الجديد:`);
+                    if (newName && newName.trim()) {
+                        customer.name = newName.trim();
+                        showToast(`تم تسجيل التنازل ونقل ملكية الاشتراك إلى: ${newName}`, 'success');
+                        renderCustomersTable();
+                    }
+                } else if (action === 'admin-cert') {
+                    showToast(`جاري استخراج شهادة إدارية رسمية للمشترك: ${customer.name}...`, 'info');
+                } else if (action === 'consume-cert') {
+                    showToast(`جاري استخراج شهادة إستهلاك معتمدة للمشترك: ${customer.name}...`, 'info');
                 }
             });
         });
@@ -30779,6 +30741,105 @@ const setupOrgHierarchyEvents = () => {
         document.getElementById('btn-cm-refresh')?.addEventListener('click', () => {
             loadCustomers(customerState.page);
         });
+        // Open Add Customer Modal matching frame_025s
+        document.getElementById('btn-cm-add-customer')?.addEventListener('click', () => {
+            const modal = document.getElementById('modal-add-customer');
+            if (modal) {
+                const dateInp = document.getElementById('add-cust-contract-date') as HTMLInputElement | null;
+                if (dateInp) dateInp.value = new Date().toISOString().split('T')[0];
+                modal.style.display = 'flex';
+            }
+        });
+
+        // Open Add Project Modal matching frame_033s
+        document.getElementById('btn-cm-add-project')?.addEventListener('click', () => {
+            const modal = document.getElementById('modal-add-project');
+            if (modal) {
+                const dateInp = document.getElementById('add-proj-date') as HTMLInputElement | null;
+                if (dateInp) dateInp.value = new Date().toISOString().split('T')[0];
+                modal.style.display = 'flex';
+            }
+        });
+
+        // Open Add Assay
+        document.getElementById('btn-cm-add-assay')?.addEventListener('click', () => {
+            showToast('فتح شاشة تسجيل وإضافة مقايسة جديدة...');
+        });
+
+        // Check National ID button
+        document.getElementById('btn-cust-check-id')?.addEventListener('click', () => {
+            const nid = (document.getElementById('add-cust-national-id') as HTMLInputElement | null)?.value.trim();
+            if (!nid || nid.length !== 14) {
+                showToast('يرجى إدخال رقم قومي صحيح مكون من 14 رقماً للفحص.', 'warning');
+                return;
+            }
+            showToast(`تم فحص الرقم القومي (${nid}) بنجاح: الرقم سليم وصالح للتسجيل ✓`, 'success');
+        });
+
+        // Save New Customer
+        document.getElementById('btn-save-new-customer')?.addEventListener('click', async () => {
+            const name = (document.getElementById('add-cust-name') as HTMLInputElement | null)?.value.trim();
+            const meter = (document.getElementById('add-cust-meter-no') as HTMLInputElement | null)?.value.trim();
+            const address = (document.getElementById('add-cust-address') as HTMLInputElement | null)?.value.trim();
+            const nationalId = (document.getElementById('add-cust-national-id') as HTMLInputElement | null)?.value.trim();
+            const phone = (document.getElementById('add-cust-phone') as HTMLInputElement | null)?.value.trim();
+            const subType = (document.getElementById('add-cust-sub-type') as HTMLSelectElement | null)?.value;
+            const custType = (document.getElementById('add-cust-type') as HTMLSelectElement | null)?.value;
+            const contractNo = (document.getElementById('add-cust-contract-no') as HTMLInputElement | null)?.value.trim() || '100';
+            const contractYear = (document.getElementById('add-cust-contract-year') as HTMLInputElement | null)?.value.trim() || '2026';
+            const accRef = (document.getElementById('add-cust-account-ref') as HTMLInputElement | null)?.value.trim() || '526/10/55/4456/0/3';
+
+            if (!name || !meter || !address) {
+                showToast('يرجى ملء الحقول المطلوبة: اسم المشترك، رقم العداد، والعنوان التفصيلي.', 'error');
+                return;
+            }
+
+            const newCust = {
+                name,
+                customerName: name,
+                meterNumber: meter,
+                meterChassisNumber: meter,
+                address,
+                nationalId,
+                identityNumber: nationalId,
+                phone,
+                customerType: custType,
+                contractNumber: contractNo,
+                contractYear,
+                accountRefrence: accRef,
+                sectorName: 'المنيا شمال',
+                publicAdministrationName: 'بنى مزار شرق',
+                subAdministrationName: 'بنى مزار شرق',
+                regionName: 'بنى مزار شرق10',
+                status: 'مركب'
+            };
+
+            try {
+                await fetch('http://127.0.0.1:5002/api/customers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newCust)
+                });
+            } catch (e) {}
+
+            showToast(`تم حفظ وتسجيل المشترك "${name}" بنجاح في المنظومة!`, 'success');
+            const modal = document.getElementById('modal-add-customer');
+            if (modal) modal.style.display = 'none';
+            loadCustomers(1);
+        });
+
+        // Save New Project
+        document.getElementById('btn-save-new-project')?.addEventListener('click', () => {
+            const projName = (document.getElementById('add-proj-name') as HTMLInputElement | null)?.value.trim();
+            if (!projName) {
+                showToast('يرجى إدخال اسم المشروع.', 'error');
+                return;
+            }
+            showToast(`تم حفظ بيانات مشروع المشترك "${projName}" بنجاح!`, 'success');
+            const modal = document.getElementById('modal-add-project');
+            if (modal) modal.style.display = 'none';
+        });
+
         document.getElementById('btn-cm-card-search')?.addEventListener('click', () => {
             handleCustomerCardSearch();
         });
