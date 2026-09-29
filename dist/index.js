@@ -17471,6 +17471,16 @@ const getCustomerDebtsSummary = (customerId, meterNumber) => {
 // Helper: Open Debt Payoff Modal (سداد دين - مطابق لمنظومة MEEDCO وفيديو الديون)
 let currentPayoffDebtId = null;
 let payoffModalListenersInitialized = false;
+const formatMeedcoDateTime = (d = new Date()) => {
+    const hours = d.getHours();
+    const period = hours < 12 ? 'AM' : 'PM';
+    const h12 = String((hours % 12) || 12).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${period} ${h12}:${min} ${day}/${month}/${year}`;
+};
 const openDebtPayoffModal = (debtId) => {
     initDebtsDefaultsIfNeeded();
     const debt = (state.debts || []).find(d => String(d.id) === String(debtId));
@@ -17540,7 +17550,7 @@ const openDebtPayoffModal = (debtId) => {
                     amount: Number(instVal.toFixed(2)),
                     paidAmount: isPaid ? Number(instVal.toFixed(2)) : 0,
                     status: isPaid ? 'مسدد' : (i === (debt.paidInstallmentsCount || 0) + 1 ? 'مستحق' : 'قادم'),
-                    payDate: isPaid ? '04/01/2026 09:44 AM' : null
+                    payDate: isPaid ? 'AM 09:44 04/01/2025' : null
                 });
             }
             debt.installments = installments;
@@ -17626,7 +17636,7 @@ const initPayoffModalListeners = () => {
             return;
         }
         const rcptNo = 'RCP-' + Date.now().toString().slice(-8);
-        const nowTime = new Date().toLocaleString('ar-EG');
+        const nowTime = formatMeedcoDateTime(new Date());
         // Distribute payoff across installments
         let remainingToPay = amt;
         let installments = debt.installments || [];
@@ -17689,73 +17699,100 @@ const openDebtInstallmentsDetailsModal = (debtId) => {
         return;
     }
     const modal = document.getElementById('modal-debt-installments-details');
-    const titleEl = document.getElementById('dtl-debt-title');
-    const subtitleEl = document.getElementById('dtl-debt-subtitle');
-    const origAmtEl = document.getElementById('dtl-orig-amt');
-    const paidAmtEl = document.getElementById('dtl-paid-amt');
-    const remAmtEl = document.getElementById('dtl-rem-amt');
-    const instAmtEl = document.getElementById('dtl-inst-amt');
-    const tbody = document.getElementById('dtl-installments-tbody');
-    if (titleEl)
-        titleEl.textContent = `بيان أقساط: ${debt.debtTypeName}`;
-    if (subtitleEl)
-        subtitleEl.textContent = `المشترك: ${debt.customerName} | عداد: ${debt.meterNumber} (${debt.subscriptionCode})`;
-    if (origAmtEl)
-        origAmtEl.textContent = Number(debt.totalDebtAmount).toFixed(2) + ' ج.م';
-    if (paidAmtEl)
-        paidAmtEl.textContent = Number(debt.paidAmount).toFixed(2) + ' ج.م';
+    const catEl = document.getElementById('dtl-debt-category');
+    const typeEl = document.getElementById('dtl-debt-typename');
+    const dueDateEl = document.getElementById('dtl-debt-due-date');
+    const totalAmtEl = document.getElementById('dtl-debt-total-amount');
+    const instCountEl = document.getElementById('dtl-debt-installments-count');
+    const remAmtEl = document.getElementById('dtl-debt-remaining-amount');
+    // Top 6 Fields (matching frame_017s & frame_042s)
+    if (catEl)
+        catEl.value = debt.category || debt.customerCategory || 'انارة';
+    if (typeEl)
+        typeEl.value = debt.debtTypeName || 'معايرة';
+    if (dueDateEl)
+        dueDateEl.value = debt.dueDate || debt.startDate || '1/01/2025';
+    if (totalAmtEl)
+        totalAmtEl.value = Number(debt.totalDebtAmount || 0).toFixed(1);
+    if (instCountEl)
+        instCountEl.value = String(debt.installmentsCount || (debt.installments ? debt.installments.length : 12));
     if (remAmtEl)
-        remAmtEl.textContent = Number(debt.remainingAmount).toFixed(2) + ' ج.م';
-    if (instAmtEl)
-        instAmtEl.textContent = Number(debt.installmentAmount).toFixed(2) + ' ج.م';
+        remAmtEl.value = Number(debt.remainingAmount || 0).toFixed(2);
+    // Section: سبب نزول دين فرق تعريفة (matching frame_042s)
+    const diffSection = document.getElementById('dtl-tariff-diff-section');
+    const isDiffTariff = (debt.debtTypeName && (debt.debtTypeName.includes('تعريفة') || debt.debtTypeName.includes('فرق'))) || (debt.tariffDiffData != null);
+    if (diffSection) {
+        if (isDiffTariff) {
+            diffSection.style.display = 'block';
+            const diffMonthEl = document.getElementById('dtl-diff-consumption-month');
+            const diffReasonEl = document.getElementById('dtl-diff-reason');
+            const diffCurrentActEl = document.getElementById('dtl-diff-current-act');
+            const diffPrevActEl = document.getElementById('dtl-diff-prev-act');
+            const diffTariffEl = document.getElementById('dtl-diff-tariff');
+            const diffMeterAmtEl = document.getElementById('dtl-diff-meter-amt');
+            const diffSysAmtEl = document.getElementById('dtl-diff-sys-amt');
+            if (diffMonthEl)
+                diffMonthEl.value = debt.consumptionMonth || '2026/7/1';
+            if (diffReasonEl)
+                diffReasonEl.value = debt.diffReason || 'تغيير تعريفة';
+            if (diffCurrentActEl)
+                diffCurrentActEl.value = debt.currentActivity || 'استخدامات منزلية';
+            if (diffPrevActEl)
+                diffPrevActEl.value = debt.previousActivity || 'استخدامات منزلية';
+            if (diffTariffEl)
+                diffTariffEl.value = debt.tariffCode || '98';
+            if (diffMeterAmtEl)
+                diffMeterAmtEl.value = Number(debt.meterAmount || 482.35).toFixed(2);
+            if (diffSysAmtEl)
+                diffSysAmtEl.value = Number(debt.systemAmount || debt.totalDebtAmount || 568.72).toFixed(2);
+        }
+        else {
+            diffSection.style.display = 'none';
+        }
+    }
+    // Installments Table (matching frame_017s & frame_042s)
+    const tbody = document.getElementById('dtl-installments-tbody');
     if (tbody) {
         let installments = debt.installments || [];
         if (installments.length === 0) {
-            // Generate sample installments if missing
-            const count = debt.installmentsCount || 1;
-            const instVal = debt.installmentAmount || (debt.totalDebtAmount / count);
+            const count = debt.installmentsCount || 12;
+            const total = Number(debt.totalDebtAmount) || 313.3;
+            const instVal = debt.installmentAmount || (total / count);
             installments = [];
             for (let i = 1; i <= count; i++) {
                 const isPaid = i <= (debt.paidInstallmentsCount || 0);
+                const m = String(i).padStart(2, '0');
                 installments.push({
                     seq: i,
-                    dueDate: `2026-${String(i).padStart(2, '0')}-01`,
-                    amount: Number(instVal.toFixed(2)),
-                    paidAmount: isPaid ? Number(instVal.toFixed(2)) : 0,
-                    status: isPaid ? 'مسدد' : (i === (debt.paidInstallmentsCount || 0) + 1 ? 'مستحق' : 'قادم'),
-                    payDate: isPaid ? '2026-08-01' : null
+                    dueDate: `1/${m}/2025`,
+                    amount: i === 1 ? Number((instVal + 5.45).toFixed(2)) : (i === count ? Number((instVal + 0.05).toFixed(2)) : Number(instVal.toFixed(2))),
+                    paidAmount: isPaid ? (i === 1 ? Number((instVal + 5.45).toFixed(2)) : Number(instVal.toFixed(2))) : 0,
+                    status: isPaid ? 'مسدد' : 'مستحق',
+                    payDate: isPaid ? `${i + 3}/${m}/2025` : null,
+                    isPostponed: false,
+                    postponeDate: null
                 });
             }
             debt.installments = installments;
         }
-        tbody.innerHTML = installments.map(inst => `
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 8px 12px; font-weight: bold;">القسط ${inst.seq}</td>
-                    <td style="padding: 8px 12px;">${inst.dueDate}</td>
-                    <td style="padding: 8px 12px; font-family: monospace; font-weight: bold;">${Number(inst.amount).toFixed(2)} ج.م</td>
-                    <td style="padding: 8px 12px; font-family: monospace; color: #16a34a;">${Number(inst.paidAmount).toFixed(2)} ج.م</td>
-                    <td style="padding: 8px 12px;">${inst.payDate || '-'}</td>
-                    <td style="padding: 8px 12px;">
-                        <span style="padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold; ${inst.status === 'مسدد' ? 'background: #dcfce7; color: #166534;' : (inst.status === 'مستحق' ? 'background: #fee2e2; color: #991b1b;' : 'background: #f1f5f9; color: #475569;')}">${inst.status}</span>
-                    </td>
-                    <td style="padding: 8px 12px; text-align: center;">
-                        ${inst.status !== 'مسدد' ? `
-                            <button type="button" class="btn btn-sm btn-pay-single-inst" data-debt-id="${debt.id}" data-seq="${inst.seq}" style="background:#16a34a; color:#fff; border:none; padding:3px 8px; border-radius:4px; font-size:0.8rem; cursor:pointer; font-weight:bold;">سداد الآن</button>
-                        ` : '<span style="color:#16a34a; font-size:0.85rem;">✓ مسدد</span>'}
-                    </td>
-                </tr>
-            `).join('');
-        // Bind single installment payment
-        tbody.querySelectorAll('.btn-pay-single-inst').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const dId = e.currentTarget.getAttribute('data-debt-id');
-                const seq = Number(e.currentTarget.getAttribute('data-seq'));
-                if (dId && seq) {
-                    await paySingleInstallment(dId, seq);
-                    openDebtInstallmentsDetailsModal(dId);
-                }
-            });
-        });
+        tbody.innerHTML = installments.map(inst => {
+            const isPaid = inst.status === 'مسدد' || (Number(inst.paidAmount) >= Number(inst.amount));
+            const remaining = isPaid ? '0' : Math.max(0, Number(inst.amount) - (Number(inst.paidAmount) || 0)).toFixed(2);
+            const reqAmt = Number(inst.amount).toFixed(2).replace(/\.00$/, '');
+            const checkIcon = '<span style="color: #14b8a6; font-size: 1.15rem; font-weight: 800;">&#10003;</span>';
+            const closeIcon = '<span style="color: #ef4444; font-size: 1.15rem; font-weight: 800;">&#10005;</span>';
+            return `
+                    <tr style="border-bottom: 1px solid #eef2f6;">
+                        <td style="padding: 10px 12px; font-weight: 600; color: #334155;">${inst.dueDate}</td>
+                        <td style="padding: 10px 12px; font-weight: 700; color: #1e293b;">${reqAmt}</td>
+                        <td style="padding: 10px 12px; font-weight: 700; color: #1e293b;">${remaining}</td>
+                        <td style="padding: 10px 12px; text-align: center;">${isPaid ? checkIcon : closeIcon}</td>
+                        <td style="padding: 10px 12px; color: #64748b;">${isPaid ? (inst.payDate || '4/01/2025') : ''}</td>
+                        <td style="padding: 10px 12px; text-align: center;">${inst.isPostponed ? checkIcon : closeIcon}</td>
+                        <td style="padding: 10px 12px; color: #64748b;">${inst.postponeDate || ''}</td>
+                    </tr>
+                `;
+        }).join('');
     }
     if (modal)
         modal.style.display = 'flex';
@@ -17821,6 +17858,10 @@ const deleteCustomerDebt = async (debtId) => {
         state.debts = (state.debts || []).filter(d => String(d.id) !== String(debtId));
         await saveState();
         logActivity('حذف دين', `تم حذف دين ${debt.debtTypeName} للمشترك ${debt.customerName}`);
+        // Bridge delete sync
+        fetch(`http://127.0.0.1:5002/api/debts/${debtId}`, {
+            method: 'DELETE'
+        }).catch(() => null);
         renderDebtsManagementSection();
     }, 'تحديث تلقائي وفوري للسحابة وجميع الأجهزة ☁️', '🗑️');
     showToast('تم حذف الدين بنجاح', 'success');

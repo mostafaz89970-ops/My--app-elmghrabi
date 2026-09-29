@@ -5922,48 +5922,108 @@
             </div>
         </div>
 
-        <!-- Modal: تفاصيل الدين والأقساط -->
-        <div id="modal-debt-installments-details" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 10005; align-items: center; justify-content: center; padding: 20px;">
-            <div style="background: #ffffff; border-radius: 12px; width: 100%; max-width: 900px; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 35px -5px rgba(0,0,0,0.35); text-align: right; direction: rtl;">
-                <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
-                    <div>
-                        <h4 id="dtl-debt-title" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #0f172a;">بيان وتفاصيل أقساط الدين</h4>
-                        <small id="dtl-debt-subtitle" style="color: #64748b; font-size: 0.88rem;">المشترك: -</small>
-                    </div>
+                <!-- Modal: تفاصيل الدين والأقساط - مطابق تماماً لفيديو MEEDCO 2025 -->
+        <div id="modal-debt-installments-details" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10005; align-items: center; justify-content: center; padding: 20px;">
+            <div style="background: #ffffff; border-radius: 12px; width: 100%; max-width: 920px; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 35px -5px rgba(0,0,0,0.35); text-align: right; direction: rtl;">
+                <!-- Header: العنوان "التفاصيل" وزر الإغلاق -->
+                <div style="padding: 18px 24px 12px 24px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.35rem; font-weight: 800; color: #1e293b;">التفاصيل</h3>
                     <button type="button" class="btn-close-modal" data-modal="modal-debt-installments-details" style="background: none; border: none; font-size: 1.5rem; color: #94a3b8; cursor: pointer;">&times;</button>
                 </div>
-                <div style="padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
-                    <!-- Financial summary cards -->
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;">
-                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center;">
-                            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">أصل الدين</div>
-                            <div id="dtl-orig-amt" style="font-size: 1.15rem; font-weight: 800; color: #0f172a; font-family: monospace;">0.00 ج.م</div>
+
+                <!-- Body (Scrollable) -->
+                <div style="padding: 10px 24px 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Top 6 Input Boxes (2 rows of 3) matching frame_017s -->
+                    <div>
+                        <!-- Row 1: الفئة | نوع الدين | تاريخ الاستحقاق -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.85rem; color: #475569; font-weight: 700; margin-bottom: 6px;">الفئة</label>
+                                <input type="text" id="dtl-debt-category" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 12px; font-weight: 700; color: #1e293b; font-size: 0.95rem;" />
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.85rem; color: #475569; font-weight: 700; margin-bottom: 6px;">نوع الدين</label>
+                                <input type="text" id="dtl-debt-typename" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 12px; font-weight: 700; color: #1e293b; font-size: 0.95rem;" />
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.85rem; color: #475569; font-weight: 700; margin-bottom: 6px;">تاريخ الاستحقاق</label>
+                                <input type="text" id="dtl-debt-due-date" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 12px; font-weight: 700; color: #1e293b; font-size: 0.95rem;" />
+                            </div>
                         </div>
-                        <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px; text-align: center;">
-                            <div style="font-size: 0.8rem; color: #065f46; font-weight: 600;">المبلغ المسدد</div>
-                            <div id="dtl-paid-amt" style="font-size: 1.15rem; font-weight: 800; color: #16a34a; font-family: monospace;">0.00 ج.م</div>
-                        </div>
-                        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; text-align: center;">
-                            <div style="font-size: 0.8rem; color: #991b1b; font-weight: 600;">المبلغ المتبقي</div>
-                            <div id="dtl-rem-amt" style="font-size: 1.15rem; font-weight: 800; color: #dc2626; font-family: monospace;">0.00 ج.م</div>
-                        </div>
-                        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; text-align: center;">
-                            <div style="font-size: 0.8rem; color: #1e40af; font-weight: 600;">قيمة القسط الشهري</div>
-                            <div id="dtl-inst-amt" style="font-size: 1.15rem; font-weight: 800; color: #0284c7; font-family: monospace;">0.00 ج.م</div>
+
+                        <!-- Row 2: اجمالي الدين | عدد الاقساط | المتبقي -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.85rem; color: #475569; font-weight: 700; margin-bottom: 6px;">اجمالي الدين</label>
+                                <input type="text" id="dtl-debt-total-amount" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 12px; font-weight: 700; color: #1e293b; font-size: 0.95rem; font-family: monospace;" />
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.85rem; color: #475569; font-weight: 700; margin-bottom: 6px;">عدد الاقساط</label>
+                                <input type="text" id="dtl-debt-installments-count" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 12px; font-weight: 700; color: #1e293b; font-size: 0.95rem;" />
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.85rem; color: #475569; font-weight: 700; margin-bottom: 6px;">المتبقي</label>
+                                <input type="text" id="dtl-debt-remaining-amount" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 12px; font-weight: 700; color: #1e293b; font-size: 0.95rem; font-family: monospace;" />
+                            </div>
                         </div>
                     </div>
-                    <!-- Table -->
+
+                    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 6px 0;" />
+
+                    <!-- Section: سبب نزول دين فرق تعريفة (يظهر فقط إذا كان نوع الدين فرق تعريفة) matching frame_042s -->
+                    <div id="dtl-tariff-diff-section" style="display: none;">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+                            <span style="background: #14b8a6; color: #ffffff; padding: 6px 18px; border-radius: 6px; font-weight: 800; font-size: 0.9rem;">سبب نزول دين فرق تعريفة</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.82rem; color: #64748b; font-weight: 700; margin-bottom: 6px;">شهر الاستهلاك</label>
+                                <input type="text" id="dtl-diff-consumption-month" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-weight: 700; color: #1e293b;" />
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.82rem; color: #64748b; font-weight: 700; margin-bottom: 6px;">سبب الدين</label>
+                                <input type="text" id="dtl-diff-reason" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-weight: 700; color: #1e293b;" />
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.82rem; color: #64748b; font-weight: 700; margin-bottom: 6px;">النشاط الحالي</label>
+                                <input type="text" id="dtl-diff-current-act" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-weight: 700; color: #1e293b;" />
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.82rem; color: #64748b; font-weight: 700; margin-bottom: 6px;">النشاط السابق</label>
+                                <input type="text" id="dtl-diff-prev-act" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-weight: 700; color: #1e293b;" />
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.82rem; color: #64748b; font-weight: 700; margin-bottom: 6px;">التعريفة</label>
+                                <input type="text" id="dtl-diff-tariff" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-weight: 700; color: #1e293b;" />
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.82rem; color: #64748b; font-weight: 700; margin-bottom: 6px;">المبلغ بالعداد</label>
+                                <input type="text" id="dtl-diff-meter-amt" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-weight: 700; color: #1e293b;" />
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 8px;">
+                            <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                                <label style="font-size: 0.82rem; color: #64748b; font-weight: 700; margin-bottom: 6px;">المبلغ بالنظام</label>
+                                <input type="text" id="dtl-diff-sys-amt" readonly style="width: 100%; text-align: center; background: #eef2f6; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-weight: 700; color: #1e293b;" />
+                            </div>
+                        </div>
+                        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 10px 0;" />
+                    </div>
+
+                    <!-- Table matching frame_017s / frame_042s -->
                     <div style="overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.88rem;">
+                        <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.88rem;">
                             <thead>
-                                <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #475569;">
-                                    <th style="padding: 10px 12px;">القسط</th>
-                                    <th style="padding: 10px 12px;">تاريخ الاستحقاق</th>
-                                    <th style="padding: 10px 12px;">القيمة</th>
-                                    <th style="padding: 10px 12px;">المسدد</th>
-                                    <th style="padding: 10px 12px;">تاريخ السداد</th>
-                                    <th style="padding: 10px 12px;">الحالة</th>
-                                    <th style="padding: 10px 12px; text-align: center;">الإجراءات</th>
+                                <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #475569; font-weight: 800;">
+                                    <th style="padding: 10px 12px; text-align: center;">تاريخ الاستحقاق</th>
+                                    <th style="padding: 10px 12px; text-align: center;">القسط المطلوب</th>
+                                    <th style="padding: 10px 12px; text-align: center;">المتبقي</th>
+                                    <th style="padding: 10px 12px; text-align: center;">تم الدفع ؟</th>
+                                    <th style="padding: 10px 12px; text-align: center;">تاريخ الدفع</th>
+                                    <th style="padding: 10px 12px; text-align: center;">مؤجل ؟</th>
+                                    <th style="padding: 10px 12px; text-align: center;">تاريخ التأجيل</th>
                                 </tr>
                             </thead>
                             <tbody id="dtl-installments-tbody">
@@ -5972,12 +6032,13 @@
                         </table>
                     </div>
                 </div>
-                <div style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end;">
-                    <button type="button" class="btn secondary btn-close-modal" data-modal="modal-debt-installments-details" style="padding: 8px 24px; font-weight: 700;">إغلاق</button>
+
+                <!-- Footer with إلغاء button on bottom-left matching frame_042s -->
+                <div style="padding: 12px 24px; border-top: 1px solid #e2e8f0; background: #ffffff; display: flex; justify-content: flex-start;">
+                    <button type="button" class="btn secondary btn-close-modal" data-modal="modal-debt-installments-details" style="background: #cbd5e1; color: #1e293b; border: none; padding: 7px 24px; border-radius: 6px; font-weight: 800; font-size: 0.95rem; cursor: pointer;">إلغاء</button>
                 </div>
             </div>
         </div>
-
 
         <!-- Modal 1: إضافة وتعديل دين - مطابق تماماً لـ MEEDCO app-add-debt -->
         <div id="modal-add-debt" class="modal-dialog-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
