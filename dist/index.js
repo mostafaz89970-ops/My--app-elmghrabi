@@ -7408,7 +7408,7 @@ const exportSupplyPortfoliosToExcel = () => {
     showToast('تم تصدير سجل حافظات التوريد بنجاح!', 'success');
 };
 const initSupplyPortfoliosListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18;
     // Calculation input triggers
     document.querySelectorAll('.sp-calc-input, .sp-system-input').forEach(inp => {
         inp.addEventListener('input', () => calculateSupplyPortfolioLive());
@@ -7702,59 +7702,6 @@ const initSupplyPortfoliosListeners = () => {
     });
     (_18 = document.getElementById('btn-sp-tx-modal-print')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', () => {
         printCurrentCashierTransactions();
-    });
-    // ===== مزامنة المعصرة الحية من المتصفح =====
-    (_19 = document.getElementById('btn-sp-maasara-live-sync')) === null || _19 === void 0 ? void 0 : _19.addEventListener('click', async () => {
-        var _a;
-        const dateInput = document.getElementById('sp-portfolio-date');
-        const userInput = document.getElementById('sp-portfolio-user');
-        const userSelect = document.getElementById('sp-portfolio-user-select');
-        const statusEl = document.getElementById('sp-maasara-live-status');
-        const date = ((dateInput === null || dateInput === void 0 ? void 0 : dateInput.value) || new Date().toISOString().slice(0, 10)).trim();
-        const userName = ((userInput === null || userInput === void 0 ? void 0 : userInput.value) || (userSelect === null || userSelect === void 0 ? void 0 : userSelect.value) || '').trim();
-        if (statusEl)
-            statusEl.textContent = '⏳ جارِ المزامنة...';
-        // محاولة قراءة المحتوى من نافذة المعصرة المفتوحة في المتصفح
-        try {
-            // إرسال الصفحة الحالية إذا كنا على صفحة المعصرة
-            const maasaraPageContent = document.body.innerHTML;
-            const isMaasaraPage = window.location.href.includes('200.1.1.240') ||
-                document.title.includes('معصرة') ||
-                maasaraPageContent.includes('CustomersRechargesTotalPaymentByUser') ||
-                maasaraPageContent.includes('RechargeByUser');
-            let payload = { date, html: '' };
-            if (isMaasaraPage) {
-                payload.html = maasaraPageContent;
-            }
-            else {
-                // محاولة فتح نافذة المعصرة وقراءة بياناتها (نفس النطاق الداخلي)
-                showToast('افتح صفحة http://200.1.1.240:5050 واستخدم F12 → Console للصق الكود', 'info');
-                const code = `fetch('http://127.0.0.1:5002/api/reports/maasara-live', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({html:document.body.innerHTML,date:'${date}'})}).then(r=>r.json()).then(res=>alert('✓ ' + res.message + ' - أعد تحميل حافظة التوريد الآن')).catch(e=>alert('خطأ: '+e.message));`;
-                (_a = navigator.clipboard) === null || _a === void 0 ? void 0 : _a.writeText(code).catch(() => { });
-                if (statusEl)
-                    statusEl.textContent = '📋 الكود نُسخ للحافظة - الصقه في Console صفحة المعصرة';
-                return;
-            }
-            const res = await fetch('http://127.0.0.1:5002/api/reports/maasara-live', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(r => r.json()).catch(() => null);
-            if (res && res.success) {
-                if (statusEl)
-                    statusEl.textContent = `✓ ${res.message}`;
-                showToast(`✓ تم مزامنة بيانات المعصرة: ${res.message}`, 'success');
-                setTimeout(() => autoFetchUserProgramsRevenue(false), 400);
-            }
-            else {
-                if (statusEl)
-                    statusEl.textContent = '⚠️ ' + ((res === null || res === void 0 ? void 0 : res.message) || 'تعذرت المزامنة');
-            }
-        }
-        catch (e) {
-            if (statusEl)
-                statusEl.textContent = '❌ ' + e.message;
-        }
     });
 };
 // =========================================================================

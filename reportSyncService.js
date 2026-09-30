@@ -179,6 +179,18 @@ async function fetchMaasaraDailySales(dateStr) {
         dateStr = new Date().toISOString().slice(0, 10);
     }
     const cacheFile = path.join(CACHE_DIR, `maasara_${dateStr}.json`);
+
+    // 1. جلب آلي ومباشر من سيرفر المعصرة عبر maasaraClient (مثل المنظومة الموحدة تماماً)
+    try {
+        const maasaraClient = require('./maasaraClient');
+        const liveReport = await maasaraClient.fetchDailyReport(dateStr);
+        if (liveReport && liveReport.success && Array.isArray(liveReport.users) && liveReport.users.length > 0) {
+            return liveReport;
+        }
+    } catch (liveErr) {
+        console.warn(`[ReportSync] Maasara direct client error:`, liveErr.message);
+    }
+
     const liveCacheFile = path.join(CACHE_DIR, `maasara_live_${dateStr}.json`);
     if (fs.existsSync(liveCacheFile)) {
         try {
@@ -575,16 +587,14 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
     }
     if (dateList.length === 0) dateList.push(fromDateStr);
 
-    // جلب تقرير المعصرة الشامل دفعة واحدة وبسرعة فائقة
-    const maasaraFullRes = await fetchMaasaraDailySales('all');
-
-    // جلب بيانات البرامج لكافة أيام الفترة
+    // جلب بيانات البرامج لكافة أيام الفترة (المنظومة الموحدة MEEDCO، إسكرا، والمعصرة آلياً)
     const dayResults = await Promise.all(dateList.map(async (d) => {
-        const [meedcoRes, iskraRes] = await Promise.all([
+        const [meedcoRes, iskraRes, maasaraRes] = await Promise.all([
             fetchMeedcoDailySales(d),
-            fetchIskraDailySales(d)
+            fetchIskraDailySales(d),
+            fetchMaasaraDailySales(d)
         ]);
-        return { date: d, meedco: meedcoRes, iskra: iskraRes };
+        return { date: d, meedco: meedcoRes, iskra: iskraRes, maasara: maasaraRes };
     }));
 
     // قراءة كافة الحافظات المحفوظة ضمن الفترة
@@ -660,57 +670,20 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
                 }
             });
         }
-    });
-
-    // 3. Maasara (تجميع دقيق وعاجل لكافة عمليات المعصرة الواقعة ضمن الفترة)
-    if (maasaraFullRes && Array.isArray(maasaraFullRes.users)) {
-        maasaraFullRes.users.forEach(u => {
-            const rangeItems = (u.items || []).filter(it => it.paymentDate >= fromDateStr && it.paymentDate <= toDateStr);
-            const rangeCount = rangeItems.length;
-            const rangeAmount = Math.round(rangeItems.reduce((acc, it) => acc + (it.amount || 0), 0) * 100) / 100;
-
-            if (rangeCount > 0) {
+        // 3. Maasara (المعصرة الحية والتلقائية)
+        if (dayRes.maasara && dayRes.maasara.success && Array.isArray(dayRes.maasara.users)) {
+            dayRes.maasara.users.forEach(u => {
                 const entry = getOrCreateUser(u.userName);
                 if (entry) {
-                    entry.maasara.amount = Math.round((entry.maasara.amount + rangeAmount) * 100) / 100;
-                    entry.maasara.count += rangeCount;
-                    entry.maasara.items.push(...rangeItems);
-                    if (rangeItems.length > 0 && rangeItems[0].subAdmin) {
-                        entry.subAdmin = rangeItems[0].subAdmin;
-                        entry.branch = rangeItems[0].subAdmin.includes('هندسة') ? rangeItems[0].subAdmin : `هندسة ${rangeItems[0].subAdmin}`;
+                    entry.maasara.amount = Math.round((entry.maasara.amount + (u.totalAmount || 0)) * 100) / 100;
+                    entry.maasara.count += (u.rechargesCount || 0);
+                    if (Array.isArray(u.items)) {
+                        entry.maasara.items.push(...u.items);
                     }
                 }
-            }
-        });
-    }
-
-    // دمج بيانات المعصرة الحية المسجلة من المتصفح (maasara_live_*.json)
-    try {
-        const liveFiles = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith('maasara_live_') && f.endsWith('.json'));
-        liveFiles.forEach(lf => {
-            const datePart = lf.replace('maasara_live_', '').replace('.json', '');
-            if (datePart >= fromDateStr && datePart <= toDateStr) {
-                const liveObj = JSON.parse(fs.readFileSync(path.join(CACHE_DIR, lf), 'utf8'));
-                if (liveObj && Array.isArray(liveObj.users)) {
-                    liveObj.users.forEach(u => {
-                        const entry = getOrCreateUser(u.userName);
-                        if (entry) {
-                            const uAmt = Number(u.totalAmount || u.amount || 0);
-                            const uCnt = Number(u.rechargesCount || u.count || 1);
-                            // Avoid duplicate if already aggregated from items
-                            if (entry.maasara.amount === 0) {
-                                entry.maasara.amount = Math.round((entry.maasara.amount + uAmt) * 100) / 100;
-                                entry.maasara.count += uCnt;
-                            }
-                            if (Array.isArray(u.items) && u.items.length > 0) {
-                                entry.maasara.items.push(...u.items);
-                            }
-                        }
-                    });
-                }
-            }
-        });
-    } catch (e) {}
+            });
+        }
+    });
 
     // 4. مطابقة مع الحافظات الفعلية المسجلة
     rangePortfolios.forEach(p => {
