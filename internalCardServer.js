@@ -489,6 +489,32 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // تجديد الجلسة التلقائي (يستدعيه الـ Watchdog كل 20 دقيقة بعد الاستيقاظ)
+            if (pathname === '/api/meedco/auto-renew-session' && req.method === 'POST') {
+                try {
+                    const unifiedClient = require('./unifiedCardClient');
+                    const status = await unifiedClient.getMeedcoStatus();
+                    if (status && status.connected) {
+                        res.writeHead(200);
+                        res.end(JSON.stringify({ success: true, renewed: false, message: 'الجلسة نشطة وصالحة' }));
+                        return;
+                    }
+                    // الجلسة منتهية — جدد تلقائياً إذا كانت بيانات الدخول محفوظة
+                    const renewResult = await unifiedClient.ensureValidSession(true);
+                    if (renewResult) {
+                        res.writeHead(200);
+                        res.end(JSON.stringify({ success: true, renewed: true, message: 'تم تجديد جلسة MEEDCO تلقائياً' }));
+                    } else {
+                        res.writeHead(200);
+                        res.end(JSON.stringify({ success: false, renewed: false, message: 'تعذر تجديد الجلسة — يرجى تسجيل الدخول يدوياً' }));
+                    }
+                } catch (renewErr) {
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ success: false, renewed: false, message: renewErr.message }));
+                }
+                return;
+            }
+
             if (pathname === '/api/meedco/hierarchy') {
                 const sectorId = url.searchParams.get('sectorId');
                 const publicAdminId = url.searchParams.get('publicAdminId');
@@ -664,6 +690,28 @@ function startInternalServer(port = 5002) {
 
     server.listen(port, '127.0.0.1', () => {
         console.log(`[InternalServer] Standalone Native Card Server running on http://127.0.0.1:${port}`);
+
+        // تجديد جلسة MEEDCO تلقائياً بعد 2 ثانية من بدء التشغيل
+        // (يضمن توفر البيانات فور فتح التطبيق بعد النوم أو إعادة التشغيل)
+        setTimeout(async () => {
+            try {
+                const unifiedClient = require('./unifiedCardClient');
+                const status = await unifiedClient.getMeedcoStatus();
+                if (status && status.connected) {
+                    console.log('[InternalServer] جلسة MEEDCO نشطة ✓ (' + (status.user || '') + ')');
+                } else {
+                    console.log('[InternalServer] جلسة MEEDCO منتهية — جارٍ التجديد التلقائي...');
+                    const result = await unifiedClient.ensureValidSession(true);
+                    if (result) {
+                        console.log('[InternalServer] تم تجديد جلسة MEEDCO بنجاح ✓');
+                    } else {
+                        console.warn('[InternalServer] تعذر التجديد التلقائي. سيتطلب تسجيل دخول يدوي.');
+                    }
+                }
+            } catch (sessionErr) {
+                console.warn('[InternalServer] تحقق الجلسة عند البدء:', sessionErr.message);
+            }
+        }, 2000);
     });
 
     return server;

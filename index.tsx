@@ -70040,6 +70040,18 @@ function initMeedcoGateway() {
 
         try {
 
+            // أولاً: تحقق من أن السيرفر المحلي يعمل
+            let serverAlive = false;
+            try {
+                const ping = await fetch('http://127.0.0.1:5002/api/status', { signal: AbortSignal.timeout(3000) });
+                serverAlive = ping.ok;
+            } catch (_) {}
+
+            if (!serverAlive) {
+                updateStatusUI(null);
+                return;
+            }
+
             const res = await fetch('http://127.0.0.1:5002/api/meedco/status').then(r => r.json()).catch(() => null);
 
             if (res) {
@@ -70052,11 +70064,42 @@ function initMeedcoGateway() {
 
                 }
 
+                // إذا انتهت الجلسة وبيانات الدخول محفوظة — جدد تلقائياً بصمت
+                if (!res.connected && res.hasSavedCredentials) {
+                    try {
+                        const renewRes = await fetch('http://127.0.0.1:5002/api/meedco/auto-renew-session', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: '{}',
+                            signal: AbortSignal.timeout(15000)
+                        }).then(r => r.json()).catch(() => null);
+
+                        if (renewRes && renewRes.success) {
+                            const refreshed = await fetch('http://127.0.0.1:5002/api/meedco/status').then(r => r.json()).catch(() => null);
+                            if (refreshed) updateStatusUI(refreshed);
+                        }
+                    } catch (_) {}
+                }
+
             }
 
         } catch (e) {}
 
     };
+
+    // ─── اكتشاف الاستيقاظ من النوم ──────────────────────────────────────────
+    let lastVisibleTime = Date.now();
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            const gap = Date.now() - lastVisibleTime;
+            if (gap > 60000) {
+                setTimeout(fetchStatus, 800);
+            }
+            lastVisibleTime = Date.now();
+        } else {
+            lastVisibleTime = Date.now();
+        }
+    });
 
 
 
@@ -70418,7 +70461,8 @@ function initMeedcoGateway() {
 
     fetchStatus();
 
-    setInterval(fetchStatus, 60000);
+    // فحص كل 30 ثانية — أسرع اكتشافاً لوضع النوم والانقطاع
+    setInterval(fetchStatus, 30000);
 
 }
 
