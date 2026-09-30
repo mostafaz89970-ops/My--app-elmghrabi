@@ -11819,6 +11819,12 @@ const handlePrintJudicialControlDetails = () => {
                 userInput.value = select.value || currentUser;
             }
 
+            if (!currentEditingSupplyPortfolio) {
+                setTimeout(() => {
+                    autoFetchUserProgramsRevenue(false);
+                }, 200);
+            }
+
             if (forceSync) {
                 showToast(`تم تحديث وسحب ${users.length} مستخدم من المنظومة الموحدة بنجاح!`, 'success');
             }
@@ -12826,6 +12832,9 @@ const handlePrintJudicialControlDetails = () => {
 
         // Automatically fetch programs revenue whenever cashier selection changes
         document.getElementById('sp-portfolio-user-select')?.addEventListener('change', () => {
+            const sel = document.getElementById('sp-portfolio-user-select') as HTMLSelectElement | null;
+            const inp = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
+            if (sel && inp) inp.value = sel.value;
             autoFetchUserProgramsRevenue(false);
         });
 
@@ -12903,6 +12912,26 @@ const handlePrintJudicialControlDetails = () => {
             loadComprehensiveDailyReport(true);
         });
 
+        document.getElementById('btn-sp-detail-apply')?.addEventListener('click', () => {
+            loadComprehensiveDailyReport(false);
+        });
+
+        document.getElementById('sp-detail-from-date')?.addEventListener('change', () => {
+            loadComprehensiveDailyReport(false);
+        });
+
+        document.getElementById('sp-detail-to-date')?.addEventListener('change', () => {
+            loadComprehensiveDailyReport(false);
+        });
+
+        document.getElementById('sp-detail-branch-filter')?.addEventListener('change', () => {
+            loadComprehensiveDailyReport(false);
+        });
+
+        document.getElementById('sp-detail-user-filter')?.addEventListener('change', () => {
+            filterAndRenderComprehensiveTable();
+        });
+
         document.getElementById('sp-detail-date')?.addEventListener('change', () => {
             loadComprehensiveDailyReport(false);
         });
@@ -12946,6 +12975,7 @@ const handlePrintJudicialControlDetails = () => {
 
     let currentComprehensiveReportData: any = null;
     let currentSelectedCashierForModal: any = null;
+    let currentFilteredComprehensiveUsers: any[] = [];
 
     const autoFetchUserProgramsRevenue = async (showToastNotice = true) => {
         const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
@@ -13036,11 +13066,28 @@ const handlePrintJudicialControlDetails = () => {
     };
 
     const loadComprehensiveDailyReport = async (forceSync = false) => {
-        const dateInput = document.getElementById('sp-detail-date') as HTMLInputElement | null;
-        if (dateInput && !dateInput.value) {
-            dateInput.value = new Date().toISOString().slice(0, 10);
+        const fromInput = document.getElementById('sp-detail-from-date') as HTMLInputElement | null;
+        const toInput = document.getElementById('sp-detail-to-date') as HTMLInputElement | null;
+        const branchSelect = document.getElementById('sp-detail-branch-filter') as HTMLSelectElement | null;
+        const legacyDateInput = document.getElementById('sp-detail-date') as HTMLInputElement | null;
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (fromInput && !fromInput.value) {
+            fromInput.value = todayStr;
         }
-        const date = (dateInput?.value || new Date().toISOString().slice(0, 10)).trim();
+        if (toInput && !toInput.value) {
+            toInput.value = todayStr;
+        }
+        if (legacyDateInput && !legacyDateInput.value) {
+            legacyDateInput.value = fromInput?.value || todayStr;
+        }
+
+        const fromDate = (fromInput?.value || legacyDateInput?.value || todayStr).trim();
+        const toDate = (toInput?.value || fromDate).trim();
+        const branch = (branchSelect?.value || 'all').trim();
+
+        const btnRefreshText = document.getElementById('btn-sp-detail-refresh-text');
+        if (btnRefreshText) btnRefreshText.textContent = 'جارِ فحص ومزامنة البرامج... ⏳';
 
         const tbody = document.getElementById('sp-detail-table-tbody');
         if (tbody) {
@@ -13049,7 +13096,7 @@ const handlePrintJudicialControlDetails = () => {
                     <td colspan="11" style="text-align: center; padding: 40px; color: #0284c7; font-weight: 700;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                             <span style="display: inline-block; width: 20px; height: 20px; border: 3px solid #0284c7; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
-                            <span>جارِ فحص ومزامنة تقارير المنظومات (MEEDCO، معصرة، إسكرا) وحصر النقدية...</span>
+                            <span>جارِ فحص ومزامنة تقارير المنظومات (MEEDCO، معصرة، إسكرا) للفترة [${fromDate} إلى ${toDate}]...</span>
                         </div>
                     </td>
                 </tr>
@@ -13057,15 +13104,31 @@ const handlePrintJudicialControlDetails = () => {
         }
 
         try {
-            const url = `http://127.0.0.1:5002/api/reports/comprehensive-daily?date=${encodeURIComponent(date)}`;
+            const url = `http://127.0.0.1:5002/api/reports/comprehensive-daily?from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}&branch=${encodeURIComponent(branch)}${forceSync ? '&forceSync=true' : ''}`;
             const res = await fetch(url).then(r => r.json()).catch(() => null);
 
             if (res && res.success && res.data) {
                 currentComprehensiveReportData = res.data;
+
+                // Dynamically populate user filter dropdown
+                const userFilterSelect = document.getElementById('sp-detail-user-filter') as HTMLSelectElement | null;
+                if (userFilterSelect && Array.isArray(res.data.users)) {
+                    const prevSelected = userFilterSelect.value;
+                    let optsHtml = '<option value="all">كافة المستخدمين والمحصلين</option>';
+                    const sortedNames = Array.from(new Set(res.data.users.map((u: any) => u.userName).filter(Boolean))).sort((a: any, b: any) => a.localeCompare(b, 'ar'));
+                    sortedNames.forEach((name: any) => {
+                        optsHtml += `<option value="${String(name).replace(/"/g, '&quot;')}">${String(name).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`;
+                    });
+                    userFilterSelect.innerHTML = optsHtml;
+                    if (prevSelected && sortedNames.includes(prevSelected)) {
+                        userFilterSelect.value = prevSelected;
+                    }
+                }
+
                 updateComprehensiveReportKPIs(res.data.summary);
                 filterAndRenderComprehensiveTable();
                 if (forceSync) {
-                    showToast(`تم تحديث التقرير الشامل لجميع المستخدمين لتاريخ ${date} بنجاح ✓`, 'success');
+                    showToast(`تم تحديث التقرير الشامل للفترة من ${fromDate} إلى ${toDate} بنجاح ✓`, 'success');
                 }
             } else {
                 if (tbody) {
@@ -13077,6 +13140,8 @@ const handlePrintJudicialControlDetails = () => {
             if (tbody) {
                 tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: #ef4444; font-weight: 700;">خطأ في الاتصال بالخادم: ${e.message}</td></tr>`;
             }
+        } finally {
+            if (btnRefreshText) btnRefreshText.textContent = 'تحديث ومزامنة البرامج الحية';
         }
     };
 
@@ -13124,8 +13189,13 @@ const handlePrintJudicialControlDetails = () => {
 
         const searchInput = (document.getElementById('sp-detail-search-user') as HTMLInputElement | null)?.value?.trim().toLowerCase() || '';
         const statusFilter = (document.getElementById('sp-detail-status-filter') as HTMLSelectElement | null)?.value || 'all';
+        const userFilter = (document.getElementById('sp-detail-user-filter') as HTMLSelectElement | null)?.value || 'all';
 
         let list: any[] = currentComprehensiveReportData.users;
+
+        if (userFilter && userFilter !== 'all') {
+            list = list.filter(u => (u.userName || '').trim() === userFilter.trim());
+        }
 
         if (searchInput) {
             list = list.filter(u => (u.userName || '').toLowerCase().includes(searchInput));
@@ -13141,8 +13211,45 @@ const handlePrintJudicialControlDetails = () => {
             });
         }
 
+        currentFilteredComprehensiveUsers = list;
+
         const countLabel = document.getElementById('sp-detail-count-label');
         if (countLabel) countLabel.textContent = `عرض ${list.length} من أصل ${currentComprehensiveReportData.users.length} محصل`;
+
+        // Calculate dynamic summary for the filtered subset
+        const dynamicSummary = list.reduce((acc, u) => {
+            acc.grandMeedcoAmount += Number(u.meedco?.amount || 0);
+            acc.grandMeedcoCount += Number(u.meedco?.count || 0);
+            acc.grandMaasaraAmount += Number(u.maasara?.amount || 0);
+            acc.grandMaasaraCount += Number(u.maasara?.count || 0);
+            acc.grandIskraAmount += Number(u.iskra?.amount || 0);
+            acc.grandIskraCount += Number(u.iskra?.count || 0);
+            acc.grandTotalRecharges += Number(u.totalRechargesCount || 0);
+            acc.grandSystemsAmount += Number(u.totalSystemsAmount || 0);
+            acc.grandCashSupplied += Number(u.cashSupplied || 0);
+            acc.grandDifference += Number(u.difference || 0);
+            acc.totalUsersCount += 1;
+            return acc;
+        }, {
+            totalUsersCount: 0,
+            grandMeedcoAmount: 0,
+            grandMeedcoCount: 0,
+            grandMaasaraAmount: 0,
+            grandMaasaraCount: 0,
+            grandIskraAmount: 0,
+            grandIskraCount: 0,
+            grandTotalRecharges: 0,
+            grandSystemsAmount: 0,
+            grandCashSupplied: 0,
+            grandDifference: 0
+        });
+
+        // Update KPIs
+        if (list.length !== currentComprehensiveReportData.users.length) {
+            updateComprehensiveReportKPIs(dynamicSummary);
+        } else {
+            updateComprehensiveReportKPIs(currentComprehensiveReportData.summary);
+        }
 
         const tbody = document.getElementById('sp-detail-table-tbody');
         const tfoot = document.getElementById('sp-detail-table-tfoot');
@@ -13249,11 +13356,11 @@ const handlePrintJudicialControlDetails = () => {
         });
 
         // Summary row in tfoot
-        if (tfoot && currentComprehensiveReportData.summary) {
-            const s = currentComprehensiveReportData.summary;
+        if (tfoot) {
+            const s = dynamicSummary;
             tfoot.innerHTML = `
                 <tr>
-                    <td colspan="2" style="padding: 12px 14px; text-align: center; color: #0f172a;">الإجمالي العام (${s.totalUsersCount} محصل)</td>
+                    <td colspan="2" style="padding: 12px 14px; text-align: center; color: #0f172a; font-weight: 800;">الإجمالي للمحدد (${s.totalUsersCount} محصل)</td>
                     <td style="padding: 12px 14px; text-align: center; color: #0369a1; background: #e0f2fe; font-family: monospace;">
                         ${Number(s.grandMeedcoAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         <span style="display:block; font-size:0.75rem;">${s.grandMeedcoCount || 0} شحنة</span>
@@ -13428,40 +13535,64 @@ const handlePrintJudicialControlDetails = () => {
             return;
         }
 
-        const date = currentComprehensiveReportData.date || new Date().toISOString().slice(0, 10);
-        const s = currentComprehensiveReportData.summary || {};
-        const users: any[] = currentComprehensiveReportData.users || [];
+        const fromDate = (document.getElementById('sp-detail-from-date') as HTMLInputElement | null)?.value || currentComprehensiveReportData.date || '';
+        const toDate = (document.getElementById('sp-detail-to-date') as HTMLInputElement | null)?.value || fromDate;
+        const branchVal = (document.getElementById('sp-detail-branch-filter') as HTMLSelectElement | null)?.value || 'all';
+        const dateRangeText = (fromDate === toDate) ? fromDate : `من ${fromDate} إلى ${toDate}`;
+        const branchText = (branchVal === 'all') ? 'كافة الإدارات والهندسات' : `هندسة ${branchVal}`;
+
+        const users: any[] = (currentFilteredComprehensiveUsers && currentFilteredComprehensiveUsers.length > 0)
+            ? currentFilteredComprehensiveUsers
+            : (currentComprehensiveReportData.users || []);
 
         const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-        let rowsHtml = users.map((u, idx) => `
-            <tr>
-                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${idx + 1}</td>
-                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${esc(u.userName)}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${Number(u.meedco.amount || 0).toFixed(2)} (${u.meedco.count || 0})</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${Number(u.maasara.amount || 0).toFixed(2)} (${u.maasara.count || 0})</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${Number(u.iskra.amount || 0).toFixed(2)} (${u.iskra.count || 0})</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${u.totalRechargesCount || 0}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${Number(u.totalSystemsAmount || 0).toFixed(2)}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${Number(u.cashSupplied || 0).toFixed(2)}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${Number(u.difference || 0).toFixed(2)}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${esc(u.status)}</td>
-            </tr>
-        `).join('');
+        let sumMeedco = 0, sumMeedcoCount = 0;
+        let sumMaasara = 0, sumMaasaraCount = 0;
+        let sumIskra = 0, sumIskraCount = 0;
+        let sumTotalRecharges = 0, sumSystems = 0, sumCash = 0, sumDiff = 0;
+
+        let rowsHtml = users.map((u, idx) => {
+            sumMeedco += Number(u.meedco?.amount || 0);
+            sumMeedcoCount += Number(u.meedco?.count || 0);
+            sumMaasara += Number(u.maasara?.amount || 0);
+            sumMaasaraCount += Number(u.maasara?.count || 0);
+            sumIskra += Number(u.iskra?.amount || 0);
+            sumIskraCount += Number(u.iskra?.count || 0);
+            sumTotalRecharges += Number(u.totalRechargesCount || 0);
+            sumSystems += Number(u.totalSystemsAmount || 0);
+            sumCash += Number(u.cashSupplied || 0);
+            sumDiff += Number(u.difference || 0);
+
+            return `
+                <tr>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: center;">${idx + 1}</td>
+                    <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${esc(u.userName)}</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: center;">${Number(u.meedco?.amount || 0).toFixed(2)} (${u.meedco?.count || 0})</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: center;">${Number(u.maasara?.amount || 0).toFixed(2)} (${u.maasara?.count || 0})</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: center;">${Number(u.iskra?.amount || 0).toFixed(2)} (${u.iskra?.count || 0})</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${u.totalRechargesCount || 0}</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${Number(u.totalSystemsAmount || 0).toFixed(2)}</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${Number(u.cashSupplied || 0).toFixed(2)}</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${Number(u.difference || 0).toFixed(2)}</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-align: center;">${esc(u.status)}</td>
+                </tr>
+            `;
+        }).join('');
 
         const printHtml = `
             <!DOCTYPE html>
             <html lang="ar" dir="rtl">
             <head>
                 <meta charset="utf-8">
-                <title>التقرير المالي والتفصيلي لحصر شحنات وإيرادات المنظومات - ${date}</title>
+                <title>التقرير المالي والتفصيلي لحصر شحنات وإيرادات المنظومات - ${dateRangeText}</title>
                 <style>
                     body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; margin: 15px; color: #000; font-size: 11.5px; }
                     .header-box { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 8px; }
                     .header-box h2 { margin: 0 0 4px 0; font-size: 17px; }
                     .header-box h3 { margin: 0 0 4px 0; font-size: 14px; text-decoration: underline; }
                     .header-box p { margin: 2px 0; font-size: 12px; font-weight: bold; }
-                    .meta-bar { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px; font-weight: bold; background: #f1f5f9; padding: 6px 12px; border: 1px solid #cbd5e1; }
+                    .meta-bar { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px; font-weight: bold; background: #f1f5f9; padding: 6px 12px; border: 1px solid #cbd5e1; flex-wrap: wrap; gap: 8px; }
                     table { width: 100%; border-collapse: collapse; margin-top: 6px; }
                     th { border: 1.5px solid #000; background: #e2e8f0; padding: 6px; font-size: 11px; }
                     td { border: 1px solid #000; padding: 5px; font-size: 11px; }
@@ -13476,15 +13607,16 @@ const handlePrintJudicialControlDetails = () => {
             <body>
                 <div class="header-box">
                     <h2>جمهورية مصر العربية - وزارة الكهرباء والطاقة المتجددة</h2>
-                    <p>الشركة القابضة لكهرباء مصر - شركة توزيع كهرباء مصر الوسطى - قطاع المنيا - هندسة بنى مزار شرق</p>
+                    <p>الشركة القابضة لكهرباء مصر - شركة توزيع كهرباء مصر الوسطى - قطاع المنيا - ${branchText}</p>
                     <h3>التقرير المالي والتفصيلي لحصر مبيعات وشحنات البرامج ومطابقة التوريد اليومي</h3>
                 </div>
                 <div class="meta-bar">
-                    <div>تاريخ التقرير: <span>${date}</span></div>
-                    <div>عدد المحصلين النشطين: <span>${s.totalUsersCount || users.length}</span></div>
-                    <div>إجمالي الشحنات: <span>${s.grandTotalRecharges || 0} شحنة</span></div>
-                    <div>إجمالي مبيعات البرامج: <span>${Number(s.grandSystemsAmount || 0).toLocaleString()} ج.م</span></div>
-                    <div>إجمالي النقدية الموردة: <span>${Number(s.grandCashSupplied || 0).toLocaleString()} ج.م</span></div>
+                    <div>الفترة: <span>${dateRangeText}</span></div>
+                    <div>الإدارة: <span>${branchText}</span></div>
+                    <div>عدد المحصلين: <span>${users.length}</span></div>
+                    <div>إجمالي الشحنات: <span>${sumTotalRecharges} شحنة</span></div>
+                    <div>إجمالي مبيعات البرامج: <span>${sumSystems.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م</span></div>
+                    <div>إجمالي النقدية الموردة: <span>${sumCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م</span></div>
                 </div>
                 <table>
                     <thead>
@@ -13505,13 +13637,13 @@ const handlePrintJudicialControlDetails = () => {
                         ${rowsHtml}
                         <tr class="total-row">
                             <td colspan="2" style="text-align: center;">الإجمالي العام</td>
-                            <td style="text-align: center;">${Number(s.grandMeedcoAmount || 0).toFixed(2)} (${s.grandMeedcoCount || 0})</td>
-                            <td style="text-align: center;">${Number(s.grandMaasaraAmount || 0).toFixed(2)} (${s.grandMaasaraCount || 0})</td>
-                            <td style="text-align: center;">${Number(s.grandIskraAmount || 0).toFixed(2)} (${s.grandIskraCount || 0})</td>
-                            <td style="text-align: center;">${s.grandTotalRecharges || 0}</td>
-                            <td style="text-align: center;">${Number(s.grandSystemsAmount || 0).toFixed(2)}</td>
-                            <td style="text-align: center;">${Number(s.grandCashSupplied || 0).toFixed(2)}</td>
-                            <td style="text-align: center;">${Number(s.grandDifference || 0).toFixed(2)}</td>
+                            <td style="text-align: center;">${sumMeedco.toFixed(2)} (${sumMeedcoCount})</td>
+                            <td style="text-align: center;">${sumMaasara.toFixed(2)} (${sumMaasaraCount})</td>
+                            <td style="text-align: center;">${sumIskra.toFixed(2)} (${sumIskraCount})</td>
+                            <td style="text-align: center;">${sumTotalRecharges}</td>
+                            <td style="text-align: center;">${sumSystems.toFixed(2)}</td>
+                            <td style="text-align: center;">${sumCash.toFixed(2)}</td>
+                            <td style="text-align: center;">${sumDiff.toFixed(2)}</td>
                             <td style="text-align: center;">اعتماد ختامي</td>
                         </tr>
                     </tbody>
@@ -13543,19 +13675,22 @@ const handlePrintJudicialControlDetails = () => {
             return;
         }
 
-        const date = currentComprehensiveReportData.date || new Date().toISOString().slice(0, 10);
-        const users: any[] = currentComprehensiveReportData.users;
+        const fromDate = (document.getElementById('sp-detail-from-date') as HTMLInputElement | null)?.value || currentComprehensiveReportData.date || '';
+        const toDate = (document.getElementById('sp-detail-to-date') as HTMLInputElement | null)?.value || fromDate;
+        const users: any[] = (currentFilteredComprehensiveUsers && currentFilteredComprehensiveUsers.length > 0)
+            ? currentFilteredComprehensiveUsers
+            : currentComprehensiveReportData.users;
 
         let csv = '\uFEFFم,اسم المحصل,مبلغ الموحد,شحنات الموحد,مبلغ معصرة,شحنات معصرة,مبلغ إسكرا,شحنات إسكرا,إجمالي الشحنات,إجمالي مبالغ البرامج,النقدية الموردة بالحافظة,فارق التسوية,حالة المطابقة\n';
 
         users.forEach((u, i) => {
-            csv += `${i + 1},"${(u.userName || '').replace(/"/g, '""')}",${u.meedco.amount || 0},${u.meedco.count || 0},${u.maasara.amount || 0},${u.maasara.count || 0},${u.iskra.amount || 0},${u.iskra.count || 0},${u.totalRechargesCount || 0},${u.totalSystemsAmount || 0},${u.cashSupplied || 0},${u.difference || 0},"${u.status}"\n`;
+            csv += `${i + 1},"${(u.userName || '').replace(/"/g, '""')}",${u.meedco?.amount || 0},${u.meedco?.count || 0},${u.maasara?.amount || 0},${u.maasara?.count || 0},${u.iskra?.amount || 0},${u.iskra?.count || 0},${u.totalRechargesCount || 0},${u.totalSystemsAmount || 0},${u.cashSupplied || 0},${u.difference || 0},"${u.status}"\n`;
         });
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `تقرير_البرامج_التفصيلي_${date}.csv`;
+        link.download = `تقرير_البرامج_التفصيلي_${fromDate}_${toDate}.csv`;
         link.click();
         showToast('تم تصدير التقرير المالي التفصيلي بنجاح ✓', 'success');
     };
@@ -13569,6 +13704,9 @@ const handlePrintJudicialControlDetails = () => {
         if (!currentEditingSupplyPortfolio) {
             resetSupplyPortfolioForm();
         }
+        setTimeout(() => {
+            autoFetchUserProgramsRevenue(false);
+        }, 350);
     };
 
     const renderSupplyPortfolioArchiveSection = () => {

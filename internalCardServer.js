@@ -1146,9 +1146,11 @@ function startInternalServer(port = 5002) {
             // 8.3 جلب التقرير الشامل والمفصل لجميع المستخدمين والبرامج مع الشحنات والمطابقة
             if (pathname === '/api/reports/comprehensive-daily') {
                 const reportSync = require('./reportSyncService');
-                const date = url.searchParams.get('date') || new Date().toISOString().slice(0, 10);
+                const fromDate = url.searchParams.get('from') || url.searchParams.get('fromDate') || url.searchParams.get('date') || new Date().toISOString().slice(0, 10);
+                const toDate = url.searchParams.get('to') || url.searchParams.get('toDate') || fromDate;
+                const branch = url.searchParams.get('branch') || '';
                 try {
-                    const data = await reportSync.getComprehensiveDailyReport(date);
+                    const data = await reportSync.getComprehensiveDailyReport(fromDate, toDate, branch);
                     res.writeHead(200);
                     res.end(JSON.stringify({ success: true, data }));
                 } catch (e) {

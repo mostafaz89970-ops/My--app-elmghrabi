@@ -6224,29 +6224,69 @@
                     </div>
                 </div>
 
-                <!-- شريط الفلاتر والأدوات -->
-                <div style="background: #ffffff; border-radius: 12px; padding: 1.25rem 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex: 1;">
-                        <!-- اختيار التاريخ -->
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <label style="font-weight: 800; color: #334155; font-size: 0.9rem; white-space: nowrap;">تاريخ التقرير:</label>
-                            <input type="date" id="sp-detail-date" style="border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 7px 12px; font-weight: 700; font-family: inherit; font-size: 0.92rem; color: #0f172a; outline: none; background: #fff;">
+                <!-- شريط الفلاتر والأدوات المتقدمة (من تاريخ إلى تاريخ، الإدارة، متعدد المحصلين، حالة المطابقة) -->
+                <div style="background: #ffffff; border-radius: 12px; padding: 1.25rem 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- السطر الأول: نطاق التواريخ، الإدارة، المحصلين، حالة المطابقة -->
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1;">
+                            <!-- من تاريخ -->
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label style="font-weight: 800; color: #334155; font-size: 0.88rem; white-space: nowrap;">من تاريخ:</label>
+                                <input type="date" id="sp-detail-from-date" style="border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-family: inherit; font-size: 0.88rem; color: #0f172a; outline: none; background: #fff;">
+                                <input type="hidden" id="sp-detail-date">
+                            </div>
+
+                            <!-- إلى تاريخ -->
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label style="font-weight: 800; color: #334155; font-size: 0.88rem; white-space: nowrap;">إلى تاريخ:</label>
+                                <input type="date" id="sp-detail-to-date" style="border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; font-weight: 700; font-family: inherit; font-size: 0.88rem; color: #0f172a; outline: none; background: #fff;">
+                            </div>
+
+                            <!-- اختيار الإدارة / الهندسة -->
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label style="font-weight: 800; color: #334155; font-size: 0.88rem; white-space: nowrap;">الإدارة:</label>
+                                <select id="sp-detail-branch-filter" style="border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; font-size: 0.88rem; font-weight: 700; font-family: inherit; color: #334155; background: #fff;">
+                                    <option value="all">كافة الإدارات والهندسات</option>
+                                    <option value="بنى مزار شرق">هندسة بنى مزار شرق</option>
+                                    <option value="بنى مزار غرب">هندسة بنى مزار غرب</option>
+                                    <option value="مطاي">هندسة مطاي</option>
+                                    <option value="سمالوط">هندسة سمالوط</option>
+                                    <option value="مغاغة">هندسة مغاغة</option>
+                                    <option value="العدوة">هندسة العدوة</option>
+                                </select>
+                            </div>
+
+                            <!-- اختيار المحصل / المستخدم -->
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label style="font-weight: 800; color: #334155; font-size: 0.88rem; white-space: nowrap;">المحصل:</label>
+                                <select id="sp-detail-user-filter" style="border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; font-size: 0.88rem; font-family: inherit; color: #334155; background: #fff; max-width: 220px;">
+                                    <option value="all">كافة المستخدمين والمحصلين</option>
+                                </select>
+                            </div>
+
+                            <!-- بحث سريع -->
+                            <div style="min-width: 200px; flex: 1; max-width: 300px;">
+                                <input type="text" id="sp-detail-search-user" placeholder="بحث باسم المستخدم أو المحصل..." style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; font-size: 0.88rem; font-family: inherit; outline: none;">
+                            </div>
+
+                            <!-- تصفية حسب حالة المطابقة -->
+                            <div>
+                                <select id="sp-detail-status-filter" style="border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; font-size: 0.88rem; font-family: inherit; color: #334155; background: #fff;">
+                                    <option value="all">كافة الحالات</option>
+                                    <option value="matched">مطابق 100% ✓</option>
+                                    <option value="shortage">عجز توريد ⚠️</option>
+                                    <option value="surplus">زيادة توريد ℹ️</option>
+                                    <option value="unsupplied">لم يتم التوريد بعد</option>
+                                </select>
+                            </div>
                         </div>
 
-                        <!-- بحث بالمحصل -->
-                        <div style="flex: 1; min-width: 240px; max-width: 380px;">
-                            <input type="text" id="sp-detail-search-user" placeholder="بحث باسم المستخدم أو المحصل..." style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 7px 12px; font-size: 0.9rem; font-family: inherit; outline: none;">
-                        </div>
-
-                        <!-- تصفية حسب حالة المطابقة -->
-                        <div>
-                            <select id="sp-detail-status-filter" style="border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 7px 10px; font-size: 0.9rem; font-family: inherit; color: #334155; background: #fff;">
-                                <option value="all">كافة الحالات</option>
-                                <option value="matched">مطابق 100% ✓</option>
-                                <option value="shortage">عجز توريد ⚠️</option>
-                                <option value="surplus">زيادة توريد ℹ️</option>
-                                <option value="unsupplied">لم يتم التوريد بعد</option>
-                            </select>
+                        <!-- زر تطبيق البحث وإعادة الضبط -->
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <button type="button" id="btn-sp-detail-apply" class="btn" style="background: #3b82f6; color: #ffffff; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                                <span>تطبيق الفلترة</span>
+                            </button>
                         </div>
                     </div>
 
