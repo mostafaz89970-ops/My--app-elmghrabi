@@ -12797,6 +12797,19 @@ const handlePrintJudicialControlDetails = () => {
             autoFetchUserProgramsRevenue(false);
         });
 
+        // Automatically re-fetch programs revenue whenever date changes
+        document.getElementById('sp-portfolio-date')?.addEventListener('change', () => {
+            autoFetchUserProgramsRevenue(false);
+        });
+
+        // Automatically re-fetch programs revenue when custom user input changes or blurs
+        document.getElementById('sp-portfolio-user')?.addEventListener('change', () => {
+            autoFetchUserProgramsRevenue(false);
+        });
+        document.getElementById('sp-portfolio-user')?.addEventListener('blur', () => {
+            autoFetchUserProgramsRevenue(false);
+        });
+
         // Modal close
         document.getElementById('btn-sp-modal-close')?.addEventListener('click', () => {
             const modal = document.getElementById('sp-details-modal');
@@ -13085,7 +13098,7 @@ const handlePrintJudicialControlDetails = () => {
                     </td>
                     <td style="padding: 10px 14px; text-align: center;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
-                            ${(u.meedco.items && u.meedco.items.length > 0) ? `
+                            ${((u.meedco?.items && u.meedco.items.length > 0) || (u.maasara?.items && u.maasara.items.length > 0)) ? `
                                 <button type="button" class="btn-sp-view-tx" data-user="${esc(u.userName)}" title="عرض كشف الشحنات التفصيلي" style="background: #e0f2fe; color: #0369a1; border: none; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">
                                     🔍 كشف الشحنات
                                 </button>
@@ -13170,13 +13183,17 @@ const handlePrintJudicialControlDetails = () => {
 
         const date = currentComprehensiveReportData.date || '';
 
+        const meedcoItems = (user.meedco?.items || []).map((it: any) => ({ ...it, sysName: 'الموحد MEEDCO', sysColor: '#0369a1', sysBg: '#e0f2fe' }));
+        const maasaraItems = (user.maasara?.items || []).map((it: any) => ({ ...it, sysName: 'المعصرة', sysColor: '#7c3aed', sysBg: '#faf5ff' }));
+        const items = [...meedcoItems, ...maasaraItems];
+        const totalItemsAmount = (user.meedco?.amount || 0) + (user.maasara?.amount || 0);
+
         if (nameEl) nameEl.textContent = `كشف الشحنات التفصيلي للمحصل: ${user.userName}`;
-        if (metaEl) metaEl.textContent = `تاريخ العمليات: ${date} | المنظومة الموحدة (MEEDCO)`;
-        if (amtEl) amtEl.textContent = Number(user.meedco?.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
-        if (countEl) countEl.textContent = `${user.meedco?.count || 0} شحنة`;
+        if (metaEl) metaEl.textContent = `تاريخ العمليات: ${date} | تفاصيل العمليات لكافة المنظومات`;
+        if (amtEl) amtEl.textContent = Number(totalItemsAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+        if (countEl) countEl.textContent = `${items.length} شحنة`;
 
         if (tbody) {
-            const items: any[] = user.meedco?.items || [];
             if (items.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 25px; color: #94a3b8;">لا تتوفر تفاصيل حركات شحن مسجلة لهذا المحصل</td></tr>`;
             } else {
@@ -13184,7 +13201,10 @@ const handlePrintJudicialControlDetails = () => {
                 tbody.innerHTML = items.map((it, idx) => `
                     <tr style="border-bottom: 1px solid #f1f5f9;">
                         <td style="padding: 8px 10px; text-align: center; color: #94a3b8;">${idx + 1}</td>
-                        <td style="padding: 8px 10px; font-weight: 800; font-family: monospace; color: #0284c7;">${esc(it.meterNumber)}</td>
+                        <td style="padding: 8px 10px; font-weight: 800; font-family: monospace; color: #0284c7;">
+                            ${esc(it.meterNumber)}
+                            ${it.sysName ? `<span style="font-size: 0.68rem; background: ${it.sysBg}; color: ${it.sysColor}; padding: 1px 6px; border-radius: 4px; margin-right: 4px; display: inline-block;">${it.sysName}</span>` : ''}
+                        </td>
                         <td style="padding: 8px 10px; font-weight: 700; color: #1e293b;">${esc(it.customerName)}</td>
                         <td style="padding: 8px 10px; color: #64748b;">${esc(it.subAdmin)}</td>
                         <td style="padding: 8px 10px; font-family: monospace; color: #475569; font-size: 0.8rem;">${esc(it.receiptNumber)}</td>
@@ -13201,7 +13221,10 @@ const handlePrintJudicialControlDetails = () => {
     const printCurrentCashierTransactions = () => {
         if (!currentSelectedCashierForModal) return;
         const user = currentSelectedCashierForModal;
-        const items: any[] = user.meedco?.items || [];
+        const meedcoItems = (user.meedco?.items || []).map((it: any) => ({ ...it, sysName: 'الموحد MEEDCO' }));
+        const maasaraItems = (user.maasara?.items || []).map((it: any) => ({ ...it, sysName: 'المعصرة' }));
+        const items: any[] = [...meedcoItems, ...maasaraItems];
+        const totalItemsAmount = (user.meedco?.amount || 0) + (user.maasara?.amount || 0);
         const date = (currentComprehensiveReportData?.date || new Date().toISOString().slice(0, 10));
 
         const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -13209,7 +13232,7 @@ const handlePrintJudicialControlDetails = () => {
         let rows = items.map((it, idx) => `
             <tr>
                 <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${esc(it.meterNumber)}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${esc(it.meterNumber)} <span style="font-size: 9px; color: #666;">(${it.sysName || ''})</span></td>
                 <td style="border: 1px solid #cbd5e1; padding: 6px;">${esc(it.customerName)}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 6px;">${esc(it.subAdmin)}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-size: 11px;">${esc(it.receiptNumber)}</td>
@@ -13247,7 +13270,7 @@ const handlePrintJudicialControlDetails = () => {
                 <div class="meta-grid">
                     <div>اسم المحصل: <span>${esc(user.userName)}</span></div>
                     <div>تاريخ العمليات: <span>${date}</span></div>
-                    <div>المنظومة: <span>المنظومة الموحدة (MEEDCO)</span></div>
+                    <div>المنظومات: <span>شامل العمليات (الموحد MEEDCO + المعصرة)</span></div>
                 </div>
                 <table>
                     <thead>
@@ -13265,7 +13288,7 @@ const handlePrintJudicialControlDetails = () => {
                         ${rows}
                         <tr class="total-row">
                             <td colspan="6" style="text-align: left; padding-left: 20px;">الإجمالي العام للعمليات (${items.length} شحنة):</td>
-                            <td style="text-align: center;">${Number(user.meedco?.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م</td>
+                            <td style="text-align: center;">${Number(totalItemsAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م</td>
                         </tr>
                     </tbody>
                 </table>

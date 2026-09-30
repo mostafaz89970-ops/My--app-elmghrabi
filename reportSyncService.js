@@ -194,7 +194,7 @@ async function fetchMaasaraDailySales(dateStr) {
 
             for (const cFile of candidateFiles) {
                 const parsed = await new Promise((resolve) => {
-                    execFile('python', [scriptPath, cFile.path], { maxBuffer: 1024 * 1024 * 20, encoding: 'utf8' }, (err, stdout) => {
+                    execFile('python', [scriptPath, cFile.path, dateStr], { maxBuffer: 1024 * 1024 * 20, encoding: 'utf8' }, (err, stdout) => {
                         if (err) return resolve(null);
                         try { resolve(JSON.parse(stdout)); } catch (e) { resolve(null); }
                     });
@@ -209,7 +209,7 @@ async function fetchMaasaraDailySales(dateStr) {
                             // If existing has 0 count and this one has count > 0, update it
                             const exist = usersMap.get(normKey);
                             if ((!exist.rechargesCount || exist.rechargesCount === 0) && u.rechargesCount > 0) {
-                                usersMap.set(normKey, u);
+                                usersMap.set(normKey, { ...exist, ...u });
                             }
                         }
                     }
@@ -231,6 +231,16 @@ async function fetchMaasaraDailySales(dateStr) {
                 };
                 fs.writeFileSync(cacheFile, JSON.stringify(finalResult, null, 2), 'utf8');
                 return finalResult;
+            } else {
+                return {
+                    success: true,
+                    connected: true,
+                    totalUsers: 0,
+                    totalRecharges: 0,
+                    totalAmount: 0,
+                    users: [],
+                    fetchedAt: new Date().toISOString()
+                };
             }
         }
     } catch (e) {
@@ -242,7 +252,7 @@ async function fetchMaasaraDailySales(dateStr) {
             return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
         } catch (e) {}
     }
-    return { success: true, connected: false, users: [] };
+    return { success: true, connected: false, totalUsers: 0, totalRecharges: 0, totalAmount: 0, users: [] };
 }
 
 /**
@@ -414,12 +424,14 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
     // 2. معصرة
     let maasaraAmount = 0;
     let maasaraCount = 0;
+    let maasaraItems = [];
     const maasaraData = await fetchMaasaraDailySales(dateStr);
     if (maasaraData && Array.isArray(maasaraData.users)) {
         const found = maasaraData.users.find(u => isArabicMatch(u.userName, cleanTarget));
         if (found) {
             maasaraAmount = found.totalAmount || 0;
             maasaraCount = found.rechargesCount || 0;
+            maasaraItems = found.items || [];
         }
     }
 
@@ -439,11 +451,12 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
         date: dateStr,
         userName: targetUserName,
         unified: { amount: meedcoAmount, count: meedcoCount, itemsCount: meedcoItems.length },
-        maasara: { amount: maasaraAmount, count: maasaraCount },
+        maasara: { amount: maasaraAmount, count: maasaraCount, items: maasaraItems },
         iskra: { amount: iskraAmount, count: iskraCount },
         totalAmount: Math.round((meedcoAmount + maasaraAmount + iskraAmount) * 100) / 100,
         totalCount: meedcoCount + maasaraCount + iskraCount,
-        meedcoItems: meedcoItems
+        meedcoItems: meedcoItems,
+        maasaraItems: maasaraItems
     };
 }
 
@@ -488,8 +501,8 @@ async function getComprehensiveDailyReport(dateStr) {
         const newUser = {
             userName: cleanName,
             meedco: { amount: 0, count: 0, items: [] },
-            maasara: { amount: 0, count: 0 },
-            iskra: { amount: 0, count: 0 },
+            maasara: { amount: 0, count: 0, items: [] },
+            iskra: { amount: 0, count: 0, items: [] },
             other: { amount: 0, count: 0 },
             totalSystemsAmount: 0,
             totalRechargesCount: 0,
@@ -521,6 +534,7 @@ async function getComprehensiveDailyReport(dateStr) {
             if (entry) {
                 entry.maasara.amount = u.totalAmount || 0;
                 entry.maasara.count = u.rechargesCount || 0;
+                entry.maasara.items = u.items || [];
             }
         });
     }

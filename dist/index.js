@@ -7391,7 +7391,7 @@ const exportSupplyPortfoliosToExcel = () => {
     showToast('تم تصدير سجل حافظات التوريد بنجاح!', 'success');
 };
 const initSupplyPortfoliosListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9;
     // Calculation input triggers
     document.querySelectorAll('.sp-calc-input, .sp-system-input').forEach(inp => {
         inp.addEventListener('input', () => calculateSupplyPortfolioLive());
@@ -7519,50 +7519,61 @@ const initSupplyPortfoliosListeners = () => {
     (_t = document.getElementById('sp-portfolio-user-select')) === null || _t === void 0 ? void 0 : _t.addEventListener('change', () => {
         autoFetchUserProgramsRevenue(false);
     });
+    // Automatically re-fetch programs revenue whenever date changes
+    (_u = document.getElementById('sp-portfolio-date')) === null || _u === void 0 ? void 0 : _u.addEventListener('change', () => {
+        autoFetchUserProgramsRevenue(false);
+    });
+    // Automatically re-fetch programs revenue when custom user input changes or blurs
+    (_v = document.getElementById('sp-portfolio-user')) === null || _v === void 0 ? void 0 : _v.addEventListener('change', () => {
+        autoFetchUserProgramsRevenue(false);
+    });
+    (_w = document.getElementById('sp-portfolio-user')) === null || _w === void 0 ? void 0 : _w.addEventListener('blur', () => {
+        autoFetchUserProgramsRevenue(false);
+    });
     // Modal close
-    (_u = document.getElementById('btn-sp-modal-close')) === null || _u === void 0 ? void 0 : _u.addEventListener('click', () => {
+    (_x = document.getElementById('btn-sp-modal-close')) === null || _x === void 0 ? void 0 : _x.addEventListener('click', () => {
         const modal = document.getElementById('sp-details-modal');
         if (modal)
             modal.style.display = 'none';
     });
-    (_v = document.getElementById('btn-sp-modal-dismiss')) === null || _v === void 0 ? void 0 : _v.addEventListener('click', () => {
+    (_y = document.getElementById('btn-sp-modal-dismiss')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', () => {
         const modal = document.getElementById('sp-details-modal');
         if (modal)
             modal.style.display = 'none';
     });
     // ================= Detailed Report Section Event Listeners =================
-    (_w = document.getElementById('btn-sp-detail-refresh')) === null || _w === void 0 ? void 0 : _w.addEventListener('click', () => {
+    (_z = document.getElementById('btn-sp-detail-refresh')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', () => {
         loadComprehensiveDailyReport(true);
     });
-    (_x = document.getElementById('sp-detail-date')) === null || _x === void 0 ? void 0 : _x.addEventListener('change', () => {
+    (_0 = document.getElementById('sp-detail-date')) === null || _0 === void 0 ? void 0 : _0.addEventListener('change', () => {
         loadComprehensiveDailyReport(false);
     });
-    (_y = document.getElementById('sp-detail-search-user')) === null || _y === void 0 ? void 0 : _y.addEventListener('input', () => {
+    (_1 = document.getElementById('sp-detail-search-user')) === null || _1 === void 0 ? void 0 : _1.addEventListener('input', () => {
         filterAndRenderComprehensiveTable();
     });
-    (_z = document.getElementById('sp-detail-status-filter')) === null || _z === void 0 ? void 0 : _z.addEventListener('change', () => {
+    (_2 = document.getElementById('sp-detail-status-filter')) === null || _2 === void 0 ? void 0 : _2.addEventListener('change', () => {
         filterAndRenderComprehensiveTable();
     });
-    (_0 = document.getElementById('btn-sp-detail-print-all')) === null || _0 === void 0 ? void 0 : _0.addEventListener('click', () => {
+    (_3 = document.getElementById('btn-sp-detail-print-all')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', () => {
         printComprehensiveDailyReport();
     });
-    (_1 = document.getElementById('btn-sp-detail-export-excel')) === null || _1 === void 0 ? void 0 : _1.addEventListener('click', () => {
+    (_4 = document.getElementById('btn-sp-detail-export-excel')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', () => {
         exportComprehensiveDailyReportToExcel();
     });
-    (_2 = document.getElementById('btn-sp-detail-nav-new')) === null || _2 === void 0 ? void 0 : _2.addEventListener('click', gotoNew);
-    (_3 = document.getElementById('btn-sp-detail-nav-archive')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', gotoArchive);
+    (_5 = document.getElementById('btn-sp-detail-nav-new')) === null || _5 === void 0 ? void 0 : _5.addEventListener('click', gotoNew);
+    (_6 = document.getElementById('btn-sp-detail-nav-archive')) === null || _6 === void 0 ? void 0 : _6.addEventListener('click', gotoArchive);
     // Transactions modal handlers
-    (_4 = document.getElementById('btn-sp-tx-modal-close')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', () => {
+    (_7 = document.getElementById('btn-sp-tx-modal-close')) === null || _7 === void 0 ? void 0 : _7.addEventListener('click', () => {
         const m = document.getElementById('sp-user-transactions-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_5 = document.getElementById('btn-sp-tx-modal-dismiss')) === null || _5 === void 0 ? void 0 : _5.addEventListener('click', () => {
+    (_8 = document.getElementById('btn-sp-tx-modal-dismiss')) === null || _8 === void 0 ? void 0 : _8.addEventListener('click', () => {
         const m = document.getElementById('sp-user-transactions-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_6 = document.getElementById('btn-sp-tx-modal-print')) === null || _6 === void 0 ? void 0 : _6.addEventListener('click', () => {
+    (_9 = document.getElementById('btn-sp-tx-modal-print')) === null || _9 === void 0 ? void 0 : _9.addEventListener('click', () => {
         printCurrentCashierTransactions();
     });
 };
@@ -7746,6 +7757,7 @@ const filterAndRenderComprehensiveTable = () => {
     const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     let rowsHtml = '';
     list.forEach((u, index) => {
+        var _a, _b;
         let statusBadge = '';
         if (u.status === 'مطابق 100%') {
             statusBadge = '<span style="background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.78rem;">مطابق 100% ✓</span>';
@@ -7796,7 +7808,7 @@ const filterAndRenderComprehensiveTable = () => {
                     </td>
                     <td style="padding: 10px 14px; text-align: center;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
-                            ${(u.meedco.items && u.meedco.items.length > 0) ? `
+                            ${((((_a = u.meedco) === null || _a === void 0 ? void 0 : _a.items) && u.meedco.items.length > 0) || (((_b = u.maasara) === null || _b === void 0 ? void 0 : _b.items) && u.maasara.items.length > 0)) ? `
                                 <button type="button" class="btn-sp-view-tx" data-user="${esc(u.userName)}" title="عرض كشف الشحنات التفصيلي" style="background: #e0f2fe; color: #0369a1; border: none; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">
                                     🔍 كشف الشحنات
                                 </button>
@@ -7863,7 +7875,7 @@ const filterAndRenderComprehensiveTable = () => {
     }
 };
 const showUserTransactionsModal = (userName) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     if (!currentComprehensiveReportData || !Array.isArray(currentComprehensiveReportData.users))
         return;
     const user = currentComprehensiveReportData.users.find((u) => u.userName === userName);
@@ -7877,16 +7889,19 @@ const showUserTransactionsModal = (userName) => {
     const countEl = document.getElementById('sp-tx-modal-total-count');
     const tbody = document.getElementById('sp-tx-modal-tbody');
     const date = currentComprehensiveReportData.date || '';
+    const meedcoItems = (((_a = user.meedco) === null || _a === void 0 ? void 0 : _a.items) || []).map((it) => (Object.assign(Object.assign({}, it), { sysName: 'الموحد MEEDCO', sysColor: '#0369a1', sysBg: '#e0f2fe' })));
+    const maasaraItems = (((_b = user.maasara) === null || _b === void 0 ? void 0 : _b.items) || []).map((it) => (Object.assign(Object.assign({}, it), { sysName: 'المعصرة', sysColor: '#7c3aed', sysBg: '#faf5ff' })));
+    const items = [...meedcoItems, ...maasaraItems];
+    const totalItemsAmount = (((_c = user.meedco) === null || _c === void 0 ? void 0 : _c.amount) || 0) + (((_d = user.maasara) === null || _d === void 0 ? void 0 : _d.amount) || 0);
     if (nameEl)
         nameEl.textContent = `كشف الشحنات التفصيلي للمحصل: ${user.userName}`;
     if (metaEl)
-        metaEl.textContent = `تاريخ العمليات: ${date} | المنظومة الموحدة (MEEDCO)`;
+        metaEl.textContent = `تاريخ العمليات: ${date} | تفاصيل العمليات لكافة المنظومات`;
     if (amtEl)
-        amtEl.textContent = Number(((_a = user.meedco) === null || _a === void 0 ? void 0 : _a.amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+        amtEl.textContent = Number(totalItemsAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
     if (countEl)
-        countEl.textContent = `${((_b = user.meedco) === null || _b === void 0 ? void 0 : _b.count) || 0} شحنة`;
+        countEl.textContent = `${items.length} شحنة`;
     if (tbody) {
-        const items = ((_c = user.meedco) === null || _c === void 0 ? void 0 : _c.items) || [];
         if (items.length === 0) {
             tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 25px; color: #94a3b8;">لا تتوفر تفاصيل حركات شحن مسجلة لهذا المحصل</td></tr>`;
         }
@@ -7895,7 +7910,10 @@ const showUserTransactionsModal = (userName) => {
             tbody.innerHTML = items.map((it, idx) => `
                     <tr style="border-bottom: 1px solid #f1f5f9;">
                         <td style="padding: 8px 10px; text-align: center; color: #94a3b8;">${idx + 1}</td>
-                        <td style="padding: 8px 10px; font-weight: 800; font-family: monospace; color: #0284c7;">${esc(it.meterNumber)}</td>
+                        <td style="padding: 8px 10px; font-weight: 800; font-family: monospace; color: #0284c7;">
+                            ${esc(it.meterNumber)}
+                            ${it.sysName ? `<span style="font-size: 0.68rem; background: ${it.sysBg}; color: ${it.sysColor}; padding: 1px 6px; border-radius: 4px; margin-right: 4px; display: inline-block;">${it.sysName}</span>` : ''}
+                        </td>
                         <td style="padding: 8px 10px; font-weight: 700; color: #1e293b;">${esc(it.customerName)}</td>
                         <td style="padding: 8px 10px; color: #64748b;">${esc(it.subAdmin)}</td>
                         <td style="padding: 8px 10px; font-family: monospace; color: #475569; font-size: 0.8rem;">${esc(it.receiptNumber)}</td>
@@ -7909,17 +7927,20 @@ const showUserTransactionsModal = (userName) => {
         modal.style.display = 'flex';
 };
 const printCurrentCashierTransactions = () => {
-    var _a, _b;
+    var _a, _b, _c, _d;
     if (!currentSelectedCashierForModal)
         return;
     const user = currentSelectedCashierForModal;
-    const items = ((_a = user.meedco) === null || _a === void 0 ? void 0 : _a.items) || [];
+    const meedcoItems = (((_a = user.meedco) === null || _a === void 0 ? void 0 : _a.items) || []).map((it) => (Object.assign(Object.assign({}, it), { sysName: 'الموحد MEEDCO' })));
+    const maasaraItems = (((_b = user.maasara) === null || _b === void 0 ? void 0 : _b.items) || []).map((it) => (Object.assign(Object.assign({}, it), { sysName: 'المعصرة' })));
+    const items = [...meedcoItems, ...maasaraItems];
+    const totalItemsAmount = (((_c = user.meedco) === null || _c === void 0 ? void 0 : _c.amount) || 0) + (((_d = user.maasara) === null || _d === void 0 ? void 0 : _d.amount) || 0);
     const date = ((currentComprehensiveReportData === null || currentComprehensiveReportData === void 0 ? void 0 : currentComprehensiveReportData.date) || new Date().toISOString().slice(0, 10));
     const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     let rows = items.map((it, idx) => `
             <tr>
                 <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${esc(it.meterNumber)}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${esc(it.meterNumber)} <span style="font-size: 9px; color: #666;">(${it.sysName || ''})</span></td>
                 <td style="border: 1px solid #cbd5e1; padding: 6px;">${esc(it.customerName)}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 6px;">${esc(it.subAdmin)}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-size: 11px;">${esc(it.receiptNumber)}</td>
@@ -7956,7 +7977,7 @@ const printCurrentCashierTransactions = () => {
                 <div class="meta-grid">
                     <div>اسم المحصل: <span>${esc(user.userName)}</span></div>
                     <div>تاريخ العمليات: <span>${date}</span></div>
-                    <div>المنظومة: <span>المنظومة الموحدة (MEEDCO)</span></div>
+                    <div>المنظومات: <span>شامل العمليات (الموحد MEEDCO + المعصرة)</span></div>
                 </div>
                 <table>
                     <thead>
@@ -7974,7 +7995,7 @@ const printCurrentCashierTransactions = () => {
                         ${rows}
                         <tr class="total-row">
                             <td colspan="6" style="text-align: left; padding-left: 20px;">الإجمالي العام للعمليات (${items.length} شحنة):</td>
-                            <td style="text-align: center;">${Number(((_b = user.meedco) === null || _b === void 0 ? void 0 : _b.amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م</td>
+                            <td style="text-align: center;">${Number(totalItemsAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م</td>
                         </tr>
                     </tbody>
                 </table>
