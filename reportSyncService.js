@@ -174,16 +174,19 @@ const maasaraFileParsedCache = new Map();
 /**
  * جلب تقرير معصرة (Maasara) لليوم المحدد
  */
-async function fetchMaasaraDailySales(dateStr) {
+async function fetchMaasaraDailySales(dateStr, toDateStr = null) {
     if (!dateStr) {
         dateStr = new Date().toISOString().slice(0, 10);
     }
-    const cacheFile = path.join(CACHE_DIR, `maasara_${dateStr}.json`);
+    const cleanDate = String(dateStr).trim().slice(0, 10);
+    const cleanToDate = toDateStr ? String(toDateStr).trim().slice(0, 10) : cleanDate;
+    const cacheKey = cleanDate === cleanToDate ? cleanDate : `${cleanDate}_${cleanToDate}`;
+    const cacheFile = path.join(CACHE_DIR, `maasara_${cacheKey}.json`);
 
-    // 1. جلب آلي ومباشر من سيرفر المعصرة عبر maasaraClient (مثل المنظومة الموحدة تماماً)
+    // 1. جلب آلي ومباشر من سيرفر المعصرة عبر maasaraClient لليوم المحدد فقط
     try {
         const maasaraClient = require('./maasaraClient');
-        const liveReport = await maasaraClient.fetchDailyReport(dateStr);
+        const liveReport = await maasaraClient.fetchDailyReport(cleanDate, cleanToDate);
         if (liveReport && liveReport.success && Array.isArray(liveReport.users) && liveReport.users.length > 0) {
             return liveReport;
         }

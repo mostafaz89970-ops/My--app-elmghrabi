@@ -167,21 +167,23 @@ async function ensureSession(forceFresh = false) {
 
 /**
  * جلب تقرير مبيعات وشحنات المعصرة لليوم المحدد آلياً
- * @param {string} dateStr صيغة YYYY-MM-DD
+ * @param {string} dateStr تاريخ البداية (صيغة YYYY-MM-DD)
+ * @param {string} toDateStr تاريخ النهاية اختياري (إن لم يحدد يقرأ اليوم المحدد فقط)
  */
-async function fetchDailyReport(dateStr) {
+async function fetchDailyReport(dateStr, toDateStr = null) {
     if (!dateStr || dateStr.toLowerCase() === 'all') {
         dateStr = new Date().toISOString().slice(0, 10);
     }
+    const fromDate = String(dateStr).trim().slice(0, 10);
+    const toDate = toDateStr ? String(toDateStr).trim().slice(0, 10) : fromDate;
 
-    const cacheFile = path.join(CACHE_DIR, `maasara_${dateStr}.json`);
+    const cacheKey = fromDate === toDate ? fromDate : `${fromDate}_${toDate}`;
+    const cacheFile = path.join(CACHE_DIR, `maasara_${cacheKey}.json`);
 
     try {
         let authCookie = await ensureSession();
 
-        const fromDate = `${dateStr}T00:00:00.000Z`;
-        const toDate = `${dateStr}T23:59:59.999Z`;
-
+        // استخدام صيغة التاريخ الصريحة YYYY-MM-DD لضمان قراءة اليوم المحدد فقط دون التداخل مع الأيام التالية
         const payload = JSON.stringify({
             Page: 1,
             Sort: '',
