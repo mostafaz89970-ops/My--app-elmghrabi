@@ -832,6 +832,7 @@ let state = {
             'manage_treasury_settlements': { name: 'إدارة تصفيات العهد ووقف الحسابات', roles: ['admin', 'supervisor'] },
 
             'view_treasury_transactions': { name: 'عرض سجل المعاملات المالية بالخزينة', roles: ['admin', 'supervisor'] },
+            'view_supply_portfolio': { name: 'عرض حافظات التوريد والتقرير المالي للبرامج', roles: ['admin', 'supervisor', 'user', 'accountant', 'reports', 'technical'] },
 
             'view_collection_section': { name: 'عرض قسم التحصيل', roles: ['admin', 'supervisor', 'user'] },
 
@@ -5395,6 +5396,17 @@ const renderDashboard = () => {
                 { id: 'treasury-user-settlements', title: 'تصفيات وعهد المستخدمين', permission: 'manage_treasury_settlements', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>', tileColor: 'tile-teal' },
 
                 { id: 'treasury-transactions-log', title: 'سجل التوريدات والمعاملات', permission: 'view_treasury_transactions', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>', tileColor: 'tile-cyan' },
+            ]
+        },
+        {
+            id: 'panel-supply-portfolios',
+            title: 'حافظات التوريد ومطابقة المنظومات والبرامج',
+            themeClass: 'panel-theme-treasury',
+            icon: '<rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line>',
+            actions: [
+                { id: 'supply-portfolio-detailed-report', title: 'التقرير المالي والتفصيلي للبرامج', permission: 'view_supply_portfolio', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>', tileColor: 'tile-purple' },
+                { id: 'supply-portfolio-new', title: 'تسجيل حافظة توريد جديدة', permission: 'view_supply_portfolio', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>', tileColor: 'tile-emerald' },
+                { id: 'supply-portfolio-archive', title: 'سجل وأرشيف الحافظات', permission: 'view_supply_portfolio', icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>', tileColor: 'tile-blue' },
 
             ]
 
@@ -5616,7 +5628,7 @@ const renderDashboard = () => {
 
             // Check page permission
 
-            if (!hasPermission(action.permission)) return false;
+            if (action.permission && !hasPermission(action.permission)) return false;
 
 
 
@@ -12687,7 +12699,7 @@ const handlePrintJudicialControlDetails = () => {
         document.getElementById('btn-sp-save')?.addEventListener('click', () => saveSupplyPortfolio(false));
         document.getElementById('btn-sp-save-print')?.addEventListener('click', () => saveSupplyPortfolio(true));
 
-        // Navigation between registration and archive
+        // Navigation between registration and archive and detailed report
         const gotoArchive = () => {
             const link = document.querySelector('.sidebar-nav .nav-link[data-target="supply-portfolio-archive"]') as HTMLElement | null;
             if (link) link.click();
@@ -12698,6 +12710,26 @@ const handlePrintJudicialControlDetails = () => {
             if (link) link.click();
         };
 
+        const gotoDetailedReport = () => {
+            const link = document.querySelector('.sidebar-nav .nav-link[data-target="supply-portfolio-detailed-report"]') as HTMLElement | null;
+            if (link) {
+                link.click();
+            } else {
+                document.querySelectorAll('.content-section.active').forEach(section => {
+                    section.classList.remove('active');
+                    (section as HTMLElement).style.removeProperty('display');
+                });
+                const target = document.getElementById('supply-portfolio-detailed-report');
+                if (target) {
+                    target.classList.add('active');
+                    (target as HTMLElement).style.display = 'block';
+                }
+                renderSupplyPortfolioDetailedReportSection();
+            }
+        };
+
+        document.getElementById('btn-sp-goto-detailed-report-from-new')?.addEventListener('click', gotoDetailedReport);
+        document.getElementById('btn-sp-goto-detailed-report-from-archive')?.addEventListener('click', gotoDetailedReport);
         document.getElementById('btn-sp-goto-archive-top')?.addEventListener('click', gotoArchive);
         document.getElementById('btn-sp-goto-archive-bottom')?.addEventListener('click', gotoArchive);
         document.getElementById('btn-sp-goto-new')?.addEventListener('click', gotoNew);
@@ -28092,6 +28124,11 @@ const handlePrintJudicialControlDetails = () => {
                 icon: '🏦',
 
                 keys: ['view_treasury_section', 'view_treasury_dashboard', 'manage_treasury_settlements', 'view_treasury_transactions']
+            },
+            {
+                title: 'حافظات التوريد والتقرير المالي للبرامج',
+                icon: '📋',
+                keys: ['view_supply_portfolio']
 
             },
 
@@ -65359,6 +65396,7 @@ const setupOrgHierarchyEvents = () => {
         if (targetSection) {
 
             targetSection.classList.add('active');
+            (targetSection as HTMLElement).style.display = 'block';
 
         }
 

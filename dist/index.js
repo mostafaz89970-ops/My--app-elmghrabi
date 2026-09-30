@@ -243,6 +243,7 @@ let state = {
             'view_treasury_dashboard': { name: 'عرض لوحة الخزينة اليومية', roles: ['admin', 'supervisor'] },
             'manage_treasury_settlements': { name: 'إدارة تصفيات العهد ووقف الحسابات', roles: ['admin', 'supervisor'] },
             'view_treasury_transactions': { name: 'عرض سجل المعاملات المالية بالخزينة', roles: ['admin', 'supervisor'] },
+            'view_supply_portfolio': { name: 'عرض حافظات التوريد والتقرير المالي للبرامج', roles: ['admin', 'supervisor', 'user', 'accountant', 'reports', 'technical'] },
             'view_collection_section': { name: 'عرض قسم التحصيل', roles: ['admin', 'supervisor', 'user'] },
             'view_collection_judicial': { name: 'عرض وإدارة تحصيل الضبطية', roles: ['admin', 'supervisor', 'user'] },
             'view_collection_zinat': { name: 'عرض وإدارة تحصيل زينات', roles: ['admin', 'supervisor', 'user'] },
@@ -2528,6 +2529,17 @@ const renderDashboard = () => {
             ]
         },
         {
+            id: 'panel-supply-portfolios',
+            title: 'حافظات التوريد ومطابقة المنظومات والبرامج',
+            themeClass: 'panel-theme-treasury',
+            icon: '<rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line>',
+            actions: [
+                { id: 'supply-portfolio-detailed-report', title: 'التقرير المالي والتفصيلي للبرامج', permission: 'view_supply_portfolio', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>', tileColor: 'tile-purple' },
+                { id: 'supply-portfolio-new', title: 'تسجيل حافظة توريد جديدة', permission: 'view_supply_portfolio', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>', tileColor: 'tile-emerald' },
+                { id: 'supply-portfolio-archive', title: 'سجل وأرشيف الحافظات', permission: 'view_supply_portfolio', icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>', tileColor: 'tile-blue' },
+            ]
+        },
+        {
             id: 'panel-collection',
             title: 'التحصيل وزينات',
             themeClass: 'panel-theme-collection',
@@ -2633,7 +2645,7 @@ const renderDashboard = () => {
             if (isSystemAdmin(loggedInUser))
                 return true;
             // Check page permission
-            if (!hasPermission(action.permission))
+            if (action.permission && !hasPermission(action.permission))
                 return false;
             // Special check for user management
             if (action.id === 'user-management' && loggedInUser && !['admin', 'supervisor'].includes(loggedInUser.role) && loggedInUser.username !== 'admin') {
@@ -7391,7 +7403,7 @@ const exportSupplyPortfoliosToExcel = () => {
     showToast('تم تصدير سجل حافظات التوريد بنجاح!', 'success');
 };
 const initSupplyPortfoliosListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11;
     // Calculation input triggers
     document.querySelectorAll('.sp-calc-input, .sp-system-input').forEach(inp => {
         inp.addEventListener('input', () => calculateSupplyPortfolioLive());
@@ -7408,7 +7420,7 @@ const initSupplyPortfoliosListeners = () => {
     // Save buttons
     (_d = document.getElementById('btn-sp-save')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => saveSupplyPortfolio(false));
     (_e = document.getElementById('btn-sp-save-print')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => saveSupplyPortfolio(true));
-    // Navigation between registration and archive
+    // Navigation between registration and archive and detailed report
     const gotoArchive = () => {
         const link = document.querySelector('.sidebar-nav .nav-link[data-target="supply-portfolio-archive"]');
         if (link)
@@ -7419,13 +7431,33 @@ const initSupplyPortfoliosListeners = () => {
         if (link)
             link.click();
     };
-    (_f = document.getElementById('btn-sp-goto-archive-top')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', gotoArchive);
-    (_g = document.getElementById('btn-sp-goto-archive-bottom')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', gotoArchive);
-    (_h = document.getElementById('btn-sp-goto-new')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', gotoNew);
+    const gotoDetailedReport = () => {
+        const link = document.querySelector('.sidebar-nav .nav-link[data-target="supply-portfolio-detailed-report"]');
+        if (link) {
+            link.click();
+        }
+        else {
+            document.querySelectorAll('.content-section.active').forEach(section => {
+                section.classList.remove('active');
+                section.style.removeProperty('display');
+            });
+            const target = document.getElementById('supply-portfolio-detailed-report');
+            if (target) {
+                target.classList.add('active');
+                target.style.display = 'block';
+            }
+            renderSupplyPortfolioDetailedReportSection();
+        }
+    };
+    (_f = document.getElementById('btn-sp-goto-detailed-report-from-new')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', gotoDetailedReport);
+    (_g = document.getElementById('btn-sp-goto-detailed-report-from-archive')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', gotoDetailedReport);
+    (_h = document.getElementById('btn-sp-goto-archive-top')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', gotoArchive);
+    (_j = document.getElementById('btn-sp-goto-archive-bottom')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', gotoArchive);
+    (_k = document.getElementById('btn-sp-goto-new')) === null || _k === void 0 ? void 0 : _k.addEventListener('click', gotoNew);
     // Archive export
-    (_j = document.getElementById('btn-sp-export-excel')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', () => exportSupplyPortfoliosToExcel());
+    (_l = document.getElementById('btn-sp-export-excel')) === null || _l === void 0 ? void 0 : _l.addEventListener('click', () => exportSupplyPortfoliosToExcel());
     // Archive filter
-    (_k = document.getElementById('btn-sp-filter-apply')) === null || _k === void 0 ? void 0 : _k.addEventListener('click', () => {
+    (_m = document.getElementById('btn-sp-filter-apply')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', () => {
         var _a, _b, _c, _d, _e;
         const query = ((_b = (_a = document.getElementById('sp-filter-query')) === null || _a === void 0 ? void 0 : _a.value) === null || _b === void 0 ? void 0 : _b.trim().toLowerCase()) || '';
         const fromDate = ((_c = document.getElementById('sp-filter-from')) === null || _c === void 0 ? void 0 : _c.value) || '';
@@ -7449,7 +7481,7 @@ const initSupplyPortfoliosListeners = () => {
         });
         renderSupplyPortfoliosTable(filtered);
     });
-    (_l = document.getElementById('btn-sp-filter-clear')) === null || _l === void 0 ? void 0 : _l.addEventListener('click', () => {
+    (_o = document.getElementById('btn-sp-filter-clear')) === null || _o === void 0 ? void 0 : _o.addEventListener('click', () => {
         const q = document.getElementById('sp-filter-query');
         const from = document.getElementById('sp-filter-from');
         const to = document.getElementById('sp-filter-to');
@@ -7465,12 +7497,12 @@ const initSupplyPortfoliosListeners = () => {
         renderSupplyPortfoliosTable();
     });
     // Cancel edit mode
-    (_m = document.getElementById('btn-sp-cancel-edit')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', () => {
+    (_p = document.getElementById('btn-sp-cancel-edit')) === null || _p === void 0 ? void 0 : _p.addEventListener('click', () => {
         resetSupplyPortfolioForm();
         showToast('تم إلغاء التعديل والعودة لحافظة جديدة', 'info');
     });
     // Edit from modal
-    (_o = document.getElementById('btn-sp-modal-edit')) === null || _o === void 0 ? void 0 : _o.addEventListener('click', () => {
+    (_q = document.getElementById('btn-sp-modal-edit')) === null || _q === void 0 ? void 0 : _q.addEventListener('click', () => {
         const modal = document.getElementById('sp-details-modal');
         if (modal)
             modal.style.display = 'none';
@@ -7479,14 +7511,14 @@ const initSupplyPortfoliosListeners = () => {
         }
     });
     // User select change
-    (_p = document.getElementById('sp-portfolio-user-select')) === null || _p === void 0 ? void 0 : _p.addEventListener('change', (e) => {
+    (_r = document.getElementById('sp-portfolio-user-select')) === null || _r === void 0 ? void 0 : _r.addEventListener('change', (e) => {
         const val = e.target.value;
         const input = document.getElementById('sp-portfolio-user');
         if (input)
             input.value = val;
     });
     // Toggle custom user typing
-    (_q = document.getElementById('btn-sp-toggle-custom-user')) === null || _q === void 0 ? void 0 : _q.addEventListener('click', () => {
+    (_s = document.getElementById('btn-sp-toggle-custom-user')) === null || _s === void 0 ? void 0 : _s.addEventListener('click', () => {
         const select = document.getElementById('sp-portfolio-user-select');
         const input = document.getElementById('sp-portfolio-user');
         if (select && input) {
@@ -7507,73 +7539,73 @@ const initSupplyPortfoliosListeners = () => {
         }
     });
     // Sync users from MEEDCO / Programs live
-    (_r = document.getElementById('btn-sp-sync-users')) === null || _r === void 0 ? void 0 : _r.addEventListener('click', async () => {
+    (_t = document.getElementById('btn-sp-sync-users')) === null || _t === void 0 ? void 0 : _t.addEventListener('click', async () => {
         showToast('جارِ سحب وتحديث قائمة المستخدمين من المنظومة الموحدة...', 'info');
         await loadSupplyPortfolioUsers(true);
     });
     // Auto-fetch user program sales and recharges
-    (_s = document.getElementById('btn-sp-auto-fetch-programs')) === null || _s === void 0 ? void 0 : _s.addEventListener('click', () => {
+    (_u = document.getElementById('btn-sp-auto-fetch-programs')) === null || _u === void 0 ? void 0 : _u.addEventListener('click', () => {
         autoFetchUserProgramsRevenue(true);
     });
     // Automatically fetch programs revenue whenever cashier selection changes
-    (_t = document.getElementById('sp-portfolio-user-select')) === null || _t === void 0 ? void 0 : _t.addEventListener('change', () => {
+    (_v = document.getElementById('sp-portfolio-user-select')) === null || _v === void 0 ? void 0 : _v.addEventListener('change', () => {
         autoFetchUserProgramsRevenue(false);
     });
     // Automatically re-fetch programs revenue whenever date changes
-    (_u = document.getElementById('sp-portfolio-date')) === null || _u === void 0 ? void 0 : _u.addEventListener('change', () => {
+    (_w = document.getElementById('sp-portfolio-date')) === null || _w === void 0 ? void 0 : _w.addEventListener('change', () => {
         autoFetchUserProgramsRevenue(false);
     });
     // Automatically re-fetch programs revenue when custom user input changes or blurs
-    (_v = document.getElementById('sp-portfolio-user')) === null || _v === void 0 ? void 0 : _v.addEventListener('change', () => {
+    (_x = document.getElementById('sp-portfolio-user')) === null || _x === void 0 ? void 0 : _x.addEventListener('change', () => {
         autoFetchUserProgramsRevenue(false);
     });
-    (_w = document.getElementById('sp-portfolio-user')) === null || _w === void 0 ? void 0 : _w.addEventListener('blur', () => {
+    (_y = document.getElementById('sp-portfolio-user')) === null || _y === void 0 ? void 0 : _y.addEventListener('blur', () => {
         autoFetchUserProgramsRevenue(false);
     });
     // Modal close
-    (_x = document.getElementById('btn-sp-modal-close')) === null || _x === void 0 ? void 0 : _x.addEventListener('click', () => {
+    (_z = document.getElementById('btn-sp-modal-close')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', () => {
         const modal = document.getElementById('sp-details-modal');
         if (modal)
             modal.style.display = 'none';
     });
-    (_y = document.getElementById('btn-sp-modal-dismiss')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', () => {
+    (_0 = document.getElementById('btn-sp-modal-dismiss')) === null || _0 === void 0 ? void 0 : _0.addEventListener('click', () => {
         const modal = document.getElementById('sp-details-modal');
         if (modal)
             modal.style.display = 'none';
     });
     // ================= Detailed Report Section Event Listeners =================
-    (_z = document.getElementById('btn-sp-detail-refresh')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', () => {
+    (_1 = document.getElementById('btn-sp-detail-refresh')) === null || _1 === void 0 ? void 0 : _1.addEventListener('click', () => {
         loadComprehensiveDailyReport(true);
     });
-    (_0 = document.getElementById('sp-detail-date')) === null || _0 === void 0 ? void 0 : _0.addEventListener('change', () => {
+    (_2 = document.getElementById('sp-detail-date')) === null || _2 === void 0 ? void 0 : _2.addEventListener('change', () => {
         loadComprehensiveDailyReport(false);
     });
-    (_1 = document.getElementById('sp-detail-search-user')) === null || _1 === void 0 ? void 0 : _1.addEventListener('input', () => {
+    (_3 = document.getElementById('sp-detail-search-user')) === null || _3 === void 0 ? void 0 : _3.addEventListener('input', () => {
         filterAndRenderComprehensiveTable();
     });
-    (_2 = document.getElementById('sp-detail-status-filter')) === null || _2 === void 0 ? void 0 : _2.addEventListener('change', () => {
+    (_4 = document.getElementById('sp-detail-status-filter')) === null || _4 === void 0 ? void 0 : _4.addEventListener('change', () => {
         filterAndRenderComprehensiveTable();
     });
-    (_3 = document.getElementById('btn-sp-detail-print-all')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', () => {
+    (_5 = document.getElementById('btn-sp-detail-print-all')) === null || _5 === void 0 ? void 0 : _5.addEventListener('click', () => {
         printComprehensiveDailyReport();
     });
-    (_4 = document.getElementById('btn-sp-detail-export-excel')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', () => {
+    (_6 = document.getElementById('btn-sp-detail-export-excel')) === null || _6 === void 0 ? void 0 : _6.addEventListener('click', () => {
         exportComprehensiveDailyReportToExcel();
     });
-    (_5 = document.getElementById('btn-sp-detail-nav-new')) === null || _5 === void 0 ? void 0 : _5.addEventListener('click', gotoNew);
-    (_6 = document.getElementById('btn-sp-detail-nav-archive')) === null || _6 === void 0 ? void 0 : _6.addEventListener('click', gotoArchive);
+    (_7 = document.getElementById('btn-sp-detail-nav-new')) === null || _7 === void 0 ? void 0 : _7.addEventListener('click', gotoNew);
+    (_8 = document.getElementById('btn-sp-detail-nav-archive')) === null || _8 === void 0 ? void 0 : _8.addEventListener('click', gotoArchive);
     // Transactions modal handlers
-    (_7 = document.getElementById('btn-sp-tx-modal-close')) === null || _7 === void 0 ? void 0 : _7.addEventListener('click', () => {
+    (_9 = document.getElementById('btn-sp-tx-modal-close')) === null || _9 === void 0 ? void 0 : _9.addEventListener('click', () => {
         const m = document.getElementById('sp-user-transactions-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_8 = document.getElementById('btn-sp-tx-modal-dismiss')) === null || _8 === void 0 ? void 0 : _8.addEventListener('click', () => {
+    (_10 = document.getElementById('btn-sp-tx-modal-dismiss')) === null || _10 === void 0 ? void 0 : _10.addEventListener('click', () => {
         const m = document.getElementById('sp-user-transactions-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_9 = document.getElementById('btn-sp-tx-modal-print')) === null || _9 === void 0 ? void 0 : _9.addEventListener('click', () => {
+    (_11 = document.getElementById('btn-sp-tx-modal-print')) === null || _11 === void 0 ? void 0 : _11.addEventListener('click', () => {
         printCurrentCashierTransactions();
     });
 };
@@ -16725,6 +16757,11 @@ const renderPermissionsSection = () => {
             title: 'الخزينة العامة وتصفيات العهد والرقابة المالية',
             icon: '🏦',
             keys: ['view_treasury_section', 'view_treasury_dashboard', 'manage_treasury_settlements', 'view_treasury_transactions']
+        },
+        {
+            title: 'حافظات التوريد والتقرير المالي للبرامج',
+            icon: '📋',
+            keys: ['view_supply_portfolio']
         },
         {
             title: 'التحصيل وزينات',
@@ -39248,6 +39285,7 @@ function handleNavigation(event) {
     const targetSection = document.getElementById(targetId);
     if (targetSection) {
         targetSection.classList.add('active');
+        targetSection.style.display = 'block';
     }
     // Update header title based on sidebar link text
     let pageTitle = state.settings.companyName || 'ELMAGHRABI';
