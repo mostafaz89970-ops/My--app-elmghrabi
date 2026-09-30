@@ -162,49 +162,75 @@ async function fetchMaasaraDailySales(dateStr) {
     const cacheFile = path.join(CACHE_DIR, `maasara_${dateStr}.json`);
 
     try {
-        // 1. البحث عن أحدث شيت معصرة تم تصديره في مجلد التنزيلات أو الكاش
+        // 1. البحث عن كافة شيتات معصرة في مجلد التنزيلات أو الكاش
         const downloadsDir = path.join(process.env.USERPROFILE || 'C:\\Users\\AL-Motahida', 'Downloads');
-        let matchedFile = null;
+        const candidateFiles = [];
 
         if (fs.existsSync(downloadsDir)) {
             const files = fs.readdirSync(downloadsDir);
-            const maasaraFiles = files
-                .filter(f => f.toLowerCase().endsWith('.xlsx') && (f.includes('مبيعات المستخدمين') || f.includes('معصرة')))
-                .map(f => {
-                    const full = path.join(downloadsDir, f);
-                    try {
-                        return { path: full, mtime: fs.statSync(full).mtimeMs };
-                    } catch (e) {
-                        return null;
+            for (const f of files) {
+                if (f.toLowerCase().endsWith('.xlsx')) {
+                    if (f.includes('مبيعات المستخدم') || f.includes('معصرة') || f.includes('maasara')) {
+                        const full = path.join(downloadsDir, f);
+                        try {
+                            candidateFiles.push({ path: full, mtime: fs.statSync(full).mtimeMs, name: f });
+                        } catch (e) {}
                     }
-                })
-                .filter(Boolean)
-                .sort((a, b) => b.mtime - a.mtime);
-
-            if (maasaraFiles.length > 0) {
-                matchedFile = maasaraFiles[0].path;
+                }
             }
         }
 
         const directCacheExcel = path.join(CACHE_DIR, `maasara_${dateStr}.xlsx`);
         if (fs.existsSync(directCacheExcel)) {
-            matchedFile = directCacheExcel;
+            candidateFiles.unshift({ path: directCacheExcel, mtime: Date.now(), name: `maasara_${dateStr}.xlsx` });
         }
 
-        if (matchedFile) {
+        if (candidateFiles.length > 0) {
+            candidateFiles.sort((a, b) => b.mtime - a.mtime);
             const scriptPath = path.join(__dirname, 'parse_maasara_excel.py');
-            const parsedResult = await new Promise((resolve) => {
-                execFile('python', [scriptPath, matchedFile], { maxBuffer: 1024 * 1024 * 20, encoding: 'utf8' }, (err, stdout) => {
-                    if (err) return resolve(null);
-                    try { resolve(JSON.parse(stdout)); } catch (e) { resolve(null); }
-                });
-            });
+            const usersMap = new Map();
+            let totalAmount = 0;
+            let totalRecharges = 0;
 
-            if (parsedResult && parsedResult.success && Array.isArray(parsedResult.users) && parsedResult.users.length > 0) {
-                parsedResult.fetchedAt = new Date().toISOString();
-                parsedResult.sourceFile = path.basename(matchedFile);
-                fs.writeFileSync(cacheFile, JSON.stringify(parsedResult, null, 2), 'utf8');
-                return parsedResult;
+            for (const cFile of candidateFiles) {
+                const parsed = await new Promise((resolve) => {
+                    execFile('python', [scriptPath, cFile.path], { maxBuffer: 1024 * 1024 * 20, encoding: 'utf8' }, (err, stdout) => {
+                        if (err) return resolve(null);
+                        try { resolve(JSON.parse(stdout)); } catch (e) { resolve(null); }
+                    });
+                });
+
+                if (parsed && parsed.success && Array.isArray(parsed.users)) {
+                    for (const u of parsed.users) {
+                        const normKey = normalizeArabic(u.userName);
+                        if (!usersMap.has(normKey)) {
+                            usersMap.set(normKey, u);
+                        } else {
+                            // If existing has 0 count and this one has count > 0, update it
+                            const exist = usersMap.get(normKey);
+                            if ((!exist.rechargesCount || exist.rechargesCount === 0) && u.rechargesCount > 0) {
+                                usersMap.set(normKey, u);
+                            }
+                        }
+                    }
+                }
+            }
+
+            const usersList = Array.from(usersMap.values());
+            if (usersList.length > 0) {
+                totalAmount = usersList.reduce((sum, u) => sum + (u.totalAmount || 0), 0);
+                totalRecharges = usersList.reduce((sum, u) => sum + (u.rechargesCount || 0), 0);
+                const finalResult = {
+                    success: true,
+                    connected: true,
+                    totalUsers: usersList.length,
+                    totalRecharges: totalRecharges,
+                    totalAmount: Math.round(totalAmount * 100) / 100,
+                    users: usersList,
+                    fetchedAt: new Date().toISOString()
+                };
+                fs.writeFileSync(cacheFile, JSON.stringify(finalResult, null, 2), 'utf8');
+                return finalResult;
             }
         }
     } catch (e) {
