@@ -175,6 +175,7 @@ async function healthLoop() {
         }
         setTimeout(startServer, 500);
     } else {
+        restartTimestamps = []; // تصفير عداد المحاولات عند استقرار السيرفر
         // السيرفر يعمل — تحقق من الجلسة إن مضى وقت كافٍ
         const now = Date.now();
         if (now - lastSessionRenew >= SESSION_RENEW_INTERVAL_MS) {
