@@ -130,28 +130,87 @@ async function fetchMeedcoDailySales(dateStr) {
     }
 }
 
+function normalizeArabic(str) {
+    if (!str) return '';
+    return str
+        .replace(/^(محاسب|المهندس|مهندس|أستاذ|استاذ|ا|م)\s*\/\s*/g, '')
+        .replace(/[أإآ]/g, 'ا')
+        .replace(/ة/g, 'ه')
+        .replace(/ى/g, 'ي')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function isArabicMatch(name1, name2) {
+    if (!name1 || !name2) return false;
+    const n1 = normalizeArabic(name1);
+    const n2 = normalizeArabic(name2);
+    if (n1 === n2 || n1.includes(n2) || n2.includes(n1)) return true;
+    const words1 = n1.split(' ').filter(w => w.length > 2);
+    const words2 = n2.split(' ').filter(w => w.length > 2);
+    const matchCount = words1.filter(w1 => words2.some(w2 => w1 === w2 || (w1.length > 3 && (w1.includes(w2) || w2.includes(w1))))).length;
+    return matchCount >= 2;
+}
+
 /**
  * جلب تقرير معصرة (Maasara) لليوم المحدد
  */
 async function fetchMaasaraDailySales(dateStr) {
+    if (!dateStr) {
+        dateStr = new Date().toISOString().slice(0, 10);
+    }
     const cacheFile = path.join(CACHE_DIR, `maasara_${dateStr}.json`);
-    // فحص الاتصال بالخادم المحلي
+
     try {
-        const isReachable = await new Promise((resolve) => {
-            const req = http.get('http://200.1.1.240:5050/Reports/CustomersRechargesTotalPaymentByUser', { timeout: 2500 }, (res) => {
-                resolve(true);
-            });
-            req.on('error', () => resolve(false));
-            req.on('timeout', () => { req.destroy(); resolve(false); });
-        });
+        // 1. البحث عن أحدث شيت معصرة تم تصديره في مجلد التنزيلات أو الكاش
+        const downloadsDir = path.join(process.env.USERPROFILE || 'C:\\Users\\AL-Motahida', 'Downloads');
+        let matchedFile = null;
 
-        if (isReachable) {
-            // سحب البيانات من السيرفر عند اتصاله بالشبكة الداخلية
-            // TODO: معالجة جداول HTML عند الاتصال الحي
+        if (fs.existsSync(downloadsDir)) {
+            const files = fs.readdirSync(downloadsDir);
+            const maasaraFiles = files
+                .filter(f => f.toLowerCase().endsWith('.xlsx') && (f.includes('مبيعات المستخدمين') || f.includes('معصرة')))
+                .map(f => {
+                    const full = path.join(downloadsDir, f);
+                    try {
+                        return { path: full, mtime: fs.statSync(full).mtimeMs };
+                    } catch (e) {
+                        return null;
+                    }
+                })
+                .filter(Boolean)
+                .sort((a, b) => b.mtime - a.mtime);
+
+            if (maasaraFiles.length > 0) {
+                matchedFile = maasaraFiles[0].path;
+            }
         }
-    } catch (e) {}
 
-    // القراءة من الكاش أو الحافظات المحفوظة
+        const directCacheExcel = path.join(CACHE_DIR, `maasara_${dateStr}.xlsx`);
+        if (fs.existsSync(directCacheExcel)) {
+            matchedFile = directCacheExcel;
+        }
+
+        if (matchedFile) {
+            const scriptPath = path.join(__dirname, 'parse_maasara_excel.py');
+            const parsedResult = await new Promise((resolve) => {
+                execFile('python', [scriptPath, matchedFile], { maxBuffer: 1024 * 1024 * 20, encoding: 'utf8' }, (err, stdout) => {
+                    if (err) return resolve(null);
+                    try { resolve(JSON.parse(stdout)); } catch (e) { resolve(null); }
+                });
+            });
+
+            if (parsedResult && parsedResult.success && Array.isArray(parsedResult.users) && parsedResult.users.length > 0) {
+                parsedResult.fetchedAt = new Date().toISOString();
+                parsedResult.sourceFile = path.basename(matchedFile);
+                fs.writeFileSync(cacheFile, JSON.stringify(parsedResult, null, 2), 'utf8');
+                return parsedResult;
+            }
+        }
+    } catch (e) {
+        console.warn(`[ReportSync] Maasara parse warning:`, e.message);
+    }
+
     if (fs.existsSync(cacheFile)) {
         try {
             return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
@@ -161,30 +220,147 @@ async function fetchMaasaraDailySales(dateStr) {
 }
 
 /**
- * جلب تقرير إسكرا (Iskra) لليوم المحدد
+ * جلب تقرير إسكرا (Iskra) لليوم المحدد - اتصال حي وقراءة رسمية
  */
 async function fetchIskraDailySales(dateStr) {
+    if (!dateStr) {
+        dateStr = new Date().toISOString().slice(0, 10);
+    }
     const cacheFile = path.join(CACHE_DIR, `iskra_${dateStr}.json`);
+
     try {
-        const isReachable = await new Promise((resolve) => {
-            const req = http.get('http://200.1.1.201:8013/SPMeters/#/app/report', { timeout: 2500 }, (res) => {
-                resolve(true);
-            });
-            req.on('error', () => resolve(false));
-            req.on('timeout', () => { req.destroy(); resolve(false); });
+        // 1. تسجيل الدخول إلى منظومة إسكرا
+        const loginPayload = JSON.stringify({
+            userName: 'اشرف فتحى عبدالوهاب',
+            password: '123456',
+            stationId: 32,
+            ignoreIP: 'true'
         });
 
-        if (isReachable) {
-            // سحب البيانات من السيرفر عند اتصاله بالشبكة الداخلية
-        }
-    } catch (e) {}
+        const loginRes = await new Promise((resolve, reject) => {
+            const req = http.request({
+                hostname: '200.1.1.201',
+                port: 8013,
+                path: '/SPMeters/user/login',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json;charset=UTF-8',
+                    'Content-Length': Buffer.byteLength(loginPayload)
+                },
+                timeout: 4000
+            }, (res) => {
+                let body = '';
+                res.on('data', d => body += d);
+                res.on('end', () => {
+                    if (res.statusCode === 200) {
+                        const cookieHeader = res.headers['set-cookie'];
+                        let sessionId = '';
+                        if (cookieHeader) {
+                            const match = cookieHeader.find(c => c.includes('JSESSIONID='));
+                            if (match) {
+                                sessionId = match.split(';')[0].trim();
+                            }
+                        }
+                        try {
+                            const userArr = JSON.parse(body);
+                            const userId = userArr[0]?.userId || 3841;
+                            resolve({ sessionId, userId });
+                        } catch (e) {
+                            resolve({ sessionId, userId: 3841 });
+                        }
+                    } else {
+                        reject(new Error(`Iskra login failed HTTP ${res.statusCode}`));
+                    }
+                });
+            });
+            req.on('error', reject);
+            req.on('timeout', () => { req.destroy(); reject(new Error('Iskra connection timeout')); });
+            req.write(loginPayload);
+            req.end();
+        });
 
-    if (fs.existsSync(cacheFile)) {
-        try {
-            return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-        } catch (e) {}
+        const { sessionId, userId } = loginRes;
+
+        // 2. تشغيل تقرير مبيعات المستخدمين (Report 14)
+        const reportPayload = JSON.stringify({
+            reportId: 14,
+            extention: 'XLSX',
+            filters: [
+                { name: 'FROM_DATE', jasperKey: 'FROM_DATE', value: dateStr },
+                { name: 'TO_DATE', jasperKey: 'TO_DATE', value: dateStr },
+                { name: 'STATION_IDS', jasperKey: 'STATION_IDS', value: '32' },
+                { name: 'SECTOR_IDS', jasperKey: 'SECTOR_IDS', value: '5' }
+            ]
+        });
+
+        const xlsxBuffer = await new Promise((resolve, reject) => {
+            const req = http.request({
+                hostname: '200.1.1.201',
+                port: 8013,
+                path: '/SPMeters/api/report/execute',
+                method: 'POST',
+                headers: {
+                    'Cookie': sessionId,
+                    'userId': String(userId),
+                    'stationIds': '32',
+                    'stationIdsReports': '32',
+                    'Content-Type': 'application/json;charset=UTF-8',
+                    'Content-Length': Buffer.byteLength(reportPayload)
+                },
+                timeout: 8000
+            }, (res) => {
+                if (res.statusCode !== 200) {
+                    let errBody = '';
+                    res.on('data', d => errBody += d);
+                    res.on('end', () => reject(new Error(`Iskra report HTTP ${res.statusCode}: ${errBody}`)));
+                    return;
+                }
+                const chunks = [];
+                res.on('data', c => chunks.push(c));
+                res.on('end', () => resolve(Buffer.concat(chunks)));
+            });
+            req.on('error', reject);
+            req.on('timeout', () => { req.destroy(); reject(new Error('Iskra execute report timeout')); });
+            req.write(reportPayload);
+            req.end();
+        });
+
+        // 3. حفظ ومعالجة ملف الإكسل عبر البارسر المعتمد
+        const tempXlsxPath = path.join(CACHE_DIR, `temp_iskra_${dateStr}_${Date.now()}.xlsx`);
+        fs.writeFileSync(tempXlsxPath, xlsxBuffer);
+
+        const scriptPath = path.join(__dirname, 'parse_iskra_excel.py');
+        const parsedResult = await new Promise((resolve, reject) => {
+            execFile('python', [scriptPath, tempXlsxPath], { maxBuffer: 1024 * 1024 * 50, encoding: 'utf8' }, (err, stdout, stderr) => {
+                try { fs.unlinkSync(tempXlsxPath); } catch (e) {}
+                if (err) return reject(new Error('Python parse error: ' + (stderr || err.message)));
+                try {
+                    resolve(JSON.parse(stdout));
+                } catch (e) {
+                    reject(new Error('Failed to parse Iskra JSON: ' + e.message));
+                }
+            });
+        });
+
+        if (parsedResult && parsedResult.success) {
+            parsedResult.fetchedAt = new Date().toISOString();
+            fs.writeFileSync(cacheFile, JSON.stringify(parsedResult, null, 2), 'utf8');
+            return parsedResult;
+        } else {
+            throw new Error((parsedResult && parsedResult.error) || 'Failed to extract Iskra data');
+        }
+
+    } catch (err) {
+        console.warn(`[ReportSync] Iskra fetch failed for ${dateStr}:`, err.message);
+        if (fs.existsSync(cacheFile)) {
+            try {
+                const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+                cached.isCached = true;
+                return cached;
+            } catch (e) {}
+        }
+        return { success: false, error: err.message, users: [] };
     }
-    return { success: true, connected: false, users: [] };
 }
 
 /**
@@ -201,10 +377,7 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
 
     const meedcoData = await fetchMeedcoDailySales(dateStr);
     if (meedcoData && meedcoData.success && Array.isArray(meedcoData.users)) {
-        const found = meedcoData.users.find(u => {
-            const uname = (u.userName || '').replace(/\s+/g, ' ').trim();
-            return uname === cleanTarget || uname.includes(cleanTarget) || cleanTarget.includes(uname);
-        });
+        const found = meedcoData.users.find(u => isArabicMatch(u.userName, cleanTarget));
         if (found) {
             meedcoAmount = found.totalAmount || 0;
             meedcoCount = found.rechargesCount || (found.items ? found.items.length : 0);
@@ -217,7 +390,7 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
     let maasaraCount = 0;
     const maasaraData = await fetchMaasaraDailySales(dateStr);
     if (maasaraData && Array.isArray(maasaraData.users)) {
-        const found = maasaraData.users.find(u => (u.userName || '').trim() === cleanTarget);
+        const found = maasaraData.users.find(u => isArabicMatch(u.userName, cleanTarget));
         if (found) {
             maasaraAmount = found.totalAmount || 0;
             maasaraCount = found.rechargesCount || 0;
@@ -229,7 +402,7 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
     let iskraCount = 0;
     const iskraData = await fetchIskraDailySales(dateStr);
     if (iskraData && Array.isArray(iskraData.users)) {
-        const found = iskraData.users.find(u => (u.userName || '').trim() === cleanTarget);
+        const found = iskraData.users.find(u => isArabicMatch(u.userName, cleanTarget));
         if (found) {
             iskraAmount = found.totalAmount || 0;
             iskraCount = found.rechargesCount || 0;
@@ -242,7 +415,7 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
         unified: { amount: meedcoAmount, count: meedcoCount, itemsCount: meedcoItems.length },
         maasara: { amount: maasaraAmount, count: maasaraCount },
         iskra: { amount: iskraAmount, count: iskraCount },
-        totalAmount: meedcoAmount + maasaraAmount + iskraAmount,
+        totalAmount: Math.round((meedcoAmount + maasaraAmount + iskraAmount) * 100) / 100,
         totalCount: meedcoCount + maasaraCount + iskraCount,
         meedcoItems: meedcoItems
     };
@@ -273,28 +446,34 @@ async function getComprehensiveDailyReport(dateStr) {
 
     const dayPortfolios = portfolios.filter(p => p.date === dateStr);
 
-    // تجميع كافة المستخدمين الذين لديهم نشاط
+    // تجميع كافة المستخدمين الذين لديهم نشاط مع مطابقة ذكية
     const usersMap = new Map();
 
     const getOrCreateUser = (name) => {
         const cleanName = (name || '').replace(/\s+/g, ' ').trim();
         if (!cleanName) return null;
-        if (!usersMap.has(cleanName)) {
-            usersMap.set(cleanName, {
-                userName: cleanName,
-                meedco: { amount: 0, count: 0, items: [] },
-                maasara: { amount: 0, count: 0 },
-                iskra: { amount: 0, count: 0 },
-                other: { amount: 0, count: 0 },
-                totalSystemsAmount: 0,
-                totalRechargesCount: 0,
-                cashSupplied: 0,
-                portfoliosCount: 0,
-                difference: 0,
-                status: 'لم يتم التوريد'
-            });
+        
+        for (const [key, val] of usersMap.entries()) {
+            if (isArabicMatch(key, cleanName)) {
+                return val;
+            }
         }
-        return usersMap.get(cleanName);
+        
+        const newUser = {
+            userName: cleanName,
+            meedco: { amount: 0, count: 0, items: [] },
+            maasara: { amount: 0, count: 0 },
+            iskra: { amount: 0, count: 0 },
+            other: { amount: 0, count: 0 },
+            totalSystemsAmount: 0,
+            totalRechargesCount: 0,
+            cashSupplied: 0,
+            portfoliosCount: 0,
+            difference: 0,
+            status: 'لم يتم التوريد'
+        };
+        usersMap.set(cleanName, newUser);
+        return newUser;
     };
 
     // 1. إضافة بيانات MEEDCO
@@ -337,7 +516,6 @@ async function getComprehensiveDailyReport(dateStr) {
         if (entry) {
             entry.cashSupplied += Number(p.totalCash || 0);
             entry.portfoliosCount += 1;
-            // إذا كانت الحافظة تحتوي قيم برامج يدوية
             if (p.systems) {
                 if (entry.maasara.amount === 0 && p.systems.maasara) {
                     entry.maasara.amount = Number(p.systems.maasara);

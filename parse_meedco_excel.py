@@ -75,11 +75,23 @@ def parse_report(file_path):
                     pay_time = row_dict.get('E', '').strip()
                     pay_type = row_dict.get('F', '').strip()
                     
-                    amt_str = row_dict.get('V', '0').strip()
+                    v_str = row_dict.get('V', '0').strip()
+                    t_str = row_dict.get('T', '0').strip()
+                    u_str = row_dict.get('U', '0').strip()
                     try:
-                        amt = float(amt_str)
+                        v = float(v_str) if v_str else 0.0
                     except:
-                        amt = 0.0
+                        v = 0.0
+                    try:
+                        t = float(t_str) if t_str else 0.0
+                    except:
+                        t = 0.0
+                    try:
+                        u = float(u_str) if u_str else 0.0
+                    except:
+                        u = 0.0
+                        
+                    amt = round(v + t + u, 2)
                         
                     if meter_no and amt > 0:
                         users[current_user]["items"].append({
@@ -89,7 +101,10 @@ def parse_report(file_path):
                             "receiptNumber": receipt_no,
                             "paymentTime": pay_time,
                             "paymentType": pay_type,
-                            "amount": amt
+                            "amount": amt,
+                            "rechargeAmount": v,
+                            "debtAmount": t,
+                            "cardAmount": u
                         })
             
             # Recalculate totals and verification
