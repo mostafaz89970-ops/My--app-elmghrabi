@@ -973,6 +973,160 @@ function startInternalServer(port = 5002) {
                 }
             }
 
+            // 8.1 استرجاع وتحديث قائمة المستخدمين والمحصلين من البرامج والمنظومة الموحدة
+            if (pathname === '/api/supply-portfolios/users') {
+                const cachePath = path.join(__dirname, 'meedco_users_cache.json');
+                const initialDataPath = path.join(__dirname, 'initial_data.json');
+                const meedcoCfgPath = path.join(__dirname, 'meedco_config.json');
+
+                const loadCachedUsers = () => {
+                    let usersMap = new Map();
+
+                    // 1. من الكاش المعتمد للمنظومة الموحدة (MEEDCO)
+                    try {
+                        if (fs.existsSync(cachePath)) {
+                            const cached = JSON.parse(fs.readFileSync(cachePath, 'utf8')) || [];
+                            cached.forEach(u => {
+                                const name = (u.name || '').trim();
+                                if (name && !usersMap.has(name)) {
+                                    usersMap.set(name, { id: u.id, name, source: 'المنظومة الموحدة (MEEDCO)' });
+                                }
+                            });
+                        }
+                    } catch (e) {}
+
+                    // 2. مستخدم جلسة MEEDCO الحالي
+                    try {
+                        if (fs.existsSync(meedcoCfgPath)) {
+                            const cfg = JSON.parse(fs.readFileSync(meedcoCfgPath, 'utf8'));
+                            const activeUser = (cfg.username || cfg.userName || '').trim();
+                            if (activeUser && !usersMap.has(activeUser)) {
+                                usersMap.set(activeUser, { id: 'meedco-active', name: activeUser, source: 'المستخدم الحالي (MEEDCO)' });
+                            }
+                        }
+                    } catch (e) {}
+
+                    // 3. مستخدمي النظام المحلي
+                    try {
+                        if (fs.existsSync(initialDataPath)) {
+                            const init = JSON.parse(fs.readFileSync(initialDataPath, 'utf8'));
+                            (init.users || []).forEach(u => {
+                                const name = (u.fullName || u.username || '').trim();
+                                if (name && !usersMap.has(name)) {
+                                    usersMap.set(name, { id: 'local-' + (u.id || u.username), name, source: 'مستخدمي النظام المحلي' });
+                                }
+                            });
+                        }
+                    } catch (e) {}
+
+                    // 4. المحصلين المحفوظين في الحافظات السابقة
+                    try {
+                        const storePath = path.join(__dirname, 'supply_portfolios_store.json');
+                        if (fs.existsSync(storePath)) {
+                            const ports = JSON.parse(fs.readFileSync(storePath, 'utf8')) || [];
+                            ports.forEach(p => {
+                                const name = (p.userName || '').trim();
+                                if (name && !usersMap.has(name)) {
+                                    usersMap.set(name, { id: 'sp-' + Date.now(), name, source: 'سجل الحافظات' });
+                                }
+                            });
+                        }
+                    } catch (e) {}
+
+                    return Array.from(usersMap.values());
+                };
+
+                // GET: إرجاع قائمة المستخدمين
+                if (req.method === 'GET') {
+                    const users = loadCachedUsers();
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ success: true, count: users.length, data: users }));
+                    return;
+                }
+
+                // POST: مزامنة حية وسحب قائمة المستخدمين فورياً من خادم MEEDCO
+                if (req.method === 'POST') {
+                    try {
+                        const unifiedClient = require('./unifiedCardClient');
+                        const token = await unifiedClient.ensureValidSession();
+                        const cfg = unifiedClient.getMeedcoConfig();
+
+                        const payload = JSON.stringify({
+                            pageSize: 9999,
+                            pageNumber: 1,
+                            searchCriteria: '',
+                            filter: {
+                                searchCriteria: '',
+                                sectorIds: cfg.sectorId ? [cfg.sectorId] : [],
+                                publicAdministrationIds: cfg.publicAdminId ? [cfg.publicAdminId] : [],
+                                subAdministrationIds: cfg.subAdminId ? [cfg.subAdminId] : []
+                            }
+                        });
+
+                        const https = require('https');
+                        const liveUsers = await new Promise((resolve) => {
+                            const r = https.request({
+                                hostname: 'report-api-prod.meedco.cyuni.net',
+                                port: 443,
+                                path: '/Users/GetUsersListWithFilterDropDown',
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': 'Bearer ' + token,
+                                    'Content-Type': 'application/json',
+                                    'Content-Length': Buffer.byteLength(payload),
+                                    'Origin': 'https://report-prod.meedco.cyuni.net'
+                                },
+                                rejectUnauthorized: false
+                            }, (resp) => {
+                                let b = '';
+                                resp.on('data', c => b += c);
+                                resp.on('end', () => {
+                                    try {
+                                        const parsed = JSON.parse(b);
+                                        const list = Array.isArray(parsed) ? parsed : (parsed.data || []);
+                                        resolve(list);
+                                    } catch (e) {
+                                        resolve([]);
+                                    }
+                                });
+                            });
+                            r.on('error', () => resolve([]));
+                            r.setTimeout(8000, () => { r.destroy(); resolve([]); });
+                            r.write(payload);
+                            r.end();
+                        });
+
+                        if (liveUsers && liveUsers.length > 0) {
+                            const cleanUsers = liveUsers.map(u => ({
+                                id: u.id,
+                                name: (u.name || '').trim().replace(/\s+/g, ' '),
+                                source: 'MEEDCO'
+                            })).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+                            fs.writeFileSync(cachePath, JSON.stringify(cleanUsers, null, 2), 'utf8');
+                        }
+
+                        const updated = loadCachedUsers();
+                        res.writeHead(200);
+                        res.end(JSON.stringify({
+                            success: true,
+                            message: `تم تحديث وسحب ${updated.length} مستخدم من المنظومة الموحدة والبرامج بنجاح`,
+                            count: updated.length,
+                            data: updated
+                        }));
+                    } catch (e) {
+                        const fallbackUsers = loadCachedUsers();
+                        res.writeHead(200);
+                        res.end(JSON.stringify({
+                            success: true,
+                            message: 'تم تحميل المستخدمين من الذاكرة المحلية: ' + e.message,
+                            count: fallbackUsers.length,
+                            data: fallbackUsers
+                        }));
+                    }
+                    return;
+                }
+            }
+
             // 404
             res.writeHead(404);
             res.end(JSON.stringify({ success: false, message: 'Not found: ' + pathname }));

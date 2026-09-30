@@ -11734,6 +11734,86 @@ const handlePrintJudicialControlDetails = () => {
     // =========================================================================
     let supplyPortfoliosInitialized = false;
     let currentEditingSupplyPortfolio: any = null;
+    let supplyPortfolioUsersList: any[] = [];
+
+    const loadSupplyPortfolioUsers = async (forceSync: boolean = false) => {
+        const select = document.getElementById('sp-portfolio-user-select') as HTMLSelectElement | null;
+        const userInput = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
+        if (!select) return;
+
+        try {
+            let users: any[] = [];
+            const url = 'http://127.0.0.1:5002/api/supply-portfolios/users';
+            const res = await fetch(url, {
+                method: forceSync ? 'POST' : 'GET'
+            }).then(r => r.json()).catch(() => null);
+
+            if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+                users = res.data;
+            } else {
+                users = [
+                    { name: 'سناء عبدالستار عبدالعزيز', source: 'المنظومة الموحدة (MEEDCO)' },
+                    { name: 'محمود سعيد محمود شرق', source: 'محصل معتمد' },
+                    { name: 'مصطفى المغربي', source: 'مدير المنظومة' }
+                ];
+                if (state.users && Array.isArray(state.users)) {
+                    state.users.forEach((u: any) => {
+                        const name = (u.fullName || u.username || '').trim();
+                        if (name && !users.some(x => x.name === name)) {
+                            users.push({ name, source: 'مستخدمي النظام' });
+                        }
+                    });
+                }
+            }
+
+            supplyPortfolioUsersList = users;
+
+            const meedcoUsers = users.filter(u => u.source && u.source.includes('MEEDCO'));
+            const otherUsers = users.filter(u => !u.source || !u.source.includes('MEEDCO'));
+
+            let html = '<option value="" disabled>-- اختر اسم المستخدم / المحصل من البرامج --</option>';
+
+            const defaultUser = 'سناء عبدالستار عبدالعزيز';
+            const currentUser = (userInput?.value || select.value || defaultUser).trim();
+
+            const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            if (meedcoUsers.length > 0) {
+                html += `<optgroup label="🏢 مستخدمو ومحصلو المنظومة الموحدة والبرامج (${meedcoUsers.length} مستخدم)">`;
+                meedcoUsers.forEach(u => {
+                    const sel = (u.name === currentUser) ? 'selected' : '';
+                    html += `<option value="${esc(u.name)}" ${sel}>${esc(u.name)}</option>`;
+                });
+                html += `</optgroup>`;
+            }
+
+            if (otherUsers.length > 0) {
+                html += `<optgroup label="💻 مستخدمو النظام المحلي">`;
+                otherUsers.forEach(u => {
+                    const sel = (u.name === currentUser) ? 'selected' : '';
+                    html += `<option value="${esc(u.name)}" ${sel}>${esc(u.name)}</option>`;
+                });
+                html += `</optgroup>`;
+            }
+
+            select.innerHTML = html;
+
+            if (currentUser && Array.from(select.options).some(o => o.value === currentUser)) {
+                select.value = currentUser;
+            } else if (select.options.length > 1) {
+                select.selectedIndex = 1;
+            }
+
+            if (userInput) {
+                userInput.value = select.value || currentUser;
+            }
+
+            if (forceSync) {
+                showToast(`تم تحديث وسحب ${users.length} مستخدم من المنظومة الموحدة بنجاح!`, 'success');
+            }
+        } catch (e: any) {
+            console.error('Error loading supply portfolio users:', e);
+        }
+    };
 
     const generateSupplyPortfolioNumber = (): string => {
         const d = new Date();
@@ -11917,11 +11997,25 @@ const handlePrintJudicialControlDetails = () => {
         const now = new Date();
         if (dateInput) dateInput.value = now.toISOString().split('T')[0];
         if (timeInput) timeInput.value = now.toTimeString().split(' ')[0].substring(0, 5);
-        if (userInput) userInput.value = loggedInUser?.fullName || 'محمود سعيد محمود شرق';
         if (numInput) numInput.value = generateSupplyPortfolioNumber();
         if (branchInput) branchInput.value = 'هندسة بنى مزار شرق';
         if (shiftInput) shiftInput.value = 'الوردية الصباحية';
         if (notesInput) notesInput.value = '';
+
+        const userSelect = document.getElementById('sp-portfolio-user-select') as HTMLSelectElement | null;
+        if (userSelect && userSelect.options.length > 1) {
+            const targetName = 'سناء عبدالستار عبدالعزيز';
+            const opt = Array.from(userSelect.options).find(o => o.value === targetName || (loggedInUser?.fullName && o.value === loggedInUser.fullName));
+            if (opt) userSelect.value = opt.value;
+            else userSelect.selectedIndex = 1;
+            if (userInput) userInput.value = userSelect.value;
+        } else if (userInput) {
+            userInput.value = loggedInUser?.fullName || 'سناء عبدالستار عبدالعزيز';
+        }
+        if (userInput && userSelect) {
+            userInput.style.display = 'none';
+            userSelect.style.display = 'block';
+        }
 
         ['sp-count-200', 'sp-count-100', 'sp-count-50', 'sp-count-20', 'sp-count-10', 'sp-count-5', 'sp-count-coins', 'sp-system-unified', 'sp-system-iskra', 'sp-system-maasara', 'sp-system-other'].forEach(id => {
             const inp = document.getElementById(id) as HTMLInputElement | null;
@@ -12102,6 +12196,23 @@ const handlePrintJudicialControlDetails = () => {
         if (dateInput) dateInput.value = p.date || '';
         if (timeInput) timeInput.value = p.time || '';
         if (userInput) userInput.value = p.userName || '';
+
+        const userSelect = document.getElementById('sp-portfolio-user-select') as HTMLSelectElement | null;
+        if (userSelect && p.userName) {
+            userSelect.value = p.userName;
+            if (userSelect.value !== p.userName) {
+                if (userInput) {
+                    userInput.style.display = 'block';
+                    userSelect.style.display = 'none';
+                }
+            } else {
+                if (userInput) {
+                    userInput.style.display = 'none';
+                    userSelect.style.display = 'block';
+                }
+            }
+        }
+
         if (branchInput) branchInput.value = p.branch || 'هندسة بنى مزار شرق';
         if (shiftInput) shiftInput.value = p.shift || 'الوردية الصباحية';
         if (notesInput) notesInput.value = p.notes || '';
@@ -12643,6 +12754,39 @@ const handlePrintJudicialControlDetails = () => {
             }
         });
 
+        // User select change
+        document.getElementById('sp-portfolio-user-select')?.addEventListener('change', (e: any) => {
+            const val = e.target.value;
+            const input = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
+            if (input) input.value = val;
+        });
+
+        // Toggle custom user typing
+        document.getElementById('btn-sp-toggle-custom-user')?.addEventListener('click', () => {
+            const select = document.getElementById('sp-portfolio-user-select') as HTMLSelectElement | null;
+            const input = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
+            if (select && input) {
+                if (input.style.display === 'none') {
+                    input.style.display = 'block';
+                    select.style.display = 'none';
+                    input.focus();
+                } else {
+                    input.style.display = 'none';
+                    select.style.display = 'block';
+                    if (input.value) {
+                        const opt = Array.from(select.options).find(o => o.value === input.value);
+                        if (opt) select.value = input.value;
+                    }
+                }
+            }
+        });
+
+        // Sync users from MEEDCO / Programs live
+        document.getElementById('btn-sp-sync-users')?.addEventListener('click', async () => {
+            showToast('جارِ سحب وتحديث قائمة المستخدمين من المنظومة الموحدة...', 'info');
+            await loadSupplyPortfolioUsers(true);
+        });
+
         // Modal close
         document.getElementById('btn-sp-modal-close')?.addEventListener('click', () => {
             const modal = document.getElementById('sp-details-modal');
@@ -12660,6 +12804,7 @@ const handlePrintJudicialControlDetails = () => {
             initSupplyPortfoliosListeners();
             supplyPortfoliosInitialized = true;
         }
+        loadSupplyPortfolioUsers();
         if (!currentEditingSupplyPortfolio) {
             resetSupplyPortfolioForm();
         }

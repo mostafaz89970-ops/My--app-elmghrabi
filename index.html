@@ -5718,8 +5718,22 @@
                             <input type="time" id="sp-portfolio-time" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 700; color: #0f172a;">
                         </div>
                         <div>
-                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 5px;">اسم المستخدم / المحصل</label>
-                            <input type="text" id="sp-portfolio-user" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 800; color: #0284c7;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                <label style="font-size: 0.82rem; font-weight: 700; color: #475569;">اسم المستخدم / المحصل</label>
+                                <button type="button" id="btn-sp-sync-users" title="تحديث وسحب المستخدمين من المنظومة الموحدة" style="background: none; border: none; color: #0284c7; cursor: pointer; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; padding: 0;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                    <span>تحديث من المنظومة</span>
+                                </button>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <select id="sp-portfolio-user-select" style="flex: 1; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 800; color: #0284c7; background: #ffffff;">
+                                    <option value="">-- جارِ تحميل المستخدمين من البرامج... --</option>
+                                </select>
+                                <input type="text" id="sp-portfolio-user" style="display: none; flex: 1; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 800; color: #0284c7;" placeholder="اكتب اسم المحصل يدوياً...">
+                                <button type="button" id="btn-sp-toggle-custom-user" title="التبديل بين القائمة المنسدلة والكتابة اليدوية" style="background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 0 10px; cursor: pointer; color: #475569;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L18.5 2.5z"></path></svg>
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 5px;">الفرع / الإدارة التابع لها</label>
