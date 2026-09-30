@@ -12842,6 +12842,51 @@ const handlePrintJudicialControlDetails = () => {
             autoFetchUserProgramsRevenue(false);
         });
 
+        // Maasara Excel File Upload
+        const maasaraUploadBtn = document.getElementById('btn-sp-upload-maasara');
+        const maasaraFileInput = document.getElementById('sp-maasara-file-input') as HTMLInputElement | null;
+        if (maasaraUploadBtn && maasaraFileInput) {
+            maasaraUploadBtn.addEventListener('click', () => {
+                maasaraFileInput.click();
+            });
+            maasaraFileInput.addEventListener('change', async () => {
+                const file = maasaraFileInput.files?.[0];
+                if (!file) return;
+                const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
+                const curDate = dateInput?.value || '';
+
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const base64Data = (e.target?.result as string || '').split(',')[1];
+                    if (!base64Data) return;
+                    showToast('جارِ استيراد وتحليل ملف المعصرة... ⏳', 'info');
+                    try {
+                        const uploadRes = await fetch('http://127.0.0.1:5002/api/reports/upload-maasara', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                fileName: file.name,
+                                fileBase64: base64Data,
+                                date: curDate
+                            })
+                        }).then(r => r.json());
+
+                        if (uploadRes && uploadRes.success) {
+                            showToast('تم استيراد وتحليل تقرير المعصرة بنجاح ✓', 'success');
+                            autoFetchUserProgramsRevenue(true);
+                        } else {
+                            showToast('تعذر معالجة الملف: ' + (uploadRes?.message || 'خطأ غير معروف'), 'error');
+                        }
+                    } catch (err: any) {
+                        showToast('خطأ في الاتصال أثناء رفع الملف: ' + err.message, 'error');
+                    } finally {
+                        maasaraFileInput.value = '';
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
         // Modal close
         document.getElementById('btn-sp-modal-close')?.addEventListener('click', () => {
             const modal = document.getElementById('sp-details-modal');
@@ -12941,6 +12986,38 @@ const handlePrintJudicialControlDetails = () => {
                 setText('sp-count-maasara-badge', `${d.maasara?.count || 0} شحنة`);
                 setText('sp-count-iskra-badge', `${d.iskra?.count || 0} شحنة`);
                 setText('sp-total-recharges-badge', `${d.totalCount || 0} شحنة`);
+
+                const maasaraHint = document.getElementById('sp-maasara-daily-hint');
+                if (maasaraHint) {
+                    if (d.maasara && d.maasara.count > 0) {
+                        maasaraHint.style.display = 'block';
+                        maasaraHint.style.background = '#f0fdf4';
+                        maasaraHint.style.borderColor = '#bbf7d0';
+                        maasaraHint.style.color = '#15803d';
+                        maasaraHint.innerHTML = `✓ تم اعتماد إيراد المعصرة الفعلي لتاريخ <strong>${date}</strong>: عدد ${d.maasara.count} شحنة بمبلغ ${Number(d.maasara.amount || 0).toLocaleString()} ج.م`;
+                    } else if (d.maasara && Array.isArray(d.maasara.dailyBreakdown) && d.maasara.dailyBreakdown.length > 0) {
+                        maasaraHint.style.display = 'block';
+                        maasaraHint.style.background = '#fffbeb';
+                        maasaraHint.style.borderColor = '#fde68a';
+                        maasaraHint.style.color = '#b45309';
+                        const daysLinks = d.maasara.dailyBreakdown.map((b: any) =>
+                            `<a href="#" class="sp-maasara-date-link" data-date="${b.date}" style="color: #7c3aed; text-decoration: underline; margin: 0 4px; font-weight: 800;">${b.date} (${b.rechargesCount} شحنة - ${Number(b.totalAmount || 0).toLocaleString()} ج.م)</a>`
+                        ).join(' | ');
+                        maasaraHint.innerHTML = `ℹ️ لا توجد عمليات معصرة لتاريخ <strong>${date}</strong>. متوفر في الملف أيام أخرى: ${daysLinks}`;
+                        maasaraHint.querySelectorAll('.sp-maasara-date-link').forEach(link => {
+                            link.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                const chosenDate = (e.currentTarget as HTMLElement).getAttribute('data-date');
+                                if (chosenDate && dateInput) {
+                                    dateInput.value = chosenDate;
+                                    autoFetchUserProgramsRevenue(true);
+                                }
+                            });
+                        });
+                    } else {
+                        maasaraHint.style.display = 'none';
+                    }
+                }
 
                 calculateSupplyPortfolioLive();
 

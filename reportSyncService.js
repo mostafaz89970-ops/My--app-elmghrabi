@@ -145,9 +145,26 @@ function isArabicMatch(name1, name2) {
     if (!name1 || !name2) return false;
     const n1 = normalizeArabic(name1);
     const n2 = normalizeArabic(name2);
-    if (n1 === n2 || n1.includes(n2) || n2.includes(n1)) return true;
-    const words1 = n1.split(' ').filter(w => w.length > 2);
-    const words2 = n2.split(' ').filter(w => w.length > 2);
+    if (n1 === n2) return true;
+
+    // Compact comparison (stripping spaces for "عبد الستار" vs "عبدالستار")
+    const c1 = n1.replace(/\s+/g, '');
+    const c2 = n2.replace(/\s+/g, '');
+    if (c1 === c2) return true;
+    if (c1.startsWith(c2) || c2.startsWith(c1)) return true;
+
+    const words1 = n1.split(' ').filter(w => w.length > 1);
+    const words2 = n2.split(' ').filter(w => w.length > 1);
+
+    // If first names exist, they MUST match (prevent matching completely different individuals)
+    if (words1.length > 0 && words2.length > 0) {
+        const w1_first = words1[0];
+        const w2_first = words2[0];
+        if (w1_first !== w2_first && !w1_first.includes(w2_first) && !w2_first.includes(w1_first)) {
+            return false;
+        }
+    }
+
     const matchCount = words1.filter(w1 => words2.some(w2 => w1 === w2 || (w1.length > 3 && (w1.includes(w2) || w2.includes(w1))))).length;
     return matchCount >= 2;
 }
@@ -425,6 +442,7 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
     let maasaraAmount = 0;
     let maasaraCount = 0;
     let maasaraItems = [];
+    let maasaraDailyBreakdown = [];
     const maasaraData = await fetchMaasaraDailySales(dateStr);
     if (maasaraData && Array.isArray(maasaraData.users)) {
         const found = maasaraData.users.find(u => isArabicMatch(u.userName, cleanTarget));
@@ -432,6 +450,7 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
             maasaraAmount = found.totalAmount || 0;
             maasaraCount = found.rechargesCount || 0;
             maasaraItems = found.items || [];
+            maasaraDailyBreakdown = found.dailyBreakdown || [];
         }
     }
 
@@ -451,7 +470,7 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
         date: dateStr,
         userName: targetUserName,
         unified: { amount: meedcoAmount, count: meedcoCount, itemsCount: meedcoItems.length },
-        maasara: { amount: maasaraAmount, count: maasaraCount, items: maasaraItems },
+        maasara: { amount: maasaraAmount, count: maasaraCount, items: maasaraItems, dailyBreakdown: maasaraDailyBreakdown },
         iskra: { amount: iskraAmount, count: iskraCount },
         totalAmount: Math.round((meedcoAmount + maasaraAmount + iskraAmount) * 100) / 100,
         totalCount: meedcoCount + maasaraCount + iskraCount,

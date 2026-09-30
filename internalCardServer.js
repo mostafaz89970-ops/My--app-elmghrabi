@@ -1158,6 +1158,59 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // 8.4 رفع واستيراد ملف مبيعات برنامج المعصرة Excel (.xlsx) مباشرة
+            if (pathname === '/api/reports/upload-maasara' && req.method === 'POST') {
+                const body = await getBody();
+                const fileName = body.fileName || `maasara_${Date.now()}.xlsx`;
+                const fileBase64 = body.fileBase64 || body.fileData || '';
+                const targetDate = body.date || '';
+
+                if (!fileBase64) {
+                    res.writeHead(400);
+                    res.end(JSON.stringify({ success: false, message: 'بيانات الملف غير موجودة' }));
+                    return;
+                }
+
+                try {
+                    const cacheDir = path.join(__dirname, 'reports_cache');
+                    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+                    
+                    const safeName = fileName.replace(/[^a-zA-Z0-9_\u0600-\u06FF\.\-\(\)]/g, '_');
+                    const targetPath = path.join(cacheDir, `maasara_uploaded_${Date.now()}_${safeName}`);
+                    const fileBuffer = Buffer.from(fileBase64, 'base64');
+                    fs.writeFileSync(targetPath, fileBuffer);
+
+                    // Also copy to Downloads if possible
+                    try {
+                        const downloadsDir = path.join(process.env.USERPROFILE || 'C:\\Users\\AL-Motahida', 'Downloads');
+                        if (fs.existsSync(downloadsDir)) {
+                            fs.writeFileSync(path.join(downloadsDir, safeName), fileBuffer);
+                        }
+                    } catch (e) {}
+
+                    // Run parser immediately
+                    const scriptPath = path.join(__dirname, 'parse_maasara_excel.py');
+                    const { execFile } = require('child_process');
+                    const parseRes = await new Promise((resolve) => {
+                        execFile('python', [scriptPath, targetPath, targetDate], { maxBuffer: 1024 * 1024 * 30, encoding: 'utf8' }, (err, stdout) => {
+                            if (err) return resolve({ success: false, error: err.message });
+                            try { resolve(JSON.parse(stdout)); } catch (e) { resolve({ success: false, error: 'Invalid parser JSON' }); }
+                        });
+                    });
+
+                    res.writeHead(200);
+                    res.end(JSON.stringify({
+                        success: true,
+                        message: 'تم استيراد وتحليل تقرير مبيعات المعصرة بنجاح',
+                        data: parseRes
+                    }));
+                } catch (e) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ success: false, message: 'خطأ في معالجة الملف: ' + e.message }));
+                }
+                return;
+            }
+
             // 404
             res.writeHead(404);
             res.end(JSON.stringify({ success: false, message: 'Not found: ' + pathname }));
