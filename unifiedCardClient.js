@@ -146,14 +146,20 @@ async function loginMeedcoLive(credentials = {}) {
 
 let isReloggingIn = false;
 async function ensureValidSession(force = false) {
-    if (isReloggingIn) return cachedAuthToken;
+    if (isReloggingIn) {
+        // انتظر حتى تنتهي عملية تسجيل الدخول الجارية
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        return cachedAuthToken;
+    }
     const cfg = getMeedcoConfig();
     if (force || !cachedAuthToken) {
         if (cfg.password && cfg.username) {
             isReloggingIn = true;
             try {
+                // امسح التوكن القديم أولاً لضمان استخدام الجديد
+                if (force) cachedAuthToken = null;
                 const res = await loginMeedcoLive();
-                if (res.success) {
+                if (res.success && cachedAuthToken) {
                     return cachedAuthToken;
                 }
             } finally {
@@ -163,6 +169,7 @@ async function ensureValidSession(force = false) {
     }
     return cachedAuthToken || getActiveAuthToken();
 }
+
 
 async function getMeedcoStatus() {
     const cfg = getMeedcoConfig();
@@ -259,7 +266,20 @@ function getLastKnownControlCard() {
  * Extract active auth token from Chrome LevelDB local storage
  */
 function getActiveAuthToken() {
+    // Helper: get token expiry time from JWT payload
+    function getTokenExp(token) {
+        try {
+            const parts = (token || '').split('.');
+            if (parts.length === 3) {
+                const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+                return payload.exp ? payload.exp * 1000 : 0;
+            }
+        } catch (_) {}
+        return 0;
+    }
+
     // 1. Try to read latest token directly from Chrome LevelDB (most fresh)
+    let chromeToken = null;
     try {
         const dbPath = path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'User Data', 'Default', 'Local Storage', 'leveldb');
         if (fs.existsSync(dbPath)) {
@@ -273,7 +293,6 @@ function getActiveAuthToken() {
                 })
                 .sort((a, b) => b.mtime - a.mtime);
 
-            let latestToken = null;
             for (const { file } of files) {
                 if (file.endsWith('.log') || file.endsWith('.ldb')) {
                     try {
@@ -282,23 +301,36 @@ function getActiveAuthToken() {
                         const re = /eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/g;
                         let m;
                         while ((m = re.exec(clean)) !== null) {
-                            latestToken = m[0];
+                            chromeToken = m[0];
                         }
-                        if (latestToken) break;
+                        if (chromeToken) break;
                     } catch (e) {}
                 }
-            }
-            if (latestToken) {
-                cachedAuthToken = latestToken;
-                // Save to .session_token as backup
-                try {
-                    fs.writeFileSync(path.join(__dirname, '.session_token'), latestToken, 'utf8');
-                } catch (e) {}
-                return latestToken;
             }
         }
     } catch (err) {
         console.error('Error reading Chrome leveldb:', err.message);
+    }
+
+    // إذا عندنا cachedAuthToken من تسجيل دخول حديث، احتفظ بالأحدث منهما
+    // (لا تستبدل توكن جديد بتوكن قديم من Chrome)
+    if (chromeToken && cachedAuthToken) {
+        const chromeExp = getTokenExp(chromeToken);
+        const cachedExp = getTokenExp(cachedAuthToken);
+        // استخدم الأحدث تسجيلاً (الأعلى iat/exp) ما لم يكن Chrome أحدث فعلاً
+        if (chromeExp > cachedExp) {
+            cachedAuthToken = chromeToken;
+            try { fs.writeFileSync(path.join(__dirname, '.session_token'), chromeToken, 'utf8'); } catch (_) {}
+            return chromeToken;
+        }
+        // cachedAuthToken أحدث أو مساوٍ — الإبقاء عليه
+        return cachedAuthToken;
+    }
+
+    if (chromeToken) {
+        cachedAuthToken = chromeToken;
+        try { fs.writeFileSync(path.join(__dirname, '.session_token'), chromeToken, 'utf8'); } catch (_) {}
+        return chromeToken;
     }
 
     if (cachedAuthToken) return cachedAuthToken;
@@ -317,6 +349,7 @@ function getActiveAuthToken() {
 
     return cachedAuthToken;
 }
+
 
 /**
  * Fetch fresh UCS Token from MEEDCO API using the user's active session token
