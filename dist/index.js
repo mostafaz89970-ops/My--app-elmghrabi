@@ -6489,6 +6489,7 @@ const initAccountStatementListeners = () => {
 // قسم حافظات التوريد (حصر النقدية ومطابقة المنظومات والبرامج)
 // =========================================================================
 let supplyPortfoliosInitialized = false;
+let currentEditingSupplyPortfolio = null;
 const generateSupplyPortfolioNumber = () => {
     const d = new Date();
     const y = d.getFullYear();
@@ -6640,6 +6641,19 @@ const calculateSupplyPortfolioLive = () => {
     }
 };
 const resetSupplyPortfolioForm = () => {
+    currentEditingSupplyPortfolio = null;
+    // Reset edit banner and save button
+    const editBanner = document.getElementById('sp-edit-mode-banner');
+    if (editBanner)
+        editBanner.style.display = 'none';
+    const saveBtn = document.getElementById('btn-sp-save');
+    if (saveBtn) {
+        saveBtn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                <span>حفظ الحافظة في السجل</span>
+            `;
+        saveBtn.style.backgroundColor = '#059669';
+    }
     const dateInput = document.getElementById('sp-portfolio-date');
     const timeInput = document.getElementById('sp-portfolio-time');
     const userInput = document.getElementById('sp-portfolio-user');
@@ -6714,8 +6728,12 @@ const saveSupplyPortfolio = async (andPrint = false) => {
     catch (e) {
         tafqeetText = `${totalCash.toFixed(2)} ج.م`;
     }
+    const isEditing = !!currentEditingSupplyPortfolio;
+    const portfolioId = (currentEditingSupplyPortfolio === null || currentEditingSupplyPortfolio === void 0 ? void 0 : currentEditingSupplyPortfolio.id) || ('SP-' + Date.now());
+    const createdAt = (currentEditingSupplyPortfolio === null || currentEditingSupplyPortfolio === void 0 ? void 0 : currentEditingSupplyPortfolio.createdAt) || new Date().toISOString();
+    const updatedAt = new Date().toISOString();
     const portfolioData = {
-        id: 'SP-' + Date.now(),
+        id: portfolioId,
         portfolioNumber,
         date,
         time,
@@ -6744,7 +6762,9 @@ const saveSupplyPortfolio = async (andPrint = false) => {
         difference,
         status,
         notes,
-        createdAt: new Date().toISOString()
+        createdAt,
+        updatedAt,
+        isEdited: isEditing ? true : undefined
     };
     try {
         // Save to backend
@@ -6756,7 +6776,7 @@ const saveSupplyPortfolio = async (andPrint = false) => {
         // Also save locally in state and localStorage
         if (!state.supplyPortfolios)
             state.supplyPortfolios = [];
-        const existingIdx = state.supplyPortfolios.findIndex((p) => p.portfolioNumber === portfolioNumber);
+        const existingIdx = state.supplyPortfolios.findIndex((p) => p.id === portfolioId || p.portfolioNumber === portfolioNumber);
         if (existingIdx >= 0) {
             state.supplyPortfolios[existingIdx] = portfolioData;
         }
@@ -6767,11 +6787,11 @@ const saveSupplyPortfolio = async (andPrint = false) => {
             localStorage.setItem('supplyPortfolios', JSON.stringify(state.supplyPortfolios));
         }
         catch (e) { }
-        showToast(`تم حفظ حافظة التوريد (${portfolioNumber}) بنجاح!`, 'success');
+        showToast(isEditing ? `تم تحديث وتعديل حافظة التوريد (${portfolioNumber}) بنجاح!` : `تم حفظ حافظة التوريد (${portfolioNumber}) بنجاح!`, 'success');
         if (andPrint) {
             printSupplyPortfolioReport(portfolioData);
         }
-        // Generate new number for next portfolio
+        // Generate new number and reset editing state
         resetSupplyPortfolioForm();
     }
     catch (err) {
@@ -6797,6 +6817,85 @@ const loadSupplyPortfolios = async () => {
     catch (e) {
         console.error('Error loading supply portfolios:', e);
     }
+};
+const editSupplyPortfolio = (p) => {
+    if (!p)
+        return;
+    currentEditingSupplyPortfolio = p;
+    // Switch navigation to supply-portfolio-new
+    const targetLink = document.querySelector(`.sidebar-nav .nav-link[data-target="supply-portfolio-new"]`);
+    if (targetLink) {
+        targetLink.click();
+    }
+    else {
+        const newSec = document.getElementById('supply-portfolio-new');
+        const allSecs = document.querySelectorAll('.content-section');
+        allSecs.forEach(s => s.style.display = 'none');
+        if (newSec)
+            newSec.style.display = 'block';
+    }
+    // Set basic fields
+    const numInput = document.getElementById('sp-portfolio-number');
+    const dateInput = document.getElementById('sp-portfolio-date');
+    const timeInput = document.getElementById('sp-portfolio-time');
+    const userInput = document.getElementById('sp-portfolio-user');
+    const branchInput = document.getElementById('sp-portfolio-branch');
+    const shiftInput = document.getElementById('sp-portfolio-shift');
+    const notesInput = document.getElementById('sp-notes');
+    if (numInput)
+        numInput.value = p.portfolioNumber || '';
+    if (dateInput)
+        dateInput.value = p.date || '';
+    if (timeInput)
+        timeInput.value = p.time || '';
+    if (userInput)
+        userInput.value = p.userName || '';
+    if (branchInput)
+        branchInput.value = p.branch || 'هندسة بنى مزار شرق';
+    if (shiftInput)
+        shiftInput.value = p.shift || 'الوردية الصباحية';
+    if (notesInput)
+        notesInput.value = p.notes || '';
+    // Denominations
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el)
+            el.value = String(val !== null && val !== void 0 ? val : 0);
+    };
+    const d = p.denominations || {};
+    setVal('sp-count-200', d.d200);
+    setVal('sp-count-100', d.d100);
+    setVal('sp-count-50', d.d50);
+    setVal('sp-count-20', d.d20);
+    setVal('sp-count-10', d.d10);
+    setVal('sp-count-5', d.d5);
+    setVal('sp-count-coins', d.coins);
+    // Systems
+    const sys = p.systems || {};
+    setVal('sp-system-unified', sys.unified);
+    setVal('sp-system-iskra', sys.iskra);
+    setVal('sp-system-maasara', sys.maasara);
+    setVal('sp-system-other', sys.other);
+    // Recalculate live
+    calculateSupplyPortfolioLive();
+    // Show edit mode banner
+    const banner = document.getElementById('sp-edit-mode-banner');
+    const bannerNum = document.getElementById('sp-editing-portfolio-num');
+    if (banner)
+        banner.style.display = 'flex';
+    if (bannerNum)
+        bannerNum.textContent = p.portfolioNumber;
+    // Change save button text and color to indicate update
+    const saveBtn = document.getElementById('btn-sp-save');
+    if (saveBtn) {
+        saveBtn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                <span>تحديث وحفظ التعديلات في الحافظة</span>
+            `;
+        saveBtn.style.backgroundColor = '#d97706';
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast(`تم فتح الحافظة (${p.portfolioNumber}) في وضع التعديل`, 'info');
 };
 const renderSupplyPortfoliosTable = (portfolios) => {
     const list = portfolios || state.supplyPortfolios || [];
@@ -6857,6 +6956,9 @@ const renderSupplyPortfoliosTable = (portfolios) => {
                             <button type="button" class="btn btn-sm btn-sp-view" data-idx="${idx}" title="عرض التفاصيل" style="background: #e0f2fe; color: #0369a1; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                             </button>
+                            <button type="button" class="btn btn-sm btn-sp-edit" data-idx="${idx}" title="تعديل الحافظة" style="background: #fef3c7; color: #b45309; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                            </button>
                             <button type="button" class="btn btn-sm btn-sp-print" data-idx="${idx}" title="طباعة الحافظة" style="background: #0284c7; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
                             </button>
@@ -6876,6 +6978,14 @@ const renderSupplyPortfoliosTable = (portfolios) => {
             const p = list[idx];
             if (p)
                 showSupplyPortfolioModal(p);
+        });
+    });
+    tbody.querySelectorAll('.btn-sp-edit').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = Number(btn.getAttribute('data-idx'));
+            const p = list[idx];
+            if (p)
+                editSupplyPortfolio(p);
         });
     });
     tbody.querySelectorAll('.btn-sp-print').forEach(btn => {
@@ -6923,6 +7033,7 @@ const showSupplyPortfolioModal = (p) => {
     const modalPrintBtn = document.getElementById('btn-sp-modal-print');
     if (!modal || !modalBody)
         return;
+    modal._currentPortfolio = p;
     if (modalTitle)
         modalTitle.textContent = `تفاصيل حافظة التوريد: ${p.portfolioNumber}`;
     const d = p.denominations || {};
@@ -7177,7 +7288,7 @@ const exportSupplyPortfoliosToExcel = () => {
     showToast('تم تصدير سجل حافظات التوريد بنجاح!', 'success');
 };
 const initSupplyPortfoliosListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
     // Calculation input triggers
     document.querySelectorAll('.sp-calc-input, .sp-system-input').forEach(inp => {
         inp.addEventListener('input', () => calculateSupplyPortfolioLive());
@@ -7250,13 +7361,27 @@ const initSupplyPortfoliosListeners = () => {
             st.value = 'all';
         renderSupplyPortfoliosTable();
     });
+    // Cancel edit mode
+    (_m = document.getElementById('btn-sp-cancel-edit')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', () => {
+        resetSupplyPortfolioForm();
+        showToast('تم إلغاء التعديل والعودة لحافظة جديدة', 'info');
+    });
+    // Edit from modal
+    (_o = document.getElementById('btn-sp-modal-edit')) === null || _o === void 0 ? void 0 : _o.addEventListener('click', () => {
+        const modal = document.getElementById('sp-details-modal');
+        if (modal)
+            modal.style.display = 'none';
+        if (modal === null || modal === void 0 ? void 0 : modal._currentPortfolio) {
+            editSupplyPortfolio(modal._currentPortfolio);
+        }
+    });
     // Modal close
-    (_m = document.getElementById('btn-sp-modal-close')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', () => {
+    (_p = document.getElementById('btn-sp-modal-close')) === null || _p === void 0 ? void 0 : _p.addEventListener('click', () => {
         const modal = document.getElementById('sp-details-modal');
         if (modal)
             modal.style.display = 'none';
     });
-    (_o = document.getElementById('btn-sp-modal-dismiss')) === null || _o === void 0 ? void 0 : _o.addEventListener('click', () => {
+    (_q = document.getElementById('btn-sp-modal-dismiss')) === null || _q === void 0 ? void 0 : _q.addEventListener('click', () => {
         const modal = document.getElementById('sp-details-modal');
         if (modal)
             modal.style.display = 'none';
@@ -7267,7 +7392,9 @@ const renderSupplyPortfolioNewSection = () => {
         initSupplyPortfoliosListeners();
         supplyPortfoliosInitialized = true;
     }
-    resetSupplyPortfolioForm();
+    if (!currentEditingSupplyPortfolio) {
+        resetSupplyPortfolioForm();
+    }
 };
 const renderSupplyPortfolioArchiveSection = () => {
     if (!supplyPortfoliosInitialized) {

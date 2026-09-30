@@ -11733,6 +11733,7 @@ const handlePrintJudicialControlDetails = () => {
     // قسم حافظات التوريد (حصر النقدية ومطابقة المنظومات والبرامج)
     // =========================================================================
     let supplyPortfoliosInitialized = false;
+    let currentEditingSupplyPortfolio: any = null;
 
     const generateSupplyPortfolioNumber = (): string => {
         const d = new Date();
@@ -11890,6 +11891,21 @@ const handlePrintJudicialControlDetails = () => {
     };
 
     const resetSupplyPortfolioForm = () => {
+        currentEditingSupplyPortfolio = null;
+
+        // Reset edit banner and save button
+        const editBanner = document.getElementById('sp-edit-mode-banner');
+        if (editBanner) editBanner.style.display = 'none';
+
+        const saveBtn = document.getElementById('btn-sp-save');
+        if (saveBtn) {
+            saveBtn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                <span>حفظ الحافظة في السجل</span>
+            `;
+            saveBtn.style.backgroundColor = '#059669';
+        }
+
         const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
         const timeInput = document.getElementById('sp-portfolio-time') as HTMLInputElement | null;
         const userInput = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
@@ -11966,8 +11982,13 @@ const handlePrintJudicialControlDetails = () => {
             tafqeetText = `${totalCash.toFixed(2)} ج.م`;
         }
 
+        const isEditing = !!currentEditingSupplyPortfolio;
+        const portfolioId = currentEditingSupplyPortfolio?.id || ('SP-' + Date.now());
+        const createdAt = currentEditingSupplyPortfolio?.createdAt || new Date().toISOString();
+        const updatedAt = new Date().toISOString();
+
         const portfolioData = {
-            id: 'SP-' + Date.now(),
+            id: portfolioId,
             portfolioNumber,
             date,
             time,
@@ -11996,7 +12017,9 @@ const handlePrintJudicialControlDetails = () => {
             difference,
             status,
             notes,
-            createdAt: new Date().toISOString()
+            createdAt,
+            updatedAt,
+            isEdited: isEditing ? true : undefined
         };
 
         try {
@@ -12009,7 +12032,7 @@ const handlePrintJudicialControlDetails = () => {
 
             // Also save locally in state and localStorage
             if (!(state as any).supplyPortfolios) (state as any).supplyPortfolios = [];
-            const existingIdx = (state as any).supplyPortfolios.findIndex((p: any) => p.portfolioNumber === portfolioNumber);
+            const existingIdx = (state as any).supplyPortfolios.findIndex((p: any) => p.id === portfolioId || p.portfolioNumber === portfolioNumber);
             if (existingIdx >= 0) {
                 (state as any).supplyPortfolios[existingIdx] = portfolioData;
             } else {
@@ -12019,13 +12042,13 @@ const handlePrintJudicialControlDetails = () => {
                 localStorage.setItem('supplyPortfolios', JSON.stringify((state as any).supplyPortfolios));
             } catch (e) {}
 
-            showToast(`تم حفظ حافظة التوريد (${portfolioNumber}) بنجاح!`, 'success');
+            showToast(isEditing ? `تم تحديث وتعديل حافظة التوريد (${portfolioNumber}) بنجاح!` : `تم حفظ حافظة التوريد (${portfolioNumber}) بنجاح!`, 'success');
 
             if (andPrint) {
                 printSupplyPortfolioReport(portfolioData);
             }
 
-            // Generate new number for next portfolio
+            // Generate new number and reset editing state
             resetSupplyPortfolioForm();
 
         } catch (err: any) {
@@ -12049,6 +12072,83 @@ const handlePrintJudicialControlDetails = () => {
         } catch (e) {
             console.error('Error loading supply portfolios:', e);
         }
+    };
+
+    const editSupplyPortfolio = (p: any) => {
+        if (!p) return;
+        currentEditingSupplyPortfolio = p;
+
+        // Switch navigation to supply-portfolio-new
+        const targetLink = document.querySelector(`.sidebar-nav .nav-link[data-target="supply-portfolio-new"]`) as HTMLElement | null;
+        if (targetLink) {
+            targetLink.click();
+        } else {
+            const newSec = document.getElementById('supply-portfolio-new');
+            const allSecs = document.querySelectorAll('.content-section');
+            allSecs.forEach(s => (s as HTMLElement).style.display = 'none');
+            if (newSec) newSec.style.display = 'block';
+        }
+
+        // Set basic fields
+        const numInput = document.getElementById('sp-portfolio-number') as HTMLInputElement | null;
+        const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
+        const timeInput = document.getElementById('sp-portfolio-time') as HTMLInputElement | null;
+        const userInput = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
+        const branchInput = document.getElementById('sp-portfolio-branch') as HTMLInputElement | null;
+        const shiftInput = document.getElementById('sp-portfolio-shift') as HTMLSelectElement | null;
+        const notesInput = document.getElementById('sp-notes') as HTMLTextAreaElement | null;
+
+        if (numInput) numInput.value = p.portfolioNumber || '';
+        if (dateInput) dateInput.value = p.date || '';
+        if (timeInput) timeInput.value = p.time || '';
+        if (userInput) userInput.value = p.userName || '';
+        if (branchInput) branchInput.value = p.branch || 'هندسة بنى مزار شرق';
+        if (shiftInput) shiftInput.value = p.shift || 'الوردية الصباحية';
+        if (notesInput) notesInput.value = p.notes || '';
+
+        // Denominations
+        const setVal = (id: string, val: any) => {
+            const el = document.getElementById(id) as HTMLInputElement | null;
+            if (el) el.value = String(val ?? 0);
+        };
+
+        const d = p.denominations || {};
+        setVal('sp-count-200', d.d200);
+        setVal('sp-count-100', d.d100);
+        setVal('sp-count-50', d.d50);
+        setVal('sp-count-20', d.d20);
+        setVal('sp-count-10', d.d10);
+        setVal('sp-count-5', d.d5);
+        setVal('sp-count-coins', d.coins);
+
+        // Systems
+        const sys = p.systems || {};
+        setVal('sp-system-unified', sys.unified);
+        setVal('sp-system-iskra', sys.iskra);
+        setVal('sp-system-maasara', sys.maasara);
+        setVal('sp-system-other', sys.other);
+
+        // Recalculate live
+        calculateSupplyPortfolioLive();
+
+        // Show edit mode banner
+        const banner = document.getElementById('sp-edit-mode-banner');
+        const bannerNum = document.getElementById('sp-editing-portfolio-num');
+        if (banner) banner.style.display = 'flex';
+        if (bannerNum) bannerNum.textContent = p.portfolioNumber;
+
+        // Change save button text and color to indicate update
+        const saveBtn = document.getElementById('btn-sp-save');
+        if (saveBtn) {
+            saveBtn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                <span>تحديث وحفظ التعديلات في الحافظة</span>
+            `;
+            saveBtn.style.backgroundColor = '#d97706';
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        showToast(`تم فتح الحافظة (${p.portfolioNumber}) في وضع التعديل`, 'info');
     };
 
     const renderSupplyPortfoliosTable = (portfolios?: any[]) => {
@@ -12111,6 +12211,9 @@ const handlePrintJudicialControlDetails = () => {
                             <button type="button" class="btn btn-sm btn-sp-view" data-idx="${idx}" title="عرض التفاصيل" style="background: #e0f2fe; color: #0369a1; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                             </button>
+                            <button type="button" class="btn btn-sm btn-sp-edit" data-idx="${idx}" title="تعديل الحافظة" style="background: #fef3c7; color: #b45309; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                            </button>
                             <button type="button" class="btn btn-sm btn-sp-print" data-idx="${idx}" title="طباعة الحافظة" style="background: #0284c7; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
                             </button>
@@ -12131,6 +12234,14 @@ const handlePrintJudicialControlDetails = () => {
                 const idx = Number(btn.getAttribute('data-idx'));
                 const p = list[idx];
                 if (p) showSupplyPortfolioModal(p);
+            });
+        });
+
+        tbody.querySelectorAll('.btn-sp-edit').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = Number(btn.getAttribute('data-idx'));
+                const p = list[idx];
+                if (p) editSupplyPortfolio(p);
             });
         });
 
@@ -12180,6 +12291,7 @@ const handlePrintJudicialControlDetails = () => {
         const modalPrintBtn = document.getElementById('btn-sp-modal-print');
 
         if (!modal || !modalBody) return;
+        (modal as any)._currentPortfolio = p;
 
         if (modalTitle) modalTitle.textContent = `تفاصيل حافظة التوريد: ${p.portfolioNumber}`;
 
@@ -12516,6 +12628,21 @@ const handlePrintJudicialControlDetails = () => {
             renderSupplyPortfoliosTable();
         });
 
+        // Cancel edit mode
+        document.getElementById('btn-sp-cancel-edit')?.addEventListener('click', () => {
+            resetSupplyPortfolioForm();
+            showToast('تم إلغاء التعديل والعودة لحافظة جديدة', 'info');
+        });
+
+        // Edit from modal
+        document.getElementById('btn-sp-modal-edit')?.addEventListener('click', () => {
+            const modal = document.getElementById('sp-details-modal');
+            if (modal) modal.style.display = 'none';
+            if ((modal as any)?._currentPortfolio) {
+                editSupplyPortfolio((modal as any)._currentPortfolio);
+            }
+        });
+
         // Modal close
         document.getElementById('btn-sp-modal-close')?.addEventListener('click', () => {
             const modal = document.getElementById('sp-details-modal');
@@ -12533,7 +12660,9 @@ const handlePrintJudicialControlDetails = () => {
             initSupplyPortfoliosListeners();
             supplyPortfoliosInitialized = true;
         }
-        resetSupplyPortfolioForm();
+        if (!currentEditingSupplyPortfolio) {
+            resetSupplyPortfolioForm();
+        }
     };
 
     const renderSupplyPortfolioArchiveSection = () => {
