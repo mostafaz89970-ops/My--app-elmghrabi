@@ -1127,6 +1127,37 @@ function startInternalServer(port = 5002) {
                 }
             }
 
+            // 8.2 جلب مبالغ وعدد شحنات البرامج لمستخدم معين في تاريخ محدد
+            if (pathname === '/api/reports/user-programs') {
+                const reportSync = require('./reportSyncService');
+                const date = url.searchParams.get('date') || new Date().toISOString().slice(0, 10);
+                const userName = url.searchParams.get('user') || '';
+                try {
+                    const data = await reportSync.getUserDailyPrograms(date, userName);
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ success: true, data }));
+                } catch (e) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ success: false, message: e.message }));
+                }
+                return;
+            }
+
+            // 8.3 جلب التقرير الشامل والمفصل لجميع المستخدمين والبرامج مع الشحنات والمطابقة
+            if (pathname === '/api/reports/comprehensive-daily') {
+                const reportSync = require('./reportSyncService');
+                const date = url.searchParams.get('date') || new Date().toISOString().slice(0, 10);
+                try {
+                    const data = await reportSync.getComprehensiveDailyReport(date);
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ success: true, data }));
+                } catch (e) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({ success: false, message: e.message }));
+                }
+                return;
+            }
+
             // 404
             res.writeHead(404);
             res.end(JSON.stringify({ success: false, message: 'Not found: ' + pathname }));

@@ -12787,6 +12787,16 @@ const handlePrintJudicialControlDetails = () => {
             await loadSupplyPortfolioUsers(true);
         });
 
+        // Auto-fetch user program sales and recharges
+        document.getElementById('btn-sp-auto-fetch-programs')?.addEventListener('click', () => {
+            autoFetchUserProgramsRevenue(true);
+        });
+
+        // Automatically fetch programs revenue whenever cashier selection changes
+        document.getElementById('sp-portfolio-user-select')?.addEventListener('change', () => {
+            autoFetchUserProgramsRevenue(false);
+        });
+
         // Modal close
         document.getElementById('btn-sp-modal-close')?.addEventListener('click', () => {
             const modal = document.getElementById('sp-details-modal');
@@ -12797,6 +12807,625 @@ const handlePrintJudicialControlDetails = () => {
             const modal = document.getElementById('sp-details-modal');
             if (modal) modal.style.display = 'none';
         });
+
+        // ================= Detailed Report Section Event Listeners =================
+        document.getElementById('btn-sp-detail-refresh')?.addEventListener('click', () => {
+            loadComprehensiveDailyReport(true);
+        });
+
+        document.getElementById('sp-detail-date')?.addEventListener('change', () => {
+            loadComprehensiveDailyReport(false);
+        });
+
+        document.getElementById('sp-detail-search-user')?.addEventListener('input', () => {
+            filterAndRenderComprehensiveTable();
+        });
+
+        document.getElementById('sp-detail-status-filter')?.addEventListener('change', () => {
+            filterAndRenderComprehensiveTable();
+        });
+
+        document.getElementById('btn-sp-detail-print-all')?.addEventListener('click', () => {
+            printComprehensiveDailyReport();
+        });
+
+        document.getElementById('btn-sp-detail-export-excel')?.addEventListener('click', () => {
+            exportComprehensiveDailyReportToExcel();
+        });
+
+        document.getElementById('btn-sp-detail-nav-new')?.addEventListener('click', gotoNew);
+        document.getElementById('btn-sp-detail-nav-archive')?.addEventListener('click', gotoArchive);
+
+        // Transactions modal handlers
+        document.getElementById('btn-sp-tx-modal-close')?.addEventListener('click', () => {
+            const m = document.getElementById('sp-user-transactions-modal');
+            if (m) m.style.display = 'none';
+        });
+        document.getElementById('btn-sp-tx-modal-dismiss')?.addEventListener('click', () => {
+            const m = document.getElementById('sp-user-transactions-modal');
+            if (m) m.style.display = 'none';
+        });
+        document.getElementById('btn-sp-tx-modal-print')?.addEventListener('click', () => {
+            printCurrentCashierTransactions();
+        });
+    };
+
+    // =========================================================================
+    // التقرير المالي والتفصيلي الشامل لكافة البرامج والمستخدمين (MEEDCO, معصرة, إسكرا)
+    // =========================================================================
+
+    let currentComprehensiveReportData: any = null;
+    let currentSelectedCashierForModal: any = null;
+
+    const autoFetchUserProgramsRevenue = async (showToastNotice = true) => {
+        const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
+        const userInput = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
+        const userSelect = document.getElementById('sp-portfolio-user-select') as HTMLSelectElement | null;
+        const btnText = document.getElementById('btn-sp-auto-fetch-text');
+
+        const date = (dateInput?.value || new Date().toISOString().slice(0, 10)).trim();
+        const userName = (userInput?.value || userSelect?.value || '').trim();
+
+        if (!userName) {
+            if (showToastNotice) showToast('يرجى اختيار اسم المستخدم / المحصل أولاً لجلب شحناته ومبيعاته', 'warning');
+            return;
+        }
+
+        if (btnText) btnText.textContent = 'جارِ الجلب والمطابقة... ⏳';
+
+        try {
+            const url = `http://127.0.0.1:5002/api/reports/user-programs?date=${encodeURIComponent(date)}&user=${encodeURIComponent(userName)}`;
+            const res = await fetch(url).then(r => r.json()).catch(() => null);
+
+            if (res && res.success && res.data) {
+                const d = res.data;
+                const setVal = (id: string, val: number) => {
+                    const el = document.getElementById(id) as HTMLInputElement | null;
+                    if (el) el.value = (val || 0).toFixed(2);
+                };
+                const setText = (id: string, text: string) => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = text;
+                };
+
+                setVal('sp-system-unified', d.unified?.amount || 0);
+                setVal('sp-system-maasara', d.maasara?.amount || 0);
+                setVal('sp-system-iskra', d.iskra?.amount || 0);
+
+                setText('sp-count-unified-badge', `${d.unified?.count || 0} شحنة`);
+                setText('sp-count-maasara-badge', `${d.maasara?.count || 0} شحنة`);
+                setText('sp-count-iskra-badge', `${d.iskra?.count || 0} شحنة`);
+                setText('sp-total-recharges-badge', `${d.totalCount || 0} شحنة`);
+
+                calculateSupplyPortfolioLive();
+
+                if (showToastNotice) {
+                    showToast(`تم استيراد مبيعات (${userName}): ${d.totalCount} شحنة بإجمالي ${(d.totalAmount || 0).toLocaleString()} ج.م ✓`, 'success');
+                }
+            } else {
+                if (showToastNotice) showToast('لم يتم العثور على مبيعات مسجلة لهذا المحصل في التاريخ المحدد', 'info');
+            }
+        } catch (e: any) {
+            console.error('Error fetching user programs revenue:', e);
+            if (showToastNotice) showToast('تعذر استيراد مبالغ البرامج: ' + e.message, 'error');
+        } finally {
+            if (btnText) btnText.textContent = 'جلب ومطابقة مبالغ البرامج آلياً';
+        }
+    };
+
+    const loadComprehensiveDailyReport = async (forceSync = false) => {
+        const dateInput = document.getElementById('sp-detail-date') as HTMLInputElement | null;
+        if (dateInput && !dateInput.value) {
+            dateInput.value = new Date().toISOString().slice(0, 10);
+        }
+        const date = (dateInput?.value || new Date().toISOString().slice(0, 10)).trim();
+
+        const tbody = document.getElementById('sp-detail-table-tbody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="11" style="text-align: center; padding: 40px; color: #0284c7; font-weight: 700;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                            <span style="display: inline-block; width: 20px; height: 20px; border: 3px solid #0284c7; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
+                            <span>جارِ فحص ومزامنة تقارير المنظومات (MEEDCO، معصرة، إسكرا) وحصر النقدية...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        try {
+            const url = `http://127.0.0.1:5002/api/reports/comprehensive-daily?date=${encodeURIComponent(date)}`;
+            const res = await fetch(url).then(r => r.json()).catch(() => null);
+
+            if (res && res.success && res.data) {
+                currentComprehensiveReportData = res.data;
+                updateComprehensiveReportKPIs(res.data.summary);
+                filterAndRenderComprehensiveTable();
+                if (forceSync) {
+                    showToast(`تم تحديث التقرير الشامل لجميع المستخدمين لتاريخ ${date} بنجاح ✓`, 'success');
+                }
+            } else {
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: #ef4444; font-weight: 700;">تعذر جلب التقرير: ${(res && res.message) || 'استجابة غير صحيحة'}</td></tr>`;
+                }
+            }
+        } catch (e: any) {
+            console.error('Error loading comprehensive report:', e);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: #ef4444; font-weight: 700;">خطأ في الاتصال بالخادم: ${e.message}</td></tr>`;
+            }
+        }
+    };
+
+    const updateComprehensiveReportKPIs = (s: any) => {
+        if (!s) return;
+        const setVal = (id: string, text: string) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+
+        setVal('sp-kpi-users-count', String(s.totalUsersCount || 0));
+        setVal('sp-kpi-meedco-amount', (s.grandMeedcoAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م');
+        setVal('sp-kpi-meedco-count', String(s.grandMeedcoCount || 0));
+
+        setVal('sp-kpi-maasara-amount', (s.grandMaasaraAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م');
+        setVal('sp-kpi-maasara-count', String(s.grandMaasaraCount || 0));
+
+        setVal('sp-kpi-iskra-amount', (s.grandIskraAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م');
+        setVal('sp-kpi-iskra-count', String(s.grandIskraCount || 0));
+
+        setVal('sp-kpi-systems-amount', (s.grandSystemsAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م');
+        setVal('sp-kpi-total-recharges', String(s.grandTotalRecharges || 0));
+
+        setVal('sp-kpi-cash-amount', (s.grandCashSupplied || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م');
+
+        const diff = Number(s.grandDifference || 0);
+        const diffBadge = document.getElementById('sp-kpi-diff-badge');
+        if (diffBadge) {
+            diffBadge.textContent = (Math.abs(diff)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+            if (Math.abs(diff) < 0.01) {
+                diffBadge.style.color = '#16a34a';
+                diffBadge.textContent += ' (مطابق 100% ✓)';
+            } else if (diff > 0) {
+                diffBadge.style.color = '#0284c7';
+                diffBadge.textContent += ' (فائض / زيادة)';
+            } else {
+                diffBadge.style.color = '#dc2626';
+                diffBadge.textContent += ' (عجز توريد ⚠️)';
+            }
+        }
+    };
+
+    const filterAndRenderComprehensiveTable = () => {
+        if (!currentComprehensiveReportData || !Array.isArray(currentComprehensiveReportData.users)) return;
+
+        const searchInput = (document.getElementById('sp-detail-search-user') as HTMLInputElement | null)?.value?.trim().toLowerCase() || '';
+        const statusFilter = (document.getElementById('sp-detail-status-filter') as HTMLSelectElement | null)?.value || 'all';
+
+        let list: any[] = currentComprehensiveReportData.users;
+
+        if (searchInput) {
+            list = list.filter(u => (u.userName || '').toLowerCase().includes(searchInput));
+        }
+
+        if (statusFilter !== 'all') {
+            list = list.filter(u => {
+                if (statusFilter === 'matched') return u.status === 'مطابق 100%';
+                if (statusFilter === 'shortage') return u.status === 'عجز توريد';
+                if (statusFilter === 'surplus') return u.status === 'زيادة توريد';
+                if (statusFilter === 'unsupplied') return u.status === 'لم يتم التوريد';
+                return true;
+            });
+        }
+
+        const countLabel = document.getElementById('sp-detail-count-label');
+        if (countLabel) countLabel.textContent = `عرض ${list.length} من أصل ${currentComprehensiveReportData.users.length} محصل`;
+
+        const tbody = document.getElementById('sp-detail-table-tbody');
+        const tfoot = document.getElementById('sp-detail-table-tfoot');
+        if (!tbody) return;
+
+        if (list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: #94a3b8; font-weight: 700;">لا توجد سجلات تطابق معايير البحث</td></tr>`;
+            if (tfoot) tfoot.innerHTML = '';
+            return;
+        }
+
+        const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        let rowsHtml = '';
+        list.forEach((u, index) => {
+            let statusBadge = '';
+            if (u.status === 'مطابق 100%') {
+                statusBadge = '<span style="background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.78rem;">مطابق 100% ✓</span>';
+            } else if (u.status === 'عجز توريد') {
+                statusBadge = '<span style="background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.78rem;">عجز توريد ⚠️</span>';
+            } else if (u.status === 'زيادة توريد') {
+                statusBadge = '<span style="background: #e0e7ff; color: #4338ca; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.78rem;">زيادة توريد ℹ️</span>';
+            } else {
+                statusBadge = '<span style="background: #f1f5f9; color: #64748b; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.78rem;">لم يورد بعد</span>';
+            }
+
+            const diffColor = Math.abs(u.difference) < 0.01 ? '#15803d' : (u.difference > 0 ? '#4338ca' : '#b91c1c');
+
+            rowsHtml += `
+                <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s ease;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 10px 14px; text-align: center; color: #94a3b8; font-weight: 700;">${index + 1}</td>
+                    <td style="padding: 10px 14px; font-weight: 800; color: #0f172a;">
+                        ${esc(u.userName)}
+                        ${u.portfoliosCount > 0 ? `<span style="font-size:0.7rem; background:#ecfdf5; color:#059669; padding:1px 6px; border-radius:8px; margin-right:4px;">${u.portfoliosCount} حافظة</span>` : ''}
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center; background: #f0f9ff; font-family: monospace;">
+                        <span style="display:block; font-weight: 800; color: #0369a1;">${Number(u.meedco.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span style="font-size: 0.72rem; color: #64748b;">${u.meedco.count || 0} شحنة</span>
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center; background: #faf5ff; font-family: monospace;">
+                        <span style="display:block; font-weight: 800; color: #7c3aed;">${Number(u.maasara.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span style="font-size: 0.72rem; color: #64748b;">${u.maasara.count || 0} شحنة</span>
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center; background: #fffbeb; font-family: monospace;">
+                        <span style="display:block; font-weight: 800; color: #d97706;">${Number(u.iskra.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span style="font-size: 0.72rem; color: #64748b;">${u.iskra.count || 0} شحنة</span>
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center; font-weight: 900; font-family: monospace; color: #0f172a;">
+                        ${u.totalRechargesCount || 0}
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center; font-weight: 900; font-family: monospace; color: #0284c7; background: #f8fafc;">
+                        ${Number(u.totalSystemsAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center; font-weight: 900; font-family: monospace; color: #16a34a;">
+                        ${Number(u.cashSupplied || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center; font-weight: 900; font-family: monospace; color: ${diffColor};">
+                        ${u.difference > 0 ? '+' : ''}${Number(u.difference || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center;">
+                        ${statusBadge}
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            ${(u.meedco.items && u.meedco.items.length > 0) ? `
+                                <button type="button" class="btn-sp-view-tx" data-user="${esc(u.userName)}" title="عرض كشف الشحنات التفصيلي" style="background: #e0f2fe; color: #0369a1; border: none; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">
+                                    🔍 كشف الشحنات
+                                </button>
+                            ` : ''}
+                            <button type="button" class="btn-sp-quick-supply" data-user="${esc(u.userName)}" title="إنشاء حافظة توريد لهذا المحصل" style="background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">
+                                ➕ حافظة
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = rowsHtml;
+
+        // Attach action handlers
+        tbody.querySelectorAll('.btn-sp-view-tx').forEach(btn => {
+            btn.addEventListener('click', (e: any) => {
+                const uname = e.currentTarget.getAttribute('data-user');
+                showUserTransactionsModal(uname);
+            });
+        });
+
+        tbody.querySelectorAll('.btn-sp-quick-supply').forEach(btn => {
+            btn.addEventListener('click', (e: any) => {
+                const uname = e.currentTarget.getAttribute('data-user');
+                const link = document.querySelector('.sidebar-nav .nav-link[data-target="supply-portfolio-new"]') as HTMLElement | null;
+                if (link) link.click();
+                setTimeout(() => {
+                    const sel = document.getElementById('sp-portfolio-user-select') as HTMLSelectElement | null;
+                    const inp = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
+                    if (sel) {
+                        sel.value = uname;
+                        if (inp) inp.value = uname;
+                        sel.dispatchEvent(new Event('change'));
+                    }
+                }, 200);
+            });
+        });
+
+        // Summary row in tfoot
+        if (tfoot && currentComprehensiveReportData.summary) {
+            const s = currentComprehensiveReportData.summary;
+            tfoot.innerHTML = `
+                <tr>
+                    <td colspan="2" style="padding: 12px 14px; text-align: center; color: #0f172a;">الإجمالي العام (${s.totalUsersCount} محصل)</td>
+                    <td style="padding: 12px 14px; text-align: center; color: #0369a1; background: #e0f2fe; font-family: monospace;">
+                        ${Number(s.grandMeedcoAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span style="display:block; font-size:0.75rem;">${s.grandMeedcoCount || 0} شحنة</span>
+                    </td>
+                    <td style="padding: 12px 14px; text-align: center; color: #7c3aed; background: #f3e8ff; font-family: monospace;">
+                        ${Number(s.grandMaasaraAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span style="display:block; font-size:0.75rem;">${s.grandMaasaraCount || 0} شحنة</span>
+                    </td>
+                    <td style="padding: 12px 14px; text-align: center; color: #d97706; background: #fef3c7; font-family: monospace;">
+                        ${Number(s.grandIskraAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span style="display:block; font-size:0.75rem;">${s.grandIskraCount || 0} شحنة</span>
+                    </td>
+                    <td style="padding: 12px 14px; text-align: center; font-family: monospace; color: #0f172a;">${s.grandTotalRecharges || 0}</td>
+                    <td style="padding: 12px 14px; text-align: center; font-family: monospace; color: #0284c7; background: #e2e8f0;">${Number(s.grandSystemsAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding: 12px 14px; text-align: center; font-family: monospace; color: #16a34a;">${Number(s.grandCashSupplied || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding: 12px 14px; text-align: center; font-family: monospace; color: ${s.grandDifference >= 0 ? '#15803d' : '#b91c1c'};">${Number(s.grandDifference || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td colspan="2" style="padding: 12px 14px; text-align: center; color: #64748b;">مطابقة إجمالية معتمدة</td>
+                </tr>
+            `;
+        }
+    };
+
+    const showUserTransactionsModal = (userName: string) => {
+        if (!currentComprehensiveReportData || !Array.isArray(currentComprehensiveReportData.users)) return;
+        const user = currentComprehensiveReportData.users.find((u: any) => u.userName === userName);
+        if (!user) return;
+
+        currentSelectedCashierForModal = user;
+
+        const modal = document.getElementById('sp-user-transactions-modal');
+        const nameEl = document.getElementById('sp-tx-modal-user-name');
+        const metaEl = document.getElementById('sp-tx-modal-meta');
+        const amtEl = document.getElementById('sp-tx-modal-total-amt');
+        const countEl = document.getElementById('sp-tx-modal-total-count');
+        const tbody = document.getElementById('sp-tx-modal-tbody');
+
+        const date = currentComprehensiveReportData.date || '';
+
+        if (nameEl) nameEl.textContent = `كشف الشحنات التفصيلي للمحصل: ${user.userName}`;
+        if (metaEl) metaEl.textContent = `تاريخ العمليات: ${date} | المنظومة الموحدة (MEEDCO)`;
+        if (amtEl) amtEl.textContent = Number(user.meedco?.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+        if (countEl) countEl.textContent = `${user.meedco?.count || 0} شحنة`;
+
+        if (tbody) {
+            const items: any[] = user.meedco?.items || [];
+            if (items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 25px; color: #94a3b8;">لا تتوفر تفاصيل حركات شحن مسجلة لهذا المحصل</td></tr>`;
+            } else {
+                const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                tbody.innerHTML = items.map((it, idx) => `
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 8px 10px; text-align: center; color: #94a3b8;">${idx + 1}</td>
+                        <td style="padding: 8px 10px; font-weight: 800; font-family: monospace; color: #0284c7;">${esc(it.meterNumber)}</td>
+                        <td style="padding: 8px 10px; font-weight: 700; color: #1e293b;">${esc(it.customerName)}</td>
+                        <td style="padding: 8px 10px; color: #64748b;">${esc(it.subAdmin)}</td>
+                        <td style="padding: 8px 10px; font-family: monospace; color: #475569; font-size: 0.8rem;">${esc(it.receiptNumber)}</td>
+                        <td style="padding: 8px 10px; text-align: center; font-family: monospace; font-size: 0.8rem; color: #64748b;">${esc(it.paymentTime)}</td>
+                        <td style="padding: 8px 10px; text-align: center; font-weight: 900; font-family: monospace; color: #15803d;">${Number(it.amount || 0).toFixed(2)}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        if (modal) modal.style.display = 'flex';
+    };
+
+    const printCurrentCashierTransactions = () => {
+        if (!currentSelectedCashierForModal) return;
+        const user = currentSelectedCashierForModal;
+        const items: any[] = user.meedco?.items || [];
+        const date = (currentComprehensiveReportData?.date || new Date().toISOString().slice(0, 10));
+
+        const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        let rows = items.map((it, idx) => `
+            <tr>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${esc(it.meterNumber)}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px;">${esc(it.customerName)}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px;">${esc(it.subAdmin)}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-size: 11px;">${esc(it.receiptNumber)}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; font-size: 11px;">${esc(it.paymentTime)}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; font-weight: bold;">${Number(it.amount || 0).toFixed(2)}</td>
+            </tr>
+        `).join('');
+
+        const printHtml = `
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="utf-8">
+                <title>كشف شحنات المحصل - ${esc(user.userName)}</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; margin: 20px; color: #000; font-size: 12px; }
+                    .header-box { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                    .header-box h2 { margin: 0 0 5px 0; font-size: 18px; }
+                    .header-box p { margin: 2px 0; font-size: 13px; font-weight: bold; }
+                    .meta-grid { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 13px; font-weight: bold; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                    th { border: 1.5px solid #000; background: #e2e8f0; padding: 8px; font-size: 12px; }
+                    td { border: 1px solid #94a3b8; padding: 6px 8px; font-size: 11px; }
+                    .total-row td { font-weight: bold; font-size: 13px; background: #f1f5f9; border-top: 2px solid #000; }
+                    .sig-grid { display: flex; justify-content: space-between; margin-top: 40px; text-align: center; font-weight: bold; font-size: 13px; }
+                    @media print { body { margin: 0; } }
+                </style>
+            </head>
+            <body>
+                <div class="header-box">
+                    <h2>وزارة الكهرباء والطاقة المتجددة - شركة توزيع كهرباء مصر الوسطى</h2>
+                    <p>قطاع توزيع كهرباء المنيا - هندسة كهرباء بنى مزار شرق</p>
+                    <p style="text-decoration: underline; margin-top: 8px;">كشف العمليات والشحنات التفصيلي اليومي للمحصل</p>
+                </div>
+                <div class="meta-grid">
+                    <div>اسم المحصل: <span>${esc(user.userName)}</span></div>
+                    <div>تاريخ العمليات: <span>${date}</span></div>
+                    <div>المنظومة: <span>المنظومة الموحدة (MEEDCO)</span></div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 35px;">م</th>
+                            <th>رقم العداد</th>
+                            <th>اسم المشترك</th>
+                            <th>الإدارة الفرعية</th>
+                            <th>رقم الإيصال</th>
+                            <th>وقت السداد</th>
+                            <th>المبلغ (ج.م)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                        <tr class="total-row">
+                            <td colspan="6" style="text-align: left; padding-left: 20px;">الإجمالي العام للعمليات (${items.length} شحنة):</td>
+                            <td style="text-align: center;">${Number(user.meedco?.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="sig-grid">
+                    <div>المحصل<br><br>...................</div>
+                    <div>مراجع الإيرادات<br><br>...................</div>
+                    <div>أمين الخزينة<br><br>...................</div>
+                    <div>مدير الشئون التجارية<br><br>...................</div>
+                </div>
+                <script>
+                    window.onload = function() { window.print(); }
+                </script>
+            </body>
+            </html>
+        `;
+
+        const win = window.open('', '_blank');
+        if (win) {
+            win.document.open();
+            win.document.write(printHtml);
+            win.document.close();
+        }
+    };
+
+    const printComprehensiveDailyReport = () => {
+        if (!currentComprehensiveReportData || !Array.isArray(currentComprehensiveReportData.users)) {
+            showToast('لا توجد بيانات متاحة للطباعة حالياً، يرجى تحديث التقرير أولاً', 'warning');
+            return;
+        }
+
+        const date = currentComprehensiveReportData.date || new Date().toISOString().slice(0, 10);
+        const s = currentComprehensiveReportData.summary || {};
+        const users: any[] = currentComprehensiveReportData.users || [];
+
+        const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        let rowsHtml = users.map((u, idx) => `
+            <tr>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${idx + 1}</td>
+                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${esc(u.userName)}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${Number(u.meedco.amount || 0).toFixed(2)} (${u.meedco.count || 0})</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${Number(u.maasara.amount || 0).toFixed(2)} (${u.maasara.count || 0})</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${Number(u.iskra.amount || 0).toFixed(2)} (${u.iskra.count || 0})</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${u.totalRechargesCount || 0}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${Number(u.totalSystemsAmount || 0).toFixed(2)}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${Number(u.cashSupplied || 0).toFixed(2)}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${Number(u.difference || 0).toFixed(2)}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${esc(u.status)}</td>
+            </tr>
+        `).join('');
+
+        const printHtml = `
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="utf-8">
+                <title>التقرير المالي والتفصيلي لحصر شحنات وإيرادات المنظومات - ${date}</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; margin: 15px; color: #000; font-size: 11.5px; }
+                    .header-box { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 8px; }
+                    .header-box h2 { margin: 0 0 4px 0; font-size: 17px; }
+                    .header-box h3 { margin: 0 0 4px 0; font-size: 14px; text-decoration: underline; }
+                    .header-box p { margin: 2px 0; font-size: 12px; font-weight: bold; }
+                    .meta-bar { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px; font-weight: bold; background: #f1f5f9; padding: 6px 12px; border: 1px solid #cbd5e1; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+                    th { border: 1.5px solid #000; background: #e2e8f0; padding: 6px; font-size: 11px; }
+                    td { border: 1px solid #000; padding: 5px; font-size: 11px; }
+                    .total-row td { font-weight: bold; font-size: 12px; background: #e2e8f0; border-top: 2px solid #000; }
+                    .sig-grid { display: flex; justify-content: space-between; margin-top: 35px; text-align: center; font-weight: bold; font-size: 12px; }
+                    @media print {
+                        body { margin: 0; }
+                        @page { size: A4 landscape; margin: 10mm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header-box">
+                    <h2>جمهورية مصر العربية - وزارة الكهرباء والطاقة المتجددة</h2>
+                    <p>الشركة القابضة لكهرباء مصر - شركة توزيع كهرباء مصر الوسطى - قطاع المنيا - هندسة بنى مزار شرق</p>
+                    <h3>التقرير المالي والتفصيلي لحصر مبيعات وشحنات البرامج ومطابقة التوريد اليومي</h3>
+                </div>
+                <div class="meta-bar">
+                    <div>تاريخ التقرير: <span>${date}</span></div>
+                    <div>عدد المحصلين النشطين: <span>${s.totalUsersCount || users.length}</span></div>
+                    <div>إجمالي الشحنات: <span>${s.grandTotalRecharges || 0} شحنة</span></div>
+                    <div>إجمالي مبيعات البرامج: <span>${Number(s.grandSystemsAmount || 0).toLocaleString()} ج.م</span></div>
+                    <div>إجمالي النقدية الموردة: <span>${Number(s.grandCashSupplied || 0).toLocaleString()} ج.م</span></div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;">م</th>
+                            <th>اسم المحصل / المستخدم</th>
+                            <th>المنظومة الموحدة<br>(مبلغ | شحنات)</th>
+                            <th>معصرة<br>(مبلغ | شحنات)</th>
+                            <th>إسكرا<br>(مبلغ | شحنات)</th>
+                            <th>إجمالي الشحنات</th>
+                            <th>إجمالي البرامج</th>
+                            <th>النقدية الموردة</th>
+                            <th>الفارق</th>
+                            <th>حالة المطابقة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                        <tr class="total-row">
+                            <td colspan="2" style="text-align: center;">الإجمالي العام</td>
+                            <td style="text-align: center;">${Number(s.grandMeedcoAmount || 0).toFixed(2)} (${s.grandMeedcoCount || 0})</td>
+                            <td style="text-align: center;">${Number(s.grandMaasaraAmount || 0).toFixed(2)} (${s.grandMaasaraCount || 0})</td>
+                            <td style="text-align: center;">${Number(s.grandIskraAmount || 0).toFixed(2)} (${s.grandIskraCount || 0})</td>
+                            <td style="text-align: center;">${s.grandTotalRecharges || 0}</td>
+                            <td style="text-align: center;">${Number(s.grandSystemsAmount || 0).toFixed(2)}</td>
+                            <td style="text-align: center;">${Number(s.grandCashSupplied || 0).toFixed(2)}</td>
+                            <td style="text-align: center;">${Number(s.grandDifference || 0).toFixed(2)}</td>
+                            <td style="text-align: center;">اعتماد ختامي</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="sig-grid">
+                    <div>أمين الخزينة<br><br>...................</div>
+                    <div>مراجع الإيرادات<br><br>...................</div>
+                    <div>مدير الشئون التجارية<br><br>...................</div>
+                    <div>مدير عام الهندسة<br><br>...................</div>
+                </div>
+                <script>
+                    window.onload = function() { window.print(); }
+                </script>
+            </body>
+            </html>
+        `;
+
+        const win = window.open('', '_blank');
+        if (win) {
+            win.document.open();
+            win.document.write(printHtml);
+            win.document.close();
+        }
+    };
+
+    const exportComprehensiveDailyReportToExcel = () => {
+        if (!currentComprehensiveReportData || !Array.isArray(currentComprehensiveReportData.users)) {
+            showToast('لا توجد بيانات متاحة للتصدير', 'warning');
+            return;
+        }
+
+        const date = currentComprehensiveReportData.date || new Date().toISOString().slice(0, 10);
+        const users: any[] = currentComprehensiveReportData.users;
+
+        let csv = '\uFEFFم,اسم المحصل,مبلغ الموحد,شحنات الموحد,مبلغ معصرة,شحنات معصرة,مبلغ إسكرا,شحنات إسكرا,إجمالي الشحنات,إجمالي مبالغ البرامج,النقدية الموردة بالحافظة,فارق التسوية,حالة المطابقة\n';
+
+        users.forEach((u, i) => {
+            csv += `${i + 1},"${(u.userName || '').replace(/"/g, '""')}",${u.meedco.amount || 0},${u.meedco.count || 0},${u.maasara.amount || 0},${u.maasara.count || 0},${u.iskra.amount || 0},${u.iskra.count || 0},${u.totalRechargesCount || 0},${u.totalSystemsAmount || 0},${u.cashSupplied || 0},${u.difference || 0},"${u.status}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `تقرير_البرامج_التفصيلي_${date}.csv`;
+        link.click();
+        showToast('تم تصدير التقرير المالي التفصيلي بنجاح ✓', 'success');
     };
 
     const renderSupplyPortfolioNewSection = () => {
@@ -12816,6 +13445,14 @@ const handlePrintJudicialControlDetails = () => {
             supplyPortfoliosInitialized = true;
         }
         loadSupplyPortfolios();
+    };
+
+    const renderSupplyPortfolioDetailedReportSection = () => {
+        if (!supplyPortfoliosInitialized) {
+            initSupplyPortfoliosListeners();
+            supplyPortfoliosInitialized = true;
+        }
+        loadComprehensiveDailyReport();
     };
 
 // ================= منظومة الطباعة الحرارية المتقدمة للموبايل (طابعة VTC) =================
@@ -64865,6 +65502,10 @@ const setupOrgHierarchyEvents = () => {
         } else if (targetId === 'supply-portfolio-archive') {
 
             renderSupplyPortfolioArchiveSection();
+
+        } else if (targetId === 'supply-portfolio-detailed-report') {
+
+            renderSupplyPortfolioDetailedReportSection();
 
         } else if (targetId === 'debts-management') {
 

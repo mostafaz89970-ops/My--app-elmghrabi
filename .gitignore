@@ -28,6 +28,8 @@ desktop.ini
 .session_token
 .vite/
 .zencoder/
+reports_cache/
+*.xlsx
 
 # Editor directories and files
 .vscode/*
