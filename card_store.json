@@ -120,7 +120,7 @@
       "meterData": []
     },
     "09315858": {
-      "id": "2cee6ee2-f3e8-4c38-8160-55647e45cf93",
+      "id": "b44a23d0-4d6a-43e3-80ac-cadd848481c4",
       "cardId": "09315858",
       "technicianCode": 12258,
       "technicianName": "وحيد فاروق كامل",
@@ -129,16 +129,16 @@
       "companyName": "جلوبال",
       "meterTypeName": "جلوبال احادي",
       "cardIssueDate": "29‏‏/9‏‏/2026 11:57:02 م",
-      "activationDate": "٢٩‏/٩‏/٢٠٢٦",
-      "expiryDate": "٦‏/١٠‏/٢٠٢٦",
+      "activationDate": "٣٠‏/٩‏/٢٠٢٦",
+      "expiryDate": "٧‏/١٠‏/٢٠٢٦",
       "issueUsername": "سناء عبدالستار عبدالعزيز",
       "status": "مفعل",
-      "readAt": "٢٩‏/٩‏/٢٠٢٦، ١١:٥٨:٢١ م",
+      "readAt": "٣٠‏/٩‏/٢٠٢٦، ١٢:٢٩:٣٩ ص",
       "meterData": []
     }
   },
   "activeControlCard": {
-    "id": "2cee6ee2-f3e8-4c38-8160-55647e45cf93",
+    "id": "b44a23d0-4d6a-43e3-80ac-cadd848481c4",
     "cardId": "09315858",
     "technicianCode": 12258,
     "technicianName": "وحيد فاروق كامل",
@@ -151,7 +151,7 @@
     "expiryDate": "6‏‏/10‏‏/2026 11:57:02 م",
     "issueUsername": "سناء عبدالستار عبدالعزيز",
     "status": "مفعل",
-    "readAt": "٢٩‏/٩‏/٢٠٢٦، ١١:٥٨:٢١ م",
+    "readAt": "٣٠‏/٩‏/٢٠٢٦، ١٢:٢٩:٣٩ ص",
     "meterData": []
   }
 }

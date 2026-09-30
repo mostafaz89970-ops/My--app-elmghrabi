@@ -128,6 +128,79 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // 7.2.1 Customer Full Account Statement (كشف حساب مشترك - MEEDCO 1:1)
+            if (pathname === '/api/customer/account-statement') {
+                const term = url.searchParams.get('term') || url.searchParams.get('code') || url.searchParams.get('customerId') || url.searchParams.get('q');
+                const body = await getBody();
+                const searchTerm = term || body.term || body.code || body.customerId || body.q;
+                
+                try {
+                    const [movRes, chgRes] = await Promise.allSettled([
+                        nativeEngine.getCustomerMeterMovements(searchTerm),
+                        nativeEngine.getCustomerChargingDetails(searchTerm)
+                    ]);
+
+                    const movData = movRes.status === 'fulfilled' && movRes.value?.success ? (movRes.value.data || movRes.value.customer) : null;
+                    const chgData = chgRes.status === 'fulfilled' && chgRes.value?.success ? chgRes.value : null;
+                    const chgCustomer = chgData?.customer || null;
+
+                    if (!movData && !chgCustomer) {
+                        res.writeHead(200);
+                        res.end(JSON.stringify({
+                            success: false,
+                            message: 'لم يتم العثور على بيانات المشترك بالبحث: ' + searchTerm
+                        }));
+                        return;
+                    }
+
+                    // دمج البيانات من كلا المصدرين لإنشاء كشف حساب كامل 100% مطابق للمنظومة
+                    const unifiedCustomer = {
+                        id: chgCustomer?.id || movData?.id || searchTerm,
+                        code: chgCustomer?.code || movData?.code || searchTerm,
+                        name: chgCustomer?.name || movData?.name || '-',
+                        nationalId: chgCustomer?.nationalId || movData?.nationalId || '-',
+                        address: chgCustomer?.address || movData?.address || '-',
+                        oldCode: chgCustomer?.oldCode || movData?.oldCode || '-',
+                        codeNumber: chgCustomer?.codeNumber || movData?.codeNumber || '-',
+                        meterNumber: chgCustomer?.meterNumber || movData?.meterNumber || movData?.codeNumber || searchTerm,
+                        unitNationalId: chgCustomer?.unitNationalId || movData?.unitNationalId || '-',
+                        sectorName: chgCustomer?.sectorName || movData?.sectorName || 'المنيا شمال',
+                        publicAdministrationName: chgCustomer?.publicAdministrationName || movData?.publicAdministrationName || 'بنى مزار شرق',
+                        subAdministrationName: chgCustomer?.subAdministrationName || movData?.subAdministrationName || 'بنى مزار شرق',
+                        activityName: chgCustomer?.activityName || movData?.activityName || 'استخدامات منزلية',
+                        accountNumberReferenceCustomer: chgCustomer?.accountNumberReferenceCustomer || movData?.accountNumberCustomerFormatted || movData?.accountNumberCustomer || '-',
+                        initialCapacity: chgCustomer?.initialCapacity || chgCustomer?.permissibleCurrent || 80,
+                        meterCompanyName: chgCustomer?.meterCompanyName || 'جلوبال',
+                        meterModel: chgCustomer?.meterModel || chgCustomer?.meterName || 'عداد احادى 2022',
+                        meterSingleOrTripple: chgCustomer?.meterSingleOrTripple || 'احادى',
+                        placeDescriptionName: chgCustomer?.placeDescriptionName || 'منزل',
+                        subscriptionType: chgCustomer?.subscriptionType || 'مشترك جديد',
+                        customerTypeName: chgCustomer?.customerTypeName || 'صغار مشتركين',
+                        phoneNumber: chgCustomer?.phoneNumber || '-',
+                        contractNumber: chgCustomer?.contractNumber ? `${chgCustomer.contractNumber} (${chgCustomer.contractYear || ''})` : '-',
+                        contractDate: chgCustomer?.contractDate || chgCustomer?.installationDate || '-',
+                        totalCharges: movData?.totalCharges || chgCustomer?.totalRechargeAmount || 0,
+                        totalRechargeAmountOnMeter: movData?.totalRechargeAmountOnMeter || chgCustomer?.totalMeterRechargeAmount || 0,
+                        financials: chgData?.financials || null,
+                        meterMoves: movData?.meterMoves || []
+                    };
+
+                    res.writeHead(200);
+                    res.end(JSON.stringify({
+                        success: true,
+                        data: unifiedCustomer
+                    }));
+                } catch (err) {
+                    res.writeHead(200);
+                    res.end(JSON.stringify({
+                        success: false,
+                        message: err.message
+                    }));
+                }
+                return;
+            }
+
+
             // 7.3 Customer Receipt Payment PDF (إيصال السداد الرسمي MEEDCO)
             if (pathname === '/api/customer/receipt-pdf' || pathname === '/api/meedco/receipt-pdf') {
                 const body = await getBody();
@@ -489,31 +562,24 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
-            // تجديد الجلسة التلقائي (يستدعيه الـ Watchdog كل 20 دقيقة بعد الاستيقاظ)
+            // فحص ومزامنة الجلسة السلبية (يقرأ من متصفح Chrome دون إرسال طلبات تسجيل دخول تغلق الجلسة)
             if (pathname === '/api/meedco/auto-renew-session' && req.method === 'POST') {
                 try {
                     const unifiedClient = require('./unifiedCardClient');
                     const status = await unifiedClient.getMeedcoStatus();
-                    if (status && status.connected) {
-                        res.writeHead(200);
-                        res.end(JSON.stringify({ success: true, renewed: false, message: 'الجلسة نشطة وصالحة' }));
-                        return;
-                    }
-                    // الجلسة منتهية — جدد تلقائياً إذا كانت بيانات الدخول محفوظة
-                    const renewResult = await unifiedClient.ensureValidSession(true);
-                    if (renewResult) {
-                        res.writeHead(200);
-                        res.end(JSON.stringify({ success: true, renewed: true, message: 'تم تجديد جلسة MEEDCO تلقائياً' }));
-                    } else {
-                        res.writeHead(200);
-                        res.end(JSON.stringify({ success: false, renewed: false, message: 'تعذر تجديد الجلسة — يرجى تسجيل الدخول يدوياً' }));
-                    }
+                    res.writeHead(200);
+                    res.end(JSON.stringify({
+                        success: Boolean(status && status.connected),
+                        renewed: false,
+                        message: status && status.connected ? 'الجلسة نشطة وصالحة' : 'الجلسة غير متصلة'
+                    }));
                 } catch (renewErr) {
                     res.writeHead(200);
                     res.end(JSON.stringify({ success: false, renewed: false, message: renewErr.message }));
                 }
                 return;
             }
+
 
             if (pathname === '/api/meedco/hierarchy') {
                 const sectorId = url.searchParams.get('sectorId');
@@ -698,19 +764,14 @@ function startInternalServer(port = 5002) {
                 const unifiedClient = require('./unifiedCardClient');
                 const status = await unifiedClient.getMeedcoStatus();
                 if (status && status.connected) {
-                    console.log('[InternalServer] جلسة MEEDCO نشطة ✓ (' + (status.user || '') + ')');
+                    console.log('[InternalServer] جلسة MEEDCO نشطة من المتصفح ✓ (' + (status.user || '') + ')');
                 } else {
-                    console.log('[InternalServer] جلسة MEEDCO منتهية — جارٍ التجديد التلقائي...');
-                    const result = await unifiedClient.ensureValidSession(true);
-                    if (result) {
-                        console.log('[InternalServer] تم تجديد جلسة MEEDCO بنجاح ✓');
-                    } else {
-                        console.warn('[InternalServer] تعذر التجديد التلقائي. سيتطلب تسجيل دخول يدوي.');
-                    }
+                    console.log('[InternalServer] لم يتم اكتشاف جلسة نشطة من المتصفح.');
                 }
             } catch (sessionErr) {
                 console.warn('[InternalServer] تحقق الجلسة عند البدء:', sessionErr.message);
             }
+
         }, 2000);
     });
 

@@ -931,6 +931,7 @@
                             <li><a href="#" class="nav-link" data-target="new-card-with-charge" data-permission="manage_replacement_cards"><span>كارت بديل بشحن</span></a></li>
                             <li><a href="#" class="nav-link" data-target="reports" data-report-type="charging-report" data-permission="view_reports"><span>تقارير الشحن والكروت</span></a></li>
                             <li><a href="#" class="nav-link" data-target="meter-movements" data-permission="view_meter_movements"><span>حركات عداد</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="account-statement" data-permission="view_meter_movements"><span>كشف حساب مشترك</span></a></li>
                             <li><a href="#" class="nav-link" data-target="subscribers-all" data-permission="view_subscribers_all"><span>جميع المشتركين</span></a></li>
                             <li><a href="#" class="nav-link" data-target="subscriber-statement" data-permission="view_subscriber_statement"><span>الاستعلام عن مشترك</span></a></li>
                             <li><a href="#" class="nav-link" data-target="subscribers-new" data-permission="view_subscribers_new"><span>جديد</span></a></li>
@@ -5348,6 +5349,273 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ========================================================================= -->
+        <!-- Section: Account Statement (كشف حساب مشترك - مطابق تماماً لشاشة MEEDCO app-prod.meedco.cyuni.net/accountstatement) -->
+        <!-- ========================================================================= -->
+        <section id="account-statement" class="content-section">
+            <div class="table-container">
+                <!-- Section Header & Toolbar (MEEDCO style) -->
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 1.25rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; padding: 12px; border-radius: 12px; display: flex; box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 800; color: #0f172a;">كشف حساب مشترك</h2>
+                            <p style="margin: 2px 0 0 0; color: #64748b; font-size: 0.9rem;">عرض تفصيلي لبيانات المشترك، استهلاكات الشهور، آخر قراءة للعداد، وسجل العمليات والشحنات (مطابق لمنظومة MEEDCO)</p>
+                        </div>
+                    </div>
+
+                    <!-- Action Toolbar -->
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" id="btn-astat-read-card" class="btn" style="background: #f59e0b; color: #ffffff; padding: 9px 16px; font-weight: 800; border-radius: 8px; border: none; display: flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 2px 6px rgba(245, 158, 11, 0.35);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                            <span>بحث بالكارت</span>
+                        </button>
+                        <button type="button" id="btn-astat-print-report" class="btn" style="background: #0284c7; color: #ffffff; padding: 9px 18px; font-weight: 800; border-radius: 8px; border: none; display: flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            <span>طباعة كشف الحساب</span>
+                        </button>
+                        <button type="button" id="btn-astat-back" class="btn btn-back-page" style="background: #f1f5f9; color: #475569; padding: 9px 14px; font-weight: 700; border-radius: 8px; border: 1px solid #cbd5e1; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                            <span>رجوع</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search Card -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                    <form id="form-account-statement-search" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 280px;">
+                            <label for="astat-search-input" style="display: block; font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; color: #1e293b;">
+                                بحث برقم المشترك / كود العداد / رقم الشاسية / الرقم القومي:
+                            </label>
+                            <div style="position: relative;">
+                                <input type="text" id="astat-search-input" class="form-control" placeholder="أدخل رقم الشاسيه أو كود المشترك أو الرقم القومي..." style="width: 100%; padding: 10px 14px 10px 40px; font-size: 1rem; border-radius: 8px; border: 1.5px solid #cbd5e1;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px;">
+                            <button type="submit" id="btn-astat-search" class="btn" style="background: #0284c7; color: #fff; padding: 10px 22px; font-weight: 800; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);">
+                                <span>بحث</span>
+                            </button>
+                            <button type="button" id="btn-astat-clear" class="btn" style="background: #f1f5f9; color: #64748b; padding: 10px 16px; font-weight: 700; border-radius: 8px; border: 1px solid #cbd5e1; cursor: pointer;">
+                                <span>تفريغ</span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Alert / Status Banner -->
+                    <div id="astat-search-banner" style="display: none; margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: 0.9rem;"></div>
+                </div>
+
+                <!-- Tabs Header -->
+                <div style="display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.5rem; gap: 8px;">
+                    <button type="button" id="btn-astat-tab-basic" class="btn-astat-tab" style="padding: 12px 24px; font-weight: 800; font-size: 1rem; border: none; background: none; color: #0284c7; border-bottom: 3px solid #0284c7; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                        <span>بيانات العداد الأساسية</span>
+                    </button>
+                    <button type="button" id="btn-astat-tab-payments" class="btn-astat-tab" style="padding: 12px 24px; font-weight: 700; font-size: 1rem; border: none; background: none; color: #64748b; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                        <span>بيانات الدفع والعمليات</span>
+                    </button>
+                </div>
+
+                <!-- ================= TAB 1: بيانات العداد الأساسية ================= -->
+                <div id="astat-panel-basic" style="display: flex; flex-direction: column; gap: 18px;">
+                    
+                    <!-- 1. بطاقة بيانات المشترك -->
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: inline-block; background: #e0f2fe; color: #0369a1; padding: 6px 16px; border-radius: 8px; font-weight: 800; font-size: 0.95rem;">
+                                بيانات المشترك والاشتراك
+                            </div>
+                            <div id="astat-account-ref-badge" style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 4px 14px; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 0.95rem;">
+                                مرجع الحساب: <span id="astat-account-ref">-</span>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; font-size: 0.88rem;">
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">رقم المشترك (كود الاشتراك)</span><input type="text" id="astat-cust-code" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 800; font-family: monospace; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">اسم المشترك</span><input type="text" id="astat-cust-name" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 800; color: #0284c7;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">الإدارة العامة</span><input type="text" id="astat-public-admin" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">الإدارة الفرعية</span><input type="text" id="astat-sub-admin" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">كود المشترك القديم</span><input type="text" id="astat-cust-old-code" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; font-family: monospace; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">كود العداد</span><input type="text" id="astat-cust-meter-code" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; font-family: monospace; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">رقم العداد (الشاسية)</span><input type="text" id="astat-cust-meter-number" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 800; font-family: monospace; color: #0284c7; font-size: 1rem;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">النشاط</span><input type="text" id="astat-cust-activity" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">القدرة التعاقدية (أمبير)</span><input type="text" id="astat-cust-capacity" readonly value="80" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">شركة توريد العداد</span><input type="text" id="astat-cust-company" readonly value="جلوبال" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">نوع العداد</span><input type="text" id="astat-cust-meter-type" readonly value="عداد احادى 2022" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">موديل العداد</span><input type="text" id="astat-cust-meter-model" readonly value="احادى" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">وصف المكان</span><input type="text" id="astat-cust-place" readonly value="منزل" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">نوع الاشتراك</span><input type="text" id="astat-cust-sub-type" readonly value="مشترك جديد" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">نوع المشترك</span><input type="text" id="astat-cust-user-type" readonly value="صغار مشتركين" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">الرقم القومي</span><input type="text" id="astat-cust-national-id" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; font-family: monospace; color: #0f172a;"></div>
+
+                            <div style="grid-column: span 2;"><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">العنوان</span><input type="text" id="astat-cust-address" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">رقم الهاتف</span><input type="text" id="astat-cust-phone" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; font-family: monospace; color: #0f172a;"></div>
+                            <div><span style="color: #64748b; display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;">رقم وتاريخ العقد</span><input type="text" id="astat-cust-contract" readonly value="-" style="width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-weight: 700; font-family: monospace; color: #0f172a;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 2. استهلاكات الشهور -->
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <div style="display: inline-block; background: #fef3c7; color: #b45309; padding: 6px 16px; border-radius: 8px; font-weight: 800; font-size: 0.95rem;">
+                                استهلاكات الشهور
+                            </div>
+                            <span style="color: #64748b; font-size: 0.85rem; font-weight: 600;">سجل استهلاك الطاقة والشرائح المحسوبة شهرياً</span>
+                        </div>
+
+                        <div class="table-responsive" style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: center;">
+                                <thead>
+                                    <tr style="background: #f8fafc; color: #334155; font-weight: 800; border-bottom: 2px solid #e2e8f0;">
+                                        <th style="padding: 10px;">سنة</th>
+                                        <th style="padding: 10px;">شهر</th>
+                                        <th style="padding: 10px;">الاستهلاك الفعال (KWh)</th>
+                                        <th style="padding: 10px;">الاستهلاك الغير فعال</th>
+                                        <th style="padding: 10px;">الاستهلاك بالجنيه</th>
+                                        <th style="padding: 10px;">خدمة العملاء</th>
+                                        <th style="padding: 10px;">الرصيد المتبقي</th>
+                                        <th style="padding: 10px;">أقصى حمل (أمبير)</th>
+                                        <th style="padding: 10px;">أقصى حمل (KW)</th>
+                                        <th style="padding: 10px;">معامل القدرة</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="astat-consumptions-tbody">
+                                    <tr><td colspan="10" style="padding: 20px; color: #64748b;">يرجى البحث عن مشترك أو قراءة الكارت لعرض استهلاكات الشهور.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 3. بيانات آخر قراءة للعداد -->
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                        <div style="display: inline-block; background: #e0e7ff; color: #3730a3; padding: 6px 16px; border-radius: 8px; font-weight: 800; font-size: 0.95rem; margin-bottom: 14px;">
+                            بيانات آخر قراءة للعداد
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 0.88rem;">
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">تاريخ العداد</span><strong id="astat-read-date" style="color: #0f172a;">-</strong></div>
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">مستوى البطارية</span><strong id="astat-read-battery" style="color: #047857;">سليمة ✓</strong></div>
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">الرصيد المتبقي</span><strong id="astat-read-balance" style="color: #047857; font-family: monospace;">0.00 ج.م</strong></div>
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">قيمة آخر شحنة</span><strong id="astat-read-last-charge" style="font-family: monospace;">0.00 ج.م</strong></div>
+
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">الشريحة الحالية</span><strong id="astat-read-tier">1</strong></div>
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">الرصيد بالـ KW</span><strong id="astat-read-kw" style="font-family: monospace;">0</strong></div>
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">أقصى قدرة (أمبير)</span><strong id="astat-read-max-cap">0</strong></div>
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">مديونية العداد</span><strong id="astat-read-debt" style="color: #dc2626; font-family: monospace;">0.00 ج.م</strong></div>
+
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">حالة الموصل (الريلاي)</span><strong id="astat-read-relay" style="color: #16a34a;">مغلق (متصل)</strong></div>
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">أقصى قدرة كيلو وات</span><strong id="astat-read-max-kw">0.00</strong></div>
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">الاستهلاك الإجمالي (KWh)</span><strong id="astat-read-total-kwh" style="font-family: monospace;">0</strong></div>
+                            <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 10px 14px; border-radius: 8px;"><span style="color: #64748b; display: block; font-size: 0.78rem;">فاتورة الشهر السابق</span><strong id="astat-read-prev-bill" style="font-family: monospace;">0.00 ج.م</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- 4. آخر ثلاث أحداث وآخر ثلاث فنيين -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;">
+                        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                            <div style="font-weight: 800; color: #0f172a; margin-bottom: 12px; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                                <span style="display: inline-block; width: 4px; height: 16px; background: #dc2626; border-radius: 2px;"></span>
+                                آخر ثلاث أحداث تمت على العداد (التلاعبات)
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: center;">
+                                <thead>
+                                    <tr style="background: #f8fafc; font-weight: 700; border-bottom: 1px solid #e2e8f0;">
+                                        <th style="padding: 8px;">اسم الحدث</th>
+                                        <th style="padding: 8px;">تاريخ الحدث</th>
+                                        <th style="padding: 8px;">تاريخ الإزالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="astat-events-tbody">
+                                    <tr><td colspan="3" style="padding: 12px; color: #64748b;">لا توجد تلاعبات مسجلة</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                            <div style="font-weight: 800; color: #0f172a; margin-bottom: 12px; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                                <span style="display: inline-block; width: 4px; height: 16px; background: #0284c7; border-radius: 2px;"></span>
+                                آخر ثلاث فنيين قاموا بعمليات على العداد
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: center;">
+                                <thead>
+                                    <tr style="background: #f8fafc; font-weight: 700; border-bottom: 1px solid #e2e8f0;">
+                                        <th style="padding: 8px;">الاسم</th>
+                                        <th style="padding: 8px;">تاريخ العملية</th>
+                                        <th style="padding: 8px;">الإدارة التابع لها</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="astat-techs-tbody">
+                                    <tr><td colspan="3" style="padding: 12px; color: #64748b;">لا توجد عمليات فنية مسجلة</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 5. بيانات آخر شحنة على النظام -->
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                        <div style="display: inline-block; background: #dcfce7; color: #166534; padding: 6px 16px; border-radius: 8px; font-weight: 800; font-size: 0.92rem; margin-bottom: 12px;">
+                            بيانات آخر شحنة مسجلة على النظام
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; font-size: 0.88rem; text-align: center;">
+                            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #f1f5f9;"><span style="display: block; color: #64748b; font-size: 0.78rem;">قيمة الشحنة</span><strong id="astat-last-charge-val" style="font-family: monospace; font-size: 1rem; color: #0f172a;">-</strong></div>
+                            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #f1f5f9;"><span style="display: block; color: #64748b; font-size: 0.78rem;">صافي الشحنة</span><strong id="astat-last-charge-net" style="font-family: monospace; font-size: 1rem; color: #16a34a;">-</strong></div>
+                            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #f1f5f9;"><span style="display: block; color: #64748b; font-size: 0.78rem;">رقم الشحنة</span><strong id="astat-last-charge-seq" style="color: #0284c7; font-family: monospace;">-</strong></div>
+                            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #f1f5f9;"><span style="display: block; color: #64748b; font-size: 0.78rem;">الشحن من خلال</span><strong id="astat-last-charge-channel">-</strong></div>
+                            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #f1f5f9;"><span style="display: block; color: #64748b; font-size: 0.78rem;">تاريخ آخر شحنة</span><strong id="astat-last-charge-date" style="font-family: monospace;">-</strong></div>
+                            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #f1f5f9;"><span style="display: block; color: #64748b; font-size: 0.78rem;">الرصيد بعد الشحن</span><strong id="astat-last-charge-balance" style="color: #047857; font-family: monospace;">-</strong></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ================= TAB 2: بيانات الدفع والعمليات ================= -->
+                <div id="astat-panel-payments" style="display: none; flex-direction: column; gap: 14px;">
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 14px;">
+                            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                                <span style="display: inline-block; width: 4px; height: 18px; background: #0284c7; border-radius: 2px;"></span>
+                                سجل وعمليات الشحن والسداد المسجلة
+                            </h3>
+                            <span id="astat-moves-badge" style="background: #f1f5f9; color: #475569; font-weight: 800; font-size: 0.85rem; padding: 4px 12px; border-radius: 20px; border: 1px solid #e2e8f0;">
+                                إجمالي العمليات: <strong id="astat-moves-count">0</strong>
+                            </span>
+                        </div>
+
+                        <div class="table-responsive" style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.92rem;">
+                                <thead>
+                                    <tr style="background: #0f172a; color: #ffffff; font-weight: 800;">
+                                        <th style="padding: 10px 12px; border: 1px solid #1e293b;">رقم العداد</th>
+                                        <th style="padding: 10px 12px; border: 1px solid #1e293b;">نوع الحركة</th>
+                                        <th style="padding: 10px 12px; border: 1px solid #1e293b; text-align: center;">قيمة الشحن</th>
+                                        <th style="padding: 10px 12px; border: 1px solid #1e293b;">رقم الإيصال</th>
+                                        <th style="padding: 10px 12px; border: 1px solid #1e293b;">تاريخ الحركة</th>
+                                        <th style="padding: 10px 12px; border: 1px solid #1e293b;">مركز الشحن</th>
+                                        <th style="padding: 10px 12px; border: 1px solid #1e293b;">اسم المشغل</th>
+                                        <th style="padding: 10px 12px; border: 1px solid #1e293b; text-align: center;">حالة الشحن</th>
+                                        <th style="padding: 10px 12px; border: 1px solid #1e293b; text-align: center; width: 140px;">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="astat-payments-tbody">
+                                    <tr><td colspan="9" style="padding: 24px; text-align: center; color: #64748b;">يرجى البحث عن مشترك لعرض سجل الشحن والمدفوعات.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 

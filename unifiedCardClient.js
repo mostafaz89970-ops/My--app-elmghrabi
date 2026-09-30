@@ -147,28 +147,44 @@ async function loginMeedcoLive(credentials = {}) {
 let isReloggingIn = false;
 async function ensureValidSession(force = false) {
     if (isReloggingIn) {
-        // انتظر حتى تنتهي عملية تسجيل الدخول الجارية
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         return cachedAuthToken;
     }
-    const cfg = getMeedcoConfig();
-    if (force || !cachedAuthToken) {
-        if (cfg.password && cfg.username) {
-            isReloggingIn = true;
-            try {
-                // امسح التوكن القديم أولاً لضمان استخدام الجديد
-                if (force) cachedAuthToken = null;
-                const res = await loginMeedcoLive();
-                if (res.success && cachedAuthToken) {
-                    return cachedAuthToken;
+
+    // 1. تحقق أولاً من وجود توكن نشط وصالح في متصفح Chrome أو في الذاكرة
+    const currentToken = getActiveAuthToken();
+    if (currentToken) {
+        try {
+            const parts = currentToken.split('.');
+            if (parts.length === 3) {
+                const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+                const exp = payload.exp ? payload.exp * 1000 : 0;
+                // إذا كان التوكن الحالي صالحاً، استخدمه فوراً وتجنب تماماً تسجيل الدخول الجديد لمنع إغلاق جلسة المتصفح
+                if (exp > Date.now()) {
+                    cachedAuthToken = currentToken;
+                    return currentToken;
                 }
-            } finally {
-                isReloggingIn = false;
             }
+        } catch (_) {}
+    }
+
+    // 2. إذا طُلِب الإجبار ولم يوجد أي توكن صالح على الإطلاق، نفّذ تسجيل الدخول فقط عند الضرورة القصوى
+    const cfg = getMeedcoConfig();
+    if (force && !cachedAuthToken && cfg.password && cfg.username) {
+        isReloggingIn = true;
+        try {
+            const res = await loginMeedcoLive();
+            if (res.success && cachedAuthToken) {
+                return cachedAuthToken;
+            }
+        } finally {
+            isReloggingIn = false;
         }
     }
+
     return cachedAuthToken || getActiveAuthToken();
 }
+
 
 
 async function getMeedcoStatus() {
@@ -1367,15 +1383,17 @@ async function apiMeedcoRequest(apiPath, method = 'GET', body = null, isRetry = 
             res.on('data', chunk => respBody += chunk);
             res.on('end', async () => {
                 if (res.statusCode === 401 && !isRetry) {
-                    console.log('[MEEDCO API] Received 401, re-authenticating MEEDCO session...');
-                    try {
-                        await ensureValidSession(true);
-                        const retryRes = await apiMeedcoRequest(apiPath, method, body, true);
-                        return resolve(retryRes);
-                    } catch (reErr) {
-                        console.error('[MEEDCO API] Re-auth failed:', reErr.message);
+                    console.log('[MEEDCO API] Received 401, checking Chrome session token...');
+                    cachedAuthToken = null;
+                    const freshToken = getActiveAuthToken();
+                    if (freshToken && freshToken !== authToken) {
+                        try {
+                            const retryRes = await apiMeedcoRequest(apiPath, method, body, true);
+                            return resolve(retryRes);
+                        } catch (_) {}
                     }
                 }
+
                 try {
                     const parsed = JSON.parse(respBody);
                     resolve(parsed);

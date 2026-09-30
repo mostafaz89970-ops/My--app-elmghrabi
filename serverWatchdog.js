@@ -179,16 +179,14 @@ async function healthLoop() {
         const now = Date.now();
         if (now - lastSessionRenew >= SESSION_RENEW_INTERVAL_MS) {
             lastSessionRenew = now;
-            log('INFO', 'جارٍ التحقق من صلاحية جلسة MEEDCO...');
             const renewResult = await renewSessionViaSever();
             if (renewResult.success) {
-                log('INFO', 'جلسة MEEDCO نشطة وصالحة ✓');
-            } else if (renewResult.renewed) {
-                log('INFO', 'تم تجديد جلسة MEEDCO تلقائياً ✓');
+                log('INFO', 'جلسة MEEDCO نشطة وصالحة من المتصفح ✓');
             } else {
-                log('WARN', 'تعذر تجديد الجلسة: ' + (renewResult.message || 'غير معروف'));
+                log('INFO', 'حالة الجلسة: بانتظار اتصال المتصفح');
             }
         }
+
     }
 }
 
