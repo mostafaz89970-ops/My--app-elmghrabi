@@ -2478,6 +2478,7 @@ const renderDashboard = () => {
                 { id: 'charging-card', title: 'شحن كارت طاقة', permission: 'manage_charging_card', icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>', tileColor: 'tile-amber' },
                 { id: 'clear-card', title: 'مسح كارت', permission: 'manage_clear_card', icon: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>', tileColor: 'tile-purple' },
                 { id: 'meter-movements', title: 'حركات عداد', permission: 'view_meter_movements', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', tileColor: 'tile-sky' },
+                { id: 'account-statement', title: 'كشف حساب مشترك', permission: 'view_meter_movements', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', tileColor: 'tile-cyan' },
                 { id: 'new-card-with-charge', title: 'كارت بديل بشحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/><path d="M12 14v4M10 16h4"/>', tileColor: 'tile-teal' },
                 { id: 'new-card-no-charge', title: 'بديل بدون شحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>', tileColor: 'tile-slate' },
                 { id: 'subscribers-faults', title: 'مرفوع أعطال', permission: 'view_subscribers_faults', filter: 'مرفوع أعطال', icon: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>', tileColor: 'tile-amber', count: scopedMeters.filter(m => m.subscriberType === 'مرفوع أعطال').length },
@@ -20221,6 +20222,7 @@ const renderCustomersTable = () => {
     // Bind All 46 Action Menu Items to Dedicated MEEDCO Modals
     tbody.querySelectorAll('.cm-act-item').forEach(item => {
         item.addEventListener('click', (e) => {
+            var _a;
             e.preventDefault();
             e.stopPropagation();
             const action = item.getAttribute('data-action') || '';
@@ -20239,14 +20241,16 @@ const renderCustomersTable = () => {
                     }
                 }
                 if (action === 'account-statement') {
-                    const asLink = document.querySelector('.sidebar-nav .nav-link[data-target="account-statement"]');
-                    if (asLink) {
-                        asLink.click();
-                        setTimeout(() => {
-                            renderAccountStatementSection(customer.meterNumber || customer.code);
-                        }, 200);
-                        return;
+                    document.querySelectorAll('.sidebar-nav .nav-link.active').forEach(l => l.classList.remove('active'));
+                    (_a = document.querySelector('.sidebar-nav .nav-link[data-target="account-statement"]')) === null || _a === void 0 ? void 0 : _a.classList.add('active');
+                    document.querySelectorAll('.content-section.active').forEach(s => s.classList.remove('active'));
+                    const astatSec = document.getElementById('account-statement');
+                    if (astatSec) {
+                        astatSec.classList.add('active');
+                        astatSec.style.removeProperty('display');
                     }
+                    renderAccountStatementSection(customer.meterNumber || customer.code);
+                    return;
                 }
                 openCustomerOperationModal(action, customer);
             }

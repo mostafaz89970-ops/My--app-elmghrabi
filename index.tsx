@@ -5304,7 +5304,10 @@ const renderDashboard = () => {
 
                 { id: 'meter-movements', title: 'حركات عداد', permission: 'view_meter_movements', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', tileColor: 'tile-sky' },
 
+                { id: 'account-statement', title: 'كشف حساب مشترك', permission: 'view_meter_movements', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', tileColor: 'tile-cyan' },
+
                 { id: 'new-card-with-charge', title: 'كارت بديل بشحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/><path d="M12 14v4M10 16h4"/>', tileColor: 'tile-teal' },
+
 
                 { id: 'new-card-no-charge', title: 'بديل بدون شحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>', tileColor: 'tile-slate' },
 
@@ -33937,15 +33940,18 @@ const handlePrintJudicialControlDetails = () => {
                     }
 
                     if (action === 'account-statement') {
-                        const asLink = document.querySelector('.sidebar-nav .nav-link[data-target="account-statement"]') as HTMLElement | null;
-                        if (asLink) {
-                            asLink.click();
-                            setTimeout(() => {
-                                renderAccountStatementSection(customer.meterNumber || customer.code);
-                            }, 200);
-                            return;
+                        document.querySelectorAll('.sidebar-nav .nav-link.active').forEach(l => l.classList.remove('active'));
+                        document.querySelector('.sidebar-nav .nav-link[data-target="account-statement"]')?.classList.add('active');
+                        document.querySelectorAll('.content-section.active').forEach(s => s.classList.remove('active'));
+                        const astatSec = document.getElementById('account-statement');
+                        if (astatSec) {
+                            astatSec.classList.add('active');
+                            (astatSec as HTMLElement).style.removeProperty('display');
                         }
+                        renderAccountStatementSection(customer.meterNumber || customer.code);
+                        return;
                     }
+
 
 
                     openCustomerOperationModal(action, customer);
