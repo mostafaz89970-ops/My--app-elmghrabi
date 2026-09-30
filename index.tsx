@@ -379,6 +379,7 @@ let state = {
     lostMeterMemos: [] as DataItem[],
 
     cardOperations: [] as any[],
+    supplyPortfolios: [] as any[],
 
     transformers: [] as DataItem[], // New: Transformer Management
 
@@ -5305,6 +5306,8 @@ const renderDashboard = () => {
                 { id: 'meter-movements', title: 'حركات عداد', permission: 'view_meter_movements', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', tileColor: 'tile-sky' },
 
                 { id: 'account-statement', title: 'كشف حساب مشترك', permission: 'view_meter_movements', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', tileColor: 'tile-cyan' },
+                { id: 'supply-portfolio-new', title: 'تسجيل حافظة توريد', permission: 'view_meter_movements', icon: '<rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>', tileColor: 'tile-emerald' },
+                { id: 'supply-portfolio-archive', title: 'سجل وأرشيف الحافظات', permission: 'view_meter_movements', icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>', tileColor: 'tile-indigo' },
 
                 { id: 'new-card-with-charge', title: 'كارت بديل بشحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/><path d="M12 14v4M10 16h4"/>', tileColor: 'tile-teal' },
 
@@ -11725,7 +11728,823 @@ const handlePrintJudicialControlDetails = () => {
         });
     };
 
-    // ================= منظومة الطباعة الحرارية المتقدمة للموبايل (طابعة VTC) =================
+    
+    // =========================================================================
+    // قسم حافظات التوريد (حصر النقدية ومطابقة المنظومات والبرامج)
+    // =========================================================================
+    let supplyPortfoliosInitialized = false;
+
+    const generateSupplyPortfolioNumber = (): string => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const rand = String(Math.floor(100 + Math.random() * 900));
+        return `DEP-${y}${m}${day}-${rand}`;
+    };
+
+    const calculateSupplyPortfolioLive = () => {
+        const getNum = (id: string): number => {
+            const el = document.getElementById(id) as HTMLInputElement | null;
+            if (!el) return 0;
+            const val = parseFloat(el.value);
+            return isNaN(val) ? 0 : Math.max(0, val);
+        };
+
+        const setTxt = (id: string, text: string) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+
+        // 1. حساب الفئات النقدية
+        const c200 = Math.floor(getNum('sp-count-200'));
+        const c100 = Math.floor(getNum('sp-count-100'));
+        const c50 = Math.floor(getNum('sp-count-50'));
+        const c20 = Math.floor(getNum('sp-count-20'));
+        const c10 = Math.floor(getNum('sp-count-10'));
+        const c5 = Math.floor(getNum('sp-count-5'));
+        const coins = getNum('sp-count-coins');
+
+        const sub200 = c200 * 200;
+        const sub100 = c100 * 100;
+        const sub50 = c50 * 50;
+        const sub20 = c20 * 20;
+        const sub10 = c10 * 10;
+        const sub5 = c5 * 5;
+
+        setTxt('sp-subtotal-200', sub200.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        setTxt('sp-subtotal-100', sub100.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        setTxt('sp-subtotal-50', sub50.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        setTxt('sp-subtotal-20', sub20.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        setTxt('sp-subtotal-10', sub10.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        setTxt('sp-subtotal-5', sub5.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        setTxt('sp-subtotal-coins', coins.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+        const totalCash = sub200 + sub100 + sub50 + sub20 + sub10 + sub5 + coins;
+        const totalBillsCount = c200 + c100 + c50 + c20 + c10 + c5;
+
+        setTxt('sp-total-cash', totalCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        setTxt('sp-total-bills-count', String(totalBillsCount));
+
+        // تفقيط المبلغ بالعربية
+        try {
+            const tafqeetFunc = (window as any).tafqeetNumber || tafqeetNumber;
+            const words = totalCash > 0 ? (tafqeetFunc(totalCash) + ' لا غير') : 'صفر جنيه مصري لا غير';
+            setTxt('sp-tafqeet-text', words);
+        } catch (e) {
+            setTxt('sp-tafqeet-text', `${totalCash.toFixed(2)} ج.م`);
+        }
+
+        // 2. حساب إيرادات المنظومات والبرامج
+        const sysUnified = getNum('sp-system-unified');
+        const sysIskra = getNum('sp-system-iskra');
+        const sysMaasara = getNum('sp-system-maasara');
+        const sysOther = getNum('sp-system-other');
+
+        const totalSystems = sysUnified + sysIskra + sysMaasara + sysOther;
+        setTxt('sp-total-systems', totalSystems.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+        // 3. مقارنة التطابق والتسوية (Reconciliation)
+        const diff = Number((totalCash - totalSystems).toFixed(2));
+        const reconCard = document.getElementById('sp-reconciliation-card');
+        const reconAlert = document.getElementById('sp-recon-alert');
+        const reconBadge = document.getElementById('sp-recon-badge');
+        const reconTitle = document.getElementById('sp-recon-title');
+        const reconDesc = document.getElementById('sp-recon-desc');
+        const diffDisplay = document.getElementById('sp-diff-display');
+
+        if (Math.abs(diff) < 0.01) {
+            // متطابق تماماً
+            if (reconCard) reconCard.style.borderColor = '#10b981';
+            if (reconAlert) {
+                reconAlert.style.backgroundColor = '#f0fdf4';
+                reconAlert.style.borderColor = '#bbf7d0';
+            }
+            if (reconBadge) {
+                reconBadge.style.backgroundColor = '#dcfce7';
+                reconBadge.style.color = '#166534';
+                reconBadge.textContent = 'متطابق بنسبة 100% ✓';
+            }
+            if (reconTitle) {
+                reconTitle.style.color = '#166534';
+                reconTitle.textContent = 'الحافظة متطابقة بنسبة 100% ✓';
+            }
+            if (reconDesc) {
+                reconDesc.style.color = '#15803d';
+                reconDesc.textContent = 'إجمالي النقدية الفعلية مطابق تماماً لإجمالي مبالغ المنظومات والبرامج (لا يوجد عجز أو زيادة).';
+            }
+            if (diffDisplay) {
+                diffDisplay.style.color = '#166534';
+                diffDisplay.textContent = '0.00 ج.م';
+            }
+        } else if (diff > 0) {
+            // زيادة نقدية
+            if (reconCard) reconCard.style.borderColor = '#0284c7';
+            if (reconAlert) {
+                reconAlert.style.backgroundColor = '#f0f9ff';
+                reconAlert.style.borderColor = '#bae6fd';
+            }
+            if (reconBadge) {
+                reconBadge.style.backgroundColor = '#e0f2fe';
+                reconBadge.style.color = '#0369a1';
+                reconBadge.textContent = 'يوجد زيادة نقدية (+)';
+            }
+            if (reconTitle) {
+                reconTitle.style.color = '#0369a1';
+                reconTitle.textContent = `يوجد زيادة نقدية في الخزينة (+${diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م)`;
+            }
+            if (reconDesc) {
+                reconDesc.style.color = '#0284c7';
+                reconDesc.textContent = 'النقدية الفعلية المحصاة أكبر من مجموع إيرادات المنظومات والبرامج المقابلة.';
+            }
+            if (diffDisplay) {
+                diffDisplay.style.color = '#0369a1';
+                diffDisplay.textContent = `+${diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
+            }
+        } else {
+            // عجز نقدي
+            const deficit = Math.abs(diff);
+            if (reconCard) reconCard.style.borderColor = '#ef4444';
+            if (reconAlert) {
+                reconAlert.style.backgroundColor = '#fef2f2';
+                reconAlert.style.borderColor = '#fecaca';
+            }
+            if (reconBadge) {
+                reconBadge.style.backgroundColor = '#fee2e2';
+                reconBadge.style.color = '#991b1b';
+                reconBadge.textContent = 'يوجد عجز نقدي (-)';
+            }
+            if (reconTitle) {
+                reconTitle.style.color = '#991b1b';
+                reconTitle.textContent = `تنبيه: يوجد عجز نقدي في الخزينة (-${deficit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م)`;
+            }
+            if (reconDesc) {
+                reconDesc.style.color = '#b91c1c';
+                reconDesc.textContent = 'النقدية الفعلية المحصاة أقل من إجمالي مبالغ المنظومات المسجلة على البرامج.';
+            }
+            if (diffDisplay) {
+                diffDisplay.style.color = '#dc2626';
+                diffDisplay.textContent = `-${deficit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
+            }
+        }
+    };
+
+    const resetSupplyPortfolioForm = () => {
+        const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
+        const timeInput = document.getElementById('sp-portfolio-time') as HTMLInputElement | null;
+        const userInput = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
+        const numInput = document.getElementById('sp-portfolio-number') as HTMLInputElement | null;
+        const branchInput = document.getElementById('sp-portfolio-branch') as HTMLInputElement | null;
+        const shiftInput = document.getElementById('sp-portfolio-shift') as HTMLSelectElement | null;
+        const notesInput = document.getElementById('sp-notes') as HTMLTextAreaElement | null;
+
+        const now = new Date();
+        if (dateInput) dateInput.value = now.toISOString().split('T')[0];
+        if (timeInput) timeInput.value = now.toTimeString().split(' ')[0].substring(0, 5);
+        if (userInput) userInput.value = loggedInUser?.fullName || 'محمود سعيد محمود شرق';
+        if (numInput) numInput.value = generateSupplyPortfolioNumber();
+        if (branchInput) branchInput.value = 'هندسة بنى مزار شرق';
+        if (shiftInput) shiftInput.value = 'الوردية الصباحية';
+        if (notesInput) notesInput.value = '';
+
+        ['sp-count-200', 'sp-count-100', 'sp-count-50', 'sp-count-20', 'sp-count-10', 'sp-count-5', 'sp-count-coins', 'sp-system-unified', 'sp-system-iskra', 'sp-system-maasara', 'sp-system-other'].forEach(id => {
+            const inp = document.getElementById(id) as HTMLInputElement | null;
+            if (inp) inp.value = '0';
+        });
+
+        calculateSupplyPortfolioLive();
+    };
+
+    const saveSupplyPortfolio = async (andPrint: boolean = false) => {
+        const numInput = document.getElementById('sp-portfolio-number') as HTMLInputElement | null;
+        const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
+        const timeInput = document.getElementById('sp-portfolio-time') as HTMLInputElement | null;
+        const userInput = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
+        const branchInput = document.getElementById('sp-portfolio-branch') as HTMLInputElement | null;
+        const shiftInput = document.getElementById('sp-portfolio-shift') as HTMLSelectElement | null;
+        const notesInput = document.getElementById('sp-notes') as HTMLTextAreaElement | null;
+
+        const portfolioNumber = numInput?.value?.trim() || generateSupplyPortfolioNumber();
+        const date = dateInput?.value || new Date().toISOString().split('T')[0];
+        const time = timeInput?.value || new Date().toTimeString().split(' ')[0].substring(0, 5);
+        const userName = userInput?.value?.trim() || loggedInUser?.fullName || 'محمود سعيد محمود شرق';
+        const branch = branchInput?.value?.trim() || 'هندسة بنى مزار شرق';
+        const shift = shiftInput?.value || 'الوردية الصباحية';
+        const notes = notesInput?.value?.trim() || '';
+
+        const getNum = (id: string): number => {
+            const el = document.getElementById(id) as HTMLInputElement | null;
+            const val = parseFloat(el?.value || '0');
+            return isNaN(val) ? 0 : Math.max(0, val);
+        };
+
+        const c200 = Math.floor(getNum('sp-count-200'));
+        const c100 = Math.floor(getNum('sp-count-100'));
+        const c50 = Math.floor(getNum('sp-count-50'));
+        const c20 = Math.floor(getNum('sp-count-20'));
+        const c10 = Math.floor(getNum('sp-count-10'));
+        const c5 = Math.floor(getNum('sp-count-5'));
+        const coins = getNum('sp-count-coins');
+
+        const totalCash = (c200 * 200) + (c100 * 100) + (c50 * 50) + (c20 * 20) + (c10 * 10) + (c5 * 5) + coins;
+        const totalBillsCount = c200 + c100 + c50 + c20 + c10 + c5;
+
+        const sysUnified = getNum('sp-system-unified');
+        const sysIskra = getNum('sp-system-iskra');
+        const sysMaasara = getNum('sp-system-maasara');
+        const sysOther = getNum('sp-system-other');
+
+        const totalSystems = sysUnified + sysIskra + sysMaasara + sysOther;
+        const difference = Number((totalCash - totalSystems).toFixed(2));
+        const status = Math.abs(difference) < 0.01 ? 'matched' : (difference > 0 ? 'surplus' : 'deficit');
+
+        let tafqeetText = '';
+        try {
+            const tafqeetFunc = (window as any).tafqeetNumber || tafqeetNumber;
+            tafqeetText = totalCash > 0 ? (tafqeetFunc(totalCash) + ' لا غير') : 'صفر جنيه مصري لا غير';
+        } catch (e) {
+            tafqeetText = `${totalCash.toFixed(2)} ج.م`;
+        }
+
+        const portfolioData = {
+            id: 'SP-' + Date.now(),
+            portfolioNumber,
+            date,
+            time,
+            userName,
+            branch,
+            shift,
+            denominations: {
+                d200: c200,
+                d100: c100,
+                d50: c50,
+                d20: c20,
+                d10: c10,
+                d5: c5,
+                coins
+            },
+            totalCash,
+            totalBillsCount,
+            tafqeetText,
+            systems: {
+                unified: sysUnified,
+                iskra: sysIskra,
+                maasara: sysMaasara,
+                other: sysOther
+            },
+            totalSystems,
+            difference,
+            status,
+            notes,
+            createdAt: new Date().toISOString()
+        };
+
+        try {
+            // Save to backend
+            await fetch('http://127.0.0.1:5002/api/supply-portfolios', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(portfolioData)
+            }).then(r => r.json()).catch(() => null);
+
+            // Also save locally in state and localStorage
+            if (!(state as any).supplyPortfolios) (state as any).supplyPortfolios = [];
+            const existingIdx = (state as any).supplyPortfolios.findIndex((p: any) => p.portfolioNumber === portfolioNumber);
+            if (existingIdx >= 0) {
+                (state as any).supplyPortfolios[existingIdx] = portfolioData;
+            } else {
+                (state as any).supplyPortfolios.unshift(portfolioData);
+            }
+            try {
+                localStorage.setItem('supplyPortfolios', JSON.stringify((state as any).supplyPortfolios));
+            } catch (e) {}
+
+            showToast(`تم حفظ حافظة التوريد (${portfolioNumber}) بنجاح!`, 'success');
+
+            if (andPrint) {
+                printSupplyPortfolioReport(portfolioData);
+            }
+
+            // Generate new number for next portfolio
+            resetSupplyPortfolioForm();
+
+        } catch (err: any) {
+            showToast('حدث خطأ أثناء حفظ حافظة التوريد: ' + err.message, 'error');
+        }
+    };
+
+    const loadSupplyPortfolios = async () => {
+        try {
+            let list: any[] = [];
+            const res = await fetch('http://127.0.0.1:5002/api/supply-portfolios').then(r => r.json()).catch(() => null);
+            if (res && res.success && Array.isArray(res.data)) {
+                list = res.data;
+            } else {
+                // Fallback to localStorage
+                const localStr = localStorage.getItem('supplyPortfolios');
+                if (localStr) list = JSON.parse(localStr);
+            }
+            (state as any).supplyPortfolios = list;
+            renderSupplyPortfoliosTable(list);
+        } catch (e) {
+            console.error('Error loading supply portfolios:', e);
+        }
+    };
+
+    const renderSupplyPortfoliosTable = (portfolios?: any[]) => {
+        const list: any[] = portfolios || (state as any).supplyPortfolios || [];
+        const tbody = document.getElementById('sp-portfolios-tbody');
+        const countBadge = document.getElementById('sp-portfolios-count');
+        if (countBadge) countBadge.textContent = String(list.length);
+
+        // Update Stat Cards
+        const totalCashSum = list.reduce((sum, p) => sum + Number(p.totalCash || 0), 0);
+        const totalUnifiedSum = list.reduce((sum, p) => sum + Number(p.systems?.unified || 0), 0);
+        const totalIskraSum = list.reduce((sum, p) => sum + Number(p.systems?.iskra || 0), 0);
+        const totalMaasaraSum = list.reduce((sum, p) => sum + Number(p.systems?.maasara || 0), 0);
+        const matchedCount = list.filter(p => p.status === 'matched').length;
+
+        const setStat = (id: string, val: number, isCurrency = true) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = isCurrency ? `${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م` : String(val);
+        };
+
+        setStat('sp-stat-total-cash', totalCashSum);
+        setStat('sp-stat-total-unified', totalUnifiedSum);
+        setStat('sp-stat-total-iskra', totalIskraSum);
+        setStat('sp-stat-total-maasara', totalMaasaraSum);
+
+        const matchEl = document.getElementById('sp-stat-matched-count');
+        if (matchEl) matchEl.textContent = `${matchedCount} / ${list.length}`;
+
+        if (!tbody) return;
+
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" style="padding: 30px; text-align: center; color: #64748b;">لا توجد حافظات توريد مسجلة في الأرشيف حالياً.</td></tr>';
+            return;
+        }
+
+        let html = '';
+        list.forEach((p, idx) => {
+            let statusBadge = '';
+            if (p.status === 'matched') {
+                statusBadge = '<span style="background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.8rem;">متطابق ✓</span>';
+            } else if (p.status === 'surplus') {
+                statusBadge = `<span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.8rem;">زيادة (+${Number(p.difference || 0).toFixed(2)})</span>`;
+            } else {
+                statusBadge = `<span style="background: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.8rem;">عجز (-${Math.abs(Number(p.difference || 0)).toFixed(2)})</span>`;
+            }
+
+            html += `
+                <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s ease;">
+                    <td style="padding: 10px 12px; font-family: monospace; font-weight: 800; color: #0284c7;">${p.portfolioNumber}</td>
+                    <td style="padding: 10px 12px; font-size: 0.85rem; color: #334155;">${p.date} <span style="color:#64748b; font-family: monospace;">(${p.time})</span></td>
+                    <td style="padding: 10px 12px; font-weight: 700; color: #0f172a;">${p.userName || '-'}</td>
+                    <td style="padding: 10px 12px; text-align: center; font-weight: 900; font-family: monospace; color: #047857; font-size: 0.95rem;">${Number(p.totalCash || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding: 10px 12px; text-align: center; font-family: monospace; font-weight: 700; color: #0369a1;">${Number(p.systems?.unified || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding: 10px 12px; text-align: center; font-family: monospace; font-weight: 700; color: #d97706;">${Number(p.systems?.iskra || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding: 10px 12px; text-align: center; font-family: monospace; font-weight: 700; color: #7c3aed;">${Number(p.systems?.maasara || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding: 10px 12px; text-align: center; font-family: monospace; font-weight: 900; color: #0f172a;">${Number(p.totalSystems || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding: 10px 12px; text-align: center;">${statusBadge}</td>
+                    <td style="padding: 10px 12px; text-align: center;">
+                        <div style="display: inline-flex; gap: 4px;">
+                            <button type="button" class="btn btn-sm btn-sp-view" data-idx="${idx}" title="عرض التفاصيل" style="background: #e0f2fe; color: #0369a1; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-sp-print" data-idx="${idx}" title="طباعة الحافظة" style="background: #0284c7; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-sp-delete" data-id="${p.id || p.portfolioNumber}" title="حذف" style="background: #fee2e2; color: #b91c1c; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+
+        // Attach action handlers
+        tbody.querySelectorAll('.btn-sp-view').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = Number(btn.getAttribute('data-idx'));
+                const p = list[idx];
+                if (p) showSupplyPortfolioModal(p);
+            });
+        });
+
+        tbody.querySelectorAll('.btn-sp-print').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = Number(btn.getAttribute('data-idx'));
+                const p = list[idx];
+                if (p) printSupplyPortfolioReport(p);
+            });
+        });
+
+        tbody.querySelectorAll('.btn-sp-delete').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.getAttribute('data-id');
+                if (!id) return;
+                if (confirm('هل أنت متأكد من رغبتك في حذف حافظة التوريد هذه من الأرشيف؟')) {
+                    await deleteSupplyPortfolio(id);
+                }
+            });
+        });
+    };
+
+    const deleteSupplyPortfolio = async (id: string) => {
+        try {
+            await fetch(`http://127.0.0.1:5002/api/supply-portfolios?id=${encodeURIComponent(id)}`, {
+                method: 'DELETE'
+            }).catch(() => null);
+
+            if ((state as any).supplyPortfolios) {
+                (state as any).supplyPortfolios = (state as any).supplyPortfolios.filter((p: any) => p.id !== id && p.portfolioNumber !== id);
+                try {
+                    localStorage.setItem('supplyPortfolios', JSON.stringify((state as any).supplyPortfolios));
+                } catch (e) {}
+            }
+
+            showToast('تم حذف حافظة التوريد بنجاح', 'success');
+            renderSupplyPortfoliosTable();
+        } catch (e: any) {
+            showToast('تعذر حذف الحافظة: ' + e.message, 'error');
+        }
+    };
+
+    const showSupplyPortfolioModal = (p: any) => {
+        const modal = document.getElementById('sp-details-modal');
+        const modalTitle = document.getElementById('sp-modal-title');
+        const modalBody = document.getElementById('sp-modal-body');
+        const modalPrintBtn = document.getElementById('btn-sp-modal-print');
+
+        if (!modal || !modalBody) return;
+
+        if (modalTitle) modalTitle.textContent = `تفاصيل حافظة التوريد: ${p.portfolioNumber}`;
+
+        const d = p.denominations || {};
+        const sys = p.systems || {};
+
+        modalBody.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 0.88rem;">
+                <div><span style="color:#64748b; font-size:0.78rem; display:block;">تاريخ وتوقيت التوريد</span><strong>${p.date} - ${p.time}</strong></div>
+                <div><span style="color:#64748b; font-size:0.78rem; display:block;">اسم المحصل / المستخدم</span><strong>${p.userName || '-'}</strong></div>
+                <div><span style="color:#64748b; font-size:0.78rem; display:block;">الفرع والإدارة</span><strong>${p.branch || '-'}</strong></div>
+                <div><span style="color:#64748b; font-size:0.78rem; display:block;">الوردية</span><strong>${p.shift || '-'}</strong></div>
+            </div>
+
+            <!-- جدول الفئات النقدية -->
+            <div>
+                <h4 style="margin: 0 0 8px; font-size: 0.95rem; font-weight: 800; color: #0f172a;">تفاصيل الفئات النقدية (الخزينة)</h4>
+                <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.88rem;">
+                    <thead>
+                        <tr style="background: #0f172a; color: #fff;">
+                            <th style="padding: 6px; border: 1px solid #334155;">الفئة</th>
+                            <th style="padding: 6px; border: 1px solid #334155;">العدد</th>
+                            <th style="padding: 6px; border: 1px solid #334155;">المبلغ الجزئي</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 700;">200 ج.م</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace;">${d.d200 || 0}</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace; font-weight: 700;">${((d.d200 || 0) * 200).toFixed(2)} ج.م</td></tr>
+                        <tr><td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 700;">100 ج.م</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace;">${d.d100 || 0}</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace; font-weight: 700;">${((d.d100 || 0) * 100).toFixed(2)} ج.م</td></tr>
+                        <tr><td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 700;">50 ج.م</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace;">${d.d50 || 0}</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace; font-weight: 700;">${((d.d50 || 0) * 50).toFixed(2)} ج.م</td></tr>
+                        <tr><td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 700;">20 ج.م</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace;">${d.d20 || 0}</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace; font-weight: 700;">${((d.d20 || 0) * 20).toFixed(2)} ج.م</td></tr>
+                        <tr><td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 700;">10 ج.م</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace;">${d.d10 || 0}</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace; font-weight: 700;">${((d.d10 || 0) * 10).toFixed(2)} ج.م</td></tr>
+                        <tr><td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 700;">5 ج.م</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace;">${d.d5 || 0}</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace; font-weight: 700;">${((d.d5 || 0) * 5).toFixed(2)} ج.م</td></tr>
+                        <tr><td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 700;">فكة وكسور</td><td style="padding: 6px; border: 1px solid #e2e8f0;">-</td><td style="padding: 6px; border: 1px solid #e2e8f0; font-family: monospace; font-weight: 700;">${Number(d.coins || 0).toFixed(2)} ج.م</td></tr>
+                        <tr style="background: #f1f5f9; font-weight: 900;"><td style="padding: 8px; border: 1px solid #cbd5e1;">الإجمالي الفعلي</td><td style="padding: 8px; border: 1px solid #cbd5e1; font-family: monospace;">${p.totalBillsCount || 0} ورقة</td><td style="padding: 8px; border: 1px solid #cbd5e1; font-family: monospace; color: #047857;">${Number(p.totalCash || 0).toFixed(2)} ج.م</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- جدول المنظومات والتسوية -->
+            <div>
+                <h4 style="margin: 0 0 8px; font-size: 0.95rem; font-weight: 800; color: #0f172a;">إيرادات المنظومات والتسوية</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 10px;">
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 6px; text-align: center;"><span style="font-size:0.75rem; color:#64748b; display:block;">الموحد MEEDCO</span><strong style="font-family: monospace; color:#0369a1;">${Number(sys.unified || 0).toFixed(2)} ج.م</strong></div>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 6px; text-align: center;"><span style="font-size:0.75rem; color:#64748b; display:block;">إسكرا Iskra</span><strong style="font-family: monospace; color:#d97706;">${Number(sys.iskra || 0).toFixed(2)} ج.م</strong></div>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 6px; text-align: center;"><span style="font-size:0.75rem; color:#64748b; display:block;">المعصرة Maasara</span><strong style="font-family: monospace; color:#7c3aed;">${Number(sys.maasara || 0).toFixed(2)} ج.م</strong></div>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 6px; text-align: center;"><span style="font-size:0.75rem; color:#64748b; display:block;">أخرى / إضافية</span><strong style="font-family: monospace;">${Number(sys.other || 0).toFixed(2)} ج.م</strong></div>
+                </div>
+                <div style="background: #f1f5f9; padding: 10px 14px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-weight: 800;">
+                    <span>إجمالي البرامج: <strong style="font-family: monospace; color:#0284c7;">${Number(p.totalSystems || 0).toFixed(2)} ج.م</strong></span>
+                    <span>فارق التسوية: <strong style="font-family: monospace; color:${p.status === 'matched' ? '#166534' : (p.status === 'surplus' ? '#0369a1' : '#dc2626')};">${Number(p.difference || 0).toFixed(2)} ج.م</strong></span>
+                </div>
+            </div>
+
+            ${p.notes ? `<div style="background:#fefce8; border:1px solid #fef08a; padding:10px; border-radius:6px; font-size:0.85rem;"><strong>ملاحظات: </strong>${p.notes}</div>` : ''}
+        `;
+
+        if (modalPrintBtn) {
+            modalPrintBtn.onclick = () => {
+                printSupplyPortfolioReport(p);
+            };
+        }
+
+        modal.style.display = 'flex';
+    };
+
+    const printSupplyPortfolioReport = (p: any) => {
+        const headerInfo = getDynamicReceiptHeader(loggedInUser?.fullName);
+        const logoSrc = state.settings.companyLogo;
+        const logoHTML = logoSrc ? `<img src="${logoSrc}" style="max-height: 60px; max-width: 80px; object-fit: contain;">` : '';
+        const printDate = new Date().toLocaleDateString('ar-EG');
+        const printTime = new Date().toLocaleTimeString('ar-EG');
+
+        const d = p.denominations || {};
+        const sys = p.systems || {};
+        const diff = Number(p.difference || 0);
+
+        let statusText = 'متطابق تماماً ✓ (لا يوجد عجز أو زيادة)';
+        let statusColor = '#166534';
+        if (p.status === 'surplus') {
+            statusText = `يوجد زيادة نقدية (+${diff.toFixed(2)} ج.م)`;
+            statusColor = '#0369a1';
+        } else if (p.status === 'deficit') {
+            statusText = `يوجد عجز نقدي (-${Math.abs(diff).toFixed(2)} ج.م)`;
+            statusColor = '#dc2626';
+        }
+
+        const printWindow = window.open('', '_blank', 'width=900,height=950');
+        if (printWindow) {
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>حافظة توريد نقدية - ${p.portfolioNumber}</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800;900&display=swap" rel="stylesheet">
+                    <style>
+                        @page { size: A4 portrait; margin: 10mm; }
+                        * { box-sizing: border-box; }
+                        body { font-family: 'Tajawal', sans-serif; background: #fff; color: #0f172a; margin: 0; padding: 15px; font-size: 11.5px; }
+                        .report-card { border: 2px solid #0f172a; border-radius: 8px; padding: 16px; }
+                        .header-grid { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 12px; }
+                        .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; margin-bottom: 12px; font-size: 11px; }
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+                        th { background: #0f172a; color: #fff; padding: 6px 8px; font-size: 11px; }
+                        td { font-size: 10.5px; border: 1px solid #cbd5e1; }
+                        .recon-box { border: 1.5px solid ${statusColor}; background: #f8fafc; padding: 10px; border-radius: 6px; margin-bottom: 14px; }
+                        .footer-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center; border-top: 1.5px dashed #94a3b8; padding-top: 14px; margin-top: 20px; font-size: 11px; font-weight: 700; }
+                        .sig-line { margin-top: 35px; border-bottom: 1px dotted #000; width: 80%; margin-left: auto; margin-right: auto; }
+                        @media print { body { padding: 0 !important; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="report-card">
+                        <div class="header-grid">
+                            <div>
+                                <h2 style="margin: 0; font-size: 15px; font-weight: 900;">${headerInfo.company}</h2>
+                                <div style="font-size: 12px; font-weight: 800; color: #1e40af;">${headerInfo.sector}</div>
+                                <div style="font-size: 11px; font-weight: 700; color: #065f46;">${p.branch || headerInfo.branchName}</div>
+                                <div style="font-size: 10px; color: #64748b;">إدارة الخزينة وحسابات التوريد</div>
+                            </div>
+                            <div style="text-align: center;">
+                                ${logoHTML}
+                                <div style="font-size: 14px; font-weight: 900; background: #0f172a; color: #fff; padding: 4px 16px; border-radius: 14px; margin-top: 4px;">
+                                    حافظة توريد نقدية معتمدة
+                                </div>
+                                <div style="font-family: monospace; font-size: 12px; font-weight: 800; color: #0284c7; margin-top: 2px;">
+                                    ${p.portfolioNumber}
+                                </div>
+                            </div>
+                            <div style="text-align: left; font-size: 10.5px; line-height: 1.6;">
+                                <div>تاريخ الطباعة: <strong>${printDate}</strong></div>
+                                <div>الوقت: <strong>${printTime}</strong></div>
+                                <div>القائم بالطباعة: <strong>${loggedInUser?.fullName || 'المسؤول'}</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="meta-grid">
+                            <div>رقم الحافظة: <strong>${p.portfolioNumber}</strong></div>
+                            <div>تاريخ التوريد: <strong>${p.date} (${p.time})</strong></div>
+                            <div>اسم المحصل: <strong>${p.userName || '-'}</strong></div>
+                            <div>الوردية: <strong>${p.shift || 'صباحية'}</strong></div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start;">
+                            <!-- جدول الفئات النقدية -->
+                            <div>
+                                <div style="font-weight: 800; margin-bottom: 6px; color: #0f172a;">أولاً: حصر الفئات النقدية (الخزينة)</div>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>الفئة</th>
+                                            <th style="text-align: center;">العدد</th>
+                                            <th style="text-align: center;">المبلغ الجزئي</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700;">200 جنيه</td><td style="text-align: center; font-family: monospace;">${d.d200 || 0}</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${((d.d200 || 0) * 200).toFixed(2)} ج.م</td></tr>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700;">100 جنيه</td><td style="text-align: center; font-family: monospace;">${d.d100 || 0}</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${((d.d100 || 0) * 100).toFixed(2)} ج.م</td></tr>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700;">50 جنيه</td><td style="text-align: center; font-family: monospace;">${d.d50 || 0}</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${((d.d50 || 0) * 50).toFixed(2)} ج.م</td></tr>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700;">20 جنيه</td><td style="text-align: center; font-family: monospace;">${d.d20 || 0}</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${((d.d20 || 0) * 20).toFixed(2)} ج.م</td></tr>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700;">10 جنيه</td><td style="text-align: center; font-family: monospace;">${d.d10 || 0}</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${((d.d10 || 0) * 10).toFixed(2)} ج.م</td></tr>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700;">5 جنيه</td><td style="text-align: center; font-family: monospace;">${d.d5 || 0}</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${((d.d5 || 0) * 5).toFixed(2)} ج.م</td></tr>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700;">فكة وكسور</td><td style="text-align: center;">-</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${Number(d.coins || 0).toFixed(2)} ج.م</td></tr>
+                                        <tr style="background: #f1f5f9; font-weight: 900;">
+                                            <td style="padding: 6px 8px;">إجمالي النقدية</td>
+                                            <td style="text-align: center; font-family: monospace;">${p.totalBillsCount || 0} ورقة</td>
+                                            <td style="text-align: center; font-family: monospace; color: #047857; font-size: 11.5px;">${Number(p.totalCash || 0).toFixed(2)} ج.م</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- جدول إيرادات المنظومات -->
+                            <div>
+                                <div style="font-weight: 800; margin-bottom: 6px; color: #0f172a;">ثانياً: مسجلات المنظومات والبرامج</div>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>المنظومة / البرنامج</th>
+                                            <th style="text-align: center;">المبلغ المحصل</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700; color: #0369a1;">البرنامج الموحد (MEEDCO)</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${Number(sys.unified || 0).toFixed(2)} ج.م</td></tr>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700; color: #d97706;">منظومة إسكرا (Iskra)</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${Number(sys.iskra || 0).toFixed(2)} ج.م</td></tr>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700; color: #7c3aed;">منظومة المعصرة (El Maasara)</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${Number(sys.maasara || 0).toFixed(2)} ج.م</td></tr>
+                                        <tr><td style="padding: 5px 8px; font-weight: 700; color: #475569;">إيرادات أخرى / برامج إضافية</td><td style="text-align: center; font-family: monospace; font-weight: 700;">${Number(sys.other || 0).toFixed(2)} ج.م</td></tr>
+                                        <tr style="background: #f1f5f9; font-weight: 900;">
+                                            <td style="padding: 6px 8px;">إجمالي البرامج</td>
+                                            <td style="text-align: center; font-family: monospace; color: #0284c7; font-size: 11.5px;">${Number(p.totalSystems || 0).toFixed(2)} ج.م</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <!-- كرت المطابقة والتسوية -->
+                                <div class="recon-box">
+                                    <div style="font-weight: 800; font-size: 11px; margin-bottom: 4px;">نتيجة المطابقة والتسوية:</div>
+                                    <div style="font-size: 12px; font-weight: 900; color: ${statusColor};">${statusText}</div>
+                                    <div style="margin-top: 4px; font-size: 10px; color: #475569;">
+                                        فارق التسوية: <strong style="font-family: monospace;">${diff.toFixed(2)} ج.م</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- التفقيط والملاحظات -->
+                        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 11px;">
+                            <div>مبلغ وقدره كتابة: <strong>${p.tafqeetText || 'فقط لا غير'}</strong></div>
+                            ${p.notes ? `<div style="margin-top: 4px; color: #475569;">ملاحظات: <strong>${p.notes}</strong></div>` : ''}
+                        </div>
+
+                        <!-- توقيعات معتمدة -->
+                        <div class="footer-grid">
+                            <div>
+                                <div>المحصل / القائم بالتوريد</div>
+                                <div class="sig-line"></div>
+                                <div style="margin-top: 4px; font-size: 10px; color: #64748b;">${p.userName || '-'}</div>
+                            </div>
+                            <div>
+                                <div>أمين الخزينة المستلم</div>
+                                <div class="sig-line"></div>
+                            </div>
+                            <div>
+                                <div>مراجع الحسابات</div>
+                                <div class="sig-line"></div>
+                            </div>
+                            <div>
+                                <div>يعتمد مدير الإدارة / الهندسة</div>
+                                <div class="sig-line"></div>
+                            </div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => { printWindow.print(); }, 300);
+        }
+    };
+
+    const exportSupplyPortfoliosToExcel = () => {
+        const list: any[] = (state as any).supplyPortfolios || [];
+        if (list.length === 0) {
+            showToast('لا توجد حافظات توريد مسجلة للتصدير.', 'warning');
+            return;
+        }
+
+        let csv = '\uFEFF'; // UTF-8 BOM
+        csv += 'رقم الحافظة,تاريخ التوريد,التوقيت,المحصل,الفرع,الوردية,إجمالي النقدية,الموحد,إسكرا,المعصرة,أخرى,إجمالي البرامج,الفارق,حالة التطابق,ملاحظات\n';
+
+        list.forEach(p => {
+            const statusStr = p.status === 'matched' ? 'متطابق' : (p.status === 'surplus' ? 'زيادة' : 'عجز');
+            csv += `"${p.portfolioNumber}","${p.date}","${p.time}","${p.userName}","${p.branch}","${p.shift}",${p.totalCash},${p.systems?.unified || 0},${p.systems?.iskra || 0},${p.systems?.maasara || 0},${p.systems?.other || 0},${p.totalSystems},${p.difference},"${statusStr}","${(p.notes || '').replace(/"/g, '""')}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `سجل_حافظات_التوريد_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        showToast('تم تصدير سجل حافظات التوريد بنجاح!', 'success');
+    };
+
+    const initSupplyPortfoliosListeners = () => {
+        // Calculation input triggers
+        document.querySelectorAll('.sp-calc-input, .sp-system-input').forEach(inp => {
+            inp.addEventListener('input', () => calculateSupplyPortfolioLive());
+            inp.addEventListener('change', () => calculateSupplyPortfolioLive());
+        });
+
+        // Top bar buttons
+        document.getElementById('btn-sp-gen-number')?.addEventListener('click', () => {
+            const inp = document.getElementById('sp-portfolio-number') as HTMLInputElement | null;
+            if (inp) inp.value = generateSupplyPortfolioNumber();
+        });
+
+        document.getElementById('btn-sp-reset-top')?.addEventListener('click', () => resetSupplyPortfolioForm());
+        document.getElementById('btn-sp-reset-bottom')?.addEventListener('click', () => resetSupplyPortfolioForm());
+
+        // Save buttons
+        document.getElementById('btn-sp-save')?.addEventListener('click', () => saveSupplyPortfolio(false));
+        document.getElementById('btn-sp-save-print')?.addEventListener('click', () => saveSupplyPortfolio(true));
+
+        // Navigation between registration and archive
+        const gotoArchive = () => {
+            const link = document.querySelector('.sidebar-nav .nav-link[data-target="supply-portfolio-archive"]') as HTMLElement | null;
+            if (link) link.click();
+        };
+
+        const gotoNew = () => {
+            const link = document.querySelector('.sidebar-nav .nav-link[data-target="supply-portfolio-new"]') as HTMLElement | null;
+            if (link) link.click();
+        };
+
+        document.getElementById('btn-sp-goto-archive-top')?.addEventListener('click', gotoArchive);
+        document.getElementById('btn-sp-goto-archive-bottom')?.addEventListener('click', gotoArchive);
+        document.getElementById('btn-sp-goto-new')?.addEventListener('click', gotoNew);
+
+        // Archive export
+        document.getElementById('btn-sp-export-excel')?.addEventListener('click', () => exportSupplyPortfoliosToExcel());
+
+        // Archive filter
+        document.getElementById('btn-sp-filter-apply')?.addEventListener('click', () => {
+            const query = (document.getElementById('sp-filter-query') as HTMLInputElement | null)?.value?.trim().toLowerCase() || '';
+            const fromDate = (document.getElementById('sp-filter-from') as HTMLInputElement | null)?.value || '';
+            const toDate = (document.getElementById('sp-filter-to') as HTMLInputElement | null)?.value || '';
+            const statusFilter = (document.getElementById('sp-filter-status') as HTMLSelectElement | null)?.value || 'all';
+
+            const all: any[] = (state as any).supplyPortfolios || [];
+            const filtered = all.filter(p => {
+                if (query) {
+                    const matchNum = (p.portfolioNumber || '').toLowerCase().includes(query);
+                    const matchUser = (p.userName || '').toLowerCase().includes(query);
+                    if (!matchNum && !matchUser) return false;
+                }
+                if (fromDate && p.date < fromDate) return false;
+                if (toDate && p.date > toDate) return false;
+                if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+                return true;
+            });
+            renderSupplyPortfoliosTable(filtered);
+        });
+
+        document.getElementById('btn-sp-filter-clear')?.addEventListener('click', () => {
+            const q = document.getElementById('sp-filter-query') as HTMLInputElement | null;
+            const from = document.getElementById('sp-filter-from') as HTMLInputElement | null;
+            const to = document.getElementById('sp-filter-to') as HTMLInputElement | null;
+            const st = document.getElementById('sp-filter-status') as HTMLSelectElement | null;
+            if (q) q.value = '';
+            if (from) from.value = '';
+            if (to) to.value = '';
+            if (st) st.value = 'all';
+            renderSupplyPortfoliosTable();
+        });
+
+        // Modal close
+        document.getElementById('btn-sp-modal-close')?.addEventListener('click', () => {
+            const modal = document.getElementById('sp-details-modal');
+            if (modal) modal.style.display = 'none';
+        });
+
+        document.getElementById('btn-sp-modal-dismiss')?.addEventListener('click', () => {
+            const modal = document.getElementById('sp-details-modal');
+            if (modal) modal.style.display = 'none';
+        });
+    };
+
+    const renderSupplyPortfolioNewSection = () => {
+        if (!supplyPortfoliosInitialized) {
+            initSupplyPortfoliosListeners();
+            supplyPortfoliosInitialized = true;
+        }
+        resetSupplyPortfolioForm();
+    };
+
+    const renderSupplyPortfolioArchiveSection = () => {
+        if (!supplyPortfoliosInitialized) {
+            initSupplyPortfoliosListeners();
+            supplyPortfoliosInitialized = true;
+        }
+        loadSupplyPortfolios();
+    };
+
+// ================= منظومة الطباعة الحرارية المتقدمة للموبايل (طابعة VTC) =================
 
 
     // =========================================================================
@@ -63764,6 +64583,14 @@ const setupOrgHierarchyEvents = () => {
         } else if (targetId === 'account-statement') {
 
             renderAccountStatementSection();
+
+        } else if (targetId === 'supply-portfolio-new') {
+
+            renderSupplyPortfolioNewSection();
+
+        } else if (targetId === 'supply-portfolio-archive') {
+
+            renderSupplyPortfolioArchiveSection();
 
         } else if (targetId === 'debts-management') {
 

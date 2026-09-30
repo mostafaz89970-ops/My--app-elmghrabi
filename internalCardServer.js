@@ -849,6 +849,130 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // ==========================================
+            // 8. حافظات التوريد (Supply Portfolios Management)
+            // ==========================================
+            if (pathname === '/api/supply-portfolios') {
+                const storePath = path.join(__dirname, 'supply_portfolios_store.json');
+                const loadPortfolios = () => {
+                    try {
+                        if (fs.existsSync(storePath)) {
+                            return JSON.parse(fs.readFileSync(storePath, 'utf8')) || [];
+                        }
+                    } catch (e) {
+                        console.error('Error reading supply portfolios store:', e);
+                    }
+                    return [];
+                };
+
+                const savePortfolios = (items) => {
+                    try {
+                        fs.writeFileSync(storePath, JSON.stringify(items, null, 2), 'utf8');
+                        return true;
+                    } catch (e) {
+                        console.error('Error saving supply portfolios store:', e);
+                        return false;
+                    }
+                };
+
+                // GET: استرجاع جميع الحافظات المحفوظة
+                if (req.method === 'GET') {
+                    const list = loadPortfolios();
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ success: true, data: list }));
+                    return;
+                }
+
+                // POST: حفظ أو تعديل حافظة توريد جديدة
+                if (req.method === 'POST') {
+                    const body = await getBody();
+                    if (!body || !body.portfolioNumber) {
+                        res.writeHead(400);
+                        res.end(JSON.stringify({ success: false, message: 'رقم الحافظة والبيانات الأساسية مطلوبة' }));
+                        return;
+                    }
+
+                    const list = loadPortfolios();
+                    const portfolioId = body.id || ('SP-' + Date.now());
+                    const existingIdx = list.findIndex(p => p.id === portfolioId || p.portfolioNumber === body.portfolioNumber);
+
+                    const newPortfolio = {
+                        id: portfolioId,
+                        portfolioNumber: body.portfolioNumber,
+                        date: body.date || new Date().toISOString().split('T')[0],
+                        time: body.time || new Date().toTimeString().split(' ')[0].substring(0, 5),
+                        userName: body.userName || 'محمود سعيد محمود شرق',
+                        branch: body.branch || 'هندسة بنى مزار شرق',
+                        shift: body.shift || 'الوردية الصباحية',
+                        denominations: body.denominations || {
+                            d200: 0,
+                            d100: 0,
+                            d50: 0,
+                            d20: 0,
+                            d10: 0,
+                            d5: 0,
+                            coins: 0
+                        },
+                        totalCash: Number(body.totalCash || 0),
+                        totalBillsCount: Number(body.totalBillsCount || 0),
+                        tafqeetText: body.tafqeetText || '',
+                        systems: body.systems || {
+                            unified: 0,
+                            iskra: 0,
+                            maasara: 0,
+                            other: 0
+                        },
+                        totalSystems: Number(body.totalSystems || 0),
+                        difference: Number(body.difference || 0),
+                        status: body.status || 'matched', // matched | deficit | surplus
+                        notes: body.notes || '',
+                        createdAt: body.createdAt || new Date().toISOString()
+                    };
+
+                    if (existingIdx >= 0) {
+                        list[existingIdx] = newPortfolio;
+                    } else {
+                        list.unshift(newPortfolio);
+                    }
+
+                    savePortfolios(list);
+
+                    res.writeHead(200);
+                    res.end(JSON.stringify({
+                        success: true,
+                        message: 'تم حفظ حافظة التوريد بنجاح في السجل والأرشيف',
+                        data: newPortfolio
+                    }));
+                    return;
+                }
+
+                // DELETE: حذف حافظة توريد
+                if (req.method === 'DELETE') {
+                    const body = await getBody();
+                    const targetId = url.searchParams.get('id') || body.id || url.searchParams.get('portfolioNumber') || body.portfolioNumber;
+                    if (!targetId) {
+                        res.writeHead(400);
+                        res.end(JSON.stringify({ success: false, message: 'معرف الحافظة مطلوب للحذف' }));
+                        return;
+                    }
+
+                    let list = loadPortfolios();
+                    const initialLen = list.length;
+                    list = list.filter(p => p.id !== targetId && p.portfolioNumber !== targetId);
+
+                    if (list.length === initialLen) {
+                        res.writeHead(404);
+                        res.end(JSON.stringify({ success: false, message: 'لم يتم العثور على الحافظة المطلوبة' }));
+                        return;
+                    }
+
+                    savePortfolios(list);
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ success: true, message: 'تم حذف حافظة التوريد بنجاح من الأرشيف' }));
+                    return;
+                }
+            }
+
             // 404
             res.writeHead(404);
             res.end(JSON.stringify({ success: false, message: 'Not found: ' + pathname }));

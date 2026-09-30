@@ -1002,6 +1002,24 @@
                     </details>
                 </li>
 
+                <!-- قسم حافظات التوريد الجديد (Supply Portfolios) -->
+                <li class="nav-category">
+                    <details open>
+                        <summary>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                                <line x1="12" y1="8" x2="12" y2="16"></line>
+                                <line x1="8" y1="12" x2="16" y2="12"></line>
+                            </svg>
+                            <span>حافظات التوريد</span>
+                        </summary>
+                        <ul>
+                            <li><a href="#" class="nav-link" data-target="supply-portfolio-new"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg><span>تسجيل حافظة توريد</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="supply-portfolio-archive"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><span>سجل وأرشيف الحافظات</span></a></li>
+                        </ul>
+                    </details>
+                </li>
+
                 <!-- قسم كروت التحكم (MEEDCO Unified Card Service) -->
                 <li class="nav-category" data-permission="view_control_cards_section">
                     <details>
@@ -5630,7 +5648,474 @@
         <!-- ========================================================================= -->
         <!-- قسم حسابات الديون - مطابقة تامة 100% لمنصة MEEDCO (https://app-prod.meedco.cyuni.net/debts) -->
         <!-- ========================================================================= -->
-        <section id="debts-management" class="content-section">
+        
+        <!-- ========================================================================= -->
+        <!-- قسم حافظات التوريد: 1. تسجيل حافظة توريد جديدة وحصر النقدية والمطابقة -->
+        <!-- ========================================================================= -->
+        <section id="supply-portfolio-new" class="content-section" style="padding: 1.5rem; background: #f8fafc;">
+            <div style="max-width: 1300px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem;">
+                
+                <!-- الترويسة الرئيسية والشريط العلوي -->
+                <div style="background: #ffffff; border-radius: 12px; padding: 1.25rem 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 44px; height: 44px; border-radius: 10px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                            </div>
+                            <div>
+                                <h2 style="margin: 0; font-size: 1.35rem; font-weight: 900; color: #0f172a;">تسجيل حافظة توريد نقدية جديدة</h2>
+                                <p style="margin: 3px 0 0; color: #64748b; font-size: 0.88rem;">حصر فئات النقدية الفعلية ومطابقة إيرادات المنظومات (الموحد - إسكرا - المعصرة)</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" id="btn-sp-goto-archive-top" class="btn" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                            <span>سجل وأرشيف الحافظات</span>
+                        </button>
+                        <button type="button" id="btn-sp-reset-top" class="btn" style="background: #f8fafc; color: #dc2626; border: 1px solid #fecaca; padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                            <span>تفريغ الحقول</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- بطاقة البيانات الأساسية للحافظة -->
+                <div style="background: #ffffff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 5px;">رقم الحافظة (مسلسل معتمد)</label>
+                            <div style="display: flex; gap: 6px;">
+                                <input type="text" id="sp-portfolio-number" style="flex: 1; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-family: monospace; font-weight: 800; font-size: 0.95rem; color: #0284c7;" readonly>
+                                <button type="button" id="btn-sp-gen-number" title="توليد رقم جديد" style="background: #e2e8f0; border: none; border-radius: 6px; padding: 0 10px; cursor: pointer;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 5px;">تاريخ التوريد</label>
+                            <input type="date" id="sp-portfolio-date" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 700; color: #0f172a;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 5px;">توقيت الحافظة</label>
+                            <input type="time" id="sp-portfolio-time" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 700; color: #0f172a;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 5px;">اسم المستخدم / المحصل</label>
+                            <input type="text" id="sp-portfolio-user" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 800; color: #0284c7;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 5px;">الفرع / الإدارة التابع لها</label>
+                            <input type="text" id="sp-portfolio-branch" value="هندسة بنى مزار شرق" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 700; color: #0f172a;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 5px;">الوردية / الفترة</label>
+                            <select id="sp-portfolio-shift" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 700; color: #0f172a;">
+                                <option value="الوردية الصباحية">الوردية الصباحية</option>
+                                <option value="الوردية المسائية">الوردية المسائية</option>
+                                <option value="وردية كاملة">وردية كاملة</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- مساحة العمل الرئيسية: جدول العملات (يمين) + مبالغ البرامج والمطابقة (يسار) -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.5rem; align-items: start;">
+                    
+                    <!-- العمود الأيمن: حصر الفئات النقدية (تضرب تلقائي) -->
+                    <div style="background: #ffffff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 10px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="display: inline-block; width: 4px; height: 18px; background: #059669; border-radius: 2px;"></span>
+                                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 900; color: #0f172a;">حصر الفئات النقدية المحصلة (الخزينة)</h3>
+                            </div>
+                            <span style="font-size: 0.8rem; background: #ecfdf5; color: #047857; font-weight: 800; padding: 3px 10px; border-radius: 12px; border: 1px solid #a7f3d0;">
+                                ضرب وحساب تلقائي مباشر
+                            </span>
+                        </div>
+
+                        <div class="table-responsive" style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.92rem;">
+                                <thead>
+                                    <tr style="background: #0f172a; color: #ffffff;">
+                                        <th style="padding: 10px; border: 1px solid #334155; width: 110px;">الفئة النقدية</th>
+                                        <th style="padding: 10px; border: 1px solid #334155; width: 140px;">عدد الأوراق</th>
+                                        <th style="padding: 10px; border: 1px solid #334155;">المعادلة</th>
+                                        <th style="padding: 10px; border: 1px solid #334155; width: 150px;">الإجمالي الجزئي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- فئة 200 -->
+                                    <tr style="border-bottom: 1px solid #f1f5f9; background: #ffffff;">
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1.05rem; color: #0284c7;">200 ج.م</td>
+                                        <td style="padding: 8px;">
+                                            <input type="number" id="sp-count-200" min="0" value="0" class="sp-calc-input" style="width: 100%; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px;">
+                                        </td>
+                                        <td style="padding: 8px; color: #64748b; font-size: 0.82rem; font-family: monospace;">عدد × 200</td>
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1rem; color: #0f172a;">
+                                            <span id="sp-subtotal-200">0.00</span> ج.م
+                                        </td>
+                                    </tr>
+                                    <!-- فئة 100 -->
+                                    <tr style="border-bottom: 1px solid #f1f5f9; background: #f8fafc;">
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1.05rem; color: #0284c7;">100 ج.م</td>
+                                        <td style="padding: 8px;">
+                                            <input type="number" id="sp-count-100" min="0" value="0" class="sp-calc-input" style="width: 100%; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px;">
+                                        </td>
+                                        <td style="padding: 8px; color: #64748b; font-size: 0.82rem; font-family: monospace;">عدد × 100</td>
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1rem; color: #0f172a;">
+                                            <span id="sp-subtotal-100">0.00</span> ج.م
+                                        </td>
+                                    </tr>
+                                    <!-- فئة 50 -->
+                                    <tr style="border-bottom: 1px solid #f1f5f9; background: #ffffff;">
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1.05rem; color: #0284c7;">50 ج.م</td>
+                                        <td style="padding: 8px;">
+                                            <input type="number" id="sp-count-50" min="0" value="0" class="sp-calc-input" style="width: 100%; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px;">
+                                        </td>
+                                        <td style="padding: 8px; color: #64748b; font-size: 0.82rem; font-family: monospace;">عدد × 50</td>
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1rem; color: #0f172a;">
+                                            <span id="sp-subtotal-50">0.00</span> ج.م
+                                        </td>
+                                    </tr>
+                                    <!-- فئة 20 -->
+                                    <tr style="border-bottom: 1px solid #f1f5f9; background: #f8fafc;">
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1.05rem; color: #0284c7;">20 ج.م</td>
+                                        <td style="padding: 8px;">
+                                            <input type="number" id="sp-count-20" min="0" value="0" class="sp-calc-input" style="width: 100%; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px;">
+                                        </td>
+                                        <td style="padding: 8px; color: #64748b; font-size: 0.82rem; font-family: monospace;">عدد × 20</td>
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1rem; color: #0f172a;">
+                                            <span id="sp-subtotal-20">0.00</span> ج.م
+                                        </td>
+                                    </tr>
+                                    <!-- فئة 10 -->
+                                    <tr style="border-bottom: 1px solid #f1f5f9; background: #ffffff;">
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1.05rem; color: #0284c7;">10 ج.م</td>
+                                        <td style="padding: 8px;">
+                                            <input type="number" id="sp-count-10" min="0" value="0" class="sp-calc-input" style="width: 100%; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px;">
+                                        </td>
+                                        <td style="padding: 8px; color: #64748b; font-size: 0.82rem; font-family: monospace;">عدد × 10</td>
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1rem; color: #0f172a;">
+                                            <span id="sp-subtotal-10">0.00</span> ج.م
+                                        </td>
+                                    </tr>
+                                    <!-- فئة 5 -->
+                                    <tr style="border-bottom: 1px solid #f1f5f9; background: #f8fafc;">
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1.05rem; color: #0284c7;">5 ج.م</td>
+                                        <td style="padding: 8px;">
+                                            <input type="number" id="sp-count-5" min="0" value="0" class="sp-calc-input" style="width: 100%; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px;">
+                                        </td>
+                                        <td style="padding: 8px; color: #64748b; font-size: 0.82rem; font-family: monospace;">عدد × 5</td>
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1rem; color: #0f172a;">
+                                            <span id="sp-subtotal-5">0.00</span> ج.م
+                                        </td>
+                                    </tr>
+                                    <!-- فكة وكسور -->
+                                    <tr style="border-bottom: 2px solid #cbd5e1; background: #ffffff;">
+                                        <td style="padding: 8px; font-weight: 800; color: #64748b;">فكة وكسور</td>
+                                        <td style="padding: 8px;" colspan="2">
+                                            <input type="number" id="sp-count-coins" min="0" step="0.5" value="0" class="sp-calc-input" placeholder="المبلغ المباشر بالجنيه" style="width: 100%; text-align: center; font-weight: 900; font-size: 1rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px;">
+                                        </td>
+                                        <td style="padding: 8px; font-weight: 900; font-family: monospace; font-size: 1rem; color: #0f172a;">
+                                            <span id="sp-subtotal-coins">0.00</span> ج.م
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- كرت تلخيص النقدية الفعلية المحصاة -->
+                        <div style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); color: #ffffff; border-radius: 10px; padding: 1.25rem; margin-top: 5px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 0.95rem; font-weight: 700; opacity: 0.9;">إجمالي النقدية الفعلية المحصاة:</span>
+                                <span id="sp-total-bills-badge" style="background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700;">
+                                    إجمالي الورق: <strong id="sp-total-bills-count">0</strong> ورقة
+                                </span>
+                            </div>
+                            <div style="font-size: 2rem; font-weight: 900; font-family: monospace; letter-spacing: 0.5px; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+                                <span id="sp-total-cash">0.00</span> <span style="font-size: 1.2rem; font-weight: 700;">ج.م</span>
+                            </div>
+                            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 0.85rem; opacity: 0.95;">
+                                <span>فقط: </span><strong id="sp-tafqeet-text">صفر جنيه مصري لا غير</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- العمود الأيسر: إيرادات البرامج والمطابقة الفورية -->
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        
+                        <!-- كرت إيرادات المنظومات والبرامج -->
+                        <div style="background: #ffffff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                            <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 14px;">
+                                <span style="display: inline-block; width: 4px; height: 18px; background: #0284c7; border-radius: 2px;"></span>
+                                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 900; color: #0f172a;">إيرادات المنظومات والبرامج المقابلة</h3>
+                            </div>
+
+                            <div style="display: flex; flex-direction: column; gap: 12px;">
+                                <!-- البرنامج الموحد MEEDCO -->
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                                    <div>
+                                        <strong style="color: #0369a1; font-size: 0.95rem; display: block;">البرنامج الموحد (MEEDCO)</strong>
+                                        <span style="font-size: 0.78rem; color: #64748b;">إجمالي توريد وتحصيل منظومة الشحن الموحدة</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <input type="number" id="sp-system-unified" min="0" step="0.01" value="0" class="sp-system-input" style="width: 140px; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px; color: #0369a1;">
+                                        <span style="font-weight: 700; color: #64748b; font-size: 0.85rem;">ج.م</span>
+                                    </div>
+                                </div>
+
+                                <!-- منظومة إسكرا ISKRA -->
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                                    <div>
+                                        <strong style="color: #d97706; font-size: 0.95rem; display: block;">منظومة إسكرا (Iskra)</strong>
+                                        <span style="font-size: 0.78rem; color: #64748b;">إجمالي إيراد شحن وتوريد عدادات إسكرا</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <input type="number" id="sp-system-iskra" min="0" step="0.01" value="0" class="sp-system-input" style="width: 140px; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px; color: #d97706;">
+                                        <span style="font-weight: 700; color: #64748b; font-size: 0.85rem;">ج.م</span>
+                                    </div>
+                                </div>
+
+                                <!-- منظومة المعصرة El Maasara -->
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                                    <div>
+                                        <strong style="color: #7c3aed; font-size: 0.95rem; display: block;">منظومة المعصرة (El Maasara)</strong>
+                                        <span style="font-size: 0.78rem; color: #64748b;">إجمالي إيراد شحن وتوريد عدادات المعصرة</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <input type="number" id="sp-system-maasara" min="0" step="0.01" value="0" class="sp-system-input" style="width: 140px; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px; color: #7c3aed;">
+                                        <span style="font-weight: 700; color: #64748b; font-size: 0.85rem;">ج.م</span>
+                                    </div>
+                                </div>
+
+                                <!-- إيرادات أنظمة أخرى -->
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                                    <div>
+                                        <strong style="color: #475569; font-size: 0.95rem; display: block;">إيرادات أخرى / برامج إضافية</strong>
+                                        <span style="font-size: 0.78rem; color: #64748b;">أي رسوم أو منظومات فرعية أخرى</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <input type="number" id="sp-system-other" min="0" step="0.01" value="0" class="sp-system-input" style="width: 140px; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px; color: #475569;">
+                                        <span style="font-weight: 700; color: #64748b; font-size: 0.85rem;">ج.م</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="background: #f1f5f9; border-radius: 8px; padding: 12px 16px; margin-top: 14px; display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 800; color: #1e293b; font-size: 1rem;">إجمالي مبالغ المنظومات والبرامج:</span>
+                                <span style="font-weight: 900; font-family: monospace; font-size: 1.4rem; color: #0284c7;">
+                                    <span id="sp-total-systems">0.00</span> ج.م
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- كرت المطابقة المالية الذكية والرقابة الفورية -->
+                        <div id="sp-reconciliation-card" style="background: #ffffff; border-radius: 12px; padding: 1.25rem; border: 2px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: all 0.2s ease;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <strong style="font-size: 1.05rem; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                    المطابقة المالية والتسوية (النقدية مقابل البرامج)
+                                </strong>
+                                <span id="sp-recon-badge" style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 0.85rem;">
+                                    متطابق ✓
+                                </span>
+                            </div>
+
+                            <!-- تفاصيل الفرق والشارة -->
+                            <div id="sp-recon-alert" style="background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 8px; padding: 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                <div>
+                                    <div id="sp-recon-title" style="font-weight: 900; font-size: 1.05rem; color: #166534;">الحافظة متطابقة بنسبة 100% ✓</div>
+                                    <div id="sp-recon-desc" style="font-size: 0.82rem; color: #15803d; margin-top: 2px;">إجمالي النقدية الفعلية مطابق تماماً لإجمالي مبالغ المنظومات (لا يوجد عجز أو زيادة).</div>
+                                </div>
+                                <div style="text-align: left;">
+                                    <div style="font-size: 0.78rem; color: #64748b; font-weight: 700;">فارق التسوية:</div>
+                                    <div id="sp-diff-display" style="font-weight: 900; font-family: monospace; font-size: 1.25rem; color: #166534;">0.00 ج.م</div>
+                                </div>
+                            </div>
+
+                            <!-- حقل الملاحظات -->
+                            <div>
+                                <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 4px;">ملاحظات / بيان إضافي للحافظة</label>
+                                <textarea id="sp-notes" rows="2" placeholder="أدخل أي ملاحظات عن الوردية أو أسباب الفروقات إن وجدت..." style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 0.88rem; font-family: inherit; resize: vertical;"></textarea>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- شريط أزرار الحفظ والطباعة -->
+                <div style="background: #ffffff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button type="button" id="btn-sp-save" class="btn" style="background: #16a34a; color: #ffffff; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 800; font-size: 1rem; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 6px rgba(22,163,74,0.3);">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                            <span>حفظ الحافظة في السجل</span>
+                        </button>
+                        <button type="button" id="btn-sp-save-print" class="btn" style="background: #0284c7; color: #ffffff; border: none; padding: 10px 22px; border-radius: 8px; font-weight: 800; font-size: 1rem; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 6px rgba(2,132,199,0.3);">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            <span>حفظ وطباعة إيصال معتمد</span>
+                        </button>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" id="btn-sp-reset-bottom" class="btn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 9px 18px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                            تفريغ الحقول
+                        </button>
+                        <button type="button" id="btn-sp-goto-archive-bottom" class="btn" style="background: #0f172a; color: #ffffff; border: none; padding: 9px 20px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                            عرض الأرشيف والسجل الكامل →
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ========================================================================= -->
+        <!-- قسم حافظات التوريد: 2. سجل وأرشيف الحافظات اليومية والتقارير -->
+        <!-- ========================================================================= -->
+        <section id="supply-portfolio-archive" class="content-section" style="padding: 1.5rem; background: #f8fafc;">
+            <div style="max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem;">
+                
+                <!-- الترويسة الرئيسية للأرشيف -->
+                <div style="background: #ffffff; border-radius: 12px; padding: 1.25rem 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 44px; height: 44px; border-radius: 10px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                            </div>
+                            <div>
+                                <h2 style="margin: 0; font-size: 1.35rem; font-weight: 900; color: #0f172a;">سجل وأرشيف حافظات التوريد اليومية</h2>
+                                <p style="margin: 3px 0 0; color: #64748b; font-size: 0.88rem;">سجل معتمد لكافة عمليات التوريد وحصر النقدية مع إمكانية التصفية، الطباعة والتصدير</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" id="btn-sp-export-excel" class="btn" style="background: #047857; color: #ffffff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>تصدير Excel</span>
+                        </button>
+                        <button type="button" id="btn-sp-goto-new" class="btn" style="background: #0284c7; color: #ffffff; border: none; padding: 8px 18px; border-radius: 8px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                            <span>تسجيل حافظة جديدة</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- بطاقات الإحصائيات العامة للأرشيف -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px;">
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                        <div style="color: #64748b; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">إجمالي النقدية الموردة</div>
+                        <div style="font-size: 1.5rem; font-weight: 900; color: #047857; font-family: monospace;" id="sp-stat-total-cash">0.00 ج.م</div>
+                    </div>
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                        <div style="color: #64748b; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">إجمالي البرنامج الموحد</div>
+                        <div style="font-size: 1.5rem; font-weight: 900; color: #0284c7; font-family: monospace;" id="sp-stat-total-unified">0.00 ج.م</div>
+                    </div>
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                        <div style="color: #64748b; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">إجمالي إسكرا</div>
+                        <div style="font-size: 1.5rem; font-weight: 900; color: #d97706; font-family: monospace;" id="sp-stat-total-iskra">0.00 ج.م</div>
+                    </div>
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                        <div style="color: #64748b; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">إجمالي المعصرة</div>
+                        <div style="font-size: 1.5rem; font-weight: 900; color: #7c3aed; font-family: monospace;" id="sp-stat-total-maasara">0.00 ج.م</div>
+                    </div>
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.1rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                        <div style="color: #64748b; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">الحافظات المتطابقة</div>
+                        <div style="font-size: 1.5rem; font-weight: 900; color: #0f172a; font-family: monospace;" id="sp-stat-matched-count">0 / 0</div>
+                    </div>
+                </div>
+
+                <!-- شريط التصفية والبحث المتقدم -->
+                <div style="background: #ffffff; border-radius: 12px; padding: 1.1rem 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end;">
+                        <div>
+                            <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 4px;">بحث بالرقم أو المحصل</label>
+                            <input type="text" id="sp-filter-query" placeholder="رقم الحافظة أو اسم المحصل..." style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 7px 10px; font-size: 0.88rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 4px;">من تاريخ</label>
+                            <input type="date" id="sp-filter-from" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 7px 10px; font-size: 0.88rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 4px;">إلى تاريخ</label>
+                            <input type="date" id="sp-filter-to" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 7px 10px; font-size: 0.88rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 4px;">حالة التطابق</label>
+                            <select id="sp-filter-status" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 7px 10px; font-size: 0.88rem; font-weight: 700;">
+                                <option value="all">جميع الحالات</option>
+                                <option value="matched">متطابق فقط ✓</option>
+                                <option value="deficit">يوجد عجز نقدي</option>
+                                <option value="surplus">يوجد زيادة نقدية</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" id="btn-sp-filter-apply" style="flex: 1; background: #0284c7; color: #fff; border: none; border-radius: 6px; padding: 8px; font-weight: 700; cursor: pointer;">تصفية</button>
+                            <button type="button" id="btn-sp-filter-clear" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; font-weight: 700; cursor: pointer;">إلغاء</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- جدول عرض الحافظات المسجلة -->
+                <div style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); overflow: hidden;">
+                    <div style="padding: 1rem 1.25rem; border-bottom: 1.5px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-weight: 800; font-size: 1.05rem; color: #0f172a;">قائمة الحافظات المسجلة في الأرشيف</div>
+                        <span id="sp-table-count-badge" style="background: #f1f5f9; color: #475569; font-weight: 800; font-size: 0.85rem; padding: 3px 12px; border-radius: 20px;">
+                            عدد الحافظات: <strong id="sp-portfolios-count">0</strong>
+                        </span>
+                    </div>
+
+                    <div class="table-responsive" style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.9rem;">
+                            <thead>
+                                <tr style="background: #0f172a; color: #ffffff; font-weight: 800;">
+                                    <th style="padding: 10px 12px;">رقم الحافظة</th>
+                                    <th style="padding: 10px 12px;">التاريخ والوقت</th>
+                                    <th style="padding: 10px 12px;">اسم المحصل</th>
+                                    <th style="padding: 10px 12px; text-align: center;">النقدية الفعلية</th>
+                                    <th style="padding: 10px 12px; text-align: center;">الموحد</th>
+                                    <th style="padding: 10px 12px; text-align: center;">إسكرا</th>
+                                    <th style="padding: 10px 12px; text-align: center;">المعصرة</th>
+                                    <th style="padding: 10px 12px; text-align: center;">إجمالي البرامج</th>
+                                    <th style="padding: 10px 12px; text-align: center;">حالة التطابق</th>
+                                    <th style="padding: 10px 12px; text-align: center; width: 140px;">الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sp-portfolios-tbody">
+                                <tr>
+                                    <td colspan="10" style="padding: 30px; text-align: center; color: #64748b;">
+                                        لا توجد حافظات توريد مسجلة حالياً.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- مودال تفاصيل الحافظة -->
+        <div id="sp-details-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 9999; justify-content: center; align-items: center; padding: 20px; backdrop-filter: blur(2px);">
+            <div style="background: #ffffff; border-radius: 12px; width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                <div style="padding: 16px 20px; border-bottom: 1.5px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #0f172a;" id="sp-modal-title">تفاصيل حافظة التوريد</h3>
+                    <button type="button" id="btn-sp-modal-close" style="background: none; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: #64748b;">&times;</button>
+                </div>
+                <div style="padding: 20px; display: flex; flex-direction: column; gap: 14px;" id="sp-modal-body">
+                    <!-- سيتم ملؤه ديناميكياً -->
+                </div>
+                <div style="padding: 14px 20px; border-top: 1.5px solid #f1f5f9; background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" id="btn-sp-modal-print" style="background: #0284c7; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        <span>طباعة تقرير الحافظة المعتمد</span>
+                    </button>
+                    <button type="button" id="btn-sp-modal-dismiss" style="background: #e2e8f0; color: #334155; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 700; cursor: pointer;">إغلاق</button>
+                </div>
+            </div>
+        </div>
+
+<section id="debts-management" class="content-section">
             <div class="card card-custom gutter-b" style="background: #ffffff; border-radius: 0.65rem; border: 1px solid #ebedf3; box-shadow: 0 0 30px 0 rgba(82, 63, 105, 0.05); margin-bottom: 25px;">
                 
                 <!-- MEEDCO Card Header & Toolbar -->
