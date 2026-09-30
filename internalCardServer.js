@@ -1213,6 +1213,65 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // 8.5 استقبال وحفظ تقرير المعصرة الحي المباشر من المتصفح بدون أي اتصال خارجي بالسيرفر
+            if (pathname === '/api/reports/maasara-live' && req.method === 'POST') {
+                const body = await getBody();
+                const htmlContent = body.html || body.content || '';
+                const directUsers = body.users || body.data;
+                const targetDate = body.date || new Date().toISOString().slice(0, 10);
+
+                const cacheDir = path.join(__dirname, 'reports_cache');
+                if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+
+                let parsedResult = null;
+
+                if (Array.isArray(directUsers) && directUsers.length > 0) {
+                    parsedResult = {
+                        success: true,
+                        source: 'Maasara Live Browser',
+                        targetDate,
+                        totalAmount: directUsers.reduce((s, u) => s + Number(u.amount || 0), 0),
+                        totalCount: directUsers.reduce((s, u) => s + Number(u.count || 0), 0),
+                        usersCount: directUsers.length,
+                        users: directUsers
+                    };
+                } else if (htmlContent) {
+                    const tempHtmlPath = path.join(cacheDir, `temp_maasara_${Date.now()}.html`);
+                    fs.writeFileSync(tempHtmlPath, htmlContent, 'utf8');
+
+                    const scriptPath = path.join(__dirname, 'parse_maasara_html.py');
+                    const { execFile } = require('child_process');
+                    parsedResult = await new Promise((resolve) => {
+                        execFile('python', [scriptPath, tempHtmlPath, targetDate], { maxBuffer: 1024 * 1024 * 30, encoding: 'utf8' }, (err, stdout) => {
+                            try { fs.unlinkSync(tempHtmlPath); } catch (e) {}
+                            if (err) return resolve({ success: false, error: err.message });
+                            try { resolve(JSON.parse(stdout)); } catch (e) { resolve({ success: false, error: 'JSON parse error' }); }
+                        });
+                    });
+                }
+
+                if (parsedResult && parsedResult.success) {
+                    const liveCacheFile = path.join(cacheDir, `maasara_live_${targetDate}.json`);
+                    const generalCacheFile = path.join(cacheDir, `maasara_${targetDate}.json`);
+                    fs.writeFileSync(liveCacheFile, JSON.stringify(parsedResult, null, 2), 'utf8');
+                    fs.writeFileSync(generalCacheFile, JSON.stringify(parsedResult, null, 2), 'utf8');
+
+                    res.writeHead(200);
+                    res.end(JSON.stringify({
+                        success: true,
+                        message: `تم استلام ومزامنة ${parsedResult.usersCount || 0} مستخدم بإجمالي ${(parsedResult.totalAmount || 0).toLocaleString()} ج.م بنجاح`,
+                        data: parsedResult
+                    }));
+                } else {
+                    res.writeHead(400);
+                    res.end(JSON.stringify({
+                        success: false,
+                        message: 'تعذر استخراج البيانات من الصفحة: ' + ((parsedResult && parsedResult.error) || 'محتوى فارغ')
+                    }));
+                }
+                return;
+            }
+
             // 404
             res.writeHead(404);
             res.end(JSON.stringify({ success: false, message: 'Not found: ' + pathname }));

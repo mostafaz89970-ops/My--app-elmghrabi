@@ -12987,6 +12987,57 @@ const handlePrintJudicialControlDetails = () => {
         document.getElementById('btn-sp-tx-modal-print')?.addEventListener('click', () => {
             printCurrentCashierTransactions();
         });
+
+        // ===== مزامنة المعصرة الحية من المتصفح =====
+        document.getElementById('btn-sp-maasara-live-sync')?.addEventListener('click', async () => {
+            const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
+            const userInput = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
+            const userSelect = document.getElementById('sp-portfolio-user-select') as HTMLSelectElement | null;
+            const statusEl = document.getElementById('sp-maasara-live-status');
+            const date = (dateInput?.value || new Date().toISOString().slice(0, 10)).trim();
+            const userName = (userInput?.value || userSelect?.value || '').trim();
+
+            if (statusEl) statusEl.textContent = '⏳ جارِ المزامنة...';
+
+            // محاولة قراءة المحتوى من نافذة المعصرة المفتوحة في المتصفح
+            try {
+                // إرسال الصفحة الحالية إذا كنا على صفحة المعصرة
+                const maasaraPageContent = document.body.innerHTML;
+                const isMaasaraPage = window.location.href.includes('200.1.1.240') ||
+                    document.title.includes('معصرة') ||
+                    maasaraPageContent.includes('CustomersRechargesTotalPaymentByUser') ||
+                    maasaraPageContent.includes('RechargeByUser');
+
+                let payload: any = { date, html: '' };
+
+                if (isMaasaraPage) {
+                    payload.html = maasaraPageContent;
+                } else {
+                    // محاولة فتح نافذة المعصرة وقراءة بياناتها (نفس النطاق الداخلي)
+                    showToast('افتح صفحة http://200.1.1.240:5050 واستخدم F12 → Console للصق الكود', 'info');
+                    const code = `fetch('http://127.0.0.1:5002/api/reports/maasara-live', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({html:document.body.innerHTML,date:'${date}'})}).then(r=>r.json()).then(res=>alert('✓ ' + res.message + ' - أعد تحميل حافظة التوريد الآن')).catch(e=>alert('خطأ: '+e.message));`;
+                    navigator.clipboard?.writeText(code).catch(() => {});
+                    if (statusEl) statusEl.textContent = '📋 الكود نُسخ للحافظة - الصقه في Console صفحة المعصرة';
+                    return;
+                }
+
+                const res = await fetch('http://127.0.0.1:5002/api/reports/maasara-live', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(r => r.json()).catch(() => null);
+
+                if (res && res.success) {
+                    if (statusEl) statusEl.textContent = `✓ ${res.message}`;
+                    showToast(`✓ تم مزامنة بيانات المعصرة: ${res.message}`, 'success');
+                    setTimeout(() => autoFetchUserProgramsRevenue(false), 400);
+                } else {
+                    if (statusEl) statusEl.textContent = '⚠️ ' + (res?.message || 'تعذرت المزامنة');
+                }
+            } catch (e: any) {
+                if (statusEl) statusEl.textContent = '❌ ' + e.message;
+            }
+        });
     };
 
     // =========================================================================

@@ -179,6 +179,27 @@ async function fetchMaasaraDailySales(dateStr) {
         dateStr = new Date().toISOString().slice(0, 10);
     }
     const cacheFile = path.join(CACHE_DIR, `maasara_${dateStr}.json`);
+    const liveCacheFile = path.join(CACHE_DIR, `maasara_live_${dateStr}.json`);
+    if (fs.existsSync(liveCacheFile)) {
+        try {
+            const liveRaw = JSON.parse(fs.readFileSync(liveCacheFile, 'utf8'));
+            if (liveRaw && Array.isArray(liveRaw.users) && liveRaw.users.length > 0) {
+                // Normalize: live cache uses amount/count, standard expects totalAmount/rechargesCount
+                liveRaw.users = liveRaw.users.map(u => ({
+                    ...u,
+                    userName: u.userName || u.name || '',
+                    totalAmount: Number(u.totalAmount || u.amount || 0),
+                    rechargesCount: Number(u.rechargesCount || u.count || 0),
+                    items: (u.items || []).map(it => ({
+                        ...it,
+                        paymentDate: it.paymentDate || (liveRaw.targetDate || dateStr),
+                        amount: Number(it.amount || 0)
+                    }))
+                }));
+                return liveRaw;
+            }
+        } catch (e) {}
+    }
 
     try {
         // 1. البحث عن كافة شيتات معصرة في مجلد التنزيلات أو الكاش
@@ -466,7 +487,7 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
         }
     }
 
-    // 2. معصرة
+    // 2. معصرة - أولاً من الكاش المباشر للتاريخ المحدد
     let maasaraAmount = 0;
     let maasaraCount = 0;
     let maasaraItems = [];
@@ -475,11 +496,31 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
     if (maasaraData && Array.isArray(maasaraData.users)) {
         const found = maasaraData.users.find(u => isArabicMatch(u.userName, cleanTarget));
         if (found) {
-            maasaraAmount = found.totalAmount || 0;
-            maasaraCount = found.rechargesCount || 0;
+            maasaraAmount = Number(found.totalAmount || found.amount || 0);
+            maasaraCount = Number(found.rechargesCount || found.count || 0);
             maasaraItems = found.items || [];
             maasaraDailyBreakdown = found.dailyBreakdown || [];
         }
+    }
+    // إذا لم توجد بيانات، نفحص كل ملفات الكاش الحية لهذا اليوم في reports_cache
+    if (maasaraAmount === 0) {
+        try {
+            const liveFiles = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith('maasara_live_') && f.endsWith('.json'));
+            for (const lf of liveFiles) {
+                const datePart = lf.replace('maasara_live_', '').replace('.json', '');
+                if (datePart !== dateStr) continue;
+                const liveObj = JSON.parse(fs.readFileSync(path.join(CACHE_DIR, lf), 'utf8'));
+                if (liveObj && Array.isArray(liveObj.users)) {
+                    const found = liveObj.users.find(u => isArabicMatch(u.userName || u.name || '', cleanTarget));
+                    if (found) {
+                        maasaraAmount = Number(found.totalAmount || found.amount || 0);
+                        maasaraCount = Number(found.rechargesCount || found.count || 0);
+                        maasaraItems = (found.items || []).map(it => ({ ...it, paymentDate: it.paymentDate || dateStr, amount: Number(it.amount || 0) }));
+                        break;
+                    }
+                }
+            }
+        } catch (e) {}
     }
 
     // 3. إسكرا
@@ -642,6 +683,34 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
             }
         });
     }
+
+    // دمج بيانات المعصرة الحية المسجلة من المتصفح (maasara_live_*.json)
+    try {
+        const liveFiles = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith('maasara_live_') && f.endsWith('.json'));
+        liveFiles.forEach(lf => {
+            const datePart = lf.replace('maasara_live_', '').replace('.json', '');
+            if (datePart >= fromDateStr && datePart <= toDateStr) {
+                const liveObj = JSON.parse(fs.readFileSync(path.join(CACHE_DIR, lf), 'utf8'));
+                if (liveObj && Array.isArray(liveObj.users)) {
+                    liveObj.users.forEach(u => {
+                        const entry = getOrCreateUser(u.userName);
+                        if (entry) {
+                            const uAmt = Number(u.totalAmount || u.amount || 0);
+                            const uCnt = Number(u.rechargesCount || u.count || 1);
+                            // Avoid duplicate if already aggregated from items
+                            if (entry.maasara.amount === 0) {
+                                entry.maasara.amount = Math.round((entry.maasara.amount + uAmt) * 100) / 100;
+                                entry.maasara.count += uCnt;
+                            }
+                            if (Array.isArray(u.items) && u.items.length > 0) {
+                                entry.maasara.items.push(...u.items);
+                            }
+                        }
+                    });
+                }
+            }
+        });
+    } catch (e) {}
 
     // 4. مطابقة مع الحافظات الفعلية المسجلة
     rangePortfolios.forEach(p => {
