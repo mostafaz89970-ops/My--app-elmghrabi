@@ -41,3 +41,7 @@ reports_cache/
 *.njsproj
 *.sln
 *.sw?
+
+# Python
+__pycache__/
+*.pyc

@@ -12916,6 +12916,26 @@ const handlePrintJudicialControlDetails = () => {
             loadComprehensiveDailyReport(false);
         });
 
+        document.getElementById('btn-sp-detail-preset-today')?.addEventListener('click', () => {
+            const fromInput = document.getElementById('sp-detail-from-date') as HTMLInputElement | null;
+            const toInput = document.getElementById('sp-detail-to-date') as HTMLInputElement | null;
+            const todayStr = new Date().toISOString().slice(0, 10);
+            if (fromInput) fromInput.value = todayStr;
+            if (toInput) toInput.value = todayStr;
+            loadComprehensiveDailyReport(false);
+        });
+
+        document.getElementById('btn-sp-detail-preset-month')?.addEventListener('click', () => {
+            const fromInput = document.getElementById('sp-detail-from-date') as HTMLInputElement | null;
+            const toInput = document.getElementById('sp-detail-to-date') as HTMLInputElement | null;
+            const today = new Date();
+            const todayStr = today.toISOString().slice(0, 10);
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+            if (fromInput) fromInput.value = firstDayOfMonth;
+            if (toInput) toInput.value = todayStr;
+            loadComprehensiveDailyReport(false);
+        });
+
         document.getElementById('sp-detail-from-date')?.addEventListener('change', () => {
             loadComprehensiveDailyReport(false);
         });
@@ -13071,9 +13091,11 @@ const handlePrintJudicialControlDetails = () => {
         const branchSelect = document.getElementById('sp-detail-branch-filter') as HTMLSelectElement | null;
         const legacyDateInput = document.getElementById('sp-detail-date') as HTMLInputElement | null;
 
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const today = new Date();
+        const todayStr = today.toISOString().slice(0, 10);
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
         if (fromInput && !fromInput.value) {
-            fromInput.value = todayStr;
+            fromInput.value = firstDayOfMonth;
         }
         if (toInput && !toInput.value) {
             toInput.value = todayStr;
@@ -13256,8 +13278,29 @@ const handlePrintJudicialControlDetails = () => {
         if (!tbody) return;
 
         if (list.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: #94a3b8; font-weight: 700;">لا توجد سجلات تطابق معايير البحث</td></tr>`;
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="11" style="text-align: center; padding: 40px; color: #64748b; font-weight: 700;">
+                        <div style="font-size: 1.1rem; margin-bottom: 8px;">ℹ️ لا توجد سجلات تطابق معايير البحث أو الفترة المحددة</div>
+                        <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px;">قد لا توجد شحنات في اليوم المحدد، يمكنك فحص مبيعات الشهر بالكامل أو رفع ملف معصرة إضافي</div>
+                        <div style="display: flex; justify-content: center; gap: 10px;">
+                            <button id="btn-sp-empty-load-month" type="button" style="background: #0284c7; color: white; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">
+                                📅 عرض بيانات الشهر بالكامل
+                            </button>
+                            <button id="btn-sp-empty-sync" type="button" style="background: #10b981; color: white; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">
+                                🔄 تحديث وفحص الأنظمة الآن
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
             if (tfoot) tfoot.innerHTML = '';
+            document.getElementById('btn-sp-empty-load-month')?.addEventListener('click', () => {
+                document.getElementById('btn-sp-detail-preset-month')?.click();
+            });
+            document.getElementById('btn-sp-empty-sync')?.addEventListener('click', () => {
+                document.getElementById('btn-sp-detail-refresh')?.click();
+            });
             return;
         }
 

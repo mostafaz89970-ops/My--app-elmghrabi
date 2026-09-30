@@ -40,6 +40,8 @@ def parse_maasara_report(file_path, target_date=None):
     try:
         if target_date:
             target_date = target_date.strip()
+            if target_date.lower() in ('all', '*', ''):
+                target_date = None
 
         file_dates = set()
 

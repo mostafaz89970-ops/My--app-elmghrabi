@@ -7408,7 +7408,7 @@ const exportSupplyPortfoliosToExcel = () => {
     showToast('تم تصدير سجل حافظات التوريد بنجاح!', 'success');
 };
 const initSupplyPortfoliosListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18;
     // Calculation input triggers
     document.querySelectorAll('.sp-calc-input, .sp-system-input').forEach(inp => {
         inp.addEventListener('input', () => calculateSupplyPortfolioLive());
@@ -7638,47 +7638,69 @@ const initSupplyPortfoliosListeners = () => {
     (_2 = document.getElementById('btn-sp-detail-apply')) === null || _2 === void 0 ? void 0 : _2.addEventListener('click', () => {
         loadComprehensiveDailyReport(false);
     });
-    (_3 = document.getElementById('sp-detail-from-date')) === null || _3 === void 0 ? void 0 : _3.addEventListener('change', () => {
+    (_3 = document.getElementById('btn-sp-detail-preset-today')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', () => {
+        const fromInput = document.getElementById('sp-detail-from-date');
+        const toInput = document.getElementById('sp-detail-to-date');
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (fromInput)
+            fromInput.value = todayStr;
+        if (toInput)
+            toInput.value = todayStr;
         loadComprehensiveDailyReport(false);
     });
-    (_4 = document.getElementById('sp-detail-to-date')) === null || _4 === void 0 ? void 0 : _4.addEventListener('change', () => {
+    (_4 = document.getElementById('btn-sp-detail-preset-month')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', () => {
+        const fromInput = document.getElementById('sp-detail-from-date');
+        const toInput = document.getElementById('sp-detail-to-date');
+        const today = new Date();
+        const todayStr = today.toISOString().slice(0, 10);
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+        if (fromInput)
+            fromInput.value = firstDayOfMonth;
+        if (toInput)
+            toInput.value = todayStr;
         loadComprehensiveDailyReport(false);
     });
-    (_5 = document.getElementById('sp-detail-branch-filter')) === null || _5 === void 0 ? void 0 : _5.addEventListener('change', () => {
+    (_5 = document.getElementById('sp-detail-from-date')) === null || _5 === void 0 ? void 0 : _5.addEventListener('change', () => {
         loadComprehensiveDailyReport(false);
     });
-    (_6 = document.getElementById('sp-detail-user-filter')) === null || _6 === void 0 ? void 0 : _6.addEventListener('change', () => {
+    (_6 = document.getElementById('sp-detail-to-date')) === null || _6 === void 0 ? void 0 : _6.addEventListener('change', () => {
+        loadComprehensiveDailyReport(false);
+    });
+    (_7 = document.getElementById('sp-detail-branch-filter')) === null || _7 === void 0 ? void 0 : _7.addEventListener('change', () => {
+        loadComprehensiveDailyReport(false);
+    });
+    (_8 = document.getElementById('sp-detail-user-filter')) === null || _8 === void 0 ? void 0 : _8.addEventListener('change', () => {
         filterAndRenderComprehensiveTable();
     });
-    (_7 = document.getElementById('sp-detail-date')) === null || _7 === void 0 ? void 0 : _7.addEventListener('change', () => {
+    (_9 = document.getElementById('sp-detail-date')) === null || _9 === void 0 ? void 0 : _9.addEventListener('change', () => {
         loadComprehensiveDailyReport(false);
     });
-    (_8 = document.getElementById('sp-detail-search-user')) === null || _8 === void 0 ? void 0 : _8.addEventListener('input', () => {
+    (_10 = document.getElementById('sp-detail-search-user')) === null || _10 === void 0 ? void 0 : _10.addEventListener('input', () => {
         filterAndRenderComprehensiveTable();
     });
-    (_9 = document.getElementById('sp-detail-status-filter')) === null || _9 === void 0 ? void 0 : _9.addEventListener('change', () => {
+    (_11 = document.getElementById('sp-detail-status-filter')) === null || _11 === void 0 ? void 0 : _11.addEventListener('change', () => {
         filterAndRenderComprehensiveTable();
     });
-    (_10 = document.getElementById('btn-sp-detail-print-all')) === null || _10 === void 0 ? void 0 : _10.addEventListener('click', () => {
+    (_12 = document.getElementById('btn-sp-detail-print-all')) === null || _12 === void 0 ? void 0 : _12.addEventListener('click', () => {
         printComprehensiveDailyReport();
     });
-    (_11 = document.getElementById('btn-sp-detail-export-excel')) === null || _11 === void 0 ? void 0 : _11.addEventListener('click', () => {
+    (_13 = document.getElementById('btn-sp-detail-export-excel')) === null || _13 === void 0 ? void 0 : _13.addEventListener('click', () => {
         exportComprehensiveDailyReportToExcel();
     });
-    (_12 = document.getElementById('btn-sp-detail-nav-new')) === null || _12 === void 0 ? void 0 : _12.addEventListener('click', gotoNew);
-    (_13 = document.getElementById('btn-sp-detail-nav-archive')) === null || _13 === void 0 ? void 0 : _13.addEventListener('click', gotoArchive);
+    (_14 = document.getElementById('btn-sp-detail-nav-new')) === null || _14 === void 0 ? void 0 : _14.addEventListener('click', gotoNew);
+    (_15 = document.getElementById('btn-sp-detail-nav-archive')) === null || _15 === void 0 ? void 0 : _15.addEventListener('click', gotoArchive);
     // Transactions modal handlers
-    (_14 = document.getElementById('btn-sp-tx-modal-close')) === null || _14 === void 0 ? void 0 : _14.addEventListener('click', () => {
+    (_16 = document.getElementById('btn-sp-tx-modal-close')) === null || _16 === void 0 ? void 0 : _16.addEventListener('click', () => {
         const m = document.getElementById('sp-user-transactions-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_15 = document.getElementById('btn-sp-tx-modal-dismiss')) === null || _15 === void 0 ? void 0 : _15.addEventListener('click', () => {
+    (_17 = document.getElementById('btn-sp-tx-modal-dismiss')) === null || _17 === void 0 ? void 0 : _17.addEventListener('click', () => {
         const m = document.getElementById('sp-user-transactions-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_16 = document.getElementById('btn-sp-tx-modal-print')) === null || _16 === void 0 ? void 0 : _16.addEventListener('click', () => {
+    (_18 = document.getElementById('btn-sp-tx-modal-print')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', () => {
         printCurrentCashierTransactions();
     });
 };
@@ -7781,9 +7803,11 @@ const loadComprehensiveDailyReport = async (forceSync = false) => {
     const toInput = document.getElementById('sp-detail-to-date');
     const branchSelect = document.getElementById('sp-detail-branch-filter');
     const legacyDateInput = document.getElementById('sp-detail-date');
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
     if (fromInput && !fromInput.value) {
-        fromInput.value = todayStr;
+        fromInput.value = firstDayOfMonth;
     }
     if (toInput && !toInput.value) {
         toInput.value = todayStr;
@@ -7889,7 +7913,7 @@ const updateComprehensiveReportKPIs = (s) => {
     }
 };
 const filterAndRenderComprehensiveTable = () => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     if (!currentComprehensiveReportData || !Array.isArray(currentComprehensiveReportData.users))
         return;
     const searchInput = ((_b = (_a = document.getElementById('sp-detail-search-user')) === null || _a === void 0 ? void 0 : _a.value) === null || _b === void 0 ? void 0 : _b.trim().toLowerCase()) || '';
@@ -7959,9 +7983,32 @@ const filterAndRenderComprehensiveTable = () => {
     if (!tbody)
         return;
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: #94a3b8; font-weight: 700;">لا توجد سجلات تطابق معايير البحث</td></tr>`;
+        tbody.innerHTML = `
+                <tr>
+                    <td colspan="11" style="text-align: center; padding: 40px; color: #64748b; font-weight: 700;">
+                        <div style="font-size: 1.1rem; margin-bottom: 8px;">ℹ️ لا توجد سجلات تطابق معايير البحث أو الفترة المحددة</div>
+                        <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px;">قد لا توجد شحنات في اليوم المحدد، يمكنك فحص مبيعات الشهر بالكامل أو رفع ملف معصرة إضافي</div>
+                        <div style="display: flex; justify-content: center; gap: 10px;">
+                            <button id="btn-sp-empty-load-month" type="button" style="background: #0284c7; color: white; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">
+                                📅 عرض بيانات الشهر بالكامل
+                            </button>
+                            <button id="btn-sp-empty-sync" type="button" style="background: #10b981; color: white; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.85rem;">
+                                🔄 تحديث وفحص الأنظمة الآن
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
         if (tfoot)
             tfoot.innerHTML = '';
+        (_e = document.getElementById('btn-sp-empty-load-month')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => {
+            var _a;
+            (_a = document.getElementById('btn-sp-detail-preset-month')) === null || _a === void 0 ? void 0 : _a.click();
+        });
+        (_f = document.getElementById('btn-sp-empty-sync')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
+            var _a;
+            (_a = document.getElementById('btn-sp-detail-refresh')) === null || _a === void 0 ? void 0 : _a.click();
+        });
         return;
     }
     const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

@@ -169,6 +169,8 @@ function isArabicMatch(name1, name2) {
     return matchCount >= 2;
 }
 
+const maasaraFileParsedCache = new Map();
+
 /**
  * جلب تقرير معصرة (Maasara) لليوم المحدد
  */
@@ -210,23 +212,49 @@ async function fetchMaasaraDailySales(dateStr) {
             let totalRecharges = 0;
 
             for (const cFile of candidateFiles) {
-                const parsed = await new Promise((resolve) => {
-                    execFile('python', [scriptPath, cFile.path, dateStr], { maxBuffer: 1024 * 1024 * 20, encoding: 'utf8' }, (err, stdout) => {
-                        if (err) return resolve(null);
-                        try { resolve(JSON.parse(stdout)); } catch (e) { resolve(null); }
+                const cacheKey = `${cFile.path}_${cFile.mtime}`;
+                let fullParsed = maasaraFileParsedCache.get(cacheKey);
+                if (!fullParsed) {
+                    fullParsed = await new Promise((resolve) => {
+                        execFile('python', [scriptPath, cFile.path, 'all'], { maxBuffer: 1024 * 1024 * 30, encoding: 'utf8' }, (err, stdout) => {
+                            if (err) return resolve(null);
+                            try { resolve(JSON.parse(stdout)); } catch (e) { resolve(null); }
+                        });
                     });
-                });
+                    if (fullParsed && fullParsed.success) {
+                        maasaraFileParsedCache.set(cacheKey, fullParsed);
+                    }
+                }
 
-                if (parsed && parsed.success && Array.isArray(parsed.users)) {
-                    for (const u of parsed.users) {
+                if (fullParsed && fullParsed.success && Array.isArray(fullParsed.users)) {
+                    for (const u of fullParsed.users) {
                         const normKey = normalizeArabic(u.userName);
+
+                        let uItems = u.items || [];
+                        let uCount = u.rechargesCount || 0;
+                        let uAmt = u.totalAmount || 0;
+
+                        if (dateStr && dateStr.toLowerCase() !== 'all') {
+                            uItems = (u.items || []).filter(it => it.paymentDate === dateStr);
+                            uCount = uItems.length;
+                            uAmt = Math.round(uItems.reduce((acc, it) => acc + (it.amount || 0), 0) * 100) / 100;
+                        }
+
+                        const uCopy = {
+                            ...u,
+                            date: dateStr,
+                            rechargesCount: uCount,
+                            totalAmount: uAmt,
+                            items: uItems,
+                            dailyBreakdown: u.dailyBreakdown || []
+                        };
+
                         if (!usersMap.has(normKey)) {
-                            usersMap.set(normKey, u);
+                            usersMap.set(normKey, uCopy);
                         } else {
-                            // If existing has 0 count and this one has count > 0, update it
                             const exist = usersMap.get(normKey);
-                            if ((!exist.rechargesCount || exist.rechargesCount === 0) && u.rechargesCount > 0) {
-                                usersMap.set(normKey, { ...exist, ...u });
+                            if ((!exist.rechargesCount || exist.rechargesCount === 0) && uCopy.rechargesCount > 0) {
+                                usersMap.set(normKey, { ...exist, ...uCopy });
                             }
                         }
                     }
@@ -506,14 +534,16 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
     }
     if (dateList.length === 0) dateList.push(fromDateStr);
 
+    // جلب تقرير المعصرة الشامل دفعة واحدة وبسرعة فائقة
+    const maasaraFullRes = await fetchMaasaraDailySales('all');
+
     // جلب بيانات البرامج لكافة أيام الفترة
     const dayResults = await Promise.all(dateList.map(async (d) => {
-        const [meedcoRes, maasaraRes, iskraRes] = await Promise.all([
+        const [meedcoRes, iskraRes] = await Promise.all([
             fetchMeedcoDailySales(d),
-            fetchMaasaraDailySales(d),
             fetchIskraDailySales(d)
         ]);
-        return { date: d, meedco: meedcoRes, maasara: maasaraRes, iskra: iskraRes };
+        return { date: d, meedco: meedcoRes, iskra: iskraRes };
     }));
 
     // قراءة كافة الحافظات المحفوظة ضمن الفترة
@@ -559,7 +589,7 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
         return newUser;
     };
 
-    // تفريغ وتجميع مبيعات الأيام
+    // تفريغ وتجميع مبيعات الأيام (MEEDCO و Iskra)
     dayResults.forEach(dayRes => {
         // 1. MEEDCO
         if (dayRes.meedco && dayRes.meedco.success && Array.isArray(dayRes.meedco.users)) {
@@ -579,25 +609,7 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
             });
         }
 
-        // 2. Maasara
-        if (dayRes.maasara && Array.isArray(dayRes.maasara.users)) {
-            dayRes.maasara.users.forEach(u => {
-                const entry = getOrCreateUser(u.userName);
-                if (entry) {
-                    entry.maasara.amount = Math.round((entry.maasara.amount + (u.totalAmount || 0)) * 100) / 100;
-                    entry.maasara.count += (u.rechargesCount || 0);
-                    if (Array.isArray(u.items)) {
-                        entry.maasara.items.push(...u.items);
-                        if (u.items.length > 0 && u.items[0].subAdmin) {
-                            entry.subAdmin = u.items[0].subAdmin;
-                            entry.branch = u.items[0].subAdmin.includes('هندسة') ? u.items[0].subAdmin : `هندسة ${u.items[0].subAdmin}`;
-                        }
-                    }
-                }
-            });
-        }
-
-        // 3. Iskra
+        // 2. Iskra
         if (dayRes.iskra && Array.isArray(dayRes.iskra.users)) {
             dayRes.iskra.users.forEach(u => {
                 const entry = getOrCreateUser(u.userName);
@@ -608,6 +620,28 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
             });
         }
     });
+
+    // 3. Maasara (تجميع دقيق وعاجل لكافة عمليات المعصرة الواقعة ضمن الفترة)
+    if (maasaraFullRes && Array.isArray(maasaraFullRes.users)) {
+        maasaraFullRes.users.forEach(u => {
+            const rangeItems = (u.items || []).filter(it => it.paymentDate >= fromDateStr && it.paymentDate <= toDateStr);
+            const rangeCount = rangeItems.length;
+            const rangeAmount = Math.round(rangeItems.reduce((acc, it) => acc + (it.amount || 0), 0) * 100) / 100;
+
+            if (rangeCount > 0) {
+                const entry = getOrCreateUser(u.userName);
+                if (entry) {
+                    entry.maasara.amount = Math.round((entry.maasara.amount + rangeAmount) * 100) / 100;
+                    entry.maasara.count += rangeCount;
+                    entry.maasara.items.push(...rangeItems);
+                    if (rangeItems.length > 0 && rangeItems[0].subAdmin) {
+                        entry.subAdmin = rangeItems[0].subAdmin;
+                        entry.branch = rangeItems[0].subAdmin.includes('هندسة') ? rangeItems[0].subAdmin : `هندسة ${rangeItems[0].subAdmin}`;
+                    }
+                }
+            }
+        });
+    }
 
     // 4. مطابقة مع الحافظات الفعلية المسجلة
     rangePortfolios.forEach(p => {
