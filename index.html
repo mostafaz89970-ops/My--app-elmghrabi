@@ -345,34 +345,8 @@
         font-size: 0.9rem;
     }
   </style>
-<link rel="stylesheet" href="index.css">
 <!-- CSS مباشر لضمان ظهور أقسام كروت التحكم -->
-<style>
-  #read-control-card,
-  #issue-control-card,
-  #control-card-details,
-  #advanced-control-card,
-  #tech-collect-card,
-  #tech-collect-card-details {
-    display: none;
-  }
-  #read-control-card.active,
-  #issue-control-card.active,
-  #control-card-details.active,
-  #advanced-control-card.active,
-  #tech-collect-card.active,
-  #tech-collect-card-details.active,
-  #read-control-card[style*="display: block"],
-  #issue-control-card[style*="display: block"],
-  #control-card-details[style*="display: block"],
-  #advanced-control-card[style*="display: block"],
-  #tech-collect-card[style*="display: block"],
-  #tech-collect-card-details[style*="display: block"] {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
-</style>
+<link rel="stylesheet" href="index.css">
 </head>
 
 <body>
@@ -507,6 +481,127 @@
     </div>
 
   <div id="toast-container"></div>
+
+  <div id="app-notification-dialog" class="app-notification-dialog" role="dialog" aria-modal="true" aria-labelledby="app-notification-title" aria-describedby="app-notification-message" hidden>
+      <div class="app-notification-dialog__backdrop" data-close-app-notification></div>
+      <div class="app-notification-dialog__panel" data-state="info">
+          <button type="button" class="app-notification-dialog__close" id="app-notification-close" aria-label="إغلاق" hidden>&times;</button>
+          <div class="app-notification-dialog__icon" id="app-notification-icon" aria-hidden="true">💬</div>
+          <h2 id="app-notification-title">إشعار</h2>
+          <p id="app-notification-message" aria-live="polite"></p>
+          <div class="app-notification-dialog__spinner" id="app-notification-spinner" hidden></div>
+          <button type="button" class="btn app-notification-dialog__confirm" id="app-notification-confirm" hidden>حسناً</button>
+      </div>
+  </div>
+  <script>
+    (() => {
+      const dialog = document.getElementById('app-notification-dialog');
+      const panel = dialog?.querySelector('.app-notification-dialog__panel');
+      const title = document.getElementById('app-notification-title');
+      const message = document.getElementById('app-notification-message');
+      const icon = document.getElementById('app-notification-icon');
+      const spinner = document.getElementById('app-notification-spinner');
+      const closeButton = document.getElementById('app-notification-close');
+      const confirmButton = document.getElementById('app-notification-confirm');
+      const toastContainer = document.getElementById('toast-container');
+      const readButtonSelector = '#btn-read-control-card';
+      if (!dialog || !panel || !title || !message || !icon || !spinner || !closeButton || !confirmButton || !toastContainer) {
+        console.error('Control card read dialog could not initialize: required elements are missing.');
+        return;
+      }
+
+      let reading = false;
+      let closeTimer;
+      let readTimeout;
+      let previousFocus;
+
+      const hide = () => {
+        if (reading) return;
+        dialog.hidden = true;
+        window.clearTimeout(closeTimer);
+        if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+        previousFocus = undefined;
+      };
+
+      const show = (text, state, loading = false) => {
+        window.clearTimeout(closeTimer);
+        if (dialog.hidden) previousFocus = document.activeElement;
+        panel.dataset.state = state;
+        title.textContent = loading
+          ? 'جاري قراءة كارت التحكم'
+          : state === 'success'
+            ? 'تم بنجاح'
+            : state === 'warning'
+              ? 'تنبيه'
+              : state === 'error'
+                ? 'حدث خطأ'
+                : 'إشعار';
+        message.textContent = text;
+        icon.textContent = state === 'success' ? '✓' : state === 'warning' ? '!' : state === 'error' ? '×' : '💬';
+        spinner.hidden = !loading;
+        closeButton.hidden = loading;
+        confirmButton.hidden = loading;
+        dialog.hidden = false;
+        if (loading) {
+          reading = true;
+          readTimeout = window.setTimeout(() => {
+            reading = false;
+            show('لم تصل استجابة من خدمة قراءة الكروت. تحقق من القارئ ثم حاول مرة أخرى.', 'error');
+          }, 60000);
+        } else {
+          reading = false;
+          window.clearTimeout(readTimeout);
+          closeTimer = window.setTimeout(hide, 6500);
+          confirmButton.focus();
+        }
+      };
+
+      document.addEventListener('click', event => {
+        const target = event.target;
+        if (target instanceof Element && target.closest(readButtonSelector)) {
+          show('جاري الاتصال بخدمة UnifiedCardService وقراءة كارت التحكم...', 'info', true);
+        }
+      }, true);
+
+      const closeWhenFinished = () => {
+        reading = false;
+        hide();
+      };
+      closeButton.addEventListener('click', closeWhenFinished);
+      confirmButton.addEventListener('click', closeWhenFinished);
+      dialog.querySelector('[data-close-app-notification]')?.addEventListener('click', closeWhenFinished);
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !dialog.hidden) closeWhenFinished();
+      });
+
+      const toastObserver = new MutationObserver(records => {
+        records.forEach(record => {
+          record.addedNodes.forEach(node => {
+            if (!(node instanceof HTMLElement)) return;
+            const toasts = node.matches('.toast') ? [node] : Array.from(node.querySelectorAll('.toast'));
+            toasts.forEach(toast => {
+              const text = toast.textContent?.trim();
+              if (!text) return;
+              toast.remove();
+              if (reading && /جاري الاتصال|جارٍ الاتصال|جاري التعامل|جاري تحديث|جارٍ تحديث/.test(text)) {
+                message.textContent = text;
+                return;
+              }
+              const state = toast.classList.contains('success')
+                ? 'success'
+                : toast.classList.contains('error')
+                  ? (/غير مفعل|تنبيه|يحتاج تجديد/.test(text) ? 'warning' : 'error')
+                  : toast.classList.contains('warning')
+                    ? 'warning'
+                    : 'info';
+              show(text, state);
+            });
+          });
+        });
+      });
+      toastObserver.observe(toastContainer, { childList: true, subtree: true });
+    })();
+  </script>
 
   <!-- Add New Area Dialog -->
   <div id="add-pending-area-dialog" class="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="add-area-dialog-title" hidden>
@@ -6217,6 +6312,7 @@
                     <button type="button" id="btn-sp-modal-dismiss" style="background: #e2e8f0; color: #334155; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 700; cursor: pointer;">إغلاق</button>
                 </div>
             </div>
+        </div>
         <!-- ========================================================================= -->
         <!-- قسم حافظات التوريد: 3. التقرير المالي والتفصيلي لجميع البرامج والمستخدمين -->
         <!-- ========================================================================= -->
@@ -8684,31 +8780,6 @@
     });
   </script>
 
-  <!-- HOTFIX v2: Guarantee control card section visibility -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      var ctrlIds = ['read-control-card','issue-control-card','control-card-details','advanced-control-card','tech-collect-card','tech-collect-card-details'];
-
-      // Intercept nav clicks for control card sections
-      document.addEventListener('click', function(e) {
-        var link = e.target && e.target.closest ? e.target.closest('.nav-link, .panel-action-card') : null;
-        if (!link) return;
-        var target = link.getAttribute('data-target');
-        if (!target || ctrlIds.indexOf(target) === -1) return;
-
-        // Delay to run after main JS handleNavigation
-        setTimeout(function() {
-          var sec = document.getElementById(target);
-          if (sec) {
-            sec.style.display = 'block';
-            sec.style.visibility = 'visible';
-            sec.style.opacity = '1';
-            if (!sec.classList.contains('active')) sec.classList.add('active');
-          }
-        }, 80);
-      }, true); // capture phase to run alongside main JS
-    });
-  </script>
     <!-- PowerPoint editor removed -->
     <!--
         document.addEventListener('DOMContentLoaded', () => {

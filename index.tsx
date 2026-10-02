@@ -73594,4 +73594,3 @@ function initMeedcoGateway() {
     setInterval(fetchStatus, 30000);
 
 }
-
