@@ -7800,10 +7800,13 @@ const autoFetchUserProgramsRevenue = async (showToastNotice = true) => {
     }
 };
 const loadComprehensiveDailyReport = async (forceSync = false) => {
+    var _a, _b, _c;
     const fromInput = document.getElementById('sp-detail-from-date');
     const toInput = document.getElementById('sp-detail-to-date');
     const branchSelect = document.getElementById('sp-detail-branch-filter');
     const legacyDateInput = document.getElementById('sp-detail-date');
+    // تصفير البيانات القديمة في بداية كل جلب جديد
+    currentComprehensiveReportData = null;
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
@@ -7820,10 +7823,50 @@ const loadComprehensiveDailyReport = async (forceSync = false) => {
     const toDate = ((toInput === null || toInput === void 0 ? void 0 : toInput.value) || fromDate).trim();
     const branch = ((branchSelect === null || branchSelect === void 0 ? void 0 : branchSelect.value) || 'all').trim();
     const btnRefreshText = document.getElementById('btn-sp-detail-refresh-text');
-    if (btnRefreshText)
-        btnRefreshText.textContent = 'جارِ فحص ومزامنة البرامج... ⏳';
     const tbody = document.getElementById('sp-detail-table-tbody');
-    if (tbody) {
+    // ── الخطوة 1: عرض الـ cache فوراً إن وجد ──
+    if (!forceSync) {
+        try {
+            const cacheUrl = `http://127.0.0.1:5002/api/reports/comprehensive-cache?from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}&branch=${encodeURIComponent(branch)}`;
+            const cacheRes = await fetch(cacheUrl).then(r => r.json()).catch(() => null);
+            if (cacheRes && cacheRes.success && cacheRes.data && Array.isArray(cacheRes.data.users) && cacheRes.data.users.length > 0) {
+                currentComprehensiveReportData = cacheRes.data;
+                const userFilterSelect = document.getElementById('sp-detail-user-filter');
+                if (userFilterSelect && Array.isArray(cacheRes.data.users)) {
+                    const prevSelected = userFilterSelect.value;
+                    let optsHtml = '<option value="all">كافة المستخدمين والمحصلين</option>';
+                    const sortedNames = Array.from(new Set(cacheRes.data.users.map((u) => u.userName).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ar'));
+                    sortedNames.forEach((name) => {
+                        optsHtml += `<option value="${String(name).replace(/"/g, '&quot;')}">${String(name).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`;
+                    });
+                    userFilterSelect.innerHTML = optsHtml;
+                    if (prevSelected && sortedNames.includes(prevSelected)) {
+                        userFilterSelect.value = prevSelected;
+                    }
+                }
+                updateComprehensiveReportKPIs(cacheRes.data.summary);
+                filterAndRenderComprehensiveTable();
+                // إضافة شريط إشعار "من cache - جارِ التحديث"
+                const cachedAt = cacheRes.data.cachedAt ? new Date(cacheRes.data.cachedAt).toLocaleString('ar-EG') : '';
+                if (tbody) {
+                    const noticeRow = document.createElement('tr');
+                    noticeRow.id = 'sp-cache-notice-row';
+                    noticeRow.innerHTML = `<td colspan="11" style="text-align: center; padding: 8px; background: #fef9c3; color: #92400e; font-size: 0.85rem; border-bottom: 2px solid #fde68a;">⏳ يتم الآن تحديث البيانات من المنظومات المباشرة... (آخر تحديث: ${cachedAt})</td>`;
+                    tbody.insertBefore(noticeRow, tbody.firstChild);
+                }
+                if (btnRefreshText)
+                    btnRefreshText.textContent = 'جارِ التحديث... ⏳';
+            }
+        }
+        catch (e) {
+            // cache غير متوفر، نكمل للجلب المباشر
+        }
+    }
+    // ── الخطوة 2: جلب البيانات الحديثة من الـ API ──
+    if (btnRefreshText && !currentComprehensiveReportData) {
+        btnRefreshText.textContent = 'جارِ فحص ومزامنة البرامج... ⏳';
+    }
+    if (tbody && !currentComprehensiveReportData) {
         tbody.innerHTML = `
                 <tr>
                     <td colspan="11" style="text-align: center; padding: 40px; color: #0284c7; font-weight: 700;">
@@ -7854,6 +7897,8 @@ const loadComprehensiveDailyReport = async (forceSync = false) => {
                     userFilterSelect.value = prevSelected;
                 }
             }
+            // إزالة شريط الـ cache notice
+            (_a = document.getElementById('sp-cache-notice-row')) === null || _a === void 0 ? void 0 : _a.remove();
             updateComprehensiveReportKPIs(res.data.summary);
             filterAndRenderComprehensiveTable();
             if (forceSync) {
@@ -7861,15 +7906,28 @@ const loadComprehensiveDailyReport = async (forceSync = false) => {
             }
         }
         else {
-            if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: #ef4444; font-weight: 700;">تعذر جلب التقرير: ${(res && res.message) || 'استجابة غير صحيحة'}</td></tr>`;
+            // إذا فشل الجلب لكن لدينا cache، ابقِ على بيانات الـ cache
+            if (!currentComprehensiveReportData) {
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: #ef4444; font-weight: 700;">تعذر جلب التقرير: ${(res && res.message) || 'استجابة غير صحيحة'}<br><button onclick="loadComprehensiveDailyReport(true)" style="margin-top:10px; padding:8px 18px; background:#3b82f6; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:1rem;">🔄 إعادة المحاولة</button></td></tr>`;
+                }
+            }
+            else {
+                (_b = document.getElementById('sp-cache-notice-row')) === null || _b === void 0 ? void 0 : _b.remove();
+                showToast('تعذر التحديث من المنظومات - تم عرض آخر بيانات محفوظة', 'warning');
             }
         }
     }
     catch (e) {
         console.error('Error loading comprehensive report:', e);
-        if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: #ef4444; font-weight: 700;">خطأ في الاتصال بالخادم: ${e.message}</td></tr>`;
+        if (!currentComprehensiveReportData) {
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: #ef4444; font-weight: 700;">خطأ في الاتصال بالخادم: ${e.message}<br><small style="color:#6b7280;">تأكد من تشغيل سيرفر المنظومة</small><br><button onclick="loadComprehensiveDailyReport(true)" style="margin-top:10px; padding:8px 18px; background:#3b82f6; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:1rem;">🔄 إعادة المحاولة</button></td></tr>`;
+            }
+        }
+        else {
+            (_c = document.getElementById('sp-cache-notice-row')) === null || _c === void 0 ? void 0 : _c.remove();
+            showToast('تعذر التحديث - تم عرض آخر بيانات محفوظة', 'warning');
         }
     }
     finally {

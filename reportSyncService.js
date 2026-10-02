@@ -564,6 +564,24 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
 }
 
 /**
+ * جلب التقرير الشامل من الـ cache المحلي فقط (بدون اتصال بالسيرفر)
+ */
+function getComprehensiveReportFromCache(fromDateStr, toDateStr, branchFilter) {
+    try {
+        const cacheKey = `comprehensive_${fromDateStr}_${toDateStr}_${branchFilter || 'all'}`;
+        const cacheFile = path.join(CACHE_DIR, `${cacheKey}.json`);
+        if (fs.existsSync(cacheFile)) {
+            const raw = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+            if (raw && raw.users) {
+                raw.fromCache = true;
+                return raw;
+            }
+        }
+    } catch (e) {}
+    return null;
+}
+
+/**
  * التقرير الشامل والمفصل لجميع المستخدمين والبرامج مع دعم البحث بفترة (من تاريخ إلى تاريخ) والإدارة
  */
 async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter) {
@@ -756,12 +774,13 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
         return u;
     });
 
-    return {
+    const result = {
         success: true,
         date: fromDateStr === toDateStr ? fromDateStr : `${fromDateStr} إلى ${toDateStr}`,
         fromDate: fromDateStr,
         toDate: toDateStr,
         branch: branchFilter || 'all',
+        cachedAt: new Date().toISOString(),
         summary: {
             totalUsersCount: userList.length,
             grandMeedcoAmount: Math.round(grandMeedcoAmount * 100) / 100,
@@ -777,6 +796,17 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
         },
         users: userList
     };
+
+    // حفظ في cache للعرض الفوري في المرات القادمة
+    try {
+        const cacheKey = `comprehensive_${fromDateStr}_${toDateStr}_${branchFilter || 'all'}`;
+        const cacheFile = path.join(CACHE_DIR, `${cacheKey}.json`);
+        fs.writeFileSync(cacheFile, JSON.stringify(result, null, 2), 'utf8');
+    } catch (e) {
+        console.warn('[ReportSync] Failed to save comprehensive cache:', e.message);
+    }
+
+    return result;
 }
 
 module.exports = {
@@ -784,5 +814,6 @@ module.exports = {
     fetchMaasaraDailySales,
     fetchIskraDailySales,
     getUserDailyPrograms,
-    getComprehensiveDailyReport
+    getComprehensiveDailyReport,
+    getComprehensiveReportFromCache
 };

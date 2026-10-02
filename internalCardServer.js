@@ -1189,6 +1189,23 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            // 8.3b جلب التقرير الشامل من الـ cache المحلي فوراً (بدون انتظار الاتصال بـ MEEDCO)
+            if (pathname === '/api/reports/comprehensive-cache') {
+                const reportSync = require('./reportSyncService');
+                const fromDate = url.searchParams.get('from') || url.searchParams.get('fromDate') || url.searchParams.get('date') || new Date().toISOString().slice(0, 10);
+                const toDate = url.searchParams.get('to') || url.searchParams.get('toDate') || fromDate;
+                const branch = url.searchParams.get('branch') || '';
+                const cached = reportSync.getComprehensiveReportFromCache(fromDate, toDate, branch);
+                if (cached) {
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ success: true, data: cached, fromCache: true }));
+                } else {
+                    res.writeHead(200);
+                    res.end(JSON.stringify({ success: false, message: 'لا يوجد cache محفوظ لهذه الفترة' }));
+                }
+                return;
+            }
+
             // 8.4 رفع واستيراد ملف مبيعات برنامج المعصرة Excel (.xlsx) مباشرة
             if (pathname === '/api/reports/upload-maasara' && req.method === 'POST') {
                 const body = await getBody();
