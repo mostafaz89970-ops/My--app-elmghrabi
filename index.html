@@ -8656,6 +8656,32 @@
       }
     });
   </script>
+
+  <!-- HOTFIX v2: Guarantee control card section visibility -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var ctrlIds = ['read-control-card','issue-control-card','control-card-details','advanced-control-card','tech-collect-card','tech-collect-card-details'];
+
+      // Intercept nav clicks for control card sections
+      document.addEventListener('click', function(e) {
+        var link = e.target && e.target.closest ? e.target.closest('.nav-link, .panel-action-card') : null;
+        if (!link) return;
+        var target = link.getAttribute('data-target');
+        if (!target || ctrlIds.indexOf(target) === -1) return;
+
+        // Delay to run after main JS handleNavigation
+        setTimeout(function() {
+          var sec = document.getElementById(target);
+          if (sec) {
+            sec.style.display = 'block';
+            sec.style.visibility = 'visible';
+            sec.style.opacity = '1';
+            if (!sec.classList.contains('active')) sec.classList.add('active');
+          }
+        }, 80);
+      }, true); // capture phase to run alongside main JS
+    });
+  </script>
     <!-- PowerPoint editor removed -->
     <!--
         document.addEventListener('DOMContentLoaded', () => {
