@@ -10,7 +10,7 @@
 
 'use strict';
 
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -101,6 +101,24 @@ function renewSessionViaSever() {
     });
 }
 
+
+function killPortProcesses(p) {
+    try {
+        const out = execSync(`netstat -ano | findstr :${p}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+        const lines = out.split('\n');
+        for (const line of lines) {
+            if (line.includes('LISTENING')) {
+                const parts = line.trim().split(/\s+/);
+                const pid = parts[parts.length - 1];
+                if (pid && pid !== String(process.pid) && pid !== '0') {
+                    log('INFO', `تحرير المنفذ ${p} من PID: ${pid}`);
+                    try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch (_) {}
+                }
+            }
+        }
+    } catch (_) {}
+}
+
 // ─── حماية من الـ crash loop ───────────────────────────────────────────────
 function canRestart() {
     const now = Date.now();
@@ -119,11 +137,12 @@ function startServer() {
     if (isRestarting) return;
     if (!canRestart()) {
         // انتظر 2 دقيقة ثم حاول مجدداً
-        setTimeout(startServer, 2 * 60_000);
+        killPortProcesses(PORT); restartTimestamps = []; setTimeout(startServer, 5000);
         return;
     }
 
     isRestarting = true;
+    killPortProcesses(PORT);
     log('INFO', 'جارٍ تشغيل internalCardServer.js...');
 
     serverProcess = spawn(process.execPath, [SERVER_SCRIPT], {

@@ -7818,6 +7818,19 @@ const loadComprehensiveDailyReport = async (forceSync = false) => {
     const legacyDateInput = document.getElementById('sp-detail-date');
     // تصفير البيانات القديمة في بداية كل جلب جديد
     currentComprehensiveReportData = null;
+    // استرجاع الكاش المحلي فوراً لمنع الشاشة الفارغة
+    try {
+        const localReport = localStorage.getItem('cachedComprehensiveReportData');
+        if (localReport) {
+            const parsed = JSON.parse(localReport);
+            if (parsed && Array.isArray(parsed.users) && parsed.users.length > 0) {
+                currentComprehensiveReportData = parsed;
+                updateComprehensiveReportKPIs(parsed.summary);
+                filterAndRenderComprehensiveTable();
+            }
+        }
+    }
+    catch (_) { }
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
@@ -7910,6 +7923,10 @@ const loadComprehensiveDailyReport = async (forceSync = false) => {
             }
             // إزالة شريط الـ cache notice
             (_a = document.getElementById('sp-cache-notice-row')) === null || _a === void 0 ? void 0 : _a.remove();
+            try {
+                localStorage.setItem('cachedComprehensiveReportData', JSON.stringify(res.data));
+            }
+            catch (_) { }
             updateComprehensiveReportKPIs(res.data.summary);
             filterAndRenderComprehensiveTable();
             if (forceSync) {
@@ -17980,22 +17997,43 @@ const fetchActiveControlCard = async () => {
         return;
     isFetchingActiveControlCard = true;
     try {
+        // 1. استرجاع فوري من التخزين المحلي لمنع أي وميض أو فراغ في الصفحة
+        if (!cachedControlCardsHistory || cachedControlCardsHistory.length === 0) {
+            try {
+                const localHist = localStorage.getItem('cachedControlCardsHistory');
+                if (localHist)
+                    cachedControlCardsHistory = JSON.parse(localHist);
+            }
+            catch (_) { }
+        }
         if (!currentControlCardData) {
             const localSaved = localStorage.getItem('activeControlCard');
             if (localSaved) {
                 try {
                     currentControlCardData = JSON.parse(localSaved);
-                    updateControlCardUI(currentControlCardData);
                 }
                 catch (e) { }
             }
+            else if (cachedControlCardsHistory && cachedControlCardsHistory.length > 0) {
+                currentControlCardData = cachedControlCardsHistory[0];
+            }
         }
+        if (currentControlCardData) {
+            updateControlCardUI(currentControlCardData);
+        }
+        populateControlCardsDropdown();
+        renderIssuedControlCardsTable();
+        // 2. مزامنة البيانات الحية مع الخادم الداخلي
         const [actRes, histRes] = await Promise.allSettled([
             fetch('http://127.0.0.1:5002/api/control-card/active').then(r => r.json()),
             fetch('http://127.0.0.1:5002/api/control-card/history').then(r => r.json())
         ]);
         if (histRes.status === 'fulfilled' && histRes.value && histRes.value.success && Array.isArray(histRes.value.data)) {
             cachedControlCardsHistory = histRes.value.data;
+            try {
+                localStorage.setItem('cachedControlCardsHistory', JSON.stringify(cachedControlCardsHistory));
+            }
+            catch (_) { }
         }
         if (actRes.status === 'fulfilled' && actRes.value && actRes.value.success && actRes.value.data) {
             currentControlCardData = actRes.value.data;
@@ -18111,13 +18149,31 @@ const renderIssuedControlCardsTable = () => {
     });
 };
 const renderReadControlCardSection = () => {
+    // فحص الكاش الفوري لمنع الصفحة الفارغة
+    if (!cachedControlCardsHistory || cachedControlCardsHistory.length === 0) {
+        try {
+            const localHist = localStorage.getItem('cachedControlCardsHistory');
+            if (localHist)
+                cachedControlCardsHistory = JSON.parse(localHist);
+        }
+        catch (_) { }
+    }
+    if (!currentControlCardData) {
+        try {
+            const localSaved = localStorage.getItem('activeControlCard');
+            if (localSaved)
+                currentControlCardData = JSON.parse(localSaved);
+            else if (cachedControlCardsHistory && cachedControlCardsHistory.length > 0)
+                currentControlCardData = cachedControlCardsHistory[0];
+        }
+        catch (_) { }
+    }
     if (currentControlCardData) {
         updateControlCardUI(currentControlCardData);
-        populateControlCardsDropdown();
     }
-    else {
-        fetchActiveControlCard();
-    }
+    populateControlCardsDropdown();
+    renderIssuedControlCardsTable();
+    fetchActiveControlCard();
 };
 const updateControlCardUI = (cardData) => {
     const companyEl = document.getElementById('ctrl-company-name');
