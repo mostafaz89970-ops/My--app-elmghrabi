@@ -345,7 +345,34 @@
         font-size: 0.9rem;
     }
   </style>
-<link rel="stylesheet" href="/index.css">
+<link rel="stylesheet" href="index.css">
+<!-- CSS مباشر لضمان ظهور أقسام كروت التحكم -->
+<style>
+  #read-control-card,
+  #issue-control-card,
+  #control-card-details,
+  #advanced-control-card,
+  #tech-collect-card,
+  #tech-collect-card-details {
+    display: none;
+  }
+  #read-control-card.active,
+  #issue-control-card.active,
+  #control-card-details.active,
+  #advanced-control-card.active,
+  #tech-collect-card.active,
+  #tech-collect-card-details.active,
+  #read-control-card[style*="display: block"],
+  #issue-control-card[style*="display: block"],
+  #control-card-details[style*="display: block"],
+  #advanced-control-card[style*="display: block"],
+  #tech-collect-card[style*="display: block"],
+  #tech-collect-card-details[style*="display: block"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+</style>
 </head>
 
 <body>
