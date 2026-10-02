@@ -654,16 +654,16 @@ async function readControlCardLive() {
                                     id: data.id,
                                     cardId: data.cardId,
                                     technicianCode: data.techniciancode,
-                                    technicianName: data.technicianName || 'فني معتمد',
-                                    controlOperationTypeName: data.controlOperationTypeName || 'إزالة تلاعبات و أخطاء',
-                                    controlOperationType: data.controlOperationType != null ? data.controlOperationType : 2,
+                                    technicianName: data.technicianName || '',
+                                    controlOperationTypeName: data.controlOperationTypeName || '',
+                                    controlOperationType: data.controlOperationType != null ? data.controlOperationType : null,
                                     companyName: data.companyName || getVendorNameById(detectedVendorId),
                                     meterTypeName: data.meterTypeName || '',
                                     cardIssueDate: data.issueDate || '',
                                     activationDate: data.controlCardActivationDate || '',
                                     expiryDate: data.controlCardExpiryDate || '',
-                                    issueUsername: data.issueUsername || 'المشغل المعتمد',
-                                    status: 'مفعل',
+                                    issueUsername: data.issueUsername || '',
+                                    status: data.status || '',
                                     readAt: new Date().toLocaleString('ar-EG'),
                                     meterData: data.meterData || []
                                 };
@@ -3110,4 +3110,3 @@ module.exports = {
     getCustomerTypesDropdownLive,
     getPlaceDescsDropdownLive
 };
-

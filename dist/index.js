@@ -18021,11 +18021,6 @@ const fetchActiveControlCard = async () => {
                 currentControlCardData = cachedControlCardsHistory[0];
             }
         }
-        if (currentControlCardData) {
-            updateControlCardUI(currentControlCardData);
-        }
-        populateControlCardsDropdown();
-        renderIssuedControlCardsTable();
         // 2. مزامنة البيانات الحية مع الخادم الداخلي
         const [actRes, histRes] = await Promise.allSettled([
             fetch('http://127.0.0.1:5002/api/control-card/active').then(r => r.json()),
@@ -18044,7 +18039,6 @@ const fetchActiveControlCard = async () => {
                 localStorage.setItem('activeControlCard', JSON.stringify(currentControlCardData));
             }
             catch (e) { }
-            updateControlCardUI(currentControlCardData);
         }
         else if (!currentControlCardData && cachedControlCardsHistory.length > 0) {
             currentControlCardData = cachedControlCardsHistory[0];
@@ -18052,10 +18046,7 @@ const fetchActiveControlCard = async () => {
                 localStorage.setItem('activeControlCard', JSON.stringify(currentControlCardData));
             }
             catch (e) { }
-            updateControlCardUI(currentControlCardData);
         }
-        populateControlCardsDropdown();
-        renderIssuedControlCardsTable();
     }
     catch (e) {
         console.warn('Could not fetch active control card:', e);
@@ -18064,119 +18055,8 @@ const fetchActiveControlCard = async () => {
         isFetchingActiveControlCard = false;
     }
 };
-const populateControlCardsDropdown = () => {
-    const select = document.getElementById('select-saved-control-card');
-    if (!select)
-        return;
-    if (!cachedControlCardsHistory || cachedControlCardsHistory.length === 0) {
-        if (currentControlCardData) {
-            cachedControlCardsHistory = [currentControlCardData];
-        }
-        else {
-            select.innerHTML = '<option value="">لا توجد كروت تحكم مسجلة حالياً</option>';
-            return;
-        }
-    }
-    const currentId = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.cardId) || (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.id) || '';
-    select.innerHTML = '';
-    cachedControlCardsHistory.forEach(card => {
-        const opt = document.createElement('option');
-        opt.value = card.cardId || card.id;
-        const opName = card.controlOperationTypeName || card.operationType || 'كارت تحكم';
-        const tech = card.technicianName ? (' | فني: ' + card.technicianName) : '';
-        const comp = card.companyName ? (' | ' + card.companyName) : '';
-        const date = card.cardIssueDate || card.readAt || '';
-        opt.textContent = 'كارت رقم ' + card.cardId + ' (' + opName + comp + tech + ') ' + date;
-        if (String(card.cardId).trim() === String(currentId).trim()) {
-            opt.selected = true;
-        }
-        select.appendChild(opt);
-    });
-};
-const renderIssuedControlCardsTable = () => {
-    const tbody = document.getElementById('tbody-issued-control-cards');
-    const countEl = document.getElementById('issue-history-count');
-    if (!tbody)
-        return;
-    const cards = cachedControlCardsHistory || [];
-    if (countEl)
-        countEl.textContent = String(cards.length);
-    if (cards.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">لا توجد كروت تحكم محفوظة بالمنظومة بعد.</td></tr>';
-        return;
-    }
-    tbody.innerHTML = cards.map((c, idx) => {
-        const cId = c.cardId || c.id || '-';
-        const comp = c.companyName || '-';
-        const op = c.controlOperationTypeName || c.operationType || '-';
-        const tech = c.technicianName || '-';
-        const issueDate = c.cardIssueDate || c.readAt || '-';
-        const expDate = c.expiryDate || '-';
-        const statusBadge = c.status === 'مفعل'
-            ? '<span style="background: #dcfce7; color: #15803d; padding: 3px 10px; border-radius: 9999px; font-weight: 600; font-size: 0.8rem;">مفعل ✓</span>'
-            : '<span style="background: #f1f5f9; color: #475569; padding: 3px 10px; border-radius: 9999px; font-weight: 600; font-size: 0.8rem;">محفوظ</span>';
-        return '<tr>' +
-            '<td>' + (idx + 1) + '</td>' +
-            '<td><strong style="color: #0284c7; font-family: monospace;">' + cId + '</strong></td>' +
-            '<td>' + comp + '</td>' +
-            '<td>' + op + '</td>' +
-            '<td>' + tech + '</td>' +
-            '<td>' + issueDate + '</td>' +
-            '<td>' + expDate + '</td>' +
-            '<td>' + statusBadge + '</td>' +
-            '<td>' +
-            '<button type="button" class="btn btn-sm btn-view-issued-card" data-card-id="' + cId + '" style="background: #0284c7; color: white; padding: 4px 10px; font-size: 0.8rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">' +
-            '<span>عرض البيانات</span>' +
-            '</button>' +
-            '</td>' +
-            '</tr>';
-    }).join('');
-    tbody.querySelectorAll('.btn-view-issued-card').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const targetCardId = e.currentTarget.getAttribute('data-card-id');
-            if (!targetCardId)
-                return;
-            const match = cards.find((c) => String(c.cardId).trim() === String(targetCardId).trim() || String(c.id).trim() === String(targetCardId).trim());
-            if (match) {
-                currentControlCardData = match;
-                try {
-                    localStorage.setItem('activeControlCard', JSON.stringify(match));
-                }
-                catch (err) { }
-                updateControlCardUI(match);
-                populateControlCardsDropdown();
-                navigateToSection('read-control-card');
-                showToast('تم فتح وعرض بيانات كارت التحكم رقم ' + targetCardId + '!', 'success');
-            }
-        });
-    });
-};
 const renderReadControlCardSection = () => {
-    // فحص الكاش الفوري لمنع الصفحة الفارغة
-    if (!cachedControlCardsHistory || cachedControlCardsHistory.length === 0) {
-        try {
-            const localHist = localStorage.getItem('cachedControlCardsHistory');
-            if (localHist)
-                cachedControlCardsHistory = JSON.parse(localHist);
-        }
-        catch (_) { }
-    }
-    if (!currentControlCardData) {
-        try {
-            const localSaved = localStorage.getItem('activeControlCard');
-            if (localSaved)
-                currentControlCardData = JSON.parse(localSaved);
-            else if (cachedControlCardsHistory && cachedControlCardsHistory.length > 0)
-                currentControlCardData = cachedControlCardsHistory[0];
-        }
-        catch (_) { }
-    }
-    if (currentControlCardData) {
-        updateControlCardUI(currentControlCardData);
-    }
-    populateControlCardsDropdown();
-    renderIssuedControlCardsTable();
-    fetchActiveControlCard();
+    clearControlCardUI();
 };
 const updateControlCardUI = (cardData) => {
     const companyEl = document.getElementById('ctrl-company-name');
@@ -18211,7 +18091,7 @@ const updateControlCardUI = (cardData) => {
     if (expiryDateEl)
         expiryDateEl.textContent = cardData.controlCardExpiryDate || cardData.expiryDate || '-';
     if (issuerEl)
-        issuerEl.textContent = cardData.issueUsername || cardData.issuerUserName || cardData.issuer || ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول النظام');
+        issuerEl.textContent = cardData.issueUsername || cardData.issuerUserName || cardData.issuer || '-';
     if (badgeEl) {
         if (cardData.isCleared || cardData.status === 'empty_card' || cardData.status === 'كارت ممسوح / فارغ') {
             badgeEl.textContent = 'كارت تحكم ممسوح / فارغ (جاهز للإصدار)';
@@ -18225,11 +18105,17 @@ const updateControlCardUI = (cardData) => {
             badgeEl.style.color = '#b45309';
             badgeEl.style.border = '1px solid #fcd34d';
         }
-        else {
+        else if (cardData.status === 'مفعل' || cardData.status === 'active') {
             badgeEl.textContent = 'كارت مفعل';
             badgeEl.style.backgroundColor = '#dcfce7';
             badgeEl.style.color = '#15803d';
             badgeEl.style.border = '1px solid #86efac';
+        }
+        else {
+            badgeEl.textContent = 'تمت قراءة بيانات الكارت';
+            badgeEl.style.backgroundColor = '#e0f2fe';
+            badgeEl.style.color = '#0369a1';
+            badgeEl.style.border = '1px solid #7dd3fc';
         }
     }
     if (printBtn) {
@@ -18266,11 +18152,13 @@ const updateControlCardUI = (cardData) => {
         const meterNum = m.meterNumber || m.meterId || m.chassisNumber || m.meterChassis || '-';
         const custCode = m.customerCode || m.customerId || m.subscriptionCode || '-';
         // Search local database for match
-        const localMatch = state.meters.find(lm => (lm.meterChassisNumber && String(lm.meterChassisNumber).trim() === String(meterNum).trim()) ||
-            (lm.subscriptionCode && String(lm.subscriptionCode).trim() === String(custCode).trim()));
-        const custName = m.customerName || m.name || (localMatch ? localMatch.subscriberName : 'غير مسجل محلياً');
-        const meterStatus = m.status || m.meterStatus || (m.hasTamper ? '<span style="color:#dc2626;">تلاعب</span>' : '<span style="color:#16a34a;">سليم</span>');
-        const batteryStatus = m.batteryStatus || m.batarryStatus || (m.batteryVoltage ? `${m.batteryVoltage} V` : 'سليمة');
+        const custName = m.customerName || m.name || '-';
+        const meterStatus = m.status || m.meterStatus || (m.hasTamper === true
+            ? '<span style="color:#dc2626;">تلاعب</span>'
+            : m.hasTamper === false
+                ? '<span style="color:#16a34a;">سليم</span>'
+                : '-');
+        const batteryStatus = m.batteryStatus || m.batarryStatus || (m.batteryVoltage ? `${m.batteryVoltage} V` : '-');
         const balanceText = m.balance != null ? `${m.balance} ج.م` : (m.remainingBalance != null ? `${m.remainingBalance} ج.م` : (m.totalActiveEnergy != null ? `${m.totalActiveEnergy} ك.و.س` : '-'));
         return `
 
@@ -18317,6 +18205,14 @@ const updateControlCardUI = (cardData) => {
 const handleReadControlCard = async () => {
     const readBtn = document.getElementById('btn-read-control-card');
     const origHtml = readBtn ? readBtn.innerHTML : '';
+    clearControlCardUI();
+    const statusBadge = document.getElementById('ctrl-card-status-badge');
+    if (statusBadge) {
+        statusBadge.textContent = 'جاري قراءة الكارت الفعلي...';
+        statusBadge.style.backgroundColor = '#e0f2fe';
+        statusBadge.style.color = '#0369a1';
+        statusBadge.style.border = '1px solid #7dd3fc';
+    }
     if (readBtn) {
         readBtn.disabled = true;
         readBtn.innerHTML = `
@@ -18339,90 +18235,78 @@ const handleReadControlCard = async () => {
                 result = await res.json();
             }
             catch (bridgeErr) {
+                if (statusBadge)
+                    statusBadge.textContent = 'تعذر الاتصال بخدمة القارئ';
                 showToast('تعذر الاتصال بخدمة قراءة الكروت المحلية. تأكد من تشغيل الخدمة على جهازك.', 'error');
                 return;
             }
         }
         if (!result) {
+            if (statusBadge)
+                statusBadge.textContent = 'لم تصل استجابة من القارئ';
             showToast('لم يتم استلام أي استجابة من خدمة كروت التحكم.', 'error');
             return;
         }
         if (result.status === 'no_reader') {
+            if (statusBadge)
+                statusBadge.textContent = 'القارئ غير متصل';
             showToast(result.message || 'لم يتم العثور على قارئ كروت متصل بالجهاز.', 'error');
             return;
         }
         if (result.status === 'no_card') {
+            if (statusBadge)
+                statusBadge.textContent = 'لم يتم اكتشاف كارت على القارئ';
             showToast(result.message || 'يرجى وضع كارت التحكم داخل القارئ والمحاولة مجدداً.', 'error');
             return;
         }
         if (result.isCleared || result.status === 'empty_card') {
-            const vendorName = result.vendorName || (result.vendor_id === 1 || result.vendorCode === 1 ? 'السويدي (El Sewedy)' : (result.vendor_id === 3 || result.vendorCode === 3 ? 'المصرية' : 'جلوبالترونكس'));
-            const emptyData = {
-                cardId: '-',
-                vendorCode: result.vendor_id || result.vendorCode || 1,
-                vendorName: vendorName,
-                companyName: vendorName,
-                generationType: result.generation_type || 'g1',
-                technicianName: '-',
-                technicianCode: '-',
-                controlOperationTypeName: '-',
-                meterTypeName: '-',
-                issueDate: '-',
-                activationDate: '-',
-                expiryDate: '-',
-                status: 'كارت ممسوح / فارغ',
-                isCleared: true,
-                meterData: []
-            };
-            currentControlCardData = emptyData;
-            updateControlCardUI(emptyData);
-            showToast(result.message || `تم التعرف على كارت التحكم الفعلي (${vendorName}): الكارت ممسوح / فارغ وجاهز للإصدار والبرمجة.`, 'info');
+            if (statusBadge) {
+                statusBadge.textContent = 'الكارت الفعلي فارغ أو غير مبرمج';
+                statusBadge.style.backgroundColor = '#e0f2fe';
+                statusBadge.style.color = '#0369a1';
+                statusBadge.style.border = '1px solid #7dd3fc';
+            }
+            showToast(result.message || 'الكارت الموجود في القارئ فارغ أو غير مبرمج ولا يحتوي على بيانات كارت تحكم.', 'info');
             return;
         }
         if (!result.success) {
             if (result.status === 'inactive' || result.card_status === 'needs_renewal' || result.errorCode === 4041 || result.apiCode === 4041) {
-                const badgeEl = document.getElementById('ctrl-card-status-badge');
-                if (badgeEl) {
-                    badgeEl.textContent = 'الكارت غير مفعل / يحتاج تجديد صلاحية';
-                    badgeEl.style.backgroundColor = '#fef3c7';
-                    badgeEl.style.color = '#b45309';
-                    badgeEl.style.border = '1px solid #fcd34d';
+                if (statusBadge) {
+                    statusBadge.textContent = 'الكارت الفعلي غير مفعل أو منتهي الصلاحية';
+                    statusBadge.style.backgroundColor = '#fef3c7';
+                    statusBadge.style.color = '#b45309';
+                    statusBadge.style.border = '1px solid #fcd34d';
                 }
-                const vendorName = result.vendorName || (result.vendor_id === 1 || result.vendorCode === 1 ? 'السويدي (El Sewedy)' : 'جلوبالترونكس');
-                const data = result.data || result.card || {
-                    cardId: result.cardId || '-',
-                    vendorCode: result.vendor_id || result.vendorCode || 1,
-                    generationType: result.generation_type || 'g1',
-                    companyName: vendorName,
-                    status: 'غير مفعل'
-                };
-                currentControlCardData = data;
-                updateControlCardUI(data);
                 showToast(result.message || 'كارت التحكم غير مفعل حالياً أو انتهت صلاحيته اليومية. يمكنك تجديده عبر زر "تحديث الكارت".', 'warning');
             }
             else {
+                if (statusBadge)
+                    statusBadge.textContent = 'تعذر قراءة بيانات الكارت الفعلي';
                 showToast(result.message || 'فشل في فك تشفير أو قراءة كارت التحكم.', 'error');
             }
             return;
         }
         const data = result.data || result.card || result;
+        if (!data || typeof data !== 'object' || !(data.cardId || data.id)) {
+            if (statusBadge)
+                statusBadge.textContent = 'لم تصل بيانات فعلية صالحة من القارئ';
+            showToast('تم الاتصال بالقارئ، لكن لم تصل بيانات كارت فعلية صالحة. لم يتم عرض بيانات محفوظة أو افتراضية.', 'error');
+            return;
+        }
         currentControlCardData = data;
         try {
             localStorage.setItem('activeControlCard', JSON.stringify(data));
         }
         catch (e) { }
-        if (!cachedControlCardsHistory.some(c => String(c.cardId || c.id).trim() === String(data.cardId || data.id).trim())) {
-            cachedControlCardsHistory.unshift(data);
-        }
         updateControlCardUI(data);
-        populateControlCardsDropdown();
-        renderIssuedControlCardsTable();
         const cardId = data.cardId || data.id || '';
         const techName = data.technicianName || '';
         showToast(`تمت قراءة كارت التحكم بنجاح! رقم الكارت: ${cardId}${techName ? ' - الفني: ' + techName : ''}`, 'success');
     }
     catch (error) {
         console.error('Error reading control card:', error);
+        if (statusBadge)
+            statusBadge.textContent = 'حدث خطأ أثناء قراءة الكارت';
         showToast(`حدث خطأ أثناء قراءة كارت التحكم: ${error.message || error}`, 'error');
     }
     finally {
@@ -18458,10 +18342,8 @@ const clearControlCardUI = () => {
     if (tbody) {
         tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="padding: 2.2rem 1rem; text-align: center; color: #0284c7; font-weight: 600; font-size: 1rem;">
-                        <span style="font-size: 1.8rem; display: inline-block; margin-bottom: 6px;">💳</span><br>
-                        تم تحديث وتفعيل الكارت بنجاح وتم تفريغ القراءة.<br>
-                        <span style="color: #64748b; font-weight: 400; font-size: 0.85rem;">يرجى سحب الكارت وإدخال كارت تحكم آخر لتحديثه بسرعة.</span>
+                    <td colspan="8" style="padding: 2.2rem 1rem; text-align: center; color: #64748b; font-weight: 500; font-size: 1rem;">
+                        لم تتم قراءة كارت بعد. ضع كارت التحكم على القارئ واضغط «قراءة الكارت» لعرض البيانات الفعلية.
                     </td>
                 </tr>
             `;
@@ -18963,7 +18845,6 @@ const loadControlCardIssuanceData = async () => {
                 ]
             };
         }
-        renderIssuedControlCardsTable();
         // Populate Companies
         companySelect.innerHTML = '<option value="" disabled selected hidden>اختر الشركة المصنعة...</option>';
         controlCardMetadata.companies.forEach((c) => {
@@ -40174,7 +40055,7 @@ function handleNavigation(event) {
  */
 const setupEventListeners = () => {
     // Welcome Screen Listeners
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119, _120, _121, _122, _123, _124, _125, _126, _127, _128, _129, _130, _131, _132, _133, _134, _135, _136, _137, _138, _139, _140, _141, _142, _143, _144, _145, _146, _147;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119, _120, _121, _122, _123, _124, _125, _126, _127, _128, _129, _130, _131, _132, _133, _134, _135, _136, _137, _138, _139, _140, _141, _142, _143, _144, _145;
     (_a = document.getElementById('start-new-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', handleStartNew);
     (_b = document.getElementById('import-from-welcome-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleImportFromWelcome);
     // ================= Treasury Event Listeners =================
@@ -40687,34 +40568,7 @@ const setupEventListeners = () => {
                 targetTc.style.display = 'block';
         });
     });
-    (_64 = document.getElementById('select-saved-control-card')) === null || _64 === void 0 ? void 0 : _64.addEventListener('change', (e) => {
-        const selCardId = e.target.value;
-        if (!selCardId)
-            return;
-        const match = cachedControlCardsHistory.find((c) => String(c.cardId || c.id).trim() === String(selCardId).trim());
-        if (match) {
-            currentControlCardData = match;
-            try {
-                localStorage.setItem('activeControlCard', JSON.stringify(match));
-            }
-            catch (err) { }
-            updateControlCardUI(match);
-            showToast('تم عرض بيانات كارت التحكم رقم ' + selCardId + ' بنجاح!', 'success');
-            try {
-                fetch('http://127.0.0.1:5002/api/control-card/select', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cardId: selCardId })
-                });
-            }
-            catch (err) { }
-        }
-    });
-    (_65 = document.getElementById('btn-refresh-control-cards-history')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', () => {
-        showToast('جاري تحديث سجل كروت التحكم من الخادم...');
-        fetchActiveControlCard();
-    });
-    (_66 = document.getElementById('select-detail-meter')) === null || _66 === void 0 ? void 0 : _66.addEventListener('change', (e) => {
+    (_64 = document.getElementById('select-detail-meter')) === null || _64 === void 0 ? void 0 : _64.addEventListener('change', (e) => {
         const mNum = e.target.value;
         if (!mNum)
             return;
@@ -40741,7 +40595,7 @@ const setupEventListeners = () => {
             renderControlCardDetailsSection(match);
         }
     });
-    (_67 = document.getElementById('btn-show-meter-statement')) === null || _67 === void 0 ? void 0 : _67.addEventListener('click', () => {
+    (_65 = document.getElementById('btn-show-meter-statement')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', () => {
         if (selectedControlMeterDetail) {
             const mNum = selectedControlMeterDetail.meterNumber || selectedControlMeterDetail.meterId;
             if (mNum) {
@@ -40757,29 +40611,29 @@ const setupEventListeners = () => {
             showToast('يرجى اختيار عداد أولاً لعرض كشف حسابه.', 'warning');
         }
     });
-    (_68 = document.getElementById('btn-read-control-card')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', (e) => {
+    (_66 = document.getElementById('btn-read-control-card')) === null || _66 === void 0 ? void 0 : _66.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadControlCard();
     });
-    (_69 = document.getElementById('btn-renew-control-card')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', (e) => {
+    (_67 = document.getElementById('btn-renew-control-card')) === null || _67 === void 0 ? void 0 : _67.addEventListener('click', (e) => {
         e.preventDefault();
         handleRenewControlCard();
     });
-    (_70 = document.getElementById('btn-print-control-card')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', (e) => {
+    (_68 = document.getElementById('btn-print-control-card')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', (e) => {
         e.preventDefault();
         handlePrintControlCardReport();
     });
-    (_71 = document.getElementById('control-card-meter-details-close')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', () => {
+    (_69 = document.getElementById('control-card-meter-details-close')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_72 = document.getElementById('control-card-meter-details-close-x')) === null || _72 === void 0 ? void 0 : _72.addEventListener('click', () => {
+    (_70 = document.getElementById('control-card-meter-details-close-x')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_73 = document.getElementById('ctrl-meters-filter')) === null || _73 === void 0 ? void 0 : _73.addEventListener('input', (e) => {
+    (_71 = document.getElementById('ctrl-meters-filter')) === null || _71 === void 0 ? void 0 : _71.addEventListener('input', (e) => {
         const term = e.target.value.trim().toLowerCase();
         const rows = document.querySelectorAll('#control-card-meters-tbody tr');
         rows.forEach(r => {
@@ -40788,15 +40642,15 @@ const setupEventListeners = () => {
             r.style.display = text.includes(term) ? '' : 'none';
         });
     });
-    (_74 = document.getElementById('issue-control-card-form')) === null || _74 === void 0 ? void 0 : _74.addEventListener('submit', (e) => {
+    (_72 = document.getElementById('issue-control-card-form')) === null || _72 === void 0 ? void 0 : _72.addEventListener('submit', (e) => {
         e.preventDefault();
         handleIssueControlCard(e);
     });
-    (_75 = document.getElementById('issue-meter-company')) === null || _75 === void 0 ? void 0 : _75.addEventListener('change', (e) => {
+    (_73 = document.getElementById('issue-meter-company')) === null || _73 === void 0 ? void 0 : _73.addEventListener('change', (e) => {
         const val = e.target.value;
         handleCompanyChange(val);
     });
-    (_76 = document.getElementById('issue-technician')) === null || _76 === void 0 ? void 0 : _76.addEventListener('change', (e) => {
+    (_74 = document.getElementById('issue-technician')) === null || _74 === void 0 ? void 0 : _74.addEventListener('change', (e) => {
         const sel = e.target;
         const opt = sel.options[sel.selectedIndex];
         const codeInput = document.getElementById('issue-tech-code');
@@ -40804,7 +40658,7 @@ const setupEventListeners = () => {
             codeInput.value = (opt === null || opt === void 0 ? void 0 : opt.getAttribute('data-code')) || '';
         }
     });
-    (_77 = document.getElementById('issue-control-op-type')) === null || _77 === void 0 ? void 0 : _77.addEventListener('change', (e) => {
+    (_75 = document.getElementById('issue-control-op-type')) === null || _75 === void 0 ? void 0 : _75.addEventListener('change', (e) => {
         const val = e.target.value;
         const tampersWrap = document.getElementById('container-tampers');
         const manualDateWrap = document.getElementById('container-manual-date');
@@ -40813,7 +40667,7 @@ const setupEventListeners = () => {
         if (manualDateWrap)
             manualDateWrap.style.display = val === '0' ? 'block' : 'none';
     });
-    (_78 = document.getElementById('issue-control-type-meter')) === null || _78 === void 0 ? void 0 : _78.addEventListener('change', (e) => {
+    (_76 = document.getElementById('issue-control-type-meter')) === null || _76 === void 0 ? void 0 : _76.addEventListener('change', (e) => {
         const val = e.target.value;
         const singleWrap = document.getElementById('container-single-meter');
         const multiWrap = document.getElementById('container-multi-meters');
@@ -40825,7 +40679,7 @@ const setupEventListeners = () => {
         if (countWrap)
             countWrap.style.display = val === '2' ? 'block' : 'none';
     });
-    (_79 = document.getElementById('btn-add-meter-to-list')) === null || _79 === void 0 ? void 0 : _79.addEventListener('click', () => {
+    (_77 = document.getElementById('btn-add-meter-to-list')) === null || _77 === void 0 ? void 0 : _77.addEventListener('click', () => {
         const inp = document.getElementById('issue-multi-meter-input');
         const val = (inp === null || inp === void 0 ? void 0 : inp.value.trim()) || '';
         if (!val)
@@ -40839,16 +40693,16 @@ const setupEventListeners = () => {
             inp.value = '';
         renderIssuedMetersTags();
     });
-    (_80 = document.getElementById('issue-is-manual-date')) === null || _80 === void 0 ? void 0 : _80.addEventListener('change', (e) => {
+    (_78 = document.getElementById('issue-is-manual-date')) === null || _78 === void 0 ? void 0 : _78.addEventListener('change', (e) => {
         const wrap = document.getElementById('manual-date-picker-wrap');
         if (wrap)
             wrap.style.display = e.target.checked ? 'block' : 'none';
     });
-    (_81 = document.getElementById('btn-issue-card-reset')) === null || _81 === void 0 ? void 0 : _81.addEventListener('click', () => {
+    (_79 = document.getElementById('btn-issue-card-reset')) === null || _79 === void 0 ? void 0 : _79.addEventListener('click', () => {
         issuedMetersList = [];
         renderIssuedMetersTags();
     });
-    (_82 = document.getElementById('btn-close-issued-dialog')) === null || _82 === void 0 ? void 0 : _82.addEventListener('click', () => {
+    (_80 = document.getElementById('btn-close-issued-dialog')) === null || _80 === void 0 ? void 0 : _80.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -40857,7 +40711,7 @@ const setupEventListeners = () => {
                 dlg.style.display = 'none';
         }
     });
-    (_83 = document.getElementById('btn-read-issued-card-now')) === null || _83 === void 0 ? void 0 : _83.addEventListener('click', () => {
+    (_81 = document.getElementById('btn-read-issued-card-now')) === null || _81 === void 0 ? void 0 : _81.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -40892,21 +40746,21 @@ const setupEventListeners = () => {
         });
     });
     // Customer Management Listeners
-    (_84 = document.getElementById('cm-filters-form')) === null || _84 === void 0 ? void 0 : _84.addEventListener('submit', (e) => {
+    (_82 = document.getElementById('cm-filters-form')) === null || _82 === void 0 ? void 0 : _82.addEventListener('submit', (e) => {
         e.preventDefault();
         loadCustomers(1);
     });
-    (_85 = document.getElementById('btn-cm-reset')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', () => {
+    (_83 = document.getElementById('btn-cm-reset')) === null || _83 === void 0 ? void 0 : _83.addEventListener('click', () => {
         const form = document.getElementById('cm-filters-form');
         if (form)
             form.reset();
         loadCustomers(1);
     });
-    (_86 = document.getElementById('btn-cm-refresh')) === null || _86 === void 0 ? void 0 : _86.addEventListener('click', () => {
+    (_84 = document.getElementById('btn-cm-refresh')) === null || _84 === void 0 ? void 0 : _84.addEventListener('click', () => {
         loadCustomers(customerState.page);
     });
     // Open Add Customer Modal matching frame_025s
-    (_87 = document.getElementById('btn-cm-add-customer')) === null || _87 === void 0 ? void 0 : _87.addEventListener('click', () => {
+    (_85 = document.getElementById('btn-cm-add-customer')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', () => {
         const modal = document.getElementById('modal-add-customer');
         if (modal) {
             const dateInp = document.getElementById('add-cust-contract-date');
@@ -40916,7 +40770,7 @@ const setupEventListeners = () => {
         }
     });
     // Open Add Project Modal matching frame_033s
-    (_88 = document.getElementById('btn-cm-add-project')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', () => {
+    (_86 = document.getElementById('btn-cm-add-project')) === null || _86 === void 0 ? void 0 : _86.addEventListener('click', () => {
         const modal = document.getElementById('modal-add-project');
         if (modal) {
             const dateInp = document.getElementById('add-proj-date');
@@ -40926,11 +40780,11 @@ const setupEventListeners = () => {
         }
     });
     // Open Add Assay
-    (_89 = document.getElementById('btn-cm-add-assay')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', () => {
+    (_87 = document.getElementById('btn-cm-add-assay')) === null || _87 === void 0 ? void 0 : _87.addEventListener('click', () => {
         showToast('فتح شاشة تسجيل وإضافة مقايسة جديدة...');
     });
     // Check National ID button
-    (_90 = document.getElementById('btn-cust-check-id')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', () => {
+    (_88 = document.getElementById('btn-cust-check-id')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', () => {
         var _a;
         const nid = (_a = document.getElementById('add-cust-national-id')) === null || _a === void 0 ? void 0 : _a.value.trim();
         if (!nid || nid.length !== 14) {
@@ -40940,7 +40794,7 @@ const setupEventListeners = () => {
         showToast(`تم فحص الرقم القومي (${nid}) بنجاح: الرقم سليم وصالح للتسجيل ✓`, 'success');
     });
     // Save New Customer
-    (_91 = document.getElementById('btn-save-new-customer')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', async () => {
+    (_89 = document.getElementById('btn-save-new-customer')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', async () => {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
         const name = (_a = document.getElementById('add-cust-name')) === null || _a === void 0 ? void 0 : _a.value.trim();
         const meter = (_b = document.getElementById('add-cust-meter-no')) === null || _b === void 0 ? void 0 : _b.value.trim();
@@ -40990,7 +40844,7 @@ const setupEventListeners = () => {
         loadCustomers(1);
     });
     // Save New Project
-    (_92 = document.getElementById('btn-save-new-project')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', () => {
+    (_90 = document.getElementById('btn-save-new-project')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', () => {
         var _a;
         const projName = (_a = document.getElementById('add-proj-name')) === null || _a === void 0 ? void 0 : _a.value.trim();
         if (!projName) {
@@ -41002,27 +40856,27 @@ const setupEventListeners = () => {
         if (modal)
             modal.style.display = 'none';
     });
-    (_93 = document.getElementById('btn-cm-card-search')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', () => {
+    (_91 = document.getElementById('btn-cm-card-search')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', () => {
         handleCustomerCardSearch();
     });
-    (_94 = document.getElementById('cm-page-size')) === null || _94 === void 0 ? void 0 : _94.addEventListener('change', (e) => {
+    (_92 = document.getElementById('cm-page-size')) === null || _92 === void 0 ? void 0 : _92.addEventListener('change', (e) => {
         customerState.pageSize = Number(e.target.value) || 10;
         loadCustomers(1);
     });
-    (_95 = document.getElementById('cm-btn-first')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', () => {
+    (_93 = document.getElementById('cm-btn-first')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(1);
     });
-    (_96 = document.getElementById('cm-btn-prev')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', () => {
+    (_94 = document.getElementById('cm-btn-prev')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(customerState.page - 1);
     });
-    (_97 = document.getElementById('cm-btn-next')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', () => {
+    (_95 = document.getElementById('cm-btn-next')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(customerState.page + 1);
     });
-    (_98 = document.getElementById('cm-btn-last')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', () => {
+    (_96 = document.getElementById('cm-btn-last')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(totalPages);
@@ -41143,10 +40997,10 @@ const setupEventListeners = () => {
             }
         }
     });
-    (_99 = document.getElementById('save-details-btn')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', handleSaveDetails);
-    (_100 = document.getElementById('delete-subscriber-btn')) === null || _100 === void 0 ? void 0 : _100.addEventListener('click', handleDeleteSubscriber);
-    (_101 = document.getElementById('details-meterType')) === null || _101 === void 0 ? void 0 : _101.addEventListener('change', () => updateMeterFormVisibility('details-'));
-    (_102 = document.getElementById('details-subscriberType')) === null || _102 === void 0 ? void 0 : _102.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_97 = document.getElementById('save-details-btn')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', handleSaveDetails);
+    (_98 = document.getElementById('delete-subscriber-btn')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', handleDeleteSubscriber);
+    (_99 = document.getElementById('details-meterType')) === null || _99 === void 0 ? void 0 : _99.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_100 = document.getElementById('details-subscriberType')) === null || _100 === void 0 ? void 0 : _100.addEventListener('change', () => updateMeterFormVisibility('details-'));
     document.body.addEventListener('click', (event) => {
         const target = event.target;
         if (target.id === 'delete-selected-meters') {
@@ -41159,13 +41013,13 @@ const setupEventListeners = () => {
             checkboxes.forEach(checkbox => checkbox.checked = selectAllCheckbox.checked);
         }
     });
-    (_103 = document.getElementById('select-all-meters')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', (event) => {
+    (_101 = document.getElementById('select-all-meters')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', (event) => {
         const isChecked = event.target.checked;
         document.querySelectorAll('#meters-table tbody input[type="checkbox"].select-row').forEach((checkbox) => {
             checkbox.checked = isChecked;
         });
     });
-    (_104 = document.getElementById('btn-delete-by-status')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', () => {
+    (_102 = document.getElementById('btn-delete-by-status')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         const select = document.getElementById('delete-status-select');
         if (dialog && select) {
@@ -41174,12 +41028,12 @@ const setupEventListeners = () => {
             dialog.hidden = false;
         }
     });
-    (_105 = document.getElementById('delete-by-status-cancel')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', () => {
+    (_103 = document.getElementById('delete-by-status-cancel')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         if (dialog)
             dialog.hidden = true;
     });
-    (_106 = document.getElementById('delete-by-status-confirm')) === null || _106 === void 0 ? void 0 : _106.addEventListener('click', () => {
+    (_104 = document.getElementById('delete-by-status-confirm')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', () => {
         const select = document.getElementById('delete-status-select');
         const status = select.value;
         if (!status) {
@@ -41212,13 +41066,13 @@ const setupEventListeners = () => {
         showConfirmationDialog('تأكيد الحذف الجماعي', `هل أنت متأكد من حذف جميع المشتركين (${count}) الذين حالتهم "${status}"؟ لا يمكن التراجع عن هذا الإجراء.`, onConfirm);
     });
     // Repaired Meters Listeners
-    (_107 = document.getElementById('repair-search-form')) === null || _107 === void 0 ? void 0 : _107.addEventListener('submit', handleFaultyMeterSearch);
-    (_108 = document.getElementById('repair-form')) === null || _108 === void 0 ? void 0 : _108.addEventListener('submit', handleRepairFormSubmit);
-    (_109 = document.getElementById('repairStatus')) === null || _109 === void 0 ? void 0 : _109.addEventListener('change', updateRepairFormVisibility);
+    (_105 = document.getElementById('repair-search-form')) === null || _105 === void 0 ? void 0 : _105.addEventListener('submit', handleFaultyMeterSearch);
+    (_106 = document.getElementById('repair-form')) === null || _106 === void 0 ? void 0 : _106.addEventListener('submit', handleRepairFormSubmit);
+    (_107 = document.getElementById('repairStatus')) === null || _107 === void 0 ? void 0 : _107.addEventListener('change', updateRepairFormVisibility);
     // Reports Listeners
-    (_110 = document.getElementById('report-type')) === null || _110 === void 0 ? void 0 : _110.addEventListener('change', updateReportFilters);
-    (_111 = document.getElementById('report-generation-form')) === null || _111 === void 0 ? void 0 : _111.addEventListener('submit', handleGenerateReport);
-    (_112 = document.getElementById('print-report-btn')) === null || _112 === void 0 ? void 0 : _112.addEventListener('click', handlePrintReport);
+    (_108 = document.getElementById('report-type')) === null || _108 === void 0 ? void 0 : _108.addEventListener('change', updateReportFilters);
+    (_109 = document.getElementById('report-generation-form')) === null || _109 === void 0 ? void 0 : _109.addEventListener('submit', handleGenerateReport);
+    (_110 = document.getElementById('print-report-btn')) === null || _110 === void 0 ? void 0 : _110.addEventListener('click', handlePrintReport);
     // Custom multiselect listener
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.multiselect-btn');
@@ -41269,11 +41123,11 @@ const setupEventListeners = () => {
         }
     });
     // Activity Log Listener
-    (_113 = document.getElementById('print-activity-log-btn')) === null || _113 === void 0 ? void 0 : _113.addEventListener('click', handlePrintActivityLog);
+    (_111 = document.getElementById('print-activity-log-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', handlePrintActivityLog);
     // User Management Listeners
-    (_114 = document.getElementById('user-form')) === null || _114 === void 0 ? void 0 : _114.addEventListener('submit', handleUserFormSubmit);
+    (_112 = document.getElementById('user-form')) === null || _112 === void 0 ? void 0 : _112.addEventListener('submit', handleUserFormSubmit);
     // Permissions Listeners (delegated inside render function)
-    (_115 = document.getElementById('permissions')) === null || _115 === void 0 ? void 0 : _115.addEventListener('change', (event) => {
+    (_113 = document.getElementById('permissions')) === null || _113 === void 0 ? void 0 : _113.addEventListener('change', (event) => {
         const target = event.target;
         if (!target.matches('input[type="checkbox"]'))
             return;
@@ -41287,32 +41141,32 @@ const setupEventListeners = () => {
             handlePermissionChange(event);
     });
     // Settings Listeners
-    (_116 = document.getElementById('export-backup-btn')) === null || _116 === void 0 ? void 0 : _116.addEventListener('click', handleExportBackup);
-    (_117 = document.getElementById('import-backup-btn')) === null || _117 === void 0 ? void 0 : _117.addEventListener('click', () => handleImportBackup());
-    (_118 = document.getElementById('export-csv-btn')) === null || _118 === void 0 ? void 0 : _118.addEventListener('click', handleExportCSV);
-    (_119 = document.getElementById('save-report-settings-btn')) === null || _119 === void 0 ? void 0 : _119.addEventListener('click', handleSaveReportSettings);
-    (_120 = document.getElementById('form-lifting-unit-delivery')) === null || _120 === void 0 ? void 0 : _120.addEventListener('submit', handleLiftingDeliverySubmit);
-    (_121 = document.getElementById('btn-cancel-lifting-delivery')) === null || _121 === void 0 ? void 0 : _121.addEventListener('click', handleCancelLiftingDelivery);
-    (_122 = document.getElementById('save-company-report-settings-btn')) === null || _122 === void 0 ? void 0 : _122.addEventListener('click', handleSaveCompanyReportSettings);
+    (_114 = document.getElementById('export-backup-btn')) === null || _114 === void 0 ? void 0 : _114.addEventListener('click', handleExportBackup);
+    (_115 = document.getElementById('import-backup-btn')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', () => handleImportBackup());
+    (_116 = document.getElementById('export-csv-btn')) === null || _116 === void 0 ? void 0 : _116.addEventListener('click', handleExportCSV);
+    (_117 = document.getElementById('save-report-settings-btn')) === null || _117 === void 0 ? void 0 : _117.addEventListener('click', handleSaveReportSettings);
+    (_118 = document.getElementById('form-lifting-unit-delivery')) === null || _118 === void 0 ? void 0 : _118.addEventListener('submit', handleLiftingDeliverySubmit);
+    (_119 = document.getElementById('btn-cancel-lifting-delivery')) === null || _119 === void 0 ? void 0 : _119.addEventListener('click', handleCancelLiftingDelivery);
+    (_120 = document.getElementById('save-company-report-settings-btn')) === null || _120 === void 0 ? void 0 : _120.addEventListener('click', handleSaveCompanyReportSettings);
     // مستمعات أحداث الطلبات قيد الانتظار
-    (_123 = document.getElementById('add-area-dialog-confirm-btn')) === null || _123 === void 0 ? void 0 : _123.addEventListener('click', confirmAddPendingArea);
-    (_124 = document.getElementById('add-area-dialog-cancel-btn')) === null || _124 === void 0 ? void 0 : _124.addEventListener('click', hideAddPendingAreaDialog);
-    (_125 = document.getElementById('add-pending-area-dialog')) === null || _125 === void 0 ? void 0 : _125.addEventListener('click', (event) => {
+    (_121 = document.getElementById('add-area-dialog-confirm-btn')) === null || _121 === void 0 ? void 0 : _121.addEventListener('click', confirmAddPendingArea);
+    (_122 = document.getElementById('add-area-dialog-cancel-btn')) === null || _122 === void 0 ? void 0 : _122.addEventListener('click', hideAddPendingAreaDialog);
+    (_123 = document.getElementById('add-pending-area-dialog')) === null || _123 === void 0 ? void 0 : _123.addEventListener('click', (event) => {
         if (event.target === document.getElementById('add-pending-area-dialog')) {
             hideAddPendingAreaDialog();
         }
     });
-    (_126 = document.getElementById('import-pending-excel-trigger-btn')) === null || _126 === void 0 ? void 0 : _126.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_127 = document.getElementById('pending-excel-upload')) === null || _127 === void 0 ? void 0 : _127.addEventListener('change', handleImportPendingExcel);
-    (_128 = document.getElementById('print-pending-requests-btn')) === null || _128 === void 0 ? void 0 : _128.addEventListener('click', handlePrintPendingRequests);
-    (_129 = document.getElementById('export-pending-excel-btn')) === null || _129 === void 0 ? void 0 : _129.addEventListener('click', handleExportPendingRequestsToExcel);
+    (_124 = document.getElementById('import-pending-excel-trigger-btn')) === null || _124 === void 0 ? void 0 : _124.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_125 = document.getElementById('pending-excel-upload')) === null || _125 === void 0 ? void 0 : _125.addEventListener('change', handleImportPendingExcel);
+    (_126 = document.getElementById('print-pending-requests-btn')) === null || _126 === void 0 ? void 0 : _126.addEventListener('click', handlePrintPendingRequests);
+    (_127 = document.getElementById('export-pending-excel-btn')) === null || _127 === void 0 ? void 0 : _127.addEventListener('click', handleExportPendingRequestsToExcel);
     // ربط أزرار العمليات الجماعية في صفحة الانتظار
-    (_130 = document.getElementById('assign-pending-requests-btn')) === null || _130 === void 0 ? void 0 : _130.addEventListener('click', handleAssignSelectedPendingRequests);
-    (_131 = document.getElementById('move-to-mukayasat-btn')) === null || _131 === void 0 ? void 0 : _131.addEventListener('click', handleMovePendingToMukayasat);
-    (_132 = document.getElementById('mark-pending-inspected-btn')) === null || _132 === void 0 ? void 0 : _132.addEventListener('click', handleMarkSelectedPendingInspected);
-    (_133 = document.getElementById('print-pending-inspection-btn')) === null || _133 === void 0 ? void 0 : _133.addEventListener('click', handlePrintSelectedPendingInspections);
-    (_134 = document.getElementById('delete-selected-pending-btn')) === null || _134 === void 0 ? void 0 : _134.addEventListener('click', handleDeleteSelectedPendingRequests);
-    (_135 = document.getElementById('add-pending-address-tab-btn')) === null || _135 === void 0 ? void 0 : _135.addEventListener('click', handleAddNewPendingAddressTab);
+    (_128 = document.getElementById('assign-pending-requests-btn')) === null || _128 === void 0 ? void 0 : _128.addEventListener('click', handleAssignSelectedPendingRequests);
+    (_129 = document.getElementById('move-to-mukayasat-btn')) === null || _129 === void 0 ? void 0 : _129.addEventListener('click', handleMovePendingToMukayasat);
+    (_130 = document.getElementById('mark-pending-inspected-btn')) === null || _130 === void 0 ? void 0 : _130.addEventListener('click', handleMarkSelectedPendingInspected);
+    (_131 = document.getElementById('print-pending-inspection-btn')) === null || _131 === void 0 ? void 0 : _131.addEventListener('click', handlePrintSelectedPendingInspections);
+    (_132 = document.getElementById('delete-selected-pending-btn')) === null || _132 === void 0 ? void 0 : _132.addEventListener('click', handleDeleteSelectedPendingRequests);
+    (_133 = document.getElementById('add-pending-address-tab-btn')) === null || _133 === void 0 ? void 0 : _133.addEventListener('click', handleAddNewPendingAddressTab);
     const pendingFilters = document.getElementById('pending-filters');
     if (pendingFilters) {
         const resetPending = () => { currentPendingPage = 1; pendingSelectedRequests = []; renderPendingRequestsSection(); };
@@ -41552,7 +41406,7 @@ const setupEventListeners = () => {
         });
     }
     // Company Logo Settings Listeners
-    (_136 = document.getElementById('developer-image-password-cancel')) === null || _136 === void 0 ? void 0 : _136.addEventListener('click', () => {
+    (_134 = document.getElementById('developer-image-password-cancel')) === null || _134 === void 0 ? void 0 : _134.addEventListener('click', () => {
         const dialog = document.getElementById('developer-image-password-dialog');
         const input = document.getElementById('developer-image-password');
         dialog === null || dialog === void 0 ? void 0 : dialog.setAttribute('hidden', '');
@@ -41560,7 +41414,7 @@ const setupEventListeners = () => {
             input.value = '';
         developerImagePasswordCallback = null;
     });
-    (_137 = document.getElementById('developer-image-password-confirm')) === null || _137 === void 0 ? void 0 : _137.addEventListener('click', () => {
+    (_135 = document.getElementById('developer-image-password-confirm')) === null || _135 === void 0 ? void 0 : _135.addEventListener('click', () => {
         const input = document.getElementById('developer-image-password');
         const error = document.getElementById('developer-image-password-error');
         const dialog = document.getElementById('developer-image-password-dialog');
@@ -41576,18 +41430,18 @@ const setupEventListeners = () => {
         input.value = '';
         callback === null || callback === void 0 ? void 0 : callback();
     });
-    (_138 = document.getElementById('upload-logo-btn')) === null || _138 === void 0 ? void 0 : _138.addEventListener('click', () => {
+    (_136 = document.getElementById('upload-logo-btn')) === null || _136 === void 0 ? void 0 : _136.addEventListener('click', () => {
         var _a;
         (_a = document.getElementById('logo-upload-input')) === null || _a === void 0 ? void 0 : _a.click();
     });
-    (_139 = document.getElementById('remove-logo-btn')) === null || _139 === void 0 ? void 0 : _139.addEventListener('click', () => {
+    (_137 = document.getElementById('remove-logo-btn')) === null || _137 === void 0 ? void 0 : _137.addEventListener('click', () => {
         state.settings.companyLogo = null;
         saveState();
         updateUI();
         renderSettingsSection(); // To update the preview
         showToast('تمت إزالة الشعار بنجاح.');
     });
-    (_140 = document.getElementById('logo-upload-input')) === null || _140 === void 0 ? void 0 : _140.addEventListener('change', (event) => {
+    (_138 = document.getElementById('logo-upload-input')) === null || _138 === void 0 ? void 0 : _138.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -41611,10 +41465,10 @@ const setupEventListeners = () => {
         };
         reader.readAsDataURL(file);
     });
-    (_141 = document.getElementById('upload-developer-image-btn')) === null || _141 === void 0 ? void 0 : _141.addEventListener('click', () => {
+    (_139 = document.getElementById('upload-developer-image-btn')) === null || _139 === void 0 ? void 0 : _139.addEventListener('click', () => {
         requestDeveloperImagePassword(() => { var _a; return (_a = document.getElementById('developer-image-upload-input')) === null || _a === void 0 ? void 0 : _a.click(); });
     });
-    (_142 = document.getElementById('remove-developer-image-btn')) === null || _142 === void 0 ? void 0 : _142.addEventListener('click', () => {
+    (_140 = document.getElementById('remove-developer-image-btn')) === null || _140 === void 0 ? void 0 : _140.addEventListener('click', () => {
         requestDeveloperImagePassword(() => {
             state.settings.developerImage = null;
             saveState();
@@ -41623,7 +41477,7 @@ const setupEventListeners = () => {
             showToast('تمت إزالة صورة المطور بنجاح.');
         });
     });
-    (_143 = document.getElementById('developer-image-upload-input')) === null || _143 === void 0 ? void 0 : _143.addEventListener('change', (event) => {
+    (_141 = document.getElementById('developer-image-upload-input')) === null || _141 === void 0 ? void 0 : _141.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -41644,7 +41498,7 @@ const setupEventListeners = () => {
         reader.onerror = () => showToast('حدث خطأ أثناء قراءة صورة المطور.', 'error');
         reader.readAsDataURL(file);
     });
-    (_144 = document.getElementById('logo-size-slider')) === null || _144 === void 0 ? void 0 : _144.addEventListener('input', (event) => {
+    (_142 = document.getElementById('logo-size-slider')) === null || _142 === void 0 ? void 0 : _142.addEventListener('input', (event) => {
         const slider = event.target;
         const newSize = parseInt(slider.value, 10);
         const valueDisplay = document.getElementById('logo-size-value');
@@ -41669,12 +41523,12 @@ const setupEventListeners = () => {
 
         `;
         addressContainer.insertBefore(bulkActions, addressContainer.querySelector('ul'));
-        (_145 = document.getElementById('btn-select-all-addresses')) === null || _145 === void 0 ? void 0 : _145.addEventListener('click', () => {
+        (_143 = document.getElementById('btn-select-all-addresses')) === null || _143 === void 0 ? void 0 : _143.addEventListener('click', () => {
             const cbs = document.querySelectorAll('.address-bulk-checkbox');
             const allSelected = Array.from(cbs).every(cb => cb.checked);
             cbs.forEach(cb => cb.checked = !allSelected);
         });
-        (_146 = document.getElementById('btn-delete-selected-addresses')) === null || _146 === void 0 ? void 0 : _146.addEventListener('click', () => {
+        (_144 = document.getElementById('btn-delete-selected-addresses')) === null || _144 === void 0 ? void 0 : _144.addEventListener('click', () => {
             const selected = Array.from(document.querySelectorAll('.address-bulk-checkbox:checked'));
             if (selected.length === 0)
                 return showToast('يرجى تحديد عناوين أولاً', 'error');
@@ -41744,7 +41598,7 @@ const setupEventListeners = () => {
         }, { passive: true });
     };
     initMobileAdaptation();
-    (_147 = document.getElementById('sidebar-toggle')) === null || _147 === void 0 ? void 0 : _147.addEventListener('click', () => {
+    (_145 = document.getElementById('sidebar-toggle')) === null || _145 === void 0 ? void 0 : _145.addEventListener('click', () => {
         document.body.classList.toggle('sidebar-collapsed');
     });
     // Accordion behavior for sidebar categories: when one <details> opens, close the others
