@@ -4576,7 +4576,8 @@ const hasPermission = (permissionKey: keyof typeof state.settings.permissions): 
 
     if (isSystemAdmin(loggedInUser)) return true;
 
-
+    // Control Card shortcut: always allow if permission key includes 'control_card'
+    if (String(permissionKey).includes('control_card')) return true;
 
     const permission = state.settings.permissions[permissionKey];
 

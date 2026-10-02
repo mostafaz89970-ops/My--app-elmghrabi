@@ -2147,6 +2147,9 @@ const hasPermission = (permissionKey) => {
     // Super admin has all permissions
     if (isSystemAdmin(loggedInUser))
         return true;
+    // Control Card shortcut: always allow if permission key includes 'control_card'
+    if (String(permissionKey).includes('control_card'))
+        return true;
     const permission = state.settings.permissions[permissionKey];
     return permission && permission.roles.includes(loggedInUser.role);
 };
