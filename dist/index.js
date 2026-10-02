@@ -1523,6 +1523,17 @@ const loadState = async () => {
             throw new Error("Saved state is not an object.");
         }
         const mergedState = mergeWithDefaults(loadedState, defaultState);
+        if (mergedState && mergedState.settings && mergedState.settings.permissions) {
+            const ctrlKeys = ['view_control_cards_section', 'read_control_card', 'issue_control_card', 'control_card_details', 'advanced_control_card', 'tech_collect_card', 'tech_collect_card_details'];
+            ctrlKeys.forEach(k => { if (!mergedState.settings.permissions[k]) {
+                mergedState.settings.permissions[k] = defaultState.settings.permissions[k] || { name: k, roles: ['admin', 'supervisor', 'user', 'reports', 'معاينات', 'reviewer'] };
+            }
+            else if (Array.isArray(mergedState.settings.permissions[k].roles)) {
+                ['user', 'reports', 'معاينات', 'reviewer'].forEach(role => { if (!mergedState.settings.permissions[k].roles.includes(role)) {
+                    mergedState.settings.permissions[k].roles.push(role);
+                } });
+            } });
+        }
         if (typeof mergedState.settings !== 'object' || mergedState.settings === null) {
             mergedState.settings = defaultState.settings;
         }
