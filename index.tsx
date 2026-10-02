@@ -507,7 +507,7 @@ let state = {
 
         footerText: 'منظومة العدادات 2025 - جميع الحقوق محفوظة ELMGHRABI © 2026',
 
-        technicians: ['محمد علي', 'أحمد السيد', 'خالد محمود'],
+        technicians: ['وحيد فاروق كامل', 'محمد علي', 'أحمد السيد', 'خالد محمود'],
 
         technicalEngineers: [] as string[],
 
@@ -844,15 +844,15 @@ let state = {
 
             'manage_collection': { name: 'إدارة التحصيل (تسجيل الدفع)', roles: ['admin', 'supervisor'] },
 
-            'view_control_cards_section': { name: 'عرض قسم كروت التحكم الذكية', roles: ['admin', 'supervisor'] },
+            'view_control_cards_section': { name: 'عرض قسم كروت التحكم الذكية', roles: ['admin', 'supervisor', 'user'] },
 
             'read_control_card': { name: 'قراءة كارت التحكم', roles: ['admin', 'supervisor', 'user'] },
 
-            'issue_control_card': { name: 'إصدار كروت التحكم وبرمجتها', roles: ['admin', 'supervisor'] },
+            'issue_control_card': { name: 'إصدار كروت التحكم وبرمجتها', roles: ['admin', 'supervisor', 'user'] },
 
             'control_card_details': { name: 'تفاصيل قراءة كارت التحكم', roles: ['admin', 'supervisor', 'user'] },
 
-            'advanced_control_card': { name: 'كارت تحكم متقدم', roles: ['admin', 'supervisor'] },
+            'advanced_control_card': { name: 'كارت تحكم متقدم', roles: ['admin', 'supervisor', 'user'] },
 
             'tech_collect_card': { name: 'قراءة كارت تجميع فني', roles: ['admin', 'supervisor', 'user'] },
 
@@ -5142,6 +5142,7 @@ const handleLogin = async (event: Event) => {
 
         window.setTimeout(() => renderDashboard(), 100);
 
+        fetchActiveControlCard();
         await hideAppLoading(300);
 
     } else {
@@ -29919,17 +29920,146 @@ const handlePrintJudicialControlDetails = () => {
     // ==========================================
 
     let currentControlCardData: any = null;
+    let cachedControlCardsHistory: any[] = [];
+    let isFetchingActiveControlCard = false;
 
+    const fetchActiveControlCard = async () => {
+        if (isFetchingActiveControlCard) return;
+        isFetchingActiveControlCard = true;
+        try {
+            if (!currentControlCardData) {
+                const localSaved = localStorage.getItem('activeControlCard');
+                if (localSaved) {
+                    try {
+                        currentControlCardData = JSON.parse(localSaved);
+                        updateControlCardUI(currentControlCardData);
+                    } catch(e) {}
+                }
+            }
 
+            const [actRes, histRes] = await Promise.allSettled([
+                fetch('http://127.0.0.1:5002/api/control-card/active').then(r => r.json()),
+                fetch('http://127.0.0.1:5002/api/control-card/history').then(r => r.json())
+            ]);
 
-    const renderReadControlCardSection = () => {
+            if (histRes.status === 'fulfilled' && histRes.value && histRes.value.success && Array.isArray(histRes.value.data)) {
+                cachedControlCardsHistory = histRes.value.data;
+            }
 
-        if (currentControlCardData) {
+            if (actRes.status === 'fulfilled' && actRes.value && actRes.value.success && actRes.value.data) {
+                currentControlCardData = actRes.value.data;
+                try { localStorage.setItem('activeControlCard', JSON.stringify(currentControlCardData)); } catch(e) {}
+                updateControlCardUI(currentControlCardData);
+            } else if (!currentControlCardData && cachedControlCardsHistory.length > 0) {
+                currentControlCardData = cachedControlCardsHistory[0];
+                try { localStorage.setItem('activeControlCard', JSON.stringify(currentControlCardData)); } catch(e) {}
+                updateControlCardUI(currentControlCardData);
+            }
 
-            updateControlCardUI(currentControlCardData);
+            populateControlCardsDropdown();
+            renderIssuedControlCardsTable();
+        } catch(e) {
+            console.warn('Could not fetch active control card:', e);
+        } finally {
+            isFetchingActiveControlCard = false;
+        }
+    };
 
+    const populateControlCardsDropdown = () => {
+        const select = document.getElementById('select-saved-control-card') as HTMLSelectElement | null;
+        if (!select) return;
+
+        if (!cachedControlCardsHistory || cachedControlCardsHistory.length === 0) {
+            if (currentControlCardData) {
+                cachedControlCardsHistory = [currentControlCardData];
+            } else {
+                select.innerHTML = '<option value="">لا توجد كروت تحكم مسجلة حالياً</option>';
+                return;
+            }
         }
 
+        const currentId = currentControlCardData?.cardId || currentControlCardData?.id || '';
+        select.innerHTML = '';
+        cachedControlCardsHistory.forEach(card => {
+            const opt = document.createElement('option');
+            opt.value = card.cardId || card.id;
+            const opName = card.controlOperationTypeName || card.operationType || 'كارت تحكم';
+            const tech = card.technicianName ? (' | فني: ' + card.technicianName) : '';
+            const comp = card.companyName ? (' | ' + card.companyName) : '';
+            const date = card.cardIssueDate || card.readAt || '';
+            opt.textContent = 'كارت رقم ' + card.cardId + ' (' + opName + comp + tech + ') ' + date;
+            if (String(card.cardId).trim() === String(currentId).trim()) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+    };
+
+    const renderIssuedControlCardsTable = () => {
+        const tbody = document.getElementById('tbody-issued-control-cards');
+        const countEl = document.getElementById('issue-history-count');
+        if (!tbody) return;
+
+        const cards = cachedControlCardsHistory || [];
+        if (countEl) countEl.textContent = String(cards.length);
+
+        if (cards.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">لا توجد كروت تحكم محفوظة بالمنظومة بعد.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = cards.map((c: any, idx: number) => {
+            const cId = c.cardId || c.id || '-';
+            const comp = c.companyName || '-';
+            const op = c.controlOperationTypeName || c.operationType || '-';
+            const tech = c.technicianName || '-';
+            const issueDate = c.cardIssueDate || c.readAt || '-';
+            const expDate = c.expiryDate || '-';
+            const statusBadge = c.status === 'مفعل' 
+                ? '<span style="background: #dcfce7; color: #15803d; padding: 3px 10px; border-radius: 9999px; font-weight: 600; font-size: 0.8rem;">مفعل ✓</span>'
+                : '<span style="background: #f1f5f9; color: #475569; padding: 3px 10px; border-radius: 9999px; font-weight: 600; font-size: 0.8rem;">محفوظ</span>';
+
+            return '<tr>' +
+                '<td>' + (idx + 1) + '</td>' +
+                '<td><strong style="color: #0284c7; font-family: monospace;">' + cId + '</strong></td>' +
+                '<td>' + comp + '</td>' +
+                '<td>' + op + '</td>' +
+                '<td>' + tech + '</td>' +
+                '<td>' + issueDate + '</td>' +
+                '<td>' + expDate + '</td>' +
+                '<td>' + statusBadge + '</td>' +
+                '<td>' +
+                    '<button type="button" class="btn btn-sm btn-view-issued-card" data-card-id="' + cId + '" style="background: #0284c7; color: white; padding: 4px 10px; font-size: 0.8rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">' +
+                        '<span>عرض البيانات</span>' +
+                    '</button>' +
+                '</td>' +
+            '</tr>';
+        }).join('');
+
+        tbody.querySelectorAll('.btn-view-issued-card').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetCardId = (e.currentTarget as HTMLElement).getAttribute('data-card-id');
+                if (!targetCardId) return;
+                const match = cards.find((c: any) => String(c.cardId).trim() === String(targetCardId).trim() || String(c.id).trim() === String(targetCardId).trim());
+                if (match) {
+                    currentControlCardData = match;
+                    try { localStorage.setItem('activeControlCard', JSON.stringify(match)); } catch(err) {}
+                    updateControlCardUI(match);
+                    populateControlCardsDropdown();
+                    navigateToSection('read-control-card');
+                    showToast('تم فتح وعرض بيانات كارت التحكم رقم ' + targetCardId + '!', 'success');
+                }
+            });
+        });
+    };
+
+    const renderReadControlCardSection = () => {
+        if (currentControlCardData) {
+            updateControlCardUI(currentControlCardData);
+            populateControlCardsDropdown();
+        } else {
+            fetchActiveControlCard();
+        }
     };
 
 
@@ -30269,10 +30399,14 @@ const handlePrintJudicialControlDetails = () => {
 
 
             const data = result.data || result.card || result;
-
             currentControlCardData = data;
-
+            try { localStorage.setItem('activeControlCard', JSON.stringify(data)); } catch(e) {}
+            if (!cachedControlCardsHistory.some(c => String(c.cardId || c.id).trim() === String(data.cardId || data.id).trim())) {
+                cachedControlCardsHistory.unshift(data);
+            }
             updateControlCardUI(data);
+            populateControlCardsDropdown();
+            renderIssuedControlCardsTable();
 
 
 
@@ -31129,6 +31263,8 @@ const handlePrintJudicialControlDetails = () => {
 
 
 
+            renderIssuedControlCardsTable();
+
             // Populate Companies
 
             companySelect.innerHTML = '<option value="" disabled selected hidden>اختر الشركة المصنعة...</option>';
@@ -31819,10 +31955,65 @@ const handlePrintJudicialControlDetails = () => {
 
 
     const renderControlCardDetailsSection = (meter: any = null) => {
+        if (!currentControlCardData) {
+            const localSaved = localStorage.getItem('activeControlCard');
+            if (localSaved) {
+                try { currentControlCardData = JSON.parse(localSaved); } catch(e) {}
+            }
+        }
 
-        const m = meter || selectedControlMeterDetail || (currentControlCardData?.meterData && currentControlCardData.meterData[0]) || null;
+        const meterSelect = document.getElementById('select-detail-meter') as HTMLSelectElement | null;
+        const availableMeters: any[] = [];
 
+        if (currentControlCardData?.meterData && Array.isArray(currentControlCardData.meterData)) {
+            currentControlCardData.meterData.forEach((mItem: any) => availableMeters.push({ ...mItem, _source: 'كارت التحكم' }));
+        }
+
+        if (state.meters && Array.isArray(state.meters)) {
+            state.meters.slice(0, 50).forEach((lm: any) => {
+                const chassis = String(lm.meterChassisNumber || '').trim();
+                if (chassis && !availableMeters.some(am => String(am.meterNumber || am.meterChassisNumber || '').trim() === chassis)) {
+                    availableMeters.push({
+                        meterNumber: lm.meterChassisNumber,
+                        customerCode: lm.subscriptionCode,
+                        customerName: lm.subscriberName,
+                        address: lm.address,
+                        activityName: lm.activityType,
+                        meterTypeName: lm.meterType,
+                        remainingBalance: lm.currentBalance || lm.remainingBalance || 0,
+                        remainingPower: lm.remainingPower || 0,
+                        totalRechargeAmountOnMeter: lm.totalRecharges || 0,
+                        totalPowerConsumption: lm.totalConsumption || 0,
+                        hasTamper: false,
+                        _source: 'المنظومة المحلية'
+                    });
+                }
+            });
+        }
+
+        if (meterSelect) {
+            meterSelect.innerHTML = '<option value="">اختر عداداً لعرض فحصه التشخيصي...</option>';
+            availableMeters.forEach((am: any) => {
+                const opt = document.createElement('option');
+                const mNum = am.meterNumber || am.meterId || am.chassisNumber || am.meterChassisNumber || '-';
+                const cName = am.customerName || am.name || am.subscriberName || '';
+                const src = am._source ? (' [' + am._source + ']') : '';
+                opt.value = mNum;
+                opt.textContent = 'عداد رقم ' + mNum + ' - ' + cName + src;
+                meterSelect.appendChild(opt);
+            });
+        }
+
+        let m = meter || selectedControlMeterDetail;
+        if (!m && availableMeters.length > 0) {
+            m = availableMeters[0];
+        }
         selectedControlMeterDetail = m;
+
+        if (meterSelect && m) {
+            const currentMNum = m.meterNumber || m.meterId || m.chassisNumber || m.meterChassisNumber || '';
+            meterSelect.value = currentMNum;
+        }
 
 
 
@@ -67233,6 +67424,73 @@ const setupOrgHierarchyEvents = () => {
         });
 
 
+
+        document.getElementById('select-saved-control-card')?.addEventListener('change', (e) => {
+            const selCardId = (e.target as HTMLSelectElement).value;
+            if (!selCardId) return;
+            const match = cachedControlCardsHistory.find((c: any) => String(c.cardId || c.id).trim() === String(selCardId).trim());
+            if (match) {
+                currentControlCardData = match;
+                try { localStorage.setItem('activeControlCard', JSON.stringify(match)); } catch(err) {}
+                updateControlCardUI(match);
+                showToast('تم عرض بيانات كارت التحكم رقم ' + selCardId + ' بنجاح!', 'success');
+                try {
+                    fetch('http://127.0.0.1:5002/api/control-card/select', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ cardId: selCardId })
+                    });
+                } catch(err) {}
+            }
+        });
+
+        document.getElementById('btn-refresh-control-cards-history')?.addEventListener('click', () => {
+            showToast('جاري تحديث سجل كروت التحكم من الخادم...');
+            fetchActiveControlCard();
+        });
+
+        document.getElementById('select-detail-meter')?.addEventListener('change', (e) => {
+            const mNum = (e.target as HTMLSelectElement).value;
+            if (!mNum) return;
+            let match = (currentControlCardData?.meterData || []).find((m: any) => String(m.meterNumber || m.meterId || m.chassisNumber).trim() === String(mNum).trim());
+            if (!match) {
+                const localMatch = (state.meters || []).find((lm: any) => String(lm.meterChassisNumber).trim() === String(mNum).trim());
+                if (localMatch) {
+                    match = {
+                        meterNumber: localMatch.meterChassisNumber,
+                        customerCode: localMatch.subscriptionCode,
+                        customerName: localMatch.subscriberName,
+                        address: localMatch.address,
+                        activityName: localMatch.activityType,
+                        meterTypeName: localMatch.meterType,
+                        remainingBalance: localMatch.currentBalance || localMatch.remainingBalance || 0,
+                        remainingPower: localMatch.remainingPower || 0,
+                        totalRechargeAmountOnMeter: localMatch.totalRecharges || 0,
+                        totalPowerConsumption: localMatch.totalConsumption || 0,
+                        hasTamper: false
+                    };
+                }
+            }
+            if (match) {
+                renderControlCardDetailsSection(match);
+            }
+        });
+
+        document.getElementById('btn-show-meter-statement')?.addEventListener('click', () => {
+            if (selectedControlMeterDetail) {
+                const mNum = selectedControlMeterDetail.meterNumber || selectedControlMeterDetail.meterId;
+                if (mNum) {
+                    navigateToSection('subscriber-statement');
+                    const searchInput = document.getElementById('search-subscriber-statement') as HTMLInputElement | null;
+                    if (searchInput) {
+                        searchInput.value = mNum;
+                        searchInput.dispatchEvent(new Event('input'));
+                    }
+                }
+            } else {
+                showToast('يرجى اختيار عداد أولاً لعرض كشف حسابه.', 'warning');
+            }
+        });
 
         document.getElementById('btn-read-control-card')?.addEventListener('click', (e) => {
 

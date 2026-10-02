@@ -433,6 +433,35 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            if (pathname === '/api/control-card/active') {
+                const result = typeof nativeEngine.getActiveControlCard === 'function'
+                    ? nativeEngine.getActiveControlCard()
+                    : { success: false, message: 'Not implemented' };
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            if (pathname === '/api/control-card/history') {
+                const result = typeof nativeEngine.getControlCardsHistory === 'function'
+                    ? nativeEngine.getControlCardsHistory()
+                    : { success: false, message: 'Not implemented' };
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
+            if (pathname === '/api/control-card/select') {
+                const body = await getBody();
+                const cardId = body.cardId || url.searchParams.get('cardId');
+                const result = typeof nativeEngine.setActiveControlCard === 'function'
+                    ? nativeEngine.setActiveControlCard(cardId)
+                    : { success: false, message: 'Not implemented' };
+                res.writeHead(200);
+                res.end(JSON.stringify(result));
+                return;
+            }
+
             if (pathname === '/api/tech-collect-card/read') {
                 const unifiedClient = require('./unifiedCardClient');
                 const result = await unifiedClient.readTechCollectCardLive();

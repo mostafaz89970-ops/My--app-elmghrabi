@@ -7777,7 +7777,26 @@
                     </div>
                 </div>
 
-                <!-- Card Metadata Card -->
+                                <!-- شريط اختيار كارت التحكم المحفوظ -->
+                <div id="control-card-selector-bar" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 1.25rem; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #bae6fd; border-radius: var(--border-radius-lg); padding: 12px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 280px;">
+                        <span style="font-weight: 700; font-size: 0.95rem; color: #0369a1; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                            سجل كروت التحكم المحفوظة:
+                        </span>
+                        <select id="select-saved-control-card" style="flex: 1; max-width: 520px; padding: 7px 12px; border-radius: 6px; border: 1.5px solid #7dd3fc; background: #ffffff; font-weight: 600; font-size: 0.9rem; color: #0c4a6e; cursor: pointer;">
+                            <option value="">جاري تحميل كروت التحكم المحفوظة...</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button type="button" id="btn-refresh-control-cards-history" class="btn secondary" style="background: #ffffff; border: 1px solid #cbd5e1; padding: 6px 12px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;" title="تحديث السجل من الخادم">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                            <span>تحديث القائمة</span>
+                        </button>
+                    </div>
+                </div>
+
+<!-- Card Metadata Card -->
                 <div id="control-card-info-box" class="form-container" style="margin-bottom: 1.5rem; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius-lg); box-shadow: 0 1px 3px rgba(0,0,0,0.05); padding: 1.25rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem;">
                         <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">بيانات كارت التحكم</h4>
@@ -8023,6 +8042,39 @@
                         </div>
                     </div>
                 </dialog>
+                <!-- جدول سجل كروت التحكم الصادرة المحفوظة -->
+                <div class="table-container" style="margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
+                        <h4 style="margin: 0; font-size: 1.15rem; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            سجل كروت التحكم المحفوظة بالمنظومة (<span id="issue-history-count">0</span>)
+                        </h4>
+                    </div>
+                    <div class="responsive-table">
+                        <table id="table-issued-control-cards">
+                            <thead>
+                                <tr>
+                                    <th>م</th>
+                                    <th>رقم الكارت</th>
+                                    <th>شركة التوريد</th>
+                                    <th>نوع العملية</th>
+                                    <th>اسم الفني المستلم</th>
+                                    <th>تاريخ الإصدار</th>
+                                    <th>تاريخ الانتهاء</th>
+                                    <th>الحالة</th>
+                                    <th>إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-issued-control-cards">
+                                <tr>
+                                    <td colspan="9" style="text-align: center; padding: 1.5rem; color: #94a3b8;">
+                                        جاري تحميل سجل كروت التحكم...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
                 <!-- نافذة منبثقة أنيقة لتأكيد نجاح تحديث / تجديد كارت التحكم -->
                 <dialog id="dialog-renew-control-card-success" style="border: none; border-radius: 14px; padding: 0; max-width: 480px; width: 92%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden;">
@@ -8078,7 +8130,20 @@
                     </div>
                 </div>
 
-                <!-- بطاقة بيانات المشترك والعداد -->
+                                <!-- شريط اختيار العداد للعرض التشخيصي -->
+                <div id="control-card-details-meter-bar" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 1.25rem; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #bbf7d0; border-radius: var(--border-radius-lg); padding: 12px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 280px;">
+                        <span style="font-weight: 700; font-size: 0.95rem; color: #166534; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                            اختيار العداد للعرض التشخيصي:
+                        </span>
+                        <select id="select-detail-meter" style="flex: 1; max-width: 520px; padding: 7px 12px; border-radius: 6px; border: 1.5px solid #86efac; background: #ffffff; font-weight: 600; font-size: 0.9rem; color: #14532d; cursor: pointer;">
+                            <option value="">جاري تحميل العدادات...</option>
+                        </select>
+                    </div>
+                </div>
+
+<!-- بطاقة بيانات المشترك والعداد -->
                 <div class="form-container" style="margin-bottom: 1.5rem; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius-lg); padding: 1.25rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem;">
                         <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">بيانات المشترك والعداد</h4>

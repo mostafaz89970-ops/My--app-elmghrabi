@@ -893,30 +893,76 @@ async function renewControlCard(cardId, generationType, vendorCode) {
 }
 
 async function getControlCardMetadata() {
+    let meta = null;
     try {
         const unifiedClient = require('./unifiedCardClient');
         if (unifiedClient && typeof unifiedClient.getControlCardMetadata === 'function') {
-            const meta = await unifiedClient.getControlCardMetadata();
-            if (meta && meta.success) return meta;
+            meta = await unifiedClient.getControlCardMetadata();
         }
     } catch(e) {}
 
+    const store = getCardStore();
+    const knownTechs = [];
+    const knownCodes = new Set();
+    // Always include authentic technician وحيد فاروق كامل (كود 12258)
+    knownTechs.push({ id: "12258", name: "وحيد فاروق كامل", code: 12258 });
+    knownCodes.add(12258);
+
+    if (store && store.controlCards) {
+        Object.values(store.controlCards).forEach(c => {
+            if (c.technicianName && c.technicianCode && !knownCodes.has(Number(c.technicianCode))) {
+                knownCodes.add(Number(c.technicianCode));
+                knownTechs.push({
+                    id: String(c.technicianCode),
+                    name: c.technicianName,
+                    code: Number(c.technicianCode)
+                });
+            }
+        });
+    }
+
+    if (meta && meta.success && meta.data) {
+        if (!meta.data.technicians || meta.data.technicians.length === 0) {
+            meta.data.technicians = knownTechs;
+        }
+        return meta;
+    }
+
     return {
         success: true,
-        companies: [
-            { id: 1, name: "السويدي" },
-            { id: 2, name: "جلوبال ترونكس" },
-            { id: 3, name: "اسكرا" },
-            { id: 4, name: "المصرية" },
-            { id: 5, name: "المعصرة" }
-        ],
-        controlOperations: [
-            { id: 1, name: "إعادة تهيئة وضبط مصنع" },
-            { id: 2, name: "إزالة تلاعبات و أخطاء" },
-            { id: 3, name: "اختبار فني وفحص عداد" },
-            { id: 4, name: "تحديث تعريفة وساعة" },
-            { id: 5, name: "كارت تجميع قراءات" }
-        ]
+        data: {
+            companies: [
+                { id: '32e12578-cf4c-4304-8af9-cefe059e1c50', name: '1  -->  جلوبال', code: '1' },
+                { id: '87d26e03-36ff-40b6-b750-80b6bfee53fd', name: '3  -->  السويدي', code: '3' },
+                { id: '56ee24ba-a161-4578-a412-882b54bec422', name: '2  -->  اسكرا', code: '2' },
+                { id: '59445293-90dc-463f-adc1-247ed3697c25', name: '4  -->  المصرية', code: '4' },
+                { id: 'b90a54b3-c0ce-4db4-8d3b-d9c2c4c0e330', name: '6  -->  جيزة باور', code: '6' }
+            ],
+            technicians: knownTechs,
+            cardTypes: [
+                { id: 0, name: "عداد معين" },
+                { id: 1, name: "مجموعة عدادات" },
+                { id: 2, name: "عدد عدادات" }
+            ],
+            operations: [
+                { id: 3, name: "كارت إطلاق تيار" },
+                { id: 2, name: "إزالة تلاعبات و أخطاء" },
+                { id: 0, name: "كارت ضبط الوقت والتاريخ" },
+                { id: 5, name: "كارت فتح و غلق مفتاح التوصيل" },
+                { id: 7, name: "كارت تصفير عداد" },
+                { id: 8, name: "خارج طور المصنع" }
+            ],
+            tampers: [
+                { id: 0, name: "الكل" },
+                { id: 2, name: "تلاعب فتح غطاء الروزتة" },
+                { id: 3, name: "إنخفاض جهد البطارية" },
+                { id: 4, name: "التيار المعاكس" },
+                { id: 5, name: "تيار غير متزن" },
+                { id: 6, name: "التلاعب الأرضى" },
+                { id: 7, name: "حمل زائد" },
+                { id: 8, name: "عطل في الريلاي" }
+            ]
+        }
     };
 }
 
@@ -940,6 +986,37 @@ async function getMeterTypesForCompany(companyId) {
     return { success: true, data: types };
 }
 
+function getActiveControlCard() {
+    const store = getCardStore();
+    if (store.activeControlCard) {
+        return { success: true, data: store.activeControlCard };
+    }
+    const cards = store.controlCards ? Object.values(store.controlCards) : [];
+    if (cards.length > 0) {
+        const lastCard = cards[cards.length - 1];
+        store.activeControlCard = lastCard;
+        saveCardStore(store);
+        return { success: true, data: lastCard };
+    }
+    return { success: false, message: 'لا يوجد كارت تحكم نشط مسجل حالياً.' };
+}
+
+function getControlCardsHistory() {
+    const store = getCardStore();
+    const cards = store.controlCards ? Object.values(store.controlCards) : [];
+    return { success: true, data: [...cards].reverse() };
+}
+
+function setActiveControlCard(cardId) {
+    const store = getCardStore();
+    if (store.controlCards && store.controlCards[cardId]) {
+        store.activeControlCard = store.controlCards[cardId];
+        saveCardStore(store);
+        return { success: true, data: store.activeControlCard };
+    }
+    return { success: false, message: 'كارت التحكم غير موجود.' };
+}
+
 async function issueControlCard(params) {
     try {
         const unifiedClient = require('./unifiedCardClient');
@@ -949,20 +1026,24 @@ async function issueControlCard(params) {
                 const store = getCardStore();
                 if (!store.controlCards) store.controlCards = {};
                 const cId = liveRes.cardId || params.cardId || ('CC-' + Date.now().toString().slice(-6));
-                store.controlCards[cId] = {
+                const newCard = {
+                    id: liveRes.card?.id || ('ctrl-' + Date.now()),
                     cardId: cId,
-                    technicianCode: params.technicianCode || 12258,
-                    technicianName: params.technicianName || 'فني معتمد',
-                    controlOperationTypeName: params.operationTypeName || 'كارت تحكم عام',
-                    controlOperationType: params.operationType || 1,
+                    technicianCode: params.technicianCode || params.techCode || 12258,
+                    technicianName: params.technicianName || 'وحيد فاروق كامل',
+                    controlOperationTypeName: params.operationTypeName || params.controlOperationTypeName || 'كارت تحكم عام',
+                    controlOperationType: params.operationType || params.controlOperationType || 1,
                     companyName: params.companyName || 'المصرية',
                     meterTypeName: params.meterTypeName || 'احادى 2024',
                     cardIssueDate: new Date().toLocaleDateString('ar-EG'),
                     activationDate: new Date().toLocaleDateString('ar-EG'),
                     expiryDate: params.expiryDate || new Date(Date.now() + 7 * 86400000).toLocaleDateString('ar-EG'),
-                    issueUsername: 'المشغل',
+                    issueUsername: params.issueUsername || 'المشغل',
+                    status: 'مفعل',
                     meterData: []
                 };
+                store.controlCards[cId] = newCard;
+                store.activeControlCard = newCard;
                 saveCardStore(store);
             }
             return liveRes;
@@ -2144,6 +2225,9 @@ module.exports = {
     getMeterTypesForCompany,
     issueControlCard,
     getControlCardDetails,
+    getActiveControlCard,
+    getControlCardsHistory,
+    setActiveControlCard,
     getAllCustomers,
     getCustomerDetails,
     getSectorsDropdown,
