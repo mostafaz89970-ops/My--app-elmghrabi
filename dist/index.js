@@ -1739,31 +1739,55 @@ const updateFavicon = (status) => {
 
  */
 const showToast = (message, type = 'success') => {
+    var _a;
+    var _b;
     const container = document.getElementById('toast-container');
     if (!container)
         return;
+    const normalizedMessage = String(message || '').trim();
+    if (!normalizedMessage)
+        return;
+    const toastMap = ((_a = (_b = window).__controlToastMap) !== null && _a !== void 0 ? _a : (_b.__controlToastMap = new Map()));
+    const dedupeKey = `${type}:${normalizedMessage}`;
+    const existing = toastMap.get(dedupeKey);
+    if (existing) {
+        window.clearTimeout(existing.timeoutId);
+        existing.toast.classList.add('show');
+        existing.timeoutId = window.setTimeout(() => {
+            existing.toast.classList.remove('show');
+            setTimeout(() => {
+                if (existing.toast.parentElement)
+                    existing.toast.remove();
+                toastMap.delete(dedupeKey);
+                if (container.childElementCount === 0)
+                    updateFavicon('normal');
+            }, 250);
+        }, 2500);
+        return;
+    }
     updateFavicon(type);
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.textContent = message;
+    toast.textContent = normalizedMessage;
     toast.setAttribute('role', 'alert');
+    while (container.childElementCount > 4) {
+        const oldest = container.firstElementChild;
+        if (oldest)
+            oldest.remove();
+    }
     container.appendChild(toast);
-    // Animate in
-    setTimeout(() => {
-        toast.classList.add('show');
-    }, 100);
-    // Animate out and remove after 3 seconds
-    setTimeout(() => {
+    requestAnimationFrame(() => toast.classList.add('show'));
+    const hideTimeout = window.setTimeout(() => {
         toast.classList.remove('show');
-        toast.addEventListener('transitionend', () => {
-            if (toast.parentElement) {
+        setTimeout(() => {
+            if (toast.parentElement)
                 toast.remove();
-            }
-            if (container.childElementCount === 0) {
+            toastMap.delete(dedupeKey);
+            if (container.childElementCount === 0)
                 updateFavicon('normal');
-            }
-        });
-    }, 3000);
+        }, 250);
+    }, 2500);
+    toastMap.set(dedupeKey, { toast, timeoutId: hideTimeout });
 };
 /**
 
@@ -17992,6 +18016,8 @@ const handleReadSmartCard = async () => {
 // --- إدارة كروت التحكم (Control Cards) ---
 // ==========================================
 let currentControlCardData = null;
+let isControlCardReadInProgress = false;
+let isControlCardRenewInProgress = false;
 const getControlCardFailureMessage = (operation, failure) => {
     const status = String((failure === null || failure === void 0 ? void 0 : failure.status) || '').toLowerCase();
     const detail = String((failure === null || failure === void 0 ? void 0 : failure.message) || failure || '').trim();
@@ -18185,6 +18211,10 @@ const updateControlCardUI = (cardData) => {
     });
 };
 const handleReadControlCard = async () => {
+    if (isControlCardReadInProgress) {
+        return;
+    }
+    isControlCardReadInProgress = true;
     const readBtn = document.getElementById('btn-read-control-card');
     const origHtml = readBtn ? readBtn.innerHTML : '';
     clearControlCardDisplay();
@@ -18288,6 +18318,7 @@ const handleReadControlCard = async () => {
         showToast(getControlCardFailureMessage('read', error), 'error');
     }
     finally {
+        isControlCardReadInProgress = false;
         if (readBtn) {
             readBtn.disabled = false;
             readBtn.innerHTML = origHtml;
@@ -18380,6 +18411,10 @@ const openRenewControlCardSuccessModal = (result) => {
 };
 const handleRenewControlCard = async () => {
     var _a, _b, _c;
+    if (isControlCardRenewInProgress) {
+        return;
+    }
+    isControlCardRenewInProgress = true;
     const renewBtn = document.getElementById('btn-renew-control-card');
     const origHtml = renewBtn ? renewBtn.innerHTML : '';
     if (renewBtn) {
@@ -18466,6 +18501,7 @@ const handleRenewControlCard = async () => {
         showToast(getControlCardFailureMessage('renew', error), 'error');
     }
     finally {
+        isControlCardRenewInProgress = false;
         if (renewBtn) {
             renewBtn.disabled = false;
             renewBtn.innerHTML = origHtml;

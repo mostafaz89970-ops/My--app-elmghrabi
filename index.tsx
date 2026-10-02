@@ -3754,62 +3754,54 @@ const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'inf
 
     if (!container) return;
 
+    const normalizedMessage = String(message || '').trim();
+    if (!normalizedMessage) return;
 
+    const toastMap = ((window as any).__controlToastMap ??= new Map<string, { toast: HTMLDivElement; timeoutId: number }>());
+    const dedupeKey = `${type}:${normalizedMessage}`;
+    const existing = toastMap.get(dedupeKey);
+
+    if (existing) {
+        window.clearTimeout(existing.timeoutId);
+        existing.toast.classList.add('show');
+        existing.timeoutId = window.setTimeout(() => {
+            existing.toast.classList.remove('show');
+            setTimeout(() => {
+                if (existing.toast.parentElement) existing.toast.remove();
+                toastMap.delete(dedupeKey);
+                if (container.childElementCount === 0) updateFavicon('normal');
+            }, 250);
+        }, 2500);
+        return;
+    }
 
     updateFavicon(type);
 
-
-
     const toast = document.createElement('div');
-
     toast.className = `toast ${type}`;
-
-    toast.textContent = message;
-
+    toast.textContent = normalizedMessage;
     toast.setAttribute('role', 'alert');
 
-
+    while (container.childElementCount > 4) {
+        const oldest = container.firstElementChild;
+        if (oldest) oldest.remove();
+    }
 
     container.appendChild(toast);
 
+    requestAnimationFrame(() => toast.classList.add('show'));
 
-
-    // Animate in
-
-    setTimeout(() => {
-
-        toast.classList.add('show');
-
-    }, 100);
-
-
-
-    // Animate out and remove after 3 seconds
-
-    setTimeout(() => {
-
+    const hideTimeout = window.setTimeout(() => {
         toast.classList.remove('show');
+        setTimeout(() => {
+            if (toast.parentElement) toast.remove();
+            toastMap.delete(dedupeKey);
+            if (container.childElementCount === 0) updateFavicon('normal');
+        }, 250);
+    }, 2500);
 
-        toast.addEventListener('transitionend', () => {
-
-            if (toast.parentElement) {
-
-                toast.remove();
-
-            }
-
-            if (container.childElementCount === 0) {
-
-                updateFavicon('normal');
-
-            }
-
-        });
-
-    }, 3000);
-
+    toastMap.set(dedupeKey, { toast, timeoutId: hideTimeout });
 };
-
 
 
 /**
@@ -29992,6 +29984,8 @@ const handlePrintJudicialControlDetails = () => {
     // ==========================================
 
     let currentControlCardData: any = null;
+    let isControlCardReadInProgress = false;
+    let isControlCardRenewInProgress = false;
 
     const getControlCardFailureMessage = (operation: 'read' | 'renew', failure: any) => {
         const status = String(failure?.status || '').toLowerCase();
@@ -30242,6 +30236,12 @@ const handlePrintJudicialControlDetails = () => {
 
     const handleReadControlCard = async () => {
 
+        if (isControlCardReadInProgress) {
+            return;
+        }
+
+        isControlCardReadInProgress = true;
+
         const readBtn = document.getElementById('btn-read-control-card') as HTMLButtonElement | null;
 
         const origHtml = readBtn ? readBtn.innerHTML : '';
@@ -30391,6 +30391,8 @@ const handlePrintJudicialControlDetails = () => {
 
         } finally {
 
+            isControlCardReadInProgress = false;
+
             if (readBtn) {
 
                 readBtn.disabled = false;
@@ -30493,6 +30495,12 @@ const handlePrintJudicialControlDetails = () => {
 
 
     const handleRenewControlCard = async () => {
+
+        if (isControlCardRenewInProgress) {
+            return;
+        }
+
+        isControlCardRenewInProgress = true;
 
         const renewBtn = document.getElementById('btn-renew-control-card') as HTMLButtonElement | null;
 
@@ -30643,6 +30651,8 @@ const handlePrintJudicialControlDetails = () => {
             showToast(getControlCardFailureMessage('renew', error), 'error');
 
         } finally {
+
+            isControlCardRenewInProgress = false;
 
             if (renewBtn) {
 
