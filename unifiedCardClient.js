@@ -549,7 +549,11 @@ async function readControlCardLive() {
     try {
         token = await getUcsToken(false);
     } catch (e) {
-        console.warn('Could not get fresh UCS token:', e.message);
+        return {
+            success: false,
+            status: 'auth_error',
+            message: `تعذر الحصول على رمز UnifiedCardService من MEEDCO: ${e.message || e}`
+        };
     }
 
     return new Promise((resolve) => {
@@ -654,15 +658,15 @@ async function readControlCardLive() {
                                     id: data.id,
                                     cardId: data.cardId,
                                     technicianCode: data.techniciancode,
-                                    technicianName: data.technicianName || 'فني معتمد',
-                                    controlOperationTypeName: data.controlOperationTypeName || 'إزالة تلاعبات و أخطاء',
-                                    controlOperationType: data.controlOperationType != null ? data.controlOperationType : 2,
-                                    companyName: data.companyName || getVendorNameById(detectedVendorId),
+                                    technicianName: data.technicianName || '',
+                                    controlOperationTypeName: data.controlOperationTypeName || '',
+                                    controlOperationType: data.controlOperationType,
+                                    companyName: data.companyName || '',
                                     meterTypeName: data.meterTypeName || '',
                                     cardIssueDate: data.issueDate || '',
                                     activationDate: data.controlCardActivationDate || '',
                                     expiryDate: data.controlCardExpiryDate || '',
-                                    issueUsername: data.issueUsername || 'المشغل المعتمد',
+                                    issueUsername: data.issueUsername || '',
                                     status: 'مفعل',
                                     readAt: new Date().toLocaleString('ar-EG'),
                                     meterData: data.meterData || []
@@ -3110,4 +3114,3 @@ module.exports = {
     getCustomerTypesDropdownLive,
     getPlaceDescsDropdownLive
 };
-

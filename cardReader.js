@@ -1,7 +1,6 @@
 /**
  * Smart Card Reader Module - منظومة العدادات 2025
- * يعمل بالكامل محلياً وبشكل مستقل عبر محرك الكروت المباشر (nativeCardEngine)
- * دون الحاجة لأي تطبيق خارجي أو خدمة وسيطة
+ * يمرر عمليات القارئ إلى nativeCardEngine، بينما تُعتمد بيانات كارت التحكم من MEEDCO.
  */
 
 const nativeEngine = require('./nativeCardEngine');

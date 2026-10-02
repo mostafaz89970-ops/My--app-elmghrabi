@@ -527,15 +527,25 @@
         window.clearTimeout(closeTimer);
         if (dialog.hidden) previousFocus = document.activeElement;
         panel.dataset.state = state;
+        const isControlCardRead = /قراءة كارت التحكم|قراءة الكارت|تمت قراءة/.test(text);
+        const isControlCardRenew = /تجديد|تحديث وتفعيل|تحديث الكارت/.test(text);
         title.textContent = loading
           ? 'جاري قراءة كارت التحكم'
-          : state === 'success'
-            ? 'تم بنجاح'
-            : state === 'warning'
-              ? 'تنبيه'
-              : state === 'error'
-                ? 'حدث خطأ'
-                : 'إشعار';
+          : state === 'success' && isControlCardRead
+            ? 'تمت قراءة كارت التحكم بنجاح'
+            : state === 'success' && isControlCardRenew
+              ? 'تم تجديد كارت التحكم بنجاح'
+              : state === 'success'
+                ? 'تمت العملية بنجاح'
+                : state === 'warning'
+                  ? 'تنبيه بخصوص كارت التحكم'
+                  : state === 'error' && isControlCardRead
+                    ? 'تعذرت قراءة كارت التحكم'
+                    : state === 'error' && isControlCardRenew
+                      ? 'تعذر تجديد كارت التحكم'
+                      : state === 'error'
+                        ? 'تعذر إتمام العملية'
+                        : 'إشعار';
         message.textContent = text;
         icon.textContent = state === 'success' ? '✓' : state === 'warning' ? '!' : state === 'error' ? '×' : '💬';
         spinner.hidden = !loading;
@@ -546,7 +556,7 @@
           reading = true;
           readTimeout = window.setTimeout(() => {
             reading = false;
-            show('لم تصل استجابة من خدمة قراءة الكروت. تحقق من القارئ ثم حاول مرة أخرى.', 'error');
+            show('انتهت مهلة قراءة كارت التحكم. تأكد من ثبات الكارت في القارئ ومن اتصال خدمة MEEDCO ثم أعد المحاولة.', 'error');
           }, 60000);
         } else {
           reading = false;
@@ -559,7 +569,7 @@
       document.addEventListener('click', event => {
         const target = event.target;
         if (target instanceof Element && target.closest(readButtonSelector)) {
-          show('جاري الاتصال بخدمة UnifiedCardService وقراءة كارت التحكم...', 'info', true);
+          show('جاري قراءة الشريحة ثم جلب بيانات كارت التحكم من MEEDCO...', 'info', true);
         }
       }, true);
 
@@ -583,7 +593,7 @@
               const text = toast.textContent?.trim();
               if (!text) return;
               toast.remove();
-              if (reading && /جاري الاتصال|جارٍ الاتصال|جاري التعامل|جاري تحديث|جارٍ تحديث/.test(text)) {
+              if (reading && /جاري الاتصال|جارٍ الاتصال|جاري التعامل|جاري قراءة|جارٍ قراءة|جاري تحديث|جارٍ تحديث/.test(text)) {
                 message.textContent = text;
                 return;
               }
@@ -8152,7 +8162,7 @@
                         <div style="width: 64px; height: 64px; background: rgba(255,255,255,0.2); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                             <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                         </div>
-                        <h3 style="margin: 0; font-size: 1.45rem; font-weight: 700;">تم تحديث وتفعيل كارت التحكم بنجاح</h3>
+                        <h3 style="margin: 0; font-size: 1.45rem; font-weight: 700;">تم تجديد كارت التحكم بنجاح</h3>
                         <p style="margin: 6px 0 0; opacity: 0.9; font-size: 0.95rem;">تمت كتابة التحديث وتمديد الصلاحية على شريحة الكارت بالمنظومة</p>
                     </div>
                     <div style="padding: 24px; text-align: center; background: #ffffff;">

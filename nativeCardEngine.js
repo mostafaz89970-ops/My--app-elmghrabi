@@ -1,8 +1,7 @@
 /**
  * Native Card Engine - منظومة العدادات 2025
- * محرك قراءة وكتابة وبرمجة كروت العدادات الذكية المستقل بالكامل
- * يعمل محلياً ومباشرة من التطبيق عبر بروتوكول PC/SC (winscard.dll)
- * بدون أي اعتماد على خدمات خارجية أو تطبيقات أخرى أو متصفحات.
+ * عمليات كارت التحكم تمر عبر UnifiedCardService للقارئ وMEEDCO للتحقق وجلب البيانات.
+ * تبقى عمليات البطاقات الأخرى مرتبطة بمساراتها الخاصة داخل هذا المحرك.
  */
 
 const { execFile } = require('child_process');
@@ -833,38 +832,41 @@ async function searchCustomer(term) {
 async function readControlCard() {
     try {
         const unifiedClient = require('./unifiedCardClient');
-        if (unifiedClient && typeof unifiedClient.readControlCardLive === 'function') {
-            const liveRes = await unifiedClient.readControlCardLive();
-            if (liveRes && liveRes.success && liveRes.card) {
-                const store = getCardStore();
-                if (!store.controlCards) store.controlCards = {};
-                store.controlCards[liveRes.card.cardId] = liveRes.card;
-                store.activeControlCard = liveRes.card;
-                saveCardStore(store);
-                return {
-                    success: true,
-                    card: liveRes.card,
-                    cardData: liveRes.card,
-                    message: liveRes.message || 'تمت قراءة كارت التحكم الفعلي بنجاح ومطابقته مع سيرفر MEEDCO.'
-                };
-            } else if (liveRes) {
-                if (liveRes.isCleared || liveRes.status === 'empty_card') {
-                    const store = getCardStore();
-                    store.activeControlCard = null;
-                    saveCardStore(store);
-                }
-                return liveRes;
-            }
+        if (!unifiedClient || typeof unifiedClient.readControlCardLive !== 'function') {
+            return {
+                success: false,
+                status: 'no_reader',
+                message: 'خدمة القراءة الحية غير متاحة. تحقق من تشغيل UnifiedCardService.'
+            };
         }
+
+        const liveRes = await unifiedClient.readControlCardLive();
+        if (!liveRes) {
+            return {
+                success: false,
+                status: 'read_failed',
+                message: 'لم ترجع خدمة MEEDCO استجابة لقراءة كارت التحكم.'
+            };
+        }
+
+        if (liveRes.success && liveRes.card) {
+            return {
+                success: true,
+                card: liveRes.card,
+                cardData: liveRes.card,
+                message: liveRes.message || 'تمت قراءة كارت التحكم الفعلي ومطابقته مع سيرفر MEEDCO.'
+            };
+        }
+
+        return liveRes;
     } catch (e) {
         console.warn('Live control card read failed:', e.message);
+        return {
+            success: false,
+            status: 'read_failed',
+            message: `فشلت قراءة كارت التحكم أو جلب بياناته من MEEDCO: ${e.message || e}`
+        };
     }
-
-    return {
-        success: false,
-        status: 'no_card',
-        message: 'لا يوجد كارت تحكم في القارئ أو تعذر قراءة الشريحة الذكية. يرجى التأكد من وضع الكارت بالقارئ.'
-    };
 }
 
 async function renewControlCard(cardId, generationType, vendorCode) {

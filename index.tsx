@@ -5145,7 +5145,6 @@ const handleLogin = async (event: Event) => {
 
         window.setTimeout(() => renderDashboard(), 100);
 
-        fetchActiveControlCard();
         await hideAppLoading(300);
 
     } else {
@@ -29993,48 +29992,70 @@ const handlePrintJudicialControlDetails = () => {
     // ==========================================
 
     let currentControlCardData: any = null;
-    let isFetchingActiveControlCard = false;
 
-    const fetchActiveControlCard = async () => {
-        if (isFetchingActiveControlCard) return;
-        isFetchingActiveControlCard = true;
-        try {
-            if (!currentControlCardData) {
-                const localSaved = localStorage.getItem('activeControlCard');
-                if (localSaved) {
-                    try { currentControlCardData = JSON.parse(localSaved); } catch(e) {}
-                }
-            }
+    const getControlCardFailureMessage = (operation: 'read' | 'renew', failure: any) => {
+        const status = String(failure?.status || '').toLowerCase();
+        const detail = String(failure?.message || failure || '').trim();
+        const isRead = operation === 'read';
+        const operationName = isRead ? 'قراءة كارت التحكم' : 'تجديد كارت التحكم';
 
-            if (currentControlCardData) {
-                updateControlCardUI(currentControlCardData);
-            }
-
-            const response = await fetch('http://127.0.0.1:5002/api/control-card/active');
-            const result = await response.json();
-            if (result && result.success && result.data) {
-                currentControlCardData = result.data;
-                try { localStorage.setItem('activeControlCard', JSON.stringify(currentControlCardData)); } catch(e) {}
-                updateControlCardUI(currentControlCardData);
-            }
-        } catch(e) {
-            console.warn('Could not fetch active control card:', e);
-        } finally {
-            isFetchingActiveControlCard = false;
+        if (status === 'no_reader') {
+            return `تعذرت ${operationName}: خدمة UnifiedCardService غير متصلة. شغّل الخدمة وتأكد من اتصال القارئ.`;
         }
+        if (status === 'no_card') {
+            return 'تعذرت قراءة كارت التحكم: لم يُعثر على كارت في القارئ. أدخله وثبّته ثم أعد المحاولة.';
+        }
+        if (status === 'wrong_card') {
+            return 'تعذرت قراءة كارت التحكم: الكارت الموجود في القارئ ليس كارت تحكم. استبدله ثم أعد المحاولة.';
+        }
+        if (status === 'auth_error' || /accessToken|جلسة.*MEEDCO|رمز.*MEEDCO|401/i.test(detail)) {
+            return `تعذر التحقق من جلسة MEEDCO لإتمام ${operationName}. سجّل الدخول إلى MEEDCO مجددًا ثم أعد المحاولة.`;
+        }
+        if (isRead && status === 'read_failed') {
+            return 'تم التعرف على الشريحة، لكن تعذر جلب بيانات الكارت من MEEDCO. تحقق من جلسة MEEDCO واتصال الإنترنت ثم أعد المحاولة.';
+        }
+
+        const technicalDetail = /Exception|Error:|Parameter name:|ECONN|self-signed|Cannot |undefined|null/i.test(detail);
+        const explanation = detail && !technicalDetail && detail !== 'حدث خطأ'
+            ? ` التفاصيل: ${detail}`
+            : '';
+        const guidance = isRead
+            ? 'تحقق من ثبات الكارت في القارئ ومن تسجيل الدخول إلى MEEDCO واتصال الإنترنت.'
+            : 'تحقق من ثبات الكارت في القارئ ومن جلسة MEEDCO، ثم أعد المحاولة.';
+        const failureLabel = isRead ? 'تعذرت قراءة كارت التحكم.' : 'تعذر تجديد كارت التحكم.';
+        return `${failureLabel}${explanation} ${guidance}`;
+    };
+
+    const clearControlCardDisplay = () => {
+        currentControlCardData = null;
+        ['ctrl-company-name', 'ctrl-meter-type', 'ctrl-card-id', 'ctrl-op-type', 'ctrl-tech-name', 'ctrl-tech-code', 'ctrl-issue-date', 'ctrl-active-date', 'ctrl-expiry-date', 'ctrl-issuer']
+            .forEach(id => {
+                const element = document.getElementById(id);
+                if (element) element.textContent = '-';
+            });
+
+        const badge = document.getElementById('ctrl-card-status-badge');
+        if (badge) {
+            badge.textContent = 'بانتظار القراءة من MEEDCO';
+            badge.style.backgroundColor = '#e2e8f0';
+            badge.style.color = '#475569';
+            badge.style.border = 'none';
+        }
+
+        const count = document.getElementById('ctrl-meters-count');
+        if (count) count.textContent = '0';
+
+        const tbody = document.getElementById('control-card-meters-tbody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="8" style="padding: 2rem; text-align: center; color: #64748b;">اضغط على "قراءة الكارت" لجلب البيانات مباشرة من MEEDCO.</td></tr>';
+        }
+
+        const printButton = document.getElementById('btn-print-control-card') as HTMLButtonElement | null;
+        if (printButton) printButton.disabled = true;
     };
 
     const renderReadControlCardSection = () => {
-        if (!currentControlCardData) {
-            try {
-                const localSaved = localStorage.getItem('activeControlCard');
-                if (localSaved) currentControlCardData = JSON.parse(localSaved);
-            } catch (_) {}
-        }
-        if (currentControlCardData) {
-            updateControlCardUI(currentControlCardData);
-        }
-        fetchActiveControlCard();
+        clearControlCardDisplay();
     };
 
     const updateControlCardUI = (cardData: any) => {
@@ -30085,7 +30106,7 @@ const handlePrintJudicialControlDetails = () => {
 
         if (expiryDateEl) expiryDateEl.textContent = cardData.controlCardExpiryDate || cardData.expiryDate || '-';
 
-        if (issuerEl) issuerEl.textContent = cardData.issueUsername || cardData.issuerUserName || cardData.issuer || (loggedInUser?.fullName || 'مسؤول النظام');
+        if (issuerEl) issuerEl.textContent = cardData.issueUsername || cardData.issuerUserName || cardData.issuer || '-';
 
 
 
@@ -30151,23 +30172,11 @@ const handlePrintJudicialControlDetails = () => {
 
             
 
-            // Search local database for match
-
-            const localMatch = state.meters.find(lm => 
-
-                (lm.meterChassisNumber && String(lm.meterChassisNumber).trim() === String(meterNum).trim()) ||
-
-                (lm.subscriptionCode && String(lm.subscriptionCode).trim() === String(custCode).trim())
-
-            );
-
-
-
-            const custName = m.customerName || m.name || (localMatch ? localMatch.subscriberName : 'غير مسجل محلياً');
+            const custName = m.customerName || m.name || '-';
 
             const meterStatus = m.status || m.meterStatus || (m.hasTamper ? '<span style="color:#dc2626;">تلاعب</span>' : '<span style="color:#16a34a;">سليم</span>');
 
-            const batteryStatus = m.batteryStatus || m.batarryStatus || (m.batteryVoltage ? `${m.batteryVoltage} V` : 'سليمة');
+            const batteryStatus = m.batteryStatus || m.batarryStatus || (m.batteryVoltage ? `${m.batteryVoltage} V` : '-');
 
             const balanceText = m.balance != null ? `${m.balance} ج.م` : (m.remainingBalance != null ? `${m.remainingBalance} ج.م` : (m.totalActiveEnergy != null ? `${m.totalActiveEnergy} ك.و.س` : '-'));
 
@@ -30236,6 +30245,7 @@ const handlePrintJudicialControlDetails = () => {
         const readBtn = document.getElementById('btn-read-control-card') as HTMLButtonElement | null;
 
         const origHtml = readBtn ? readBtn.innerHTML : '';
+        clearControlCardDisplay();
 
         if (readBtn) {
 
@@ -30255,7 +30265,7 @@ const handlePrintJudicialControlDetails = () => {
 
         try {
 
-            showToast('جاري الاتصال بخدمة UnifiedCardService وقراءة كارت التحكم...');
+            showToast('جاري قراءة الشريحة ثم جلب بيانات كارت التحكم مباشرة من MEEDCO...');
 
             let result: any = null;
 
@@ -30274,11 +30284,8 @@ const handlePrintJudicialControlDetails = () => {
                     result = await res.json();
 
                 } catch (bridgeErr) {
-
-                    showToast('تعذر الاتصال بخدمة قراءة الكروت المحلية. تأكد من تشغيل الخدمة على جهازك.', 'error');
-
+                    showToast(getControlCardFailureMessage('read', bridgeErr), 'error');
                     return;
-
                 }
 
             }
@@ -30296,21 +30303,13 @@ const handlePrintJudicialControlDetails = () => {
 
 
             if (result.status === 'no_reader') {
-
-                showToast(result.message || 'لم يتم العثور على قارئ كروت متصل بالجهاز.', 'error');
-
+                showToast(getControlCardFailureMessage('read', result), 'error');
                 return;
-
             }
 
-
-
             if (result.status === 'no_card') {
-
-                showToast(result.message || 'يرجى وضع كارت التحكم داخل القارئ والمحاولة مجدداً.', 'error');
-
+                showToast(getControlCardFailureMessage('read', result), 'error');
                 return;
-
             }
 
 
@@ -30352,28 +30351,26 @@ const handlePrintJudicialControlDetails = () => {
                     }
 
                     const vendorName = result.vendorName || (result.vendor_id === 1 || result.vendorCode === 1 ? 'السويدي (El Sewedy)' : 'جلوبالترونكس');
-                    const data = result.data || result.card || {
-                        cardId: result.cardId || '-',
-                        vendorCode: result.vendor_id || result.vendorCode || 1,
-                        generationType: result.generation_type || 'g1',
-                        companyName: vendorName,
-                        status: 'غير مفعل'
-                    };
-                    currentControlCardData = data;
-                    updateControlCardUI(data);
-
+                    const data = result.data || result.card;
+                    if (data) {
+                        currentControlCardData = data;
+                        updateControlCardUI(data);
+                    }
                     showToast(result.message || 'كارت التحكم غير مفعل حالياً أو انتهت صلاحيته اليومية. يمكنك تجديده عبر زر "تحديث الكارت".', 'warning');
                 } else {
-                    showToast(result.message || 'فشل في فك تشفير أو قراءة كارت التحكم.', 'error');
+                    showToast(getControlCardFailureMessage('read', result), 'error');
                 }
                 return;
             }
 
 
 
-            const data = result.data || result.card || result;
+            const data = result.card || result.cardData;
+            if (!data) {
+                showToast('لم يرجع MEEDCO بيانات للكارت بعد القراءة. لن يتم عرض بيانات محفوظة محلياً.', 'error');
+                return;
+            }
             currentControlCardData = data;
-            try { localStorage.setItem('activeControlCard', JSON.stringify(data)); } catch(e) {}
             updateControlCardUI(data);
 
 
@@ -30390,7 +30387,7 @@ const handlePrintJudicialControlDetails = () => {
 
             console.error('Error reading control card:', error);
 
-            showToast(`حدث خطأ أثناء قراءة كارت التحكم: ${error.message || error}`, 'error');
+            showToast(getControlCardFailureMessage('read', error), 'error');
 
         } finally {
 
@@ -30633,7 +30630,7 @@ const handlePrintJudicialControlDetails = () => {
 
             } else {
 
-                showToast(result?.message || 'فشل تحديث كارت التحكم. تأكد من إدخال الكارت وثباته في القارئ.', 'error');
+                showToast(getControlCardFailureMessage('renew', result), 'error');
 
             }
 
@@ -30641,7 +30638,7 @@ const handlePrintJudicialControlDetails = () => {
 
             console.error('Error renewing control card:', error);
 
-            showToast(`حدث خطأ أثناء تحديث الكارت: ${error.message || error}`, 'error');
+            showToast(getControlCardFailureMessage('renew', error), 'error');
 
         } finally {
 
@@ -30667,19 +30664,8 @@ const handlePrintJudicialControlDetails = () => {
 
         
 
-        const localMatch = state.meters.find(lm => 
-
-            (lm.meterChassisNumber && String(lm.meterChassisNumber).trim() === String(meterNum).trim()) ||
-
-            (lm.subscriptionCode && String(lm.subscriptionCode).trim() === String(custCode).trim())
-
-        );
-
-
-
-        const custName = meter.customerName || meter.name || (localMatch ? localMatch.subscriberName : 'غير مسجل محلياً');
-
-        const meterTime = meter.meterDateTime || meter.timestamp || meter.readTime || new Date().toLocaleString('ar-EG');
+        const custName = meter.customerName || meter.name || '-';
+        const meterTime = meter.meterDateTime || meter.timestamp || meter.readTime || '-';
 
 
 
@@ -30911,15 +30897,7 @@ const handlePrintJudicialControlDetails = () => {
 
             const custCode = m.customerCode || m.subscriptionCode || '-';
 
-            const localMatch = state.meters.find(lm => 
-
-                (lm.meterChassisNumber && String(lm.meterChassisNumber).trim() === String(meterNum).trim()) ||
-
-                (lm.subscriptionCode && String(lm.subscriptionCode).trim() === String(custCode).trim())
-
-            );
-
-            const custName = m.customerName || (localMatch ? localMatch.subscriberName : '-');
+            const custName = m.customerName || m.name || '-';
 
             const balanceText = m.balance != null ? `${m.balance} ج.م` : '-';
 
@@ -31918,13 +31896,6 @@ const handlePrintJudicialControlDetails = () => {
 
 
     const renderControlCardDetailsSection = (meter: any = null) => {
-        if (!currentControlCardData) {
-            const localSaved = localStorage.getItem('activeControlCard');
-            if (localSaved) {
-                try { currentControlCardData = JSON.parse(localSaved); } catch(e) {}
-            }
-        }
-
         const meterSelect = document.getElementById('select-detail-meter') as HTMLSelectElement | null;
         const availableMeters: any[] = [];
 
@@ -31932,30 +31903,10 @@ const handlePrintJudicialControlDetails = () => {
             currentControlCardData.meterData.forEach((mItem: any) => availableMeters.push({ ...mItem, _source: 'كارت التحكم' }));
         }
 
-        if (state.meters && Array.isArray(state.meters)) {
-            state.meters.slice(0, 50).forEach((lm: any) => {
-                const chassis = String(lm.meterChassisNumber || '').trim();
-                if (chassis && !availableMeters.some(am => String(am.meterNumber || am.meterChassisNumber || '').trim() === chassis)) {
-                    availableMeters.push({
-                        meterNumber: lm.meterChassisNumber,
-                        customerCode: lm.subscriptionCode,
-                        customerName: lm.subscriberName,
-                        address: lm.address,
-                        activityName: lm.activityType,
-                        meterTypeName: lm.meterType,
-                        remainingBalance: lm.currentBalance || lm.remainingBalance || 0,
-                        remainingPower: lm.remainingPower || 0,
-                        totalRechargeAmountOnMeter: lm.totalRecharges || 0,
-                        totalPowerConsumption: lm.totalConsumption || 0,
-                        hasTamper: false,
-                        _source: 'المنظومة المحلية'
-                    });
-                }
-            });
-        }
-
         if (meterSelect) {
-            meterSelect.innerHTML = '<option value="">اختر عداداً لعرض فحصه التشخيصي...</option>';
+            meterSelect.innerHTML = currentControlCardData
+                ? '<option value="">اختر عداداً من بيانات MEEDCO...</option>'
+                : '<option value="">اقرأ كارت التحكم أولاً من MEEDCO...</option>';
             availableMeters.forEach((am: any) => {
                 const opt = document.createElement('option');
                 const mNum = am.meterNumber || am.meterId || am.chassisNumber || am.meterChassisNumber || '-';
@@ -32010,27 +31961,17 @@ const handlePrintJudicialControlDetails = () => {
 
             const custCode = m.customerCode || m.customerId || m.subscriptionCode || '-';
 
-            const localMatch = state.meters.find(lm => 
-
-                (lm.meterChassisNumber && String(lm.meterChassisNumber).trim() === String(meterNum).trim()) ||
-
-                (lm.subscriptionCode && String(lm.subscriptionCode).trim() === String(custCode).trim())
-
-            );
-
-
-
             if (custCodeEl) custCodeEl.textContent = custCode;
 
             if (meterNumEl) meterNumEl.textContent = meterNum;
 
-            if (custNameEl) custNameEl.textContent = m.customerName || m.name || (localMatch ? localMatch.subscriberName : 'غير مسجل محلياً');
+            if (custNameEl) custNameEl.textContent = m.customerName || m.name || '-';
 
-            if (addressEl) addressEl.textContent = m.address || (localMatch ? localMatch.address : '-');
+            if (addressEl) addressEl.textContent = m.address || '-';
 
-            if (activityEl) activityEl.textContent = m.activityName || (localMatch ? localMatch.activityType : '-');
+            if (activityEl) activityEl.textContent = m.activityName || '-';
 
-            if (meterTypeEl) meterTypeEl.textContent = m.meterTypeName || currentControlCardData?.meterTypeName || (localMatch ? localMatch.meterType : '-');
+            if (meterTypeEl) meterTypeEl.textContent = m.meterTypeName || currentControlCardData?.meterTypeName || '-';
 
             if (remBalEl) remBalEl.textContent = m.remainingBalance != null ? `${m.remainingBalance} ج.م` : (m.balance != null ? `${m.balance} ج.م` : '-');
 
@@ -67391,25 +67332,7 @@ const setupOrgHierarchyEvents = () => {
         document.getElementById('select-detail-meter')?.addEventListener('change', (e) => {
             const mNum = (e.target as HTMLSelectElement).value;
             if (!mNum) return;
-            let match = (currentControlCardData?.meterData || []).find((m: any) => String(m.meterNumber || m.meterId || m.chassisNumber).trim() === String(mNum).trim());
-            if (!match) {
-                const localMatch = (state.meters || []).find((lm: any) => String(lm.meterChassisNumber).trim() === String(mNum).trim());
-                if (localMatch) {
-                    match = {
-                        meterNumber: localMatch.meterChassisNumber,
-                        customerCode: localMatch.subscriptionCode,
-                        customerName: localMatch.subscriberName,
-                        address: localMatch.address,
-                        activityName: localMatch.activityType,
-                        meterTypeName: localMatch.meterType,
-                        remainingBalance: localMatch.currentBalance || localMatch.remainingBalance || 0,
-                        remainingPower: localMatch.remainingPower || 0,
-                        totalRechargeAmountOnMeter: localMatch.totalRecharges || 0,
-                        totalPowerConsumption: localMatch.totalConsumption || 0,
-                        hasTamper: false
-                    };
-                }
-            }
+            const match = (currentControlCardData?.meterData || []).find((m: any) => String(m.meterNumber || m.meterId || m.chassisNumber).trim() === String(mNum).trim());
             if (match) {
                 renderControlCardDetailsSection(match);
             }
