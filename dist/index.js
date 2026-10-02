@@ -18035,6 +18035,9 @@ const getControlCardFailureMessage = (operation, failure) => {
     if (status === 'auth_error' || /accessToken|جلسة.*MEEDCO|رمز.*MEEDCO|401/i.test(detail)) {
         return `تعذر التحقق من جلسة MEEDCO لإتمام ${operationName}. سجّل الدخول إلى MEEDCO مجددًا ثم أعد المحاولة.`;
     }
+    if (/Failed to fetch|ERR_CONNECTION_(?:RESET|REFUSED)|NetworkError|Load failed/i.test(detail)) {
+        return `تعذر الاتصال بخدمة الكروت المحلية لإتمام ${operationName}. افتح تطبيق المنظومة على الجهاز الذي يتصل به القارئ، وتأكد من تشغيل خدمة القارئ المحلية.`;
+    }
     if (isRead && status === 'read_failed') {
         return 'تم التعرف على الشريحة، لكن تعذر جلب بيانات الكارت من MEEDCO. تحقق من جلسة MEEDCO واتصال الإنترنت ثم أعد المحاولة.';
     }
@@ -18235,13 +18238,26 @@ const handleReadControlCard = async () => {
             result = await window.readControlCard();
         }
         else {
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), 68000);
             try {
-                const res = await fetch('http://127.0.0.1:5002/api/read-control-card');
+                const res = await fetch('http://127.0.0.1:5002/api/read-control-card', {
+                    signal: controller.signal
+                });
+                if (!res.ok) {
+                    throw new Error(`خدمة الكروت المحلية أعادت رمز HTTP ${res.status}.`);
+                }
                 result = await res.json();
             }
             catch (bridgeErr) {
-                showToast(getControlCardFailureMessage('read', bridgeErr), 'error');
+                const failure = bridgeErr instanceof Error && bridgeErr.name === 'AbortError'
+                    ? { message: 'انتهت مهلة الاتصال بخدمة قراءة الكارت المحلية.' }
+                    : bridgeErr;
+                showToast(getControlCardFailureMessage('read', failure), 'error');
                 return;
+            }
+            finally {
+                window.clearTimeout(timeoutId);
             }
         }
         if (!result) {
@@ -18442,7 +18458,7 @@ const handleRenewControlCard = async () => {
         }
         else {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            const timeoutId = window.setTimeout(() => controller.abort(), 68000);
             let fetchRes;
             try {
                 fetchRes = await fetch('http://127.0.0.1:5002/api/renew-control-card', {
@@ -18460,7 +18476,7 @@ const handleRenewControlCard = async () => {
             }
             catch (bridgeErr) {
                 clearTimeout(timeoutId);
-                const errMsg = bridgeErr.name === 'AbortError' ? 'انتهت مهلة التحديث (15 ثانية)' : 'تعذر الاتصال بخدمة كروت التحكم المحلية.';
+                const errMsg = bridgeErr.name === 'AbortError' ? 'انتهت مهلة الاتصال بخدمة تحديث الكارت المحلية.' : 'تعذر الاتصال بخدمة كروت التحكم المحلية.';
                 // Throw so finally block runs and re-enables the button
                 throw new Error(errMsg);
             }

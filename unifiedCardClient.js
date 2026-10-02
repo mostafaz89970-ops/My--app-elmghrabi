@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const WebSocket = require('ws');
 
 const WS_URL = 'ws://127.0.0.1:5001/v1';
 const MEEDCO_API_HOST = 'api-prod.meedco.cyuni.net';

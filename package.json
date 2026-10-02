@@ -14,9 +14,10 @@
   "author": "Moustafa Elmaghrabi",
   "license": "ISC",
   "dependencies": {
+    "better-sqlite3": "^9.4.3",
     "electron-updater": "^6.6.2",
     "knex": "^3.1.0",
-    "better-sqlite3": "^9.4.3"
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "chokidar": "^3.6.0",
@@ -31,7 +32,7 @@
     "directories": {
       "output": "${env.USERPROFILE}/Desktop/Unified Counter System Output"
     },
-      "files": [
+    "files": [
       "dist/**/*",
       "main.js",
       "preload.js",
@@ -42,6 +43,7 @@
       "cardReader.js",
       "nativeCardEngine.js",
       "internalCardServer.js",
+      "unifiedCardClient.js",
       "debts_store.json",
       "card_store.json",
       "initial_data.json",
