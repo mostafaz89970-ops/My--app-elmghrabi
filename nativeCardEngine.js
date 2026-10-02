@@ -858,17 +858,12 @@ async function readControlCard() {
         }
     } catch (e) {
         console.warn('Live control card read failed:', e.message);
-        return {
-            success: false,
-            status: 'read_failed',
-            message: `تعذر إكمال القراءة الفعلية لكارت التحكم: ${e.message}`
-        };
     }
 
     return {
         success: false,
-        status: 'read_failed',
-        message: 'محرك القراءة الفعلية لكارت التحكم غير متاح على هذا الجهاز.'
+        status: 'no_card',
+        message: 'لا يوجد كارت تحكم في القارئ أو تعذر قراءة الشريحة الذكية. يرجى التأكد من وضع الكارت بالقارئ.'
     };
 }
 

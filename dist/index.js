@@ -17993,22 +17993,12 @@ const handleReadSmartCard = async () => {
 // --- إدارة كروت التحكم (Control Cards) ---
 // ==========================================
 let currentControlCardData = null;
-let cachedControlCardsHistory = [];
 let isFetchingActiveControlCard = false;
 const fetchActiveControlCard = async () => {
     if (isFetchingActiveControlCard)
         return;
     isFetchingActiveControlCard = true;
     try {
-        // 1. استرجاع فوري من التخزين المحلي لمنع أي وميض أو فراغ في الصفحة
-        if (!cachedControlCardsHistory || cachedControlCardsHistory.length === 0) {
-            try {
-                const localHist = localStorage.getItem('cachedControlCardsHistory');
-                if (localHist)
-                    cachedControlCardsHistory = JSON.parse(localHist);
-            }
-            catch (_) { }
-        }
         if (!currentControlCardData) {
             const localSaved = localStorage.getItem('activeControlCard');
             if (localSaved) {
@@ -18017,35 +18007,19 @@ const fetchActiveControlCard = async () => {
                 }
                 catch (e) { }
             }
-            else if (cachedControlCardsHistory && cachedControlCardsHistory.length > 0) {
-                currentControlCardData = cachedControlCardsHistory[0];
-            }
         }
-        // 2. مزامنة البيانات الحية مع الخادم الداخلي
-        const [actRes, histRes] = await Promise.allSettled([
-            fetch('http://127.0.0.1:5002/api/control-card/active').then(r => r.json()),
-            fetch('http://127.0.0.1:5002/api/control-card/history').then(r => r.json())
-        ]);
-        if (histRes.status === 'fulfilled' && histRes.value && histRes.value.success && Array.isArray(histRes.value.data)) {
-            cachedControlCardsHistory = histRes.value.data;
-            try {
-                localStorage.setItem('cachedControlCardsHistory', JSON.stringify(cachedControlCardsHistory));
-            }
-            catch (_) { }
+        if (currentControlCardData) {
+            updateControlCardUI(currentControlCardData);
         }
-        if (actRes.status === 'fulfilled' && actRes.value && actRes.value.success && actRes.value.data) {
-            currentControlCardData = actRes.value.data;
+        const response = await fetch('http://127.0.0.1:5002/api/control-card/active');
+        const result = await response.json();
+        if (result && result.success && result.data) {
+            currentControlCardData = result.data;
             try {
                 localStorage.setItem('activeControlCard', JSON.stringify(currentControlCardData));
             }
             catch (e) { }
-        }
-        else if (!currentControlCardData && cachedControlCardsHistory.length > 0) {
-            currentControlCardData = cachedControlCardsHistory[0];
-            try {
-                localStorage.setItem('activeControlCard', JSON.stringify(currentControlCardData));
-            }
-            catch (e) { }
+            updateControlCardUI(currentControlCardData);
         }
     }
     catch (e) {
@@ -18056,7 +18030,18 @@ const fetchActiveControlCard = async () => {
     }
 };
 const renderReadControlCardSection = () => {
-    clearControlCardUI();
+    if (!currentControlCardData) {
+        try {
+            const localSaved = localStorage.getItem('activeControlCard');
+            if (localSaved)
+                currentControlCardData = JSON.parse(localSaved);
+        }
+        catch (_) { }
+    }
+    if (currentControlCardData) {
+        updateControlCardUI(currentControlCardData);
+    }
+    fetchActiveControlCard();
 };
 const updateControlCardUI = (cardData) => {
     const companyEl = document.getElementById('ctrl-company-name');
@@ -18091,7 +18076,7 @@ const updateControlCardUI = (cardData) => {
     if (expiryDateEl)
         expiryDateEl.textContent = cardData.controlCardExpiryDate || cardData.expiryDate || '-';
     if (issuerEl)
-        issuerEl.textContent = cardData.issueUsername || cardData.issuerUserName || cardData.issuer || '-';
+        issuerEl.textContent = cardData.issueUsername || cardData.issuerUserName || cardData.issuer || ((loggedInUser === null || loggedInUser === void 0 ? void 0 : loggedInUser.fullName) || 'مسؤول النظام');
     if (badgeEl) {
         if (cardData.isCleared || cardData.status === 'empty_card' || cardData.status === 'كارت ممسوح / فارغ') {
             badgeEl.textContent = 'كارت تحكم ممسوح / فارغ (جاهز للإصدار)';
@@ -18105,17 +18090,11 @@ const updateControlCardUI = (cardData) => {
             badgeEl.style.color = '#b45309';
             badgeEl.style.border = '1px solid #fcd34d';
         }
-        else if (cardData.status === 'مفعل' || cardData.status === 'active') {
+        else {
             badgeEl.textContent = 'كارت مفعل';
             badgeEl.style.backgroundColor = '#dcfce7';
             badgeEl.style.color = '#15803d';
             badgeEl.style.border = '1px solid #86efac';
-        }
-        else {
-            badgeEl.textContent = 'تمت قراءة بيانات الكارت';
-            badgeEl.style.backgroundColor = '#e0f2fe';
-            badgeEl.style.color = '#0369a1';
-            badgeEl.style.border = '1px solid #7dd3fc';
         }
     }
     if (printBtn) {
@@ -18152,13 +18131,11 @@ const updateControlCardUI = (cardData) => {
         const meterNum = m.meterNumber || m.meterId || m.chassisNumber || m.meterChassis || '-';
         const custCode = m.customerCode || m.customerId || m.subscriptionCode || '-';
         // Search local database for match
-        const custName = m.customerName || m.name || '-';
-        const meterStatus = m.status || m.meterStatus || (m.hasTamper === true
-            ? '<span style="color:#dc2626;">تلاعب</span>'
-            : m.hasTamper === false
-                ? '<span style="color:#16a34a;">سليم</span>'
-                : '-');
-        const batteryStatus = m.batteryStatus || m.batarryStatus || (m.batteryVoltage ? `${m.batteryVoltage} V` : '-');
+        const localMatch = state.meters.find(lm => (lm.meterChassisNumber && String(lm.meterChassisNumber).trim() === String(meterNum).trim()) ||
+            (lm.subscriptionCode && String(lm.subscriptionCode).trim() === String(custCode).trim()));
+        const custName = m.customerName || m.name || (localMatch ? localMatch.subscriberName : 'غير مسجل محلياً');
+        const meterStatus = m.status || m.meterStatus || (m.hasTamper ? '<span style="color:#dc2626;">تلاعب</span>' : '<span style="color:#16a34a;">سليم</span>');
+        const batteryStatus = m.batteryStatus || m.batarryStatus || (m.batteryVoltage ? `${m.batteryVoltage} V` : 'سليمة');
         const balanceText = m.balance != null ? `${m.balance} ج.م` : (m.remainingBalance != null ? `${m.remainingBalance} ج.م` : (m.totalActiveEnergy != null ? `${m.totalActiveEnergy} ك.و.س` : '-'));
         return `
 
@@ -18205,14 +18182,6 @@ const updateControlCardUI = (cardData) => {
 const handleReadControlCard = async () => {
     const readBtn = document.getElementById('btn-read-control-card');
     const origHtml = readBtn ? readBtn.innerHTML : '';
-    clearControlCardUI();
-    const statusBadge = document.getElementById('ctrl-card-status-badge');
-    if (statusBadge) {
-        statusBadge.textContent = 'جاري قراءة الكارت الفعلي...';
-        statusBadge.style.backgroundColor = '#e0f2fe';
-        statusBadge.style.color = '#0369a1';
-        statusBadge.style.border = '1px solid #7dd3fc';
-    }
     if (readBtn) {
         readBtn.disabled = true;
         readBtn.innerHTML = `
@@ -18235,64 +18204,73 @@ const handleReadControlCard = async () => {
                 result = await res.json();
             }
             catch (bridgeErr) {
-                if (statusBadge)
-                    statusBadge.textContent = 'تعذر الاتصال بخدمة القارئ';
                 showToast('تعذر الاتصال بخدمة قراءة الكروت المحلية. تأكد من تشغيل الخدمة على جهازك.', 'error');
                 return;
             }
         }
         if (!result) {
-            if (statusBadge)
-                statusBadge.textContent = 'لم تصل استجابة من القارئ';
             showToast('لم يتم استلام أي استجابة من خدمة كروت التحكم.', 'error');
             return;
         }
         if (result.status === 'no_reader') {
-            if (statusBadge)
-                statusBadge.textContent = 'القارئ غير متصل';
             showToast(result.message || 'لم يتم العثور على قارئ كروت متصل بالجهاز.', 'error');
             return;
         }
         if (result.status === 'no_card') {
-            if (statusBadge)
-                statusBadge.textContent = 'لم يتم اكتشاف كارت على القارئ';
             showToast(result.message || 'يرجى وضع كارت التحكم داخل القارئ والمحاولة مجدداً.', 'error');
             return;
         }
         if (result.isCleared || result.status === 'empty_card') {
-            if (statusBadge) {
-                statusBadge.textContent = 'الكارت الفعلي فارغ أو غير مبرمج';
-                statusBadge.style.backgroundColor = '#e0f2fe';
-                statusBadge.style.color = '#0369a1';
-                statusBadge.style.border = '1px solid #7dd3fc';
-            }
-            showToast(result.message || 'الكارت الموجود في القارئ فارغ أو غير مبرمج ولا يحتوي على بيانات كارت تحكم.', 'info');
+            const vendorName = result.vendorName || (result.vendor_id === 1 || result.vendorCode === 1 ? 'السويدي (El Sewedy)' : (result.vendor_id === 3 || result.vendorCode === 3 ? 'المصرية' : 'جلوبالترونكس'));
+            const emptyData = {
+                cardId: '-',
+                vendorCode: result.vendor_id || result.vendorCode || 1,
+                vendorName: vendorName,
+                companyName: vendorName,
+                generationType: result.generation_type || 'g1',
+                technicianName: '-',
+                technicianCode: '-',
+                controlOperationTypeName: '-',
+                meterTypeName: '-',
+                issueDate: '-',
+                activationDate: '-',
+                expiryDate: '-',
+                status: 'كارت ممسوح / فارغ',
+                isCleared: true,
+                meterData: []
+            };
+            currentControlCardData = emptyData;
+            updateControlCardUI(emptyData);
+            showToast(result.message || `تم التعرف على كارت التحكم الفعلي (${vendorName}): الكارت ممسوح / فارغ وجاهز للإصدار والبرمجة.`, 'info');
             return;
         }
         if (!result.success) {
             if (result.status === 'inactive' || result.card_status === 'needs_renewal' || result.errorCode === 4041 || result.apiCode === 4041) {
-                if (statusBadge) {
-                    statusBadge.textContent = 'الكارت الفعلي غير مفعل أو منتهي الصلاحية';
-                    statusBadge.style.backgroundColor = '#fef3c7';
-                    statusBadge.style.color = '#b45309';
-                    statusBadge.style.border = '1px solid #fcd34d';
+                const badgeEl = document.getElementById('ctrl-card-status-badge');
+                if (badgeEl) {
+                    badgeEl.textContent = 'الكارت غير مفعل / يحتاج تجديد صلاحية';
+                    badgeEl.style.backgroundColor = '#fef3c7';
+                    badgeEl.style.color = '#b45309';
+                    badgeEl.style.border = '1px solid #fcd34d';
                 }
+                const vendorName = result.vendorName || (result.vendor_id === 1 || result.vendorCode === 1 ? 'السويدي (El Sewedy)' : 'جلوبالترونكس');
+                const data = result.data || result.card || {
+                    cardId: result.cardId || '-',
+                    vendorCode: result.vendor_id || result.vendorCode || 1,
+                    generationType: result.generation_type || 'g1',
+                    companyName: vendorName,
+                    status: 'غير مفعل'
+                };
+                currentControlCardData = data;
+                updateControlCardUI(data);
                 showToast(result.message || 'كارت التحكم غير مفعل حالياً أو انتهت صلاحيته اليومية. يمكنك تجديده عبر زر "تحديث الكارت".', 'warning');
             }
             else {
-                if (statusBadge)
-                    statusBadge.textContent = 'تعذر قراءة بيانات الكارت الفعلي';
                 showToast(result.message || 'فشل في فك تشفير أو قراءة كارت التحكم.', 'error');
             }
             return;
         }
         const data = result.data || result.card || result;
-        if (!data || typeof data !== 'object' || !(data.cardId || data.id)) {
-            if (statusBadge)
-                statusBadge.textContent = 'لم تصل بيانات فعلية صالحة من القارئ';
-            showToast('تم الاتصال بالقارئ، لكن لم تصل بيانات كارت فعلية صالحة. لم يتم عرض بيانات محفوظة أو افتراضية.', 'error');
-            return;
-        }
         currentControlCardData = data;
         try {
             localStorage.setItem('activeControlCard', JSON.stringify(data));
@@ -18305,8 +18283,6 @@ const handleReadControlCard = async () => {
     }
     catch (error) {
         console.error('Error reading control card:', error);
-        if (statusBadge)
-            statusBadge.textContent = 'حدث خطأ أثناء قراءة الكارت';
         showToast(`حدث خطأ أثناء قراءة كارت التحكم: ${error.message || error}`, 'error');
     }
     finally {
@@ -18342,8 +18318,10 @@ const clearControlCardUI = () => {
     if (tbody) {
         tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="padding: 2.2rem 1rem; text-align: center; color: #64748b; font-weight: 500; font-size: 1rem;">
-                        لم تتم قراءة كارت بعد. ضع كارت التحكم على القارئ واضغط «قراءة الكارت» لعرض البيانات الفعلية.
+                    <td colspan="8" style="padding: 2.2rem 1rem; text-align: center; color: #0284c7; font-weight: 600; font-size: 1rem;">
+                        <span style="font-size: 1.8rem; display: inline-block; margin-bottom: 6px;">💳</span><br>
+                        تم تحديث وتفعيل الكارت بنجاح وتم تفريغ القراءة.<br>
+                        <span style="color: #64748b; font-weight: 400; font-size: 0.85rem;">يرجى سحب الكارت وإدخال كارت تحكم آخر لتحديثه بسرعة.</span>
                     </td>
                 </tr>
             `;
