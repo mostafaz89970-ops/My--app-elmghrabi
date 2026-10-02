@@ -70378,7 +70378,8 @@ const initMobileAdaptation = () => {
 
                 // Restore last active section
 
-                const lastSection = localStorage.getItem('lastActiveSection') || 'dashboard';
+                const urlHash = (window.location.hash || '').replace('#', '').trim();
+                const lastSection = urlHash || localStorage.getItem('lastActiveSection') || 'dashboard';
 
                 const link = document.querySelector(`.nav-link[data-target="${lastSection}"]`) as HTMLElement;
 

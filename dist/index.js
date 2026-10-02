@@ -41966,7 +41966,8 @@ const initApp = async () => {
             applyLogoSize(state.settings.companyLogoSize);
             showScreen('app-container');
             // Restore last active section
-            const lastSection = localStorage.getItem('lastActiveSection') || 'dashboard';
+            const urlHash = (window.location.hash || '').replace('#', '').trim();
+            const lastSection = urlHash || localStorage.getItem('lastActiveSection') || 'dashboard';
             const link = document.querySelector(`.nav-link[data-target="${lastSection}"]`);
             if (link) {
                 const details = link.closest('details');

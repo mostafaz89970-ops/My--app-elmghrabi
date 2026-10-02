@@ -1,5 +1,37 @@
 [
   {
+    "id": "SP-1790864762941",
+    "portfolioNumber": "DEP-20261001-320",
+    "date": "2026-10-01",
+    "time": "16:26",
+    "userName": "سناء عبدالستار عبدالعزيز",
+    "branch": "هندسة بنى مزار شرق",
+    "shift": "الوردية الصباحية",
+    "denominations": {
+      "d200": 347,
+      "d100": 621,
+      "d50": 171,
+      "d20": 65,
+      "d10": 39,
+      "d5": 0,
+      "coins": 0
+    },
+    "totalCash": 141740,
+    "totalBillsCount": 1243,
+    "tafqeetText": "مائة وواحد وأربعون ألف وسبعمائة وأربعون جنيه مصري لا غير",
+    "systems": {
+      "unified": 132435.08,
+      "iskra": 0,
+      "maasara": 9300,
+      "other": 0
+    },
+    "totalSystems": 141735.08,
+    "difference": 4.92,
+    "status": "surplus",
+    "notes": "",
+    "createdAt": "2026-10-01T14:26:02.941Z"
+  },
+  {
     "id": "SP-1790785375861",
     "portfolioNumber": "DEP-20260930-858",
     "date": "2026-09-30",
