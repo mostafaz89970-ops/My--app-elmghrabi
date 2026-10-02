@@ -18362,11 +18362,11 @@ const openRenewControlCardSuccessModal = (result) => {
     dlg.style.transform = 'translate(-50%, -50%)';
     dlg.style.margin = '0';
     dlg.style.zIndex = '999999';
-    if (typeof dlg.showModal === 'function') {
+    if (typeof dlg.show === 'function') {
         try {
             if (dlg.open)
                 dlg.close();
-            dlg.showModal();
+            dlg.show();
         }
         catch (e) {
             dlg.style.display = 'block';
@@ -18393,9 +18393,13 @@ const handleRenewControlCard = async () => {
             `;
     }
     try {
-        showToast('جاري تحديث وتفعيل كارت التحكم عبر خدمة UnifiedCardService...');
+        if (!(currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.cardId)) {
+            showToast('اقرأ كارت التحكم أولاً حتى يتم تجديد الكارت الصحيح.', 'warning');
+            return;
+        }
+        showToast('جاري تسجيل التجديد في MEEDCO وكتابة التحديث على الشريحة...', 'info');
         let result = null;
-        const cardIdToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.cardId) || '55267369';
+        const cardIdToRenew = currentControlCardData.cardId;
         const genToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.generationType) || 'g1';
         const vendorToRenew = (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.vendorCode) || (currentControlCardData === null || currentControlCardData === void 0 ? void 0 : currentControlCardData.vendor_id) || 1;
         if (window.renewControlCard) {
@@ -18446,10 +18450,11 @@ const handleRenewControlCard = async () => {
                 badgeEl.style.color = '#15803d';
                 badgeEl.style.border = '1px solid #86efac';
             }
-            const expiryEl = document.getElementById('ctrl-card-expiry');
+            const expiryEl = document.getElementById('ctrl-expiry-date');
             if (expiryEl && ((_c = result.card) === null || _c === void 0 ? void 0 : _c.expiryDate)) {
                 expiryEl.textContent = result.card.expiryDate;
             }
+            document.dispatchEvent(new Event('control-card-operation-finished'));
             openRenewControlCardSuccessModal(result);
         }
         else {

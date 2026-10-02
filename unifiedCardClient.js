@@ -794,7 +794,7 @@ async function readControlCardLive() {
  * 2. If targetCardId is unknown, read card once to identify cardId
  * 3. Register renewal in MEEDCO backend (POST /CustomerMeterTransaction/WriteRenewControl)
  * 4. Write new renewal cryptogram to physical card via WebSocket (cards:write)
- * 5. Update local state and return success immediately without re-reading (prevents UI freeze & complies with user request)
+ * 5. Report success only after UnifiedCardService confirms the physical write
  */
 async function renewControlCardLive(cardId = null, generationType = 'g1', vendorCode = 4) {
     try {
@@ -826,9 +826,9 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                 finish({
                     success: false,
                     status: 'timeout',
-                    message: 'استغرقت عملية التحديث وقتاً أطول من المتوقع. تأكد من ثبات كارت التحكم داخل القارئ.'
+                    message: 'لم يؤكد القارئ اكتمال تحديث الكارت خلال دقيقة. تحقق من ثبات الكارت ثم أعد المحاولة.'
                 });
-            }, 8000);
+            }, 60000);
 
             try {
                 ws = new WebSocket(WS_URL);
@@ -859,6 +859,13 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                                 success: false,
                                 status: 'no_card',
                                 message: 'يرجى وضع كارت التحكم داخل القارئ قبل محاولة التجديد.'
+                            });
+                        }
+                        if (step === 'ws_write_renew') {
+                            return finish({
+                                success: false,
+                                status: 'write_failed',
+                                message: `سجلت MEEDCO طلب التجديد، لكن القارئ لم يؤكد كتابة التحديث على الكارت: ${err.message || `رمز الخطأ ${err.code || 'غير معروف'}`}. ثبّت الكارت وحاول مرة أخرى.`
                             });
                         }
                         if (step === 'read_for_id' && (err.code === 5104 || err.api_code === 4022)) {
@@ -933,28 +940,24 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                         step = 'renew_be';
                         await executeBeRenew();
 
-                    } else if (step === 'ws_write_renew') {
-                        if (res.event === 'write') {
-                            console.log('[RenewControlCard] Physical write success:', res.write);
+                    } else if (step === 'ws_write_renew' && res.event === 'write') {
+                        const writeResult = res.write || {};
+                        if (writeResult.success === false || writeResult.error) {
                             return finish({
-                                success: true,
-                                status: 'success',
-                                message: `تم تجديد كارت التحكم بنجاح! رقم كارت الفني: ${lastKnownControlCard?.cardId || targetCardId}`,
-                                cardId: lastKnownControlCard?.cardId || targetCardId,
-                                card: lastKnownControlCard,
-                                renewedAt: new Date().toLocaleString('ar-EG')
-                            });
-                        } else {
-                            console.warn('[RenewControlCard] WS write returned error:', res.error);
-                            return finish({
-                                success: true,
-                                status: 'success',
-                                message: `تم تسجيل تجديد الكارت بالمنظومة بنجاح! رقم كارت الفني: ${lastKnownControlCard?.cardId || targetCardId}`,
-                                cardId: lastKnownControlCard?.cardId || targetCardId,
-                                card: lastKnownControlCard,
-                                renewedAt: new Date().toLocaleString('ar-EG')
+                                success: false,
+                                status: 'write_failed',
+                                message: `رفض القارئ كتابة تحديث الكارت: ${writeResult.error?.message || writeResult.error || 'تعذر تأكيد الكتابة'}. ثبّت الكارت وحاول مرة أخرى.`
                             });
                         }
+                        console.log('[RenewControlCard] Physical write success:', writeResult);
+                        return finish({
+                            success: true,
+                            status: 'success',
+                            message: `تم تجديد كارت التحكم وكتابة التحديث على الشريحة بنجاح. رقم الكارت: ${lastKnownControlCard?.cardId || targetCardId}`,
+                            cardId: lastKnownControlCard?.cardId || targetCardId,
+                            card: lastKnownControlCard,
+                            renewedAt: new Date().toLocaleString('ar-EG')
+                        });
                     }
                 } catch(msgErr) {
                     console.error('[RenewControlCard] Message handling error:', msgErr);
@@ -995,15 +998,23 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                         const renewUuid = renewRes.data?.uuid;
                         const newCardId = renewRes.data?.cardId || targetCardId;
 
+                        if (!renewUuid) {
+                            return finish({
+                                success: false,
+                                status: 'write_failed',
+                                message: 'استلمت MEEDCO طلب التجديد دون رمز عملية الكتابة؛ لم يتم تأكيد تحديث الشريحة، لذلك لم يُعلن نجاح التجديد.'
+                            });
+                        }
+
                         if (!lastKnownControlCard) {
                             lastKnownControlCard = {
                                 cardId: newCardId,
-                                technicianCode: 12258,
-                                technicianName: 'وحيد فاروق كامل',
-                                controlOperationTypeName: 'كارت فتح و غلق مفتاح التوصيل',
-                                controlOperationType: 5,
-                                companyName: 'المصرية',
-                                meterTypeName: 'احادى 2024'
+                                technicianCode: null,
+                                technicianName: '',
+                                controlOperationTypeName: '',
+                                controlOperationType: null,
+                                companyName: '',
+                                meterTypeName: ''
                             };
                         }
                         lastKnownControlCard.cardId = newCardId;
@@ -1013,24 +1024,20 @@ async function renewControlCardLive(cardId = null, generationType = 'g1', vendor
                         lastKnownControlCard.activationDate = new Date().toLocaleDateString('ar-EG');
                         lastKnownControlCard.status = 'مفعل';
 
-                        if (renewUuid) {
-                            step = 'ws_write_renew';
-                            ws.send(JSON.stringify({
-                                token: ucsToken || '',
-                                service: 'cards',
-                                event: 'write',
-                                write: { operation_uuid: renewUuid }
-                            }));
-                            return;
-                        }
+                        step = 'ws_write_renew';
+                        ws.send(JSON.stringify({
+                            token: ucsToken || '',
+                            service: 'cards',
+                            event: 'write',
+                            write: { operation_uuid: renewUuid }
+                        }));
+                        return;
                     }
 
                     finish({
-                        success: true,
-                        status: 'success',
-                        message: `تم تجديد كارت التحكم بنجاح! رقم كارت الفني: ${targetCardId}`,
-                        cardId: targetCardId,
-                        card: lastKnownControlCard
+                        success: false,
+                        status: 'renew_failed',
+                        message: renewRes?.message || 'لم تؤكد MEEDCO تسجيل طلب تجديد الكارت، ولم تُكتب أي تحديثات على الشريحة.'
                     });
                 } catch(apiErr) {
                     console.error('[RenewControlCard] API call error:', apiErr.message);

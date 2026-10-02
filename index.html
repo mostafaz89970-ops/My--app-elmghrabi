@@ -504,13 +504,14 @@
       const closeButton = document.getElementById('app-notification-close');
       const confirmButton = document.getElementById('app-notification-confirm');
       const toastContainer = document.getElementById('toast-container');
-      const readButtonSelector = '#btn-read-control-card';
+      const operationButtonSelector = '#btn-read-control-card, #btn-renew-control-card';
       if (!dialog || !panel || !title || !message || !icon || !spinner || !closeButton || !confirmButton || !toastContainer) {
         console.error('Control card read dialog could not initialize: required elements are missing.');
         return;
       }
 
       let reading = false;
+      let activeOperation = 'read';
       let closeTimer;
       let readTimeout;
       let previousFocus;
@@ -530,7 +531,7 @@
         const isControlCardRead = /قراءة كارت التحكم|قراءة الكارت|تمت قراءة/.test(text);
         const isControlCardRenew = /تجديد|تحديث وتفعيل|تحديث الكارت/.test(text);
         title.textContent = loading
-          ? 'جاري قراءة كارت التحكم'
+          ? activeOperation === 'renew' ? 'جاري تجديد كارت التحكم' : 'جاري قراءة كارت التحكم'
           : state === 'success' && isControlCardRead
             ? 'تمت قراءة كارت التحكم بنجاح'
             : state === 'success' && isControlCardRenew
@@ -556,8 +557,10 @@
           reading = true;
           readTimeout = window.setTimeout(() => {
             reading = false;
-            show('انتهت مهلة قراءة كارت التحكم. تأكد من ثبات الكارت في القارئ ومن اتصال خدمة MEEDCO ثم أعد المحاولة.', 'error');
-          }, 60000);
+            show(activeOperation === 'renew'
+              ? 'لم يكتمل تجديد الكارت خلال المهلة. تحقق من ثبات الكارت في القارئ قبل إعادة المحاولة.'
+              : 'انتهت مهلة قراءة كارت التحكم. تأكد من ثبات الكارت في القارئ ومن اتصال خدمة MEEDCO ثم أعد المحاولة.', 'error');
+          }, 70000);
         } else {
           reading = false;
           window.clearTimeout(readTimeout);
@@ -568,10 +571,19 @@
 
       document.addEventListener('click', event => {
         const target = event.target;
-        if (target instanceof Element && target.closest(readButtonSelector)) {
-          show('جاري قراءة الشريحة ثم جلب بيانات كارت التحكم من MEEDCO...', 'info', true);
+        if (target instanceof Element && target.closest(operationButtonSelector)) {
+          activeOperation = target.closest('#btn-renew-control-card') ? 'renew' : 'read';
+          show(activeOperation === 'renew'
+            ? 'جاري تسجيل التجديد في MEEDCO ثم كتابة التحديث على الشريحة. لن تظهر رسالة النجاح إلا بعد تأكيد القارئ.'
+            : 'جاري قراءة الشريحة ثم جلب بيانات كارت التحكم من MEEDCO...', 'info', true);
         }
       }, true);
+
+      document.addEventListener('control-card-operation-finished', () => {
+        reading = false;
+        window.clearTimeout(readTimeout);
+        hide();
+      });
 
       const closeWhenFinished = () => {
         reading = false;
@@ -592,8 +604,12 @@
             toasts.forEach(toast => {
               const text = toast.textContent?.trim();
               if (!text) return;
+              if (/مزامنة|المزامنة|sync|synchroniz/i.test(text)) {
+                toast.classList.add('toast-sync-compact');
+                return;
+              }
               toast.remove();
-              if (reading && /جاري الاتصال|جارٍ الاتصال|جاري التعامل|جاري قراءة|جارٍ قراءة|جاري تحديث|جارٍ تحديث/.test(text)) {
+              if (reading && /جاري الاتصال|جارٍ الاتصال|جاري التعامل|جاري قراءة|جارٍ قراءة|جاري تسجيل التجديد|جاري كتابة|جاري تحديث|جارٍ تحديث/.test(text)) {
                 message.textContent = text;
                 return;
               }

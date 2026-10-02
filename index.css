@@ -1413,6 +1413,7 @@ body.dark-mode table tbody tr:hover {
 
 .toast {
   padding: 1rem 1.5rem;
+  max-width: min(420px, calc(100vw - 40px));
   border-radius: var(--border-radius-md);
   color: #fff;
   font-weight: 500;
@@ -1420,6 +1421,15 @@ body.dark-mode table tbody tr:hover {
   transform: translateX(-120%);
   opacity: 0;
   transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.toast.toast-sync-compact {
+  max-width: min(240px, calc(100vw - 32px));
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .toast.show {
@@ -2555,6 +2565,9 @@ html {
 
     #settings .settings-card {
         padding: 1rem;
+    }
+    .toast.toast-sync-compact {
+        padding: 0.4rem 0.65rem;
     }
 
     #settings .add-item-form {

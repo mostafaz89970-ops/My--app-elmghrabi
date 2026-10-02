@@ -30475,10 +30475,10 @@ const handlePrintJudicialControlDetails = () => {
         dlg.style.margin = '0';
         dlg.style.zIndex = '999999';
 
-        if (typeof dlg.showModal === 'function') {
+        if (typeof dlg.show === 'function') {
             try {
                 if (dlg.open) dlg.close();
-                dlg.showModal();
+                dlg.show();
             } catch (e) {
                 dlg.style.display = 'block';
             }
@@ -30516,13 +30516,17 @@ const handlePrintJudicialControlDetails = () => {
 
         try {
 
-            showToast('جاري تحديث وتفعيل كارت التحكم عبر خدمة UnifiedCardService...');
+            if (!currentControlCardData?.cardId) {
+                showToast('اقرأ كارت التحكم أولاً حتى يتم تجديد الكارت الصحيح.', 'warning');
+                return;
+            }
 
+            showToast('جاري تسجيل التجديد في MEEDCO وكتابة التحديث على الشريحة...', 'info');
             let result: any = null;
 
 
 
-            const cardIdToRenew = currentControlCardData?.cardId || '55267369';
+            const cardIdToRenew = currentControlCardData.cardId;
 
             const genToRenew = currentControlCardData?.generationType || 'g1';
 
@@ -30616,16 +30620,14 @@ const handlePrintJudicialControlDetails = () => {
 
 
 
-                const expiryEl = document.getElementById('ctrl-card-expiry');
+                const expiryEl = document.getElementById('ctrl-expiry-date');
 
                 if (expiryEl && result.card?.expiryDate) {
 
                     expiryEl.textContent = result.card.expiryDate;
 
                 }
-
-
-
+                document.dispatchEvent(new Event('control-card-operation-finished'));
                 openRenewControlCardSuccessModal(result);
 
             } else {
