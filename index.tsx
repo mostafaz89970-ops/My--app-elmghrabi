@@ -73023,23 +73023,7 @@ function initMeedcoGateway() {
 
                 }
 
-                // إذا انتهت الجلسة وبيانات الدخول محفوظة — جدد تلقائياً بصمت
-                if (!res.connected && res.hasSavedCredentials) {
-                    try {
-                        const renewRes = await fetch('http://127.0.0.1:5002/api/meedco/auto-renew-session', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: '{}',
-                            signal: AbortSignal.timeout(15000)
-                        }).then(r => r.json()).catch(() => null);
-
-                        if (renewRes && renewRes.success) {
-                            const refreshed = await fetch('http://127.0.0.1:5002/api/meedco/status').then(r => r.json()).catch(() => null);
-                            if (refreshed) updateStatusUI(refreshed);
-                        }
-                    } catch (_) {}
-                }
-
+                // تم إلغاء التجديد التلقائي للجلسات في الخلفية بطلب المستخدم لضمان الاستقرار وعدم التداخل مع أي جلسات خارجية
             }
 
         } catch (e) {}

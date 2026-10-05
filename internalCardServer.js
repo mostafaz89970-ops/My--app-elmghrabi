@@ -705,6 +705,22 @@ function startInternalServer(port = 5002) {
                 return;
             }
 
+            if (pathname === '/api/meedco/report-login' && req.method === 'POST') {
+                // تم فك الربط بناءً على طلب المستخدم لمنع تداخل جلسات التقارير مع البرامج الأخرى
+                res.writeHead(200);
+                res.end(JSON.stringify({
+                    success: true,
+                    message: 'جلسة تسجيل الدخول محلية ومستقلة تماماً بدون ارتباط خارجي'
+                }));
+                return;
+            }
+
+            if (pathname === '/api/meedco/report-logout' && req.method === 'POST') {
+                res.writeHead(200);
+                res.end(JSON.stringify({ success: true }));
+                return;
+            }
+
             // فحص ومزامنة الجلسة السلبية (يقرأ من متصفح Chrome دون إرسال طلبات تسجيل دخول تغلق الجلسة)
             if (pathname === '/api/meedco/auto-renew-session' && req.method === 'POST') {
                 try {
@@ -1329,42 +1345,13 @@ function startInternalServer(port = 5002) {
         }
     });
 
-    const { execSync } = require('child_process');
-
-    function forceFreePort(p) {
-        try {
-            const out = execSync(`netstat -ano | findstr :${p}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-            const lines = out.split('\n');
-            for (const line of lines) {
-                if (line.includes('LISTENING')) {
-                    const parts = line.trim().split(/\s+/);
-                    const pid = parts[parts.length - 1];
-                    if (pid && pid !== String(process.pid) && pid !== '0') {
-                        console.log(`[InternalServer] تحرير المنفذ ${p} من العملية العالقة PID: ${pid}...`);
-                        try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch (_) {}
-                    }
-                }
-            }
-        } catch (_) {}
-    }
-
     server.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
-            console.log(`[InternalServer] المنفذ ${port} محجوز. جاري تحريره تلقائياً وإعادة الربط...`);
-            forceFreePort(port);
-            setTimeout(() => {
-                try {
-                    server.close();
-                } catch (_) {}
-                server.listen(port, '127.0.0.1');
-            }, 1000);
+            console.error(`[InternalServer] Port ${port} is already in use; no other process was terminated.`);
         } else {
             console.error('[InternalServer] Server error:', err);
         }
     });
-
-    // تحرير المنفذ مسبقاً إذا كانت هناك عملية عالقة
-    forceFreePort(port);
 
     server.listen(port, '127.0.0.1', () => {
         console.log(`[InternalServer] Standalone Native Card Server running on http://127.0.0.1:${port}`);
