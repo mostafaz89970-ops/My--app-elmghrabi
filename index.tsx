@@ -3948,7 +3948,15 @@ const populateUserDropdown = () => {
     // دالة تحديث الفروع التابعة للإدارة العامة
     const updateSubAdmins = (sec: string, gen: string) => {
         if (!subAdminSelect) return;
-        const subList = (gen && gen !== 'all') ? getSubAdmins(sec, gen) : [];
+        const subSet = new Set<string>((gen && gen !== 'all') ? getSubAdmins(sec, gen) : []);
+        allUsers.forEach(u => {
+            if ((sec === 'all' || !u.sector || u.sector === sec) &&
+                (gen === 'all' || !u.generalAdmin || u.generalAdmin === gen)) {
+                const sub = u.subAdmin || u.branch;
+                if (sub && sub !== 'all') subSet.add(sub);
+            }
+        });
+        const subList = Array.from(subSet);
         let html = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
         if (sec === 'all' || gen === 'all') {
             html += '<option value="all">-- كل الفروع / الهندسات --</option>';
@@ -3968,7 +3976,13 @@ const populateUserDropdown = () => {
     // دالة تحديث الإدارات العامة التابعة للقطاع
     const updateGenAdmins = (sec: string) => {
         if (!genAdminSelect) return;
-        const genList = (sec && sec !== 'all') ? getGeneralAdminsForSector(sec) : [];
+        const genSet = new Set<string>((sec && sec !== 'all') ? getGeneralAdminsForSector(sec) : []);
+        allUsers.forEach(u => {
+            if ((sec === 'all' || !u.sector || u.sector === sec) && u.generalAdmin && u.generalAdmin !== 'all') {
+                genSet.add(u.generalAdmin);
+            }
+        });
+        const genList = Array.from(genSet);
         let html = '<option value="" disabled selected>-- اختر الإدارة العامة --</option>';
         if (sec === 'all') {
             html += '<option value="all">-- كل الإدارات العامة --</option>';
@@ -3990,8 +4004,14 @@ const populateUserDropdown = () => {
         }
     };
 
-    // 1. تعبئة قائمة القطاعات الأساسية
-    const sectors = getAvailableSectors();
+    // 1. تعبئة قائمة القطاعات الأساسية مع تضمين أي قطاعات مسجلة للمستخدمين
+    const availableSectorsSet = new Set<string>(getAvailableSectors());
+    allUsers.forEach(u => {
+        if (u.sector && u.sector !== 'all' && u.sector !== 'الكل') {
+            availableSectorsSet.add(u.sector);
+        }
+    });
+    const sectors = Array.from(availableSectorsSet);
     let secHtml = '<option value="" disabled selected>-- اختر القطاع --</option>';
     sectors.forEach(s => {
         secHtml += `<option value="${s}">${s}</option>`;
@@ -4465,51 +4485,43 @@ const updateUI = () => {
  */
 
 const showScreen = (screenId: 'welcome-screen' | 'login-screen' | 'app-container') => {
-
     const welcomeScreen = document.getElementById('welcome-screen') as HTMLElement | null;
-
     const loginScreen = document.getElementById('login-screen') as HTMLElement | null;
-
     const appContainer = document.getElementById('app-container') as HTMLElement | null;
 
-
-
-    // First, hide all of them by removing the 'active' class
-
-    if (welcomeScreen) welcomeScreen.classList.remove('active');
-
-    if (loginScreen) loginScreen.classList.remove('active');
-
-    if (appContainer) appContainer.classList.remove('active');
-
-
-
-    // Then, show the correct one by adding the 'active' class
-
-    if (screenId === 'welcome-screen') {
-
-        welcomeScreen?.classList.add('active');
-
-    } else if (screenId === 'login-screen') {
-
-        loginScreen?.classList.add('active');
-
-        // Clear password field to prevent auto-fill when showing login screen
-
-        const passwordInput = document.getElementById('password') as HTMLInputElement;
-
-        if (passwordInput) {
-
-            passwordInput.value = '';
-
-        }
-
-    } else if (screenId === 'app-container') {
-
-        appContainer?.classList.add('active');
-
+    if (welcomeScreen) {
+        welcomeScreen.classList.remove('active');
+        welcomeScreen.style.display = 'none';
+    }
+    if (loginScreen) {
+        loginScreen.classList.remove('active');
+        loginScreen.style.display = 'none';
+    }
+    if (appContainer) {
+        appContainer.classList.remove('active');
+        appContainer.style.display = 'none';
     }
 
+    if (screenId === 'welcome-screen') {
+        if (welcomeScreen) {
+            welcomeScreen.classList.add('active');
+            welcomeScreen.style.display = 'flex';
+        }
+    } else if (screenId === 'login-screen') {
+        if (loginScreen) {
+            loginScreen.classList.add('active');
+            loginScreen.style.display = 'flex';
+        }
+        const passwordInput = document.getElementById('password') as HTMLInputElement | null;
+        if (passwordInput) {
+            passwordInput.value = '';
+        }
+    } else if (screenId === 'app-container') {
+        if (appContainer) {
+            appContainer.classList.add('active');
+            appContainer.style.display = 'flex';
+        }
+    }
 };
 
 
@@ -4928,221 +4940,159 @@ function getSectionIcon(targetId: string): string {
 
 
 const handleLogin = async (event: Event) => {
-
     event.preventDefault();
-
     const form = event.target as HTMLFormElement;
 
-
-
-    if (!validateForm(form)) return;
-
-
-
-    const username = (form.elements.namedItem('username') as HTMLSelectElement).value;
-
-    const password = (form.elements.namedItem('password') as HTMLInputElement).value;
-
+    const usernameSelect = form.elements.namedItem('username') as HTMLSelectElement | null;
+    const passwordInput = form.elements.namedItem('password') as HTMLInputElement | null;
     const errorElement = document.getElementById('login-error');
 
-
+    const username = (usernameSelect?.value || '').trim();
+    const password = (passwordInput?.value || '').trim();
 
     if (!username) {
-
         if (errorElement) {
-
             errorElement.textContent = 'يرجى اختيار اسم المستخدم أولاً.';
-
             errorElement.classList.remove('hidden');
-
         }
-
         showToast('يرجى اختيار اسم المستخدم أولاً.', 'error');
-
         return;
-
     }
 
+    if (!password) {
+        if (errorElement) {
+            errorElement.textContent = 'يرجى إدخال كلمة المرور.';
+            errorElement.classList.remove('hidden');
+        }
+        showToast('يرجى إدخال كلمة المرور.', 'error');
+        passwordInput?.focus();
+        return;
+    }
 
+    // البحث في قاعدة بيانات المستخدمين المسجلة محلياً
+    const cleanUsername = username.toLowerCase();
+    let user = (state.users || []).find(u => 
+        (u.username?.trim().toLowerCase() === cleanUsername || (u.fullName && u.fullName.trim() === username)) && 
+        (String(u.password ?? '').trim() === password)
+    );
 
-    const user = state.users.find(u => u.username === username && u.password === password);
-
-
+    // حساب مسؤول النظام الافتراضي للتوافق وضمان عدم إغلاق المنظومة
+    if (!user && (cleanUsername === 'admin' || cleanUsername === 'المدير') && password === '123') {
+        user = {
+            id: 1,
+            fullName: 'مصطفى المغربي (مسؤول النظام)',
+            username: 'admin',
+            password: '123',
+            role: 'admin',
+            sector: 'all',
+            generalAdmin: 'all',
+            subAdmin: 'all',
+            branch: 'all'
+        } as any;
+    }
 
     if (user) {
-
         // فحص وضع الصيانة
-
         if (state.settings?.maintenanceMode && user.username !== 'admin' && user.role !== 'admin') {
-
             if (errorElement) {
-
                 errorElement.textContent = state.settings.maintenanceMessage || 'المنظومة في وضع الصيانة من قِبل المطور حالياً.';
-
                 errorElement.classList.remove('hidden');
-
             }
-
             showToast('المنظومة متوقفة حالياً لوضع الصيانة من قِبل المطور.', 'error');
-
             showMaintenanceModeAlert(state.settings.maintenanceMessage);
-
             return;
-
         }
-
-
 
         // فحص إيقاف الحساب
-
         if (user.isSuspended) {
-
             const reason = user.suspendReason || 'عدم تصفية العهدة المالية المستحقة';
-
             if (errorElement) {
-
                 errorElement.textContent = `تم إيقاف حسابك من قِبل مسؤول الخزينة / الإدارة: ${reason}`;
-
                 errorElement.classList.remove('hidden');
-
             }
-
             showToast(`تم إيقاف حسابك: ${reason}`, 'error');
-
             showAccountSuspendedAlert(reason);
-
             return;
         }
 
-        showAppLoading('جارٍ التحقق من حساب الموظف وتجهيز جلسة التقارير...', 'المنظومة الموحدة للعدادات - مزامنة سحابية ⚡', '🔐');
-        let reportLoginMessage = '';
-        let reportLoginSucceeded = false;
-        try {
-            const response = await fetch('http://127.0.0.1:5002/api/meedco/report-login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            const result = await response.json();
-            reportLoginSucceeded = response.ok && result.success === true;
-            reportLoginMessage = result.message || '';
-        } catch (err: any) {
-            reportLoginMessage = err?.message || 'تعذر الاتصال بخادم التقارير المحلي';
-        }
-
-        await new Promise(r => setTimeout(r, 650));
-
+        // تسجيل الدخول محلياً ومباشراً بدون أي ارتباط ببرامج خارجية
         loggedInUser = {
-
-            fullName: user.fullName,
-
-            role: user.role,
-
+            fullName: user.fullName || user.username,
+            role: user.role || 'user',
             username: user.username,
-
             sector: user.sector || 'all',
-
-            generalAdmin: user.generalAdmin || (user.sector === 'all' ? 'all' : 'الإدارة العامة لهندسات شمال المنيا'),
-
-            subAdmin: user.subAdmin || user.branch || (user.sector === 'all' ? 'all' : 'هندسة كهرباء بني مزار'),
-
-            branch: user.subAdmin || user.branch || (user.sector === 'all' ? 'all' : 'هندسة كهرباء بني مزار')
-
+            generalAdmin: user.generalAdmin || 'all',
+            subAdmin: user.subAdmin || user.branch || 'all',
+            branch: user.subAdmin || user.branch || 'all'
         };
 
         localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
 
         currentAdminScopeSector = 'all';
-
         currentAdminScopeGeneralAdmin = 'all';
-
         currentAdminScopeBranch = 'all';
-
         updateAdminScopeUI();
 
-        errorElement?.classList.add('hidden');
-
-        (document.getElementById('password') as HTMLInputElement).value = '';
+        if (errorElement) errorElement.classList.add('hidden');
+        if (passwordInput) passwordInput.value = '';
 
         updateUI();
-
         showScreen('app-container');
-
         localStorage.setItem('lastActiveSection', 'dashboard');
 
         const appContainer = document.getElementById('app-container') as HTMLElement | null;
-
         const mainContent = document.querySelector('#app-container .main-content') as HTMLElement | null;
+        const loginScreen = document.getElementById('login-screen') as HTMLElement | null;
+
+        if (loginScreen) {
+            loginScreen.classList.remove('active');
+            loginScreen.style.display = 'none';
+        }
 
         if (appContainer) {
-
             appContainer.classList.add('active');
-
             appContainer.style.display = 'flex';
-
         }
 
         if (mainContent) mainContent.style.display = 'block';
 
         document.querySelectorAll('.content-section.active').forEach(section => section.classList.remove('active'));
-
         const dashboard = document.getElementById('dashboard');
-
-        dashboard?.classList.add('active');
-
-        dashboard?.style.removeProperty('display');
-
-        document.querySelectorAll('.sidebar-nav .nav-link.active').forEach(link => link.classList.remove('active'));
-
-        document.querySelector('.sidebar-nav .nav-link[data-target="dashboard"]')?.classList.add('active');
-
-        setPageTitle(state.settings.companyName || 'ELMAGHRABI');
-
-        window.requestAnimationFrame(() => renderDashboard());
-
-        window.setTimeout(() => renderDashboard(), 100);
-
-        await hideAppLoading(300);
-        if (reportLoginSucceeded) {
-            showToast(`تم تسجيل الدخول إلى MEEDCO وتجهيز تقارير ${user.fullName}`, 'success');
-        } else {
-            showToast(`تم الدخول إلى التطبيق المحلي، لكن جلسة تقارير MEEDCO غير متاحة: ${reportLoginMessage || 'تحقق من بيانات الحساب أو اتصال الخادم المحلي'}`, 'warning');
+        if (dashboard) {
+            dashboard.classList.add('active');
+            dashboard.style.removeProperty('display');
         }
 
+        document.querySelectorAll('.sidebar-nav .nav-link.active').forEach(link => link.classList.remove('active'));
+        document.querySelector('.sidebar-nav .nav-link[data-target="dashboard"]')?.classList.add('active');
+
+        setPageTitle(state.settings?.companyName || 'ELMAGHRABI');
+
+        window.requestAnimationFrame(() => renderDashboard());
+        window.setTimeout(() => renderDashboard(), 100);
+
+        showToast(`مرحباً بك ${user.fullName || user.username}، تم تسجيل الدخول بنجاح!`, 'success');
+
     } else {
-
         loggedInUser = null;
-
-        errorElement?.classList.remove('hidden');
-
+        if (errorElement) {
+            errorElement.textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة.';
+            errorElement.classList.remove('hidden');
+        }
+        showToast('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');
     }
-
 };
 
-
-
 /**
-
  * معالجة تسجيل الخروج
-
  * Handles the logout process.
-
  */
-
 const handleLogout = () => {
-
     loggedInUser = null;
-
-    void fetch('http://127.0.0.1:5002/api/meedco/report-logout', { method: 'POST' }).catch(() => {});
-
     localStorage.removeItem('currentUser');
-
     localStorage.removeItem('lastActiveSection');
-
     showScreen('login-screen');
-
     populateUserDropdown(); // Repopulate in case users changed
-
 };
 
 
@@ -69913,7 +69863,7 @@ const initMobileAdaptation = () => {
 
                 if (
                     isLoggedOutScreenVisible &&
-                    (state.users.length > 1 || state.meters.length > 0)
+                    (state.users.length >= 1 || state.meters.length > 0)
                 ) {
                     populateUserDropdown();
 
@@ -70591,7 +70541,7 @@ const initMobileAdaptation = () => {
 
             // Check if we have any state loaded (either from IDB or localStorage)
 
-            if (state.users.length > 1 || state.meters.length > 0) {
+            if (state.users.length >= 1 || state.meters.length > 0) {
 
                 populateUserDropdown();
 
