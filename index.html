@@ -981,24 +981,35 @@
           <div class="input-group" id="login-sector-group">
             <label for="login-sector">القطاع</label>
             <select id="login-sector" name="loginSector">
-              <option value="">-- كل القطاعات (جميع المستخدمين) --</option>
+              <option value="" disabled selected>-- اختر القطاع --</option>
+              <option value="قطاع شمال المنيا">قطاع شمال المنيا</option>
+              <option value="قطاع جنوب المنيا">قطاع جنوب المنيا</option>
+              <option value="🌐 الإدارة المركزية العامة">🌐 الإدارة المركزية العامة</option>
+              <option value="all">🌐 كل القطاعات (عرض عام)</option>
             </select>
           </div>
           <div class="input-group" id="login-general-admin-group">
             <label for="login-general-admin">الإدارة العامة</label>
-            <select id="login-general-admin" name="loginGeneralAdmin">
-              <option value="">-- كل الإدارات العامة --</option>
+            <select id="login-general-admin" name="loginGeneralAdmin" disabled>
+              <option value="" disabled selected>-- اختر الإدارة العامة --</option>
             </select>
           </div>
           <div class="input-group" id="login-sub-admin-group">
             <label for="login-sub-admin">الإدارة الفرعية / الهندسة</label>
-            <select id="login-sub-admin" name="loginSubAdmin">
-              <option value="">-- كل الفروع / الهندسات --</option>
+            <select id="login-sub-admin" name="loginSubAdmin" disabled>
+              <option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>
             </select>
           </div>
           <div class="input-group">
             <label for="username">اسم المستخدم</label>
-            <select id="username" name="username" required="" autocomplete="off"><option value="" disabled selected>-- اختر اسم المستخدم --</option></select>
+            <select id="username" name="username" required="" autocomplete="off">
+              <option value="" disabled selected>-- اختر اسم المستخدم --</option>
+              <option value="admin">مصطفى المغربي (@admin) ⭐ (مسؤول)</option>
+              <option value="المدير">مصطفى المغربي (@المدير) ⭐ (مسؤول)</option>
+              <option value="Eng - MOstafaEl mghrabi">Eng - MOstafa (@Eng - MOstafaEl mghrabi) ⭐ (مسؤول)</option>
+              <option value="احمد مصطفى">احمد مصطفى مغربي (@احمد مصطفى) [هندسة كهرباء بني مزار]</option>
+              <option value="محمود رفعت">محمود رفعت ابو جرابيع (@محمود رفعت) [هندسة كهرباء بني مزار]</option>
+            </select>
             <div id="login-user-affiliation" style="display: none; font-size: 0.85rem; color: #60a5fa; margin-top: 6px; font-weight: bold; background: rgba(30, 58, 138, 0.4); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(96, 165, 250, 0.3);">
               <span style="margin-left: 4px;">🏢</span>
               <span id="login-user-affiliation-text"></span>
@@ -1018,6 +1029,125 @@
           <p id="login-error" class="error-message hidden">اسم المستخدم أو كلمة المرور غير صحيحة.</p>
           <button type="submit" class="btn btn-login">تسجيل الدخول</button>
         </form>
+        <script id="inline-login-cascading-script">
+        (function() {
+          var org = {
+            'قطاع شمال المنيا': {
+              'الإدارة العامة لهندسات شمال المنيا': [
+                'هندسة كهرباء بني مزار',
+                'هندسة كهرباء مغاغة',
+                'هندسة كهرباء العدوة',
+                'هندسة كهرباء مطاي',
+                'هندسة كهرباء سمالوط شرق',
+                'هندسة كهرباء سمالوط غرب'
+              ],
+              'الإدارة العامة لكبار المشتركين والعدادات': [
+                'هندسة فحص واختبار العدادات',
+                'وحدة الرفع والفحص الفني',
+                'إدارة كبار المشتركين (شمال)'
+              ],
+              'الإدارة العامة للضبطية القضائية والتفتيش': [
+                'فرع الضبطية القضائية بني مزار ومغاغة',
+                'فرع الضبطية القضائية سمالوط ومطاي'
+              ],
+              'الإدارة العامة للشئون التجارية والتحصيل': [
+                'خزينة وتحصيل شمال المنيا',
+                'إدارة اشتراكات شمال المنيا'
+              ]
+            },
+            'قطاع جنوب المنيا': {
+              'الإدارة العامة لهندسات جنوب المنيا': [
+                'هندسة كهرباء المنيا شرق',
+                'هندسة كهرباء المنيا غرب',
+                'هندسة كهرباء أبو قرقاص',
+                'هندسة كهرباء ملوي',
+                'هندسة كهرباء ديرمواس'
+              ],
+              'الإدارة العامة لكبار المشتركين (جنوب)': [
+                'إدارة كبار المشتركين (جنوب)',
+                'وحدة فحص العدادات جنوب'
+              ],
+              'الإدارة العامة للشئون التجارية (جنوب)': [
+                'خزينة وتحصيل جنوب المنيا'
+              ]
+            },
+            '🌐 الإدارة المركزية العامة': {
+              'الإدارة العامة للمنظومة والتحكم': [
+                'المسؤولين العامين والمديرين'
+              ]
+            }
+          };
+
+          var secEl = document.getElementById('login-sector');
+          var genEl = document.getElementById('login-general-admin');
+          var subEl = document.getElementById('login-sub-admin');
+
+          if (!secEl || !genEl || !subEl) return;
+
+          secEl.addEventListener('change', function() {
+            var sVal = secEl.value;
+            genEl.innerHTML = '<option value="" disabled selected>-- اختر الإدارة العامة --</option>';
+            subEl.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
+            subEl.disabled = true;
+
+            if (!sVal) {
+              genEl.disabled = true;
+              return;
+            }
+
+            var gas = org[sVal] || {};
+            var gaKeys = Object.keys(gas);
+            if (sVal === 'all') {
+              genEl.innerHTML += '<option value="all">-- كل الإدارات العامة --</option>';
+              Object.keys(org).forEach(function(s) {
+                Object.keys(org[s]).forEach(function(g) {
+                  genEl.innerHTML += '<option value="' + g + '">' + g + '</option>';
+                });
+              });
+            } else {
+              gaKeys.forEach(function(g) {
+                genEl.innerHTML += '<option value="' + g + '">' + g + '</option>';
+              });
+            }
+
+            genEl.disabled = false;
+            if (gaKeys.length === 1 && sVal !== 'all') {
+              genEl.value = gaKeys[0];
+              genEl.dispatchEvent(new Event('change'));
+            }
+          });
+
+          genEl.addEventListener('change', function() {
+            var sVal = secEl.value;
+            var gVal = genEl.value;
+            subEl.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
+
+            if (!gVal) {
+              subEl.disabled = true;
+              return;
+            }
+
+            var branches = [];
+            if (org[sVal] && org[sVal][gVal]) {
+              branches = org[sVal][gVal];
+            } else {
+              Object.keys(org).forEach(function(s) {
+                if (org[s][gVal]) branches = org[s][gVal];
+              });
+            }
+
+            branches.forEach(function(b) {
+              subEl.innerHTML += '<option value="' + b + '">' + b + '</option>';
+            });
+
+            subEl.disabled = false;
+            if (branches.length === 1) {
+              subEl.value = branches[0];
+              subEl.dispatchEvent(new Event('change'));
+            }
+          });
+        })();
+        </script>
         <footer class="login-box-footer">
           <p id="login-footer-text">المنظومة الموحدة للعدادات - جميع الحقوق محفوظة ELMGHRABI © 2026</p>
         </footer>

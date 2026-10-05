@@ -3889,393 +3889,219 @@ const populateSelect = (selectElement: HTMLSelectElement | null, options: string
  */
 
 const populateUserDropdown = () => {
-
     const sectorSelect = document.getElementById('login-sector') as HTMLSelectElement | null;
-
     const genAdminSelect = document.getElementById('login-general-admin') as HTMLSelectElement | null;
-
     const subAdminSelect = document.getElementById('login-sub-admin') as HTMLSelectElement | null;
-
     const usernameSelect = document.getElementById('username') as HTMLSelectElement | null;
-
     const passwordInput = document.getElementById('password') as HTMLInputElement | null;
-
     const affBoxEl = document.getElementById('login-user-affiliation');
-
     const affTextEl = document.getElementById('login-user-affiliation-text');
 
-
-
-    if (!usernameSelect) return;
-
-
+    if (!usernameSelect || !sectorSelect) return;
 
     if (passwordInput) passwordInput.value = '';
-
     if (affBoxEl) affBoxEl.style.display = 'none';
 
-
-
     // التأكد من توفر قائمة المستخدمين كاملة
-
     let allUsers = (state.users && state.users.length > 0) ? state.users : [];
-
     if (!allUsers || allUsers.length === 0) {
-
         allUsers = [
-
-            { id: 1, fullName: 'مصطفى المغربي (مسؤول النظام)', username: 'admin', password: '123', role: 'admin', sector: 'all', generalAdmin: 'all', subAdmin: 'all' } as any
-
+            { id: 1, fullName: 'مصطفى المغربي (مسؤول النظام)', username: 'admin', password: '123', role: 'admin', sector: 'all', generalAdmin: 'all', subAdmin: 'all' } as any,
+            { id: 2, fullName: 'مصطفى المغربي (المدير)', username: 'المدير', password: '123', role: 'admin', sector: 'all', generalAdmin: 'all', subAdmin: 'all' } as any
         ];
-
     }
 
-
-
-    // دالة عرض خيارات المستخدمين وتحديثها بناءً على التصفية مع بقاء المدراء والمستخدمين العامين دائماً
-
-    const renderUserOptions = (filterSector?: string, filterGen?: string, filterSub?: string) => {
-
-        const currentVal = usernameSelect.value;
-
+    // دالة تحديث قائمة المستخدمين وفقاً للتصفية الحالية مع تضمين مسؤولي النظام دائماً
+    const updateUsersDropdown = (sec?: string, gen?: string, sub?: string) => {
+        const curUser = usernameSelect.value;
         const filtered = allUsers.filter(u => {
-
-            // مستخدمو الإدارة العليا والنطاق الشامل يظهرون دائماً
-
-            const isGlobal = u.role === 'admin' ||
-
-                             u.username === 'admin' ||
-
-                             u.sector === 'all' ||
-
-                             u.sector === 'الكل' ||
-
-                             !u.sector;
-
-            if (isGlobal) return true;
-
-
-
-            if (filterSector && filterSector !== 'all' && filterSector !== '') {
-
-                if (u.sector && u.sector !== filterSector) return false;
-
+            if (u.role === 'admin' || u.username === 'admin' || u.sector === 'all' || u.sector === 'الكل' || !u.sector) return true;
+            if (sec && sec !== 'all' && sec !== '' && u.sector && u.sector !== sec) return false;
+            if (gen && gen !== 'all' && gen !== '' && u.generalAdmin && u.generalAdmin !== 'all' && u.generalAdmin !== gen) return false;
+            if (sub && sub !== 'all' && sub !== '') {
+                const uSub = u.subAdmin || u.branch;
+                if (uSub && uSub !== 'all' && uSub !== sub) return false;
             }
-
-            if (filterGen && filterGen !== 'all' && filterGen !== '') {
-
-                if (u.generalAdmin && u.generalAdmin !== 'all' && u.generalAdmin !== filterGen) return false;
-
-            }
-
-            if (filterSub && filterSub !== 'all' && filterSub !== '') {
-
-                const userSub = u.subAdmin || u.branch;
-
-                if (userSub && userSub !== 'all' && userSub !== filterSub) return false;
-
-            }
-
             return true;
-
         });
 
-
-
         usernameSelect.disabled = false;
+        let html = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>';
+        filtered.sort((a, b) => {
+            if (a.role === 'admin' && b.role !== 'admin') return -1;
+            if (b.role === 'admin' && a.role !== 'admin') return 1;
+            return (a.fullName || a.username).localeCompare(b.fullName || b.username, 'ar');
+        });
 
-        if (filtered.length === 0) {
+        filtered.forEach(u => {
+            const roleBadge = (u.role === 'admin' || u.username === 'admin') ? ' ⭐ (مسؤول)' : '';
+            const branchText = (u.subAdmin || u.branch) && u.subAdmin !== 'all' ? ` [${u.subAdmin || u.branch}]` : '';
+            html += `<option value="${u.username}">${u.fullName || u.username} (@${u.username})${roleBadge}${branchText}</option>`;
+        });
+        usernameSelect.innerHTML = html;
 
-            usernameSelect.innerHTML = '<option value="" disabled selected>-- لا يوجد مستخدمين لهذا الاختيار --</option>';
-
-        } else {
-
-            let html = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>';
-
-            // ترتيب: المسؤول أولاً ثم باقي المستخدمين أبجدياً
-
-            const sorted = [...filtered].sort((a, b) => {
-
-                if (a.role === 'admin' && b.role !== 'admin') return -1;
-
-                if (b.role === 'admin' && a.role !== 'admin') return 1;
-
-                return (a.fullName || a.username).localeCompare(b.fullName || b.username, 'ar');
-
-            });
-
-
-
-            sorted.forEach(u => {
-
-                const roleBadge = u.role === 'admin' ? ' ⭐ (مسؤول)' : '';
-
-                const suspBadge = u.isSuspended ? ' ⛔ (موقوف)' : '';
-
-                const branchInfo = (u.subAdmin || u.branch) && u.subAdmin !== 'all' ? ` [${u.subAdmin || u.branch}]` : '';
-
-                html += `<option value="${u.username}">${u.fullName || u.username} (@${u.username})${roleBadge}${suspBadge}${branchInfo}</option>`;
-
-            });
-
-            usernameSelect.innerHTML = html;
-
-
-
-            if (currentVal && filtered.some(u => u.username === currentVal)) {
-
-                usernameSelect.value = currentVal;
-
-            }
-
+        if (curUser && filtered.some(u => u.username === curUser)) {
+            usernameSelect.value = curUser;
         }
-
     };
 
-
-
-    // تهيئة القطاعات بقيمة افتراضية لعرض الكل
-
-    if (sectorSelect) {
-
-        const sectors = getAvailableSectors();
-
-        sectorSelect.innerHTML = '<option value="">-- كل القطاعات (جميع المستخدمين) --</option>' +
-
-            sectors.map(s => `<option value="${s}">${s}</option>`).join('');
-
-        sectorSelect.disabled = false;
-
-        sectorSelect.value = '';
-
-    }
-
-
-
-    if (genAdminSelect) {
-
-        genAdminSelect.innerHTML = '<option value="">-- كل الإدارات العامة --</option>';
-
-        genAdminSelect.disabled = false;
-
-        genAdminSelect.value = '';
-
-    }
-
-
-
-    if (subAdminSelect) {
-
-        subAdminSelect.innerHTML = '<option value="">-- كل الفروع / الهندسات --</option>';
-
+    // دالة تحديث الفروع التابعة للإدارة العامة
+    const updateSubAdmins = (sec: string, gen: string) => {
+        if (!subAdminSelect) return;
+        const subList = (gen && gen !== 'all') ? getSubAdmins(sec, gen) : [];
+        let html = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
+        if (sec === 'all' || gen === 'all') {
+            html += '<option value="all">-- كل الفروع / الهندسات --</option>';
+        }
+        subList.forEach(b => {
+            html += `<option value="${b}">${b}</option>`;
+        });
+        subAdminSelect.innerHTML = html;
         subAdminSelect.disabled = false;
+        if (subList.length === 1) {
+            subAdminSelect.value = subList[0];
+        } else {
+            subAdminSelect.value = '';
+        }
+    };
 
-        subAdminSelect.value = '';
-
-    }
-
-
-
-    // عرض جميع المستخدمين فوراً دون حجب
-
-    renderUserOptions();
-
-
-
-    // عند تغيير القطاع (تصفية اختيارية)
-
-    if (sectorSelect) {
-
-        sectorSelect.onchange = () => {
-
-            const selSec = sectorSelect.value;
-
-            if (passwordInput) passwordInput.value = '';
-
-            if (affBoxEl) affBoxEl.style.display = 'none';
-
-
-
-            if (genAdminSelect) {
-
-                const genList = selSec ? getGeneralAdminsForSector(selSec) : [];
-
-                genAdminSelect.innerHTML = '<option value="">-- كل الإدارات العامة --</option>' +
-
-                    genList.map(g => `<option value="${g}">${g}</option>`).join('');
-
-                genAdminSelect.value = '';
-
-            }
-
-
-
+    // دالة تحديث الإدارات العامة التابعة للقطاع
+    const updateGenAdmins = (sec: string) => {
+        if (!genAdminSelect) return;
+        const genList = (sec && sec !== 'all') ? getGeneralAdminsForSector(sec) : [];
+        let html = '<option value="" disabled selected>-- اختر الإدارة العامة --</option>';
+        if (sec === 'all') {
+            html += '<option value="all">-- كل الإدارات العامة --</option>';
+        }
+        genList.forEach(g => {
+            html += `<option value="${g}">${g}</option>`;
+        });
+        genAdminSelect.innerHTML = html;
+        genAdminSelect.disabled = false;
+        if (genList.length === 1) {
+            genAdminSelect.value = genList[0];
+            updateSubAdmins(sec, genList[0]);
+        } else {
+            genAdminSelect.value = '';
             if (subAdminSelect) {
-
-                subAdminSelect.innerHTML = '<option value="">-- كل الفروع / الهندسات --</option>';
-
-                subAdminSelect.value = '';
-
+                subAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
+                subAdminSelect.disabled = true;
             }
+        }
+    };
 
+    // 1. تعبئة قائمة القطاعات الأساسية
+    const sectors = getAvailableSectors();
+    let secHtml = '<option value="" disabled selected>-- اختر القطاع --</option>';
+    sectors.forEach(s => {
+        secHtml += `<option value="${s}">${s}</option>`;
+    });
+    secHtml += '<option value="all">🌐 كل القطاعات (عرض عام)</option>';
+    sectorSelect.innerHTML = secHtml;
+    sectorSelect.disabled = false;
 
-
-            renderUserOptions(selSec);
-
-        };
-
-    }
-
-
-
-    // عند تغيير الإدارة العامة
-
+    // تهيئة الحقول التابعة
     if (genAdminSelect) {
-
-        genAdminSelect.onchange = () => {
-
-            const selSec = sectorSelect ? sectorSelect.value : '';
-
-            const selGen = genAdminSelect.value;
-
-            if (passwordInput) passwordInput.value = '';
-
-            if (affBoxEl) affBoxEl.style.display = 'none';
-
-
-
-            if (subAdminSelect) {
-
-                const subList = selGen ? getSubAdmins(selSec, selGen) : [];
-
-                subAdminSelect.innerHTML = '<option value="">-- كل الفروع / الهندسات --</option>' +
-
-                    subList.map(b => `<option value="${b}">${b}</option>`).join('');
-
-                subAdminSelect.value = '';
-
-            }
-
-
-
-            renderUserOptions(selSec, selGen);
-
-        };
-
+        genAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة العامة --</option>';
+        genAdminSelect.disabled = true;
     }
-
-
-
-    // عند تغيير الفرع / الهندسة
-
     if (subAdminSelect) {
-
-        subAdminSelect.onchange = () => {
-
-            const selSec = sectorSelect ? sectorSelect.value : '';
-
-            const selGen = genAdminSelect ? genAdminSelect.value : '';
-
-            const selSub = subAdminSelect.value;
-
-            if (passwordInput) passwordInput.value = '';
-
-            if (affBoxEl) affBoxEl.style.display = 'none';
-
-
-
-            renderUserOptions(selSec, selGen, selSub);
-
-        };
-
+        subAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
+        subAdminSelect.disabled = true;
     }
 
+    // عرض جميع المستخدمين مبدئياً
+    updateUsersDropdown();
 
+    // حدث تغيير القطاع: تنشيط وتعبئة الإدارة العامة والفروع المرتبطة فورياً
+    sectorSelect.onchange = () => {
+        const selSec = sectorSelect.value;
+        if (passwordInput) passwordInput.value = '';
+        if (affBoxEl) affBoxEl.style.display = 'none';
 
-    // عند اختيار اسم المستخدم مباشرة: يتم التعبئة التلقائية للبيانات والتبعية دون أي تعقيد
-
-    usernameSelect.onchange = () => {
-
-        const val = usernameSelect.value;
-
-        const u = allUsers.find(usr => usr.username === val);
-
-        if (u) {
-
-            // ضبط القطاع والإدارة تلقائياً إن وجد في بيانات المستخدم
-
-            if (u.sector && u.sector !== 'all' && sectorSelect) {
-
-                sectorSelect.value = u.sector;
-
-                if (genAdminSelect) {
-
-                    const genList = getGeneralAdminsForSector(u.sector);
-
-                    genAdminSelect.innerHTML = '<option value="">-- كل الإدارات العامة --</option>' +
-
-                        genList.map(g => `<option value="${g}">${g}</option>`).join('');
-
-                    if (u.generalAdmin && u.generalAdmin !== 'all') {
-
-                        genAdminSelect.value = u.generalAdmin;
-
-                    }
-
-                }
-
-                if (subAdminSelect && u.generalAdmin && u.generalAdmin !== 'all') {
-
-                    const subList = getSubAdmins(u.sector, u.generalAdmin);
-
-                    subAdminSelect.innerHTML = '<option value="">-- كل الفروع / الهندسات --</option>' +
-
-                        subList.map(b => `<option value="${b}">${b}</option>`).join('');
-
-                    const uSub = u.subAdmin || u.branch;
-
-                    if (uSub && uSub !== 'all') {
-
-                        subAdminSelect.value = uSub;
-
-                    }
-
-                }
-
+        if (selSec) {
+            updateGenAdmins(selSec);
+            updateUsersDropdown(selSec);
+        } else {
+            if (genAdminSelect) {
+                genAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة العامة --</option>';
+                genAdminSelect.disabled = true;
             }
+            if (subAdminSelect) {
+                subAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
+                subAdminSelect.disabled = true;
+            }
+            updateUsersDropdown();
+        }
+    };
 
+    // حدث تغيير الإدارة العامة: تنشيط وتعبئة الفروع التابعة فورياً
+    if (genAdminSelect) {
+        genAdminSelect.onchange = () => {
+            const selSec = sectorSelect.value;
+            const selGen = genAdminSelect.value;
+            if (passwordInput) passwordInput.value = '';
+            if (affBoxEl) affBoxEl.style.display = 'none';
 
+            if (selGen) {
+                updateSubAdmins(selSec, selGen);
+                updateUsersDropdown(selSec, selGen, subAdminSelect?.value);
+            } else {
+                if (subAdminSelect) {
+                    subAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
+                    subAdminSelect.disabled = true;
+                }
+                updateUsersDropdown(selSec);
+            }
+        };
+    }
+
+    // حدث تغيير الفرع / الهندسة: تحديث المستخدمين
+    if (subAdminSelect) {
+        subAdminSelect.onchange = () => {
+            const selSec = sectorSelect.value;
+            const selGen = genAdminSelect ? genAdminSelect.value : '';
+            const selSub = subAdminSelect.value;
+            if (passwordInput) passwordInput.value = '';
+            if (affBoxEl) affBoxEl.style.display = 'none';
+
+            updateUsersDropdown(selSec, selGen, selSub);
+        };
+    }
+
+    // حدث اختيار اسم المستخدم: تحديد القطاع والإدارة والهندسة تلقائياً
+    usernameSelect.onchange = () => {
+        const val = usernameSelect.value;
+        const u = allUsers.find(usr => usr.username === val);
+        if (u) {
+            if (u.sector && u.sector !== 'all') {
+                sectorSelect.value = u.sector;
+                updateGenAdmins(u.sector);
+                if (u.generalAdmin && u.generalAdmin !== 'all' && genAdminSelect) {
+                    genAdminSelect.value = u.generalAdmin;
+                    updateSubAdmins(u.sector, u.generalAdmin);
+                    const userSub = u.subAdmin || u.branch;
+                    if (userSub && userSub !== 'all' && subAdminSelect) {
+                        subAdminSelect.value = userSub;
+                    }
+                }
+            }
 
             if (affBoxEl && affTextEl) {
-
                 const sec = (u.sector && u.sector !== 'all') ? u.sector : 'صلاحية عامة (كل القطاعات)';
-
                 const gen = (u.generalAdmin && u.generalAdmin !== 'all') ? u.generalAdmin : 'شامل الإدارات';
-
                 const br = (u.subAdmin || u.branch) && (u.subAdmin !== 'all' && u.branch !== 'all') ? (u.subAdmin || u.branch) : 'شامل الفروع';
-
                 const roleDesc = u.role === 'admin' ? 'مدير النظام' : u.role;
-
                 affTextEl.textContent = `${roleDesc} | ${sec} | ${gen} | ${br}`;
-
                 affBoxEl.style.display = 'block';
-
             }
-
-
 
             if (passwordInput) {
-
                 passwordInput.value = '';
-
                 passwordInput.focus();
-
             }
-
         }
-
     };
-
 };
 
 
@@ -70953,7 +70779,11 @@ initUniversalModalCloser();
 
 
 
-document.addEventListener('DOMContentLoaded', initApp);
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    initApp();
+}
 
 
 
