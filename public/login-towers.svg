@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 760" fill="none">
+  <title>أبراج شبكة الكهرباء</title>
+  <g stroke="#d8d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M130 645 198 375l68 270M155 548h86M169 493h58M182 439h32M143 592h110"/>
+    <path d="m198 375-40 42h80l-40-42Zm-28 75 28 43 28-43m-50 77 50 48m-50 0 50-48m-63 68 63 55m-63 0 63-55"/>
+    <path d="M634 645 702 375l68 270M659 548h86M673 493h58M686 439h32M647 592h110"/>
+    <path d="m702 375-40 42h80l-40-42Zm-28 75 28 43 28-43m-50 77 50 48m-50 0 50-48m-63 68 63 55m-63 0 63-55"/>
+  </g>
+  <g stroke="#454693" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M450 90 333 670m117-580 117 580M365 510h170m-156-78h142m-127-78h112m-97-78h82m-67-78h52"/>
+    <path d="m450 90-80 108h160L450 90Zm-87 218 87 46 87-46m-103 78 119 46m-119 0 119-46m-135 82 151 46m-151 0 151-46m-168 82 185 46m-185 0 185-46m-201 82 218 46m-218 0 218-46"/>
+    <path d="M360 230h-98m338 0h-60M355 312H198m504 0H545M340 390H166m568 0H560"/>
+  </g>
+  <g stroke="#952327" stroke-width="7" stroke-linecap="round">
+    <path d="M198 375c-54-67-92-94-146-94M702 375c54-67 92-94 146-94"/>
+    <path d="M262 230c-62-78-126-106-210-106m586 106c62-78 126-106 210-106"/>
+    <path d="M450 90V46m-22 0h44"/>
+  </g>
+  <g fill="#fff" stroke="#952327" stroke-width="7">
+    <rect x="357" y="360" width="186" height="136" rx="20"/>
+    <circle cx="450" cy="395" r="9"/>
+    <path d="m462 414-24 36h20l-8 29 29-40h-21l10-25Z" fill="#952327" stroke="none"/>
+  </g>
+  <g stroke="#454693" stroke-width="6" stroke-linecap="round">
+    <path d="M130 645h640M117 684h666" opacity=".45"/>
+    <path d="M292 230v23m-14 0h28m233-23v23m-14 0h28M178 312v23m-14 0h28m516-23v23m-14 0h28"/>
+  </g>
+  <g fill="#454693">
+    <circle cx="262" cy="230" r="9"/><circle cx="638" cy="230" r="9"/>
+    <circle cx="198" cy="312" r="9"/><circle cx="702" cy="312" r="9"/>
+    <circle cx="166" cy="390" r="9"/><circle cx="734" cy="390" r="9"/>
+  </g>
+</svg>
