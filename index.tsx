@@ -3906,7 +3906,7 @@ const populateUserDropdown = () => {
 
 
 
-    if (!usernameSelect || !sectorSelect) return;
+    if (!usernameSelect) return;
 
 
 
@@ -3916,105 +3916,225 @@ const populateUserDropdown = () => {
 
 
 
-    // Populate Sectors
+    // التأكد من توفر قائمة المستخدمين كاملة
 
-    const sectors = getAvailableSectors();
+    let allUsers = (state.users && state.users.length > 0) ? state.users : [];
 
-    sectorSelect.innerHTML = '<option value="" disabled selected>-- اختر القطاع --</option>' +
+    if (!allUsers || allUsers.length === 0) {
 
-        sectors.map(s => `<option value="${s}">${s}</option>`).join('');
+        allUsers = [
 
-    sectorSelect.value = '';
+            { id: 1, fullName: 'مصطفى المغربي (مسؤول النظام)', username: 'admin', password: '123', role: 'admin', sector: 'all', generalAdmin: 'all', subAdmin: 'all' } as any
 
-
-
-    // Initially disable downstream selects
-
-    if (genAdminSelect) {
-
-        genAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة العامة --</option>';
-
-        genAdminSelect.disabled = true;
-
-        genAdminSelect.value = '';
+        ];
 
     }
 
-    if (subAdminSelect) {
-
-        subAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
-
-        subAdminSelect.disabled = true;
-
-        subAdminSelect.value = '';
-
-    }
-
-    usernameSelect.innerHTML = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>';
-
-    usernameSelect.disabled = true;
-
-    usernameSelect.value = '';
 
 
+    // دالة عرض خيارات المستخدمين وتحديثها بناءً على التصفية مع بقاء المدراء والمستخدمين العامين دائماً
 
-    // Step 1: When Sector changes
+    const renderUserOptions = (filterSector?: string, filterGen?: string, filterSub?: string) => {
 
-    sectorSelect.onchange = () => {
+        const currentVal = usernameSelect.value;
 
-        const selSec = sectorSelect.value;
+        const filtered = allUsers.filter(u => {
 
-        if (passwordInput) passwordInput.value = '';
+            // مستخدمو الإدارة العليا والنطاق الشامل يظهرون دائماً
 
-        if (affBoxEl) affBoxEl.style.display = 'none';
+            const isGlobal = u.role === 'admin' ||
+
+                             u.username === 'admin' ||
+
+                             u.sector === 'all' ||
+
+                             u.sector === 'الكل' ||
+
+                             !u.sector;
+
+            if (isGlobal) return true;
 
 
 
-        if (genAdminSelect) {
+            if (filterSector && filterSector !== 'all' && filterSector !== '') {
 
-            const genList = getGeneralAdminsForSector(selSec);
+                if (u.sector && u.sector !== filterSector) return false;
 
-            genAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة العامة --</option>' +
+            }
 
-                genList.map(g => `<option value="${g}">${g}</option>`).join('');
+            if (filterGen && filterGen !== 'all' && filterGen !== '') {
 
-            genAdminSelect.disabled = false;
+                if (u.generalAdmin && u.generalAdmin !== 'all' && u.generalAdmin !== filterGen) return false;
 
-            genAdminSelect.value = '';
+            }
+
+            if (filterSub && filterSub !== 'all' && filterSub !== '') {
+
+                const userSub = u.subAdmin || u.branch;
+
+                if (userSub && userSub !== 'all' && userSub !== filterSub) return false;
+
+            }
+
+            return true;
+
+        });
+
+
+
+        usernameSelect.disabled = false;
+
+        if (filtered.length === 0) {
+
+            usernameSelect.innerHTML = '<option value="" disabled selected>-- لا يوجد مستخدمين لهذا الاختيار --</option>';
+
+        } else {
+
+            let html = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>';
+
+            // ترتيب: المسؤول أولاً ثم باقي المستخدمين أبجدياً
+
+            const sorted = [...filtered].sort((a, b) => {
+
+                if (a.role === 'admin' && b.role !== 'admin') return -1;
+
+                if (b.role === 'admin' && a.role !== 'admin') return 1;
+
+                return (a.fullName || a.username).localeCompare(b.fullName || b.username, 'ar');
+
+            });
+
+
+
+            sorted.forEach(u => {
+
+                const roleBadge = u.role === 'admin' ? ' ⭐ (مسؤول)' : '';
+
+                const suspBadge = u.isSuspended ? ' ⛔ (موقوف)' : '';
+
+                const branchInfo = (u.subAdmin || u.branch) && u.subAdmin !== 'all' ? ` [${u.subAdmin || u.branch}]` : '';
+
+                html += `<option value="${u.username}">${u.fullName || u.username} (@${u.username})${roleBadge}${suspBadge}${branchInfo}</option>`;
+
+            });
+
+            usernameSelect.innerHTML = html;
+
+
+
+            if (currentVal && filtered.some(u => u.username === currentVal)) {
+
+                usernameSelect.value = currentVal;
+
+            }
 
         }
-
-
-
-        if (subAdminSelect) {
-
-            subAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>';
-
-            subAdminSelect.disabled = true;
-
-            subAdminSelect.value = '';
-
-        }
-
-
-
-        usernameSelect.innerHTML = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>';
-
-        usernameSelect.disabled = true;
-
-        usernameSelect.value = '';
 
     };
 
 
 
-    // Step 2: When General Admin changes
+    // تهيئة القطاعات بقيمة افتراضية لعرض الكل
+
+    if (sectorSelect) {
+
+        const sectors = getAvailableSectors();
+
+        sectorSelect.innerHTML = '<option value="">-- كل القطاعات (جميع المستخدمين) --</option>' +
+
+            sectors.map(s => `<option value="${s}">${s}</option>`).join('');
+
+        sectorSelect.disabled = false;
+
+        sectorSelect.value = '';
+
+    }
+
+
+
+    if (genAdminSelect) {
+
+        genAdminSelect.innerHTML = '<option value="">-- كل الإدارات العامة --</option>';
+
+        genAdminSelect.disabled = false;
+
+        genAdminSelect.value = '';
+
+    }
+
+
+
+    if (subAdminSelect) {
+
+        subAdminSelect.innerHTML = '<option value="">-- كل الفروع / الهندسات --</option>';
+
+        subAdminSelect.disabled = false;
+
+        subAdminSelect.value = '';
+
+    }
+
+
+
+    // عرض جميع المستخدمين فوراً دون حجب
+
+    renderUserOptions();
+
+
+
+    // عند تغيير القطاع (تصفية اختيارية)
+
+    if (sectorSelect) {
+
+        sectorSelect.onchange = () => {
+
+            const selSec = sectorSelect.value;
+
+            if (passwordInput) passwordInput.value = '';
+
+            if (affBoxEl) affBoxEl.style.display = 'none';
+
+
+
+            if (genAdminSelect) {
+
+                const genList = selSec ? getGeneralAdminsForSector(selSec) : [];
+
+                genAdminSelect.innerHTML = '<option value="">-- كل الإدارات العامة --</option>' +
+
+                    genList.map(g => `<option value="${g}">${g}</option>`).join('');
+
+                genAdminSelect.value = '';
+
+            }
+
+
+
+            if (subAdminSelect) {
+
+                subAdminSelect.innerHTML = '<option value="">-- كل الفروع / الهندسات --</option>';
+
+                subAdminSelect.value = '';
+
+            }
+
+
+
+            renderUserOptions(selSec);
+
+        };
+
+    }
+
+
+
+    // عند تغيير الإدارة العامة
 
     if (genAdminSelect) {
 
         genAdminSelect.onchange = () => {
 
-            const selSec = sectorSelect.value;
+            const selSec = sectorSelect ? sectorSelect.value : '';
 
             const selGen = genAdminSelect.value;
 
@@ -4026,13 +4146,11 @@ const populateUserDropdown = () => {
 
             if (subAdminSelect) {
 
-                const subList = getSubAdmins(selSec, selGen);
+                const subList = selGen ? getSubAdmins(selSec, selGen) : [];
 
-                subAdminSelect.innerHTML = '<option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>' +
+                subAdminSelect.innerHTML = '<option value="">-- كل الفروع / الهندسات --</option>' +
 
                     subList.map(b => `<option value="${b}">${b}</option>`).join('');
-
-                subAdminSelect.disabled = false;
 
                 subAdminSelect.value = '';
 
@@ -4040,11 +4158,7 @@ const populateUserDropdown = () => {
 
 
 
-            usernameSelect.innerHTML = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>';
-
-            usernameSelect.disabled = true;
-
-            usernameSelect.value = '';
+            renderUserOptions(selSec, selGen);
 
         };
 
@@ -4052,13 +4166,13 @@ const populateUserDropdown = () => {
 
 
 
-    // Step 3: When Sub Admin changes
+    // عند تغيير الفرع / الهندسة
 
     if (subAdminSelect) {
 
         subAdminSelect.onchange = () => {
 
-            const selSec = sectorSelect.value;
+            const selSec = sectorSelect ? sectorSelect.value : '';
 
             const selGen = genAdminSelect ? genAdminSelect.value : '';
 
@@ -4070,45 +4184,7 @@ const populateUserDropdown = () => {
 
 
 
-            // Strict filtering: only users in this exact Sector, General Admin, and Sub Admin
-
-            const matchingUsers = state.users.filter(user => {
-
-                const uSec = user.sector || 'قطاع شمال المنيا';
-
-                const uGen = user.generalAdmin || 'الإدارة العامة لهندسات شمال المنيا';
-
-                const uSub = user.subAdmin || user.branch || 'هندسة كهرباء بني مزار';
-
-                return uSec === selSec && uGen === selGen && uSub === selSub;
-
-            });
-
-
-
-            if (matchingUsers.length === 0) {
-
-                usernameSelect.innerHTML = '<option value="" disabled selected>⚠️ لا يوجد مستخدمين مسجلين في هذا الفرع</option>';
-
-                usernameSelect.disabled = true;
-
-                usernameSelect.value = '';
-
-            } else {
-
-                usernameSelect.innerHTML = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>' +
-
-                    matchingUsers.map(u => {
-
-                        return `<option value="${u.username}">${u.fullName} ${u.isSuspended ? '⛔ (موقوف)' : ''}</option>`;
-
-                    }).join('');
-
-                usernameSelect.disabled = false;
-
-                usernameSelect.value = '';
-
-            }
+            renderUserOptions(selSec, selGen, selSub);
 
         };
 
@@ -4116,29 +4192,81 @@ const populateUserDropdown = () => {
 
 
 
-    // Step 4: When Username is chosen
+    // عند اختيار اسم المستخدم مباشرة: يتم التعبئة التلقائية للبيانات والتبعية دون أي تعقيد
 
     usernameSelect.onchange = () => {
 
         const val = usernameSelect.value;
 
-        const u = state.users.find(usr => usr.username === val);
+        const u = allUsers.find(usr => usr.username === val);
 
-        if (u && affBoxEl && affTextEl) {
+        if (u) {
 
-            const sec = u.sector || sectorSelect.value;
+            // ضبط القطاع والإدارة تلقائياً إن وجد في بيانات المستخدم
 
-            const gen = u.generalAdmin || (genAdminSelect ? genAdminSelect.value : '');
+            if (u.sector && u.sector !== 'all' && sectorSelect) {
 
-            const br = u.subAdmin || u.branch || (subAdminSelect ? subAdminSelect.value : '');
+                sectorSelect.value = u.sector;
 
-            affTextEl.textContent = `${sec} | ${gen} | ${br}`;
+                if (genAdminSelect) {
 
-            affBoxEl.style.display = 'block';
+                    const genList = getGeneralAdminsForSector(u.sector);
+
+                    genAdminSelect.innerHTML = '<option value="">-- كل الإدارات العامة --</option>' +
+
+                        genList.map(g => `<option value="${g}">${g}</option>`).join('');
+
+                    if (u.generalAdmin && u.generalAdmin !== 'all') {
+
+                        genAdminSelect.value = u.generalAdmin;
+
+                    }
+
+                }
+
+                if (subAdminSelect && u.generalAdmin && u.generalAdmin !== 'all') {
+
+                    const subList = getSubAdmins(u.sector, u.generalAdmin);
+
+                    subAdminSelect.innerHTML = '<option value="">-- كل الفروع / الهندسات --</option>' +
+
+                        subList.map(b => `<option value="${b}">${b}</option>`).join('');
+
+                    const uSub = u.subAdmin || u.branch;
+
+                    if (uSub && uSub !== 'all') {
+
+                        subAdminSelect.value = uSub;
+
+                    }
+
+                }
+
+            }
+
+
+
+            if (affBoxEl && affTextEl) {
+
+                const sec = (u.sector && u.sector !== 'all') ? u.sector : 'صلاحية عامة (كل القطاعات)';
+
+                const gen = (u.generalAdmin && u.generalAdmin !== 'all') ? u.generalAdmin : 'شامل الإدارات';
+
+                const br = (u.subAdmin || u.branch) && (u.subAdmin !== 'all' && u.branch !== 'all') ? (u.subAdmin || u.branch) : 'شامل الفروع';
+
+                const roleDesc = u.role === 'admin' ? 'مدير النظام' : u.role;
+
+                affTextEl.textContent = `${roleDesc} | ${sec} | ${gen} | ${br}`;
+
+                affBoxEl.style.display = 'block';
+
+            }
 
 
 
             if (passwordInput) {
+
+                passwordInput.value = '';
 
                 passwordInput.focus();
 
@@ -5058,12 +5186,23 @@ const handleLogin = async (event: Event) => {
             showAccountSuspendedAlert(reason);
 
             return;
-
         }
 
-
-
-        showAppLoading('جارٍ تسجيل الدخول والتحقق من الصلاحيات...', 'المنظومة الموحدة للعدادات - مزامنة سحابية ⚡', '🔐');
+        showAppLoading('جارٍ التحقق من حساب الموظف وتجهيز جلسة التقارير...', 'المنظومة الموحدة للعدادات - مزامنة سحابية ⚡', '🔐');
+        let reportLoginMessage = '';
+        let reportLoginSucceeded = false;
+        try {
+            const response = await fetch('http://127.0.0.1:5002/api/meedco/report-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const result = await response.json();
+            reportLoginSucceeded = response.ok && result.success === true;
+            reportLoginMessage = result.message || '';
+        } catch (err: any) {
+            reportLoginMessage = err?.message || 'تعذر الاتصال بخادم التقارير المحلي';
+        }
 
         await new Promise(r => setTimeout(r, 650));
 
@@ -5138,6 +5277,11 @@ const handleLogin = async (event: Event) => {
         window.setTimeout(() => renderDashboard(), 100);
 
         await hideAppLoading(300);
+        if (reportLoginSucceeded) {
+            showToast(`تم تسجيل الدخول إلى MEEDCO وتجهيز تقارير ${user.fullName}`, 'success');
+        } else {
+            showToast(`تم الدخول إلى التطبيق المحلي، لكن جلسة تقارير MEEDCO غير متاحة: ${reportLoginMessage || 'تحقق من بيانات الحساب أو اتصال الخادم المحلي'}`, 'warning');
+        }
 
     } else {
 
@@ -5162,6 +5306,8 @@ const handleLogin = async (event: Event) => {
 const handleLogout = () => {
 
     loggedInUser = null;
+
+    void fetch('http://127.0.0.1:5002/api/meedco/report-logout', { method: 'POST' }).catch(() => {});
 
     localStorage.removeItem('currentUser');
 
@@ -11782,12 +11928,16 @@ const handlePrintJudicialControlDetails = () => {
 
             const defaultUser = 'سناء عبدالستار عبدالعزيز';
             const currentUser = (userInput?.value || select.value || defaultUser).trim();
+            const firstAvailableUser = meedcoUsers[0]?.name || otherUsers[0]?.name || defaultUser;
+            const resolvedUser = currentUser && Array.from((users || []) as any[]).some(u => (u.name || '') === currentUser)
+                ? currentUser
+                : firstAvailableUser;
 
             const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             if (meedcoUsers.length > 0) {
                 html += `<optgroup label="🏢 مستخدمو ومحصلو المنظومة الموحدة والبرامج (${meedcoUsers.length} مستخدم)">`;
                 meedcoUsers.forEach(u => {
-                    const sel = (u.name === currentUser) ? 'selected' : '';
+                    const sel = (u.name === resolvedUser) ? 'selected' : '';
                     html += `<option value="${esc(u.name)}" ${sel}>${esc(u.name)}</option>`;
                 });
                 html += `</optgroup>`;
@@ -11796,7 +11946,7 @@ const handlePrintJudicialControlDetails = () => {
             if (otherUsers.length > 0) {
                 html += `<optgroup label="💻 مستخدمو النظام المحلي">`;
                 otherUsers.forEach(u => {
-                    const sel = (u.name === currentUser) ? 'selected' : '';
+                    const sel = (u.name === resolvedUser) ? 'selected' : '';
                     html += `<option value="${esc(u.name)}" ${sel}>${esc(u.name)}</option>`;
                 });
                 html += `</optgroup>`;
@@ -11804,20 +11954,21 @@ const handlePrintJudicialControlDetails = () => {
 
             select.innerHTML = html;
 
-            if (currentUser && Array.from(select.options).some(o => o.value === currentUser)) {
-                select.value = currentUser;
+            if (resolvedUser && Array.from(select.options).some(o => o.value === resolvedUser)) {
+                select.value = resolvedUser;
             } else if (select.options.length > 1) {
                 select.selectedIndex = 1;
             }
 
+            const selectedUserValue = select.value || resolvedUser || defaultUser;
             if (userInput) {
-                userInput.value = select.value || currentUser;
+                userInput.value = selectedUserValue;
             }
 
             if (!currentEditingSupplyPortfolio) {
                 setTimeout(() => {
                     autoFetchUserProgramsRevenue(false);
-                }, 200);
+                }, 250);
             }
 
             if (forceSync) {
@@ -12846,6 +12997,8 @@ const handlePrintJudicialControlDetails = () => {
             autoFetchUserProgramsRevenue(false);
         });
 
+
+
         // Maasara Excel File Upload
         const maasaraUploadBtn = document.getElementById('btn-sp-upload-maasara');
         const maasaraFileInput = document.getElementById('sp-maasara-file-input') as HTMLInputElement | null;
@@ -12992,6 +13145,20 @@ const handlePrintJudicialControlDetails = () => {
     let currentSelectedCashierForModal: any = null;
     let currentFilteredComprehensiveUsers: any[] = [];
 
+    const renderComprehensiveSourceWarnings = (warnings: any[] = []) => {
+        const notice = document.getElementById('sp-detail-source-warning');
+        if (!notice) return;
+        if (warnings.length === 0) {
+            notice.style.display = 'none';
+            notice.textContent = '';
+            return;
+        }
+        const details = warnings.slice(0, 3).map(w => `${w.source} (${w.date}): ${w.message}`).join(' | ');
+        const remaining = warnings.length > 3 ? ` | وهناك ${warnings.length - 3} تنبيهات أخرى` : '';
+        notice.textContent = `تنبيه: التقرير جزئي أو يحتوي على بيانات محفوظة؛ لا تعتبر المبالغ الصفرية تأكيداً بعدم وجود عمليات. ${details}${remaining}`;
+        notice.style.display = 'block';
+    };
+
     const autoFetchUserProgramsRevenue = async (showToastNotice = true) => {
         const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
         const userInput = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
@@ -13067,7 +13234,12 @@ const handlePrintJudicialControlDetails = () => {
                 calculateSupplyPortfolioLive();
 
                 if (showToastNotice) {
-                    showToast(`تم استيراد مبيعات (${userName}): ${d.totalCount} شحنة بإجمالي ${(d.totalAmount || 0).toLocaleString()} ج.م ✓`, 'success');
+                    if (Array.isArray(d.sourceWarnings) && d.sourceWarnings.length > 0) {
+                        const warning = d.sourceWarnings.map((item: any) => `${item.source}: ${item.message}`).join(' | ');
+                        showToast(`تم تحميل البيانات جزئياً لـ (${userName}) بإجمالي ${(d.totalAmount || 0).toLocaleString()} ج.م. ${warning}`, 'warning');
+                    } else {
+                        showToast(`تم استيراد مبيعات (${userName}): ${d.totalCount} شحنة بإجمالي ${(d.totalAmount || 0).toLocaleString()} ج.م ✓`, 'success');
+                    }
                 }
             } else {
                 if (showToastNotice) showToast('لم يتم العثور على مبيعات مسجلة لهذا المحصل في التاريخ المحدد', 'info');
@@ -13095,6 +13267,7 @@ const handlePrintJudicialControlDetails = () => {
                 const parsed = JSON.parse(localReport);
                 if (parsed && Array.isArray(parsed.users) && parsed.users.length > 0) {
                     currentComprehensiveReportData = parsed;
+                    renderComprehensiveSourceWarnings(parsed.sourceWarnings || []);
                     updateComprehensiveReportKPIs(parsed.summary);
                     filterAndRenderComprehensiveTable();
                 }
@@ -13128,6 +13301,7 @@ const handlePrintJudicialControlDetails = () => {
                 const cacheRes = await fetch(cacheUrl).then(r => r.json()).catch(() => null);
                 if (cacheRes && cacheRes.success && cacheRes.data && Array.isArray(cacheRes.data.users) && cacheRes.data.users.length > 0) {
                     currentComprehensiveReportData = cacheRes.data;
+                    renderComprehensiveSourceWarnings(cacheRes.data.sourceWarnings || []);
                     const userFilterSelect = document.getElementById('sp-detail-user-filter') as HTMLSelectElement | null;
                     if (userFilterSelect && Array.isArray(cacheRes.data.users)) {
                         const prevSelected = userFilterSelect.value;
@@ -13181,6 +13355,7 @@ const handlePrintJudicialControlDetails = () => {
 
             if (res && res.success && res.data) {
                 currentComprehensiveReportData = res.data;
+                renderComprehensiveSourceWarnings(res.data.sourceWarnings || []);
 
                 // Dynamically populate user filter dropdown
                 const userFilterSelect = document.getElementById('sp-detail-user-filter') as HTMLSelectElement | null;
@@ -13808,13 +13983,10 @@ const handlePrintJudicialControlDetails = () => {
             initSupplyPortfoliosListeners();
             supplyPortfoliosInitialized = true;
         }
-        loadSupplyPortfolioUsers();
+        void loadSupplyPortfolioUsers(false);
         if (!currentEditingSupplyPortfolio) {
             resetSupplyPortfolioForm();
         }
-        setTimeout(() => {
-            autoFetchUserProgramsRevenue(false);
-        }, 350);
     };
 
     const renderSupplyPortfolioArchiveSection = () => {
@@ -69900,9 +70072,29 @@ const initMobileAdaptation = () => {
 
 
 
-                // 7. إنعاش الواجهة والصلاحيات
+                const loginScreen = document.getElementById('login-screen');
+                const welcomeScreen = document.getElementById('welcome-screen');
+                const isLoggedOutScreenVisible =
+                    !loggedInUser &&
+                    loginScreen?.classList.contains('active') ||
+                    !loggedInUser &&
+                    welcomeScreen?.classList.contains('active');
 
-                updateUI();
+                // 7. إنعاش الواجهة والصلاحيات
+                if (!isLoggedOutScreenVisible) {
+                    updateUI();
+                }
+
+                if (
+                    isLoggedOutScreenVisible &&
+                    (state.users.length > 1 || state.meters.length > 0)
+                ) {
+                    populateUserDropdown();
+
+                    if (welcomeScreen?.classList.contains('active')) {
+                        showScreen('login-screen');
+                    }
+                }
 
 
 

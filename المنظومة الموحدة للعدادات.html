@@ -12,7 +12,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>المنظومة الموحدة للعدادات</title>
-  <link rel="stylesheet" href="index.css?v=20260918_2">
+  <link rel="stylesheet" href="index.css?v=20261005_3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -345,34 +345,7 @@
         font-size: 0.9rem;
     }
   </style>
-<link rel="stylesheet" href="index.css">
 <!-- CSS مباشر لضمان ظهور أقسام كروت التحكم -->
-<style>
-  #read-control-card,
-  #issue-control-card,
-  #control-card-details,
-  #advanced-control-card,
-  #tech-collect-card,
-  #tech-collect-card-details {
-    display: none;
-  }
-  #read-control-card.active,
-  #issue-control-card.active,
-  #control-card-details.active,
-  #advanced-control-card.active,
-  #tech-collect-card.active,
-  #tech-collect-card-details.active,
-  #read-control-card[style*="display: block"],
-  #issue-control-card[style*="display: block"],
-  #control-card-details[style*="display: block"],
-  #advanced-control-card[style*="display: block"],
-  #tech-collect-card[style*="display: block"],
-  #tech-collect-card-details[style*="display: block"] {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
-</style>
 </head>
 
 <body>
@@ -507,6 +480,153 @@
     </div>
 
   <div id="toast-container"></div>
+
+  <div id="app-notification-dialog" class="app-notification-dialog" role="dialog" aria-modal="true" aria-labelledby="app-notification-title" aria-describedby="app-notification-message" hidden>
+      <div class="app-notification-dialog__backdrop" data-close-app-notification></div>
+      <div class="app-notification-dialog__panel" data-state="info">
+          <button type="button" class="app-notification-dialog__close" id="app-notification-close" aria-label="إغلاق" hidden>&times;</button>
+          <div class="app-notification-dialog__icon" id="app-notification-icon" aria-hidden="true">💬</div>
+          <h2 id="app-notification-title">إشعار</h2>
+          <p id="app-notification-message" aria-live="polite"></p>
+          <div class="app-notification-dialog__spinner" id="app-notification-spinner" hidden></div>
+          <button type="button" class="btn app-notification-dialog__confirm" id="app-notification-confirm" hidden>حسناً</button>
+      </div>
+  </div>
+  <script>
+    (() => {
+      const dialog = document.getElementById('app-notification-dialog');
+      const panel = dialog?.querySelector('.app-notification-dialog__panel');
+      const title = document.getElementById('app-notification-title');
+      const message = document.getElementById('app-notification-message');
+      const icon = document.getElementById('app-notification-icon');
+      const spinner = document.getElementById('app-notification-spinner');
+      const closeButton = document.getElementById('app-notification-close');
+      const confirmButton = document.getElementById('app-notification-confirm');
+      const toastContainer = document.getElementById('toast-container');
+      const operationButtonSelector = '#btn-read-control-card, #btn-renew-control-card';
+      if (!dialog || !panel || !title || !message || !icon || !spinner || !closeButton || !confirmButton || !toastContainer) {
+        console.error('Control card read dialog could not initialize: required elements are missing.');
+        return;
+      }
+
+      let reading = false;
+      let activeOperation = 'read';
+      let closeTimer;
+      let readTimeout;
+      let previousFocus;
+
+      const hide = () => {
+        if (reading) return;
+        dialog.hidden = true;
+        window.clearTimeout(closeTimer);
+        if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+        previousFocus = undefined;
+      };
+
+      const show = (text, state, loading = false) => {
+        window.clearTimeout(closeTimer);
+        if (dialog.hidden) previousFocus = document.activeElement;
+        panel.dataset.state = state;
+        const isControlCardRead = /قراءة كارت التحكم|قراءة الكارت|تمت قراءة/.test(text);
+        const isControlCardRenew = /تجديد|تحديث وتفعيل|تحديث الكارت/.test(text);
+        title.textContent = loading
+          ? activeOperation === 'renew' ? 'جاري تجديد كارت التحكم' : 'جاري قراءة كارت التحكم'
+          : state === 'success' && isControlCardRead
+            ? 'تمت قراءة كارت التحكم بنجاح'
+            : state === 'success' && isControlCardRenew
+              ? 'تم تجديد كارت التحكم بنجاح'
+              : state === 'success'
+                ? 'تمت العملية بنجاح'
+                : state === 'warning'
+                  ? 'تنبيه بخصوص كارت التحكم'
+                  : state === 'error' && isControlCardRead
+                    ? 'تعذرت قراءة كارت التحكم'
+                    : state === 'error' && isControlCardRenew
+                      ? 'تعذر تجديد كارت التحكم'
+                      : state === 'error'
+                        ? 'تعذر إتمام العملية'
+                        : 'إشعار';
+        message.textContent = text;
+        icon.textContent = state === 'success' ? '✓' : state === 'warning' ? '!' : state === 'error' ? '×' : '💬';
+        spinner.hidden = !loading;
+        closeButton.hidden = loading;
+        confirmButton.hidden = loading;
+        dialog.hidden = false;
+        if (loading) {
+          reading = true;
+          readTimeout = window.setTimeout(() => {
+            reading = false;
+            show(activeOperation === 'renew'
+              ? 'لم يكتمل تجديد الكارت خلال المهلة. تحقق من ثبات الكارت في القارئ قبل إعادة المحاولة.'
+              : 'انتهت مهلة قراءة كارت التحكم. تأكد من ثبات الكارت في القارئ ومن اتصال خدمة MEEDCO ثم أعد المحاولة.', 'error');
+          }, 70000);
+        } else {
+          reading = false;
+          window.clearTimeout(readTimeout);
+          closeTimer = window.setTimeout(hide, 6500);
+          confirmButton.focus();
+        }
+      };
+
+      document.addEventListener('click', event => {
+        const target = event.target;
+        if (target instanceof Element && target.closest(operationButtonSelector)) {
+          activeOperation = target.closest('#btn-renew-control-card') ? 'renew' : 'read';
+          show(activeOperation === 'renew'
+            ? 'جاري تسجيل التجديد في MEEDCO ثم كتابة التحديث على الشريحة. لن تظهر رسالة النجاح إلا بعد تأكيد القارئ.'
+            : 'جاري قراءة الشريحة ثم جلب بيانات كارت التحكم من MEEDCO...', 'info', true);
+        }
+      }, true);
+
+      document.addEventListener('control-card-operation-finished', () => {
+        reading = false;
+        window.clearTimeout(readTimeout);
+        hide();
+      });
+
+      const closeWhenFinished = () => {
+        reading = false;
+        hide();
+      };
+      closeButton.addEventListener('click', closeWhenFinished);
+      confirmButton.addEventListener('click', closeWhenFinished);
+      dialog.querySelector('[data-close-app-notification]')?.addEventListener('click', closeWhenFinished);
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !dialog.hidden) closeWhenFinished();
+      });
+
+      const toastObserver = new MutationObserver(records => {
+        records.forEach(record => {
+          record.addedNodes.forEach(node => {
+            if (!(node instanceof HTMLElement)) return;
+            const toasts = node.matches('.toast') ? [node] : Array.from(node.querySelectorAll('.toast'));
+            toasts.forEach(toast => {
+              const text = toast.textContent?.trim();
+              if (!text) return;
+              if (/مزامنة|المزامنة|sync|synchroniz/i.test(text)) {
+                toast.classList.add('toast-sync-compact');
+                return;
+              }
+              toast.remove();
+              if (reading && /جاري الاتصال|جارٍ الاتصال|جاري التعامل|جاري قراءة|جارٍ قراءة|جاري تسجيل التجديد|جاري كتابة|جاري تحديث|جارٍ تحديث/.test(text)) {
+                message.textContent = text;
+                return;
+              }
+              const state = toast.classList.contains('success')
+                ? 'success'
+                : toast.classList.contains('error')
+                  ? (/غير مفعل|تنبيه|يحتاج تجديد/.test(text) ? 'warning' : 'error')
+                  : toast.classList.contains('warning')
+                    ? 'warning'
+                    : 'info';
+              show(text, state);
+            });
+          });
+        });
+      });
+      toastObserver.observe(toastContainer, { childList: true, subtree: true });
+    })();
+  </script>
 
   <!-- Add New Area Dialog -->
   <div id="add-pending-area-dialog" class="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="add-area-dialog-title" hidden>
@@ -861,24 +981,24 @@
           <div class="input-group" id="login-sector-group">
             <label for="login-sector">القطاع</label>
             <select id="login-sector" name="loginSector">
-              <option value="" disabled selected>-- اختر القطاع --</option>
+              <option value="">-- كل القطاعات (جميع المستخدمين) --</option>
             </select>
           </div>
           <div class="input-group" id="login-general-admin-group">
             <label for="login-general-admin">الإدارة العامة</label>
-            <select id="login-general-admin" name="loginGeneralAdmin" disabled>
-              <option value="" disabled selected>-- اختر الإدارة العامة --</option>
+            <select id="login-general-admin" name="loginGeneralAdmin">
+              <option value="">-- كل الإدارات العامة --</option>
             </select>
           </div>
           <div class="input-group" id="login-sub-admin-group">
             <label for="login-sub-admin">الإدارة الفرعية / الهندسة</label>
-            <select id="login-sub-admin" name="loginSubAdmin" disabled>
-              <option value="" disabled selected>-- اختر الإدارة الفرعية / الهندسة --</option>
+            <select id="login-sub-admin" name="loginSubAdmin">
+              <option value="">-- كل الفروع / الهندسات --</option>
             </select>
           </div>
           <div class="input-group">
             <label for="username">اسم المستخدم</label>
-            <select id="username" name="username" required="" autocomplete="off"><option value="" disabled selected>اختر اسم المستخدم...</option></select>
+            <select id="username" name="username" required="" autocomplete="off"><option value="" disabled selected>-- اختر اسم المستخدم --</option></select>
             <div id="login-user-affiliation" style="display: none; font-size: 0.85rem; color: #60a5fa; margin-top: 6px; font-weight: bold; background: rgba(30, 58, 138, 0.4); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(96, 165, 250, 0.3);">
               <span style="margin-left: 4px;">🏢</span>
               <span id="login-user-affiliation-text"></span>
@@ -6217,6 +6337,7 @@
                     <button type="button" id="btn-sp-modal-dismiss" style="background: #e2e8f0; color: #334155; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 700; cursor: pointer;">إغلاق</button>
                 </div>
             </div>
+        </div>
         <!-- ========================================================================= -->
         <!-- قسم حافظات التوريد: 3. التقرير المالي والتفصيلي لجميع البرامج والمستخدمين -->
         <!-- ========================================================================= -->
@@ -6335,6 +6456,8 @@
                         </button>
                     </div>
                 </div>
+
+                <div id="sp-detail-source-warning" role="status" aria-live="polite" style="display: none; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; border-radius: 8px; padding: 10px 14px; font-weight: 700; line-height: 1.6;"></div>
 
                 <!-- بطاقات المؤشرات العامة (KPIs Overview) -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem;">
@@ -7804,25 +7927,6 @@
                     </div>
                 </div>
 
-                                <!-- شريط اختيار كارت التحكم المحفوظ -->
-                <div id="control-card-selector-bar" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 1.25rem; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #bae6fd; border-radius: var(--border-radius-lg); padding: 12px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
-                    <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 280px;">
-                        <span style="font-weight: 700; font-size: 0.95rem; color: #0369a1; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                            سجل كروت التحكم المحفوظة:
-                        </span>
-                        <select id="select-saved-control-card" style="flex: 1; max-width: 520px; padding: 7px 12px; border-radius: 6px; border: 1.5px solid #7dd3fc; background: #ffffff; font-weight: 600; font-size: 0.9rem; color: #0c4a6e; cursor: pointer;">
-                            <option value="">جاري تحميل كروت التحكم المحفوظة...</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <button type="button" id="btn-refresh-control-cards-history" class="btn secondary" style="background: #ffffff; border: 1px solid #cbd5e1; padding: 6px 12px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;" title="تحديث السجل من الخادم">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                            <span>تحديث القائمة</span>
-                        </button>
-                    </div>
-                </div>
-
 <!-- Card Metadata Card -->
                 <div id="control-card-info-box" class="form-container" style="margin-bottom: 1.5rem; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--border-radius-lg); box-shadow: 0 1px 3px rgba(0,0,0,0.05); padding: 1.25rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem;">
@@ -8069,47 +8173,13 @@
                         </div>
                     </div>
                 </dialog>
-                <!-- جدول سجل كروت التحكم الصادرة المحفوظة -->
-                <div class="table-container" style="margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
-                        <h4 style="margin: 0; font-size: 1.15rem; color: #1e293b; display: flex; align-items: center; gap: 8px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                            سجل كروت التحكم المحفوظة بالمنظومة (<span id="issue-history-count">0</span>)
-                        </h4>
-                    </div>
-                    <div class="responsive-table">
-                        <table id="table-issued-control-cards">
-                            <thead>
-                                <tr>
-                                    <th>م</th>
-                                    <th>رقم الكارت</th>
-                                    <th>شركة التوريد</th>
-                                    <th>نوع العملية</th>
-                                    <th>اسم الفني المستلم</th>
-                                    <th>تاريخ الإصدار</th>
-                                    <th>تاريخ الانتهاء</th>
-                                    <th>الحالة</th>
-                                    <th>إجراءات</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbody-issued-control-cards">
-                                <tr>
-                                    <td colspan="9" style="text-align: center; padding: 1.5rem; color: #94a3b8;">
-                                        جاري تحميل سجل كروت التحكم...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
                 <!-- نافذة منبثقة أنيقة لتأكيد نجاح تحديث / تجديد كارت التحكم -->
                 <dialog id="dialog-renew-control-card-success" style="border: none; border-radius: 14px; padding: 0; max-width: 480px; width: 92%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden;">
                     <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: white; padding: 24px; text-align: center;">
                         <div style="width: 64px; height: 64px; background: rgba(255,255,255,0.2); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                             <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                         </div>
-                        <h3 style="margin: 0; font-size: 1.45rem; font-weight: 700;">تم تحديث وتفعيل كارت التحكم بنجاح</h3>
+                        <h3 style="margin: 0; font-size: 1.45rem; font-weight: 700;">تم تجديد كارت التحكم بنجاح</h3>
                         <p style="margin: 6px 0 0; opacity: 0.9; font-size: 0.95rem;">تمت كتابة التحديث وتمديد الصلاحية على شريحة الكارت بالمنظومة</p>
                     </div>
                     <div style="padding: 24px; text-align: center; background: #ffffff;">
@@ -8684,31 +8754,6 @@
     });
   </script>
 
-  <!-- HOTFIX v2: Guarantee control card section visibility -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      var ctrlIds = ['read-control-card','issue-control-card','control-card-details','advanced-control-card','tech-collect-card','tech-collect-card-details'];
-
-      // Intercept nav clicks for control card sections
-      document.addEventListener('click', function(e) {
-        var link = e.target && e.target.closest ? e.target.closest('.nav-link, .panel-action-card') : null;
-        if (!link) return;
-        var target = link.getAttribute('data-target');
-        if (!target || ctrlIds.indexOf(target) === -1) return;
-
-        // Delay to run after main JS handleNavigation
-        setTimeout(function() {
-          var sec = document.getElementById(target);
-          if (sec) {
-            sec.style.display = 'block';
-            sec.style.visibility = 'visible';
-            sec.style.opacity = '1';
-            if (!sec.classList.contains('active')) sec.classList.add('active');
-          }
-        }, 80);
-      }, true); // capture phase to run alongside main JS
-    });
-  </script>
     <!-- PowerPoint editor removed -->
     <!--
         document.addEventListener('DOMContentLoaded', () => {
