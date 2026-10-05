@@ -454,42 +454,155 @@ const syncOrgStructureSettings = () => {
 };
 const getAvailableSectors = () => {
     const struct = getActiveOrgStructure();
-    return Object.keys(struct);
+    const set = new Set();
+    // 1. من الهيكل الإداري
+    Object.keys(struct || {}).forEach(s => {
+        if (s && s !== 'all' && s !== 'الكل')
+            set.add(s.trim());
+    });
+    // 2. من إعدادات القطاعات
+    if (state.settings && Array.isArray(state.settings.sectors)) {
+        state.settings.sectors.forEach(s => {
+            if (s && s !== 'all' && s !== 'الكل')
+                set.add(s.trim());
+        });
+    }
+    // 3. من المستخدمين المسجلين
+    if (Array.isArray(state.users)) {
+        state.users.forEach(u => {
+            if (u.sector && u.sector !== 'all' && u.sector !== 'الكل')
+                set.add(u.sector.trim());
+        });
+    }
+    // 4. من العدادات المسجلة
+    if (Array.isArray(state.meters)) {
+        state.meters.forEach(m => {
+            if (m.sector && m.sector !== 'all' && m.sector !== 'الكل')
+                set.add(m.sector.trim());
+        });
+    }
+    // 5. من البيانات الأولية المخزنة
+    const seed = (typeof window !== 'undefined' && window.__INITIAL_DATA__) ? window.__INITIAL_DATA__ : null;
+    if (seed && seed.settings && Array.isArray(seed.settings.sectors)) {
+        seed.settings.sectors.forEach((s) => {
+            if (s && s !== 'all' && s !== 'الكل')
+                set.add(s.trim());
+        });
+    }
+    return Array.from(set);
 };
 const getGeneralAdminsForSector = (selectedSector) => {
     const struct = getActiveOrgStructure();
-    if (selectedSector && selectedSector !== 'all') {
-        return Object.keys(struct[selectedSector] || {});
-    }
     const list = new Set();
-    Object.values(struct).forEach(s => {
-        Object.keys(s).forEach(ga => list.add(ga));
-    });
+    if (selectedSector && selectedSector !== 'all') {
+        const gaInStruct = struct[selectedSector];
+        if (gaInStruct) {
+            Object.keys(gaInStruct).forEach(ga => list.add(ga.trim()));
+        }
+        // ابحث في المستخدمين المسجلين
+        if (Array.isArray(state.users)) {
+            state.users.forEach(u => {
+                if (u.sector === selectedSector && u.generalAdmin && u.generalAdmin !== 'all') {
+                    list.add(u.generalAdmin.trim());
+                }
+            });
+        }
+        // ابحث في العدادات المسجلة
+        if (Array.isArray(state.meters)) {
+            state.meters.forEach(m => {
+                if (m.sector === selectedSector && m.generalAdmin && m.generalAdmin !== 'all') {
+                    list.add(m.generalAdmin.trim());
+                }
+            });
+        }
+        // إذا لم نجد إدارات مسجلة لهذا القطاع، أعطِ الإدارات من الإعدادات العامة
+        if (list.size === 0 && state.settings && Array.isArray(state.settings.generalAdministrations)) {
+            state.settings.generalAdministrations.forEach(ga => {
+                if (ga && ga !== 'all')
+                    list.add(ga.trim());
+            });
+        }
+    }
+    else {
+        Object.values(struct || {}).forEach(s => {
+            Object.keys(s || {}).forEach(ga => list.add(ga.trim()));
+        });
+        if (state.settings && Array.isArray(state.settings.generalAdministrations)) {
+            state.settings.generalAdministrations.forEach(ga => {
+                if (ga && ga !== 'all')
+                    list.add(ga.trim());
+            });
+        }
+        if (Array.isArray(state.users)) {
+            state.users.forEach(u => {
+                if (u.generalAdmin && u.generalAdmin !== 'all')
+                    list.add(u.generalAdmin.trim());
+            });
+        }
+    }
     return Array.from(list);
 };
 const getSubAdmins = (selectedSector, selectedGeneralAdmin) => {
     const struct = getActiveOrgStructure();
+    const list = new Set();
     if (selectedSector && selectedSector !== 'all') {
         const s = struct[selectedSector];
-        if (!s)
-            return [];
-        if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
-            return s[selectedGeneralAdmin] || [];
+        if (s) {
+            if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
+                const branches = s[selectedGeneralAdmin] || [];
+                branches.forEach(b => list.add(b.trim()));
+            }
+            else {
+                Object.values(s).forEach(branches => branches.forEach(b => list.add(b.trim())));
+            }
         }
-        const list = new Set();
-        Object.values(s).forEach(branches => branches.forEach(b => list.add(b)));
-        return Array.from(list);
+        // ابحث في المستخدمين المسجلين
+        if (Array.isArray(state.users)) {
+            state.users.forEach(u => {
+                if (u.sector === selectedSector &&
+                    (!selectedGeneralAdmin || selectedGeneralAdmin === 'all' || u.generalAdmin === selectedGeneralAdmin)) {
+                    const br = u.subAdmin || u.branch;
+                    if (br && br !== 'all')
+                        list.add(br.trim());
+                }
+            });
+        }
+        // ابحث في العدادات المسجلة
+        if (Array.isArray(state.meters)) {
+            state.meters.forEach(m => {
+                if (m.sector === selectedSector &&
+                    (!selectedGeneralAdmin || selectedGeneralAdmin === 'all' || m.generalAdmin === selectedGeneralAdmin)) {
+                    const br = m.subAdmin || m.branch;
+                    if (br && br !== 'all')
+                        list.add(br.trim());
+                }
+            });
+        }
     }
-    const list = new Set();
-    Object.values(struct).forEach(s => {
-        if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
-            if (s[selectedGeneralAdmin])
-                s[selectedGeneralAdmin].forEach(b => list.add(b));
+    else {
+        Object.values(struct || {}).forEach(s => {
+            if (selectedGeneralAdmin && selectedGeneralAdmin !== 'all') {
+                if (s[selectedGeneralAdmin])
+                    s[selectedGeneralAdmin].forEach(b => list.add(b.trim()));
+            }
+            else {
+                Object.values(s).forEach(branches => branches.forEach(b => list.add(b.trim())));
+            }
+        });
+        if (state.settings && Array.isArray(state.settings.subAdministrations)) {
+            state.settings.subAdministrations.forEach(b => {
+                if (b && b !== 'all')
+                    list.add(b.trim());
+            });
         }
-        else {
-            Object.values(s).forEach(branches => branches.forEach(b => list.add(b)));
+        if (Array.isArray(state.users)) {
+            state.users.forEach(u => {
+                const br = u.subAdmin || u.branch;
+                if (br && br !== 'all')
+                    list.add(br.trim());
+            });
         }
-    });
+    }
     return Array.from(list);
 };
 const getCouncilsForBranch = (branchName) => {
@@ -1485,34 +1598,50 @@ const loadState = async () => {
         // Automatic initial seed: Only on absolute first run when never initialized before
         const hasEverInitialized = loadedState && (loadedState.hasInitializedData || (loadedState._deletedIds && loadedState._deletedIds.meters && loadedState._deletedIds.meters.length > 0));
         const needsInitialData = !hasEverInitialized && (!loadedState || !loadedState.meters || loadedState.meters.length === 0);
+        let initialDataset = (typeof window !== 'undefined' && window.__INITIAL_DATA__) ? window.__INITIAL_DATA__ : null;
         if (needsInitialData) {
             try {
-                console.log("Fetching initial dataset (initial_data.json)...");
-                const res = await fetch('./initial_data.json');
-                if (res.ok) {
-                    const seedData = await res.json();
-                    if (seedData && seedData.meters && seedData.meters.length > 0) {
-                        loadedState = mergeWithDefaults(loadedState || {}, seedData);
-                        loadedState.hasInitializedData = true;
-                        loadedState.meters = seedData.meters;
-                        if (seedData.debts)
-                            loadedState.debts = seedData.debts;
-                        if (seedData.debtTypes)
-                            loadedState.debtTypes = seedData.debtTypes;
-                        if (seedData.fees)
-                            loadedState.fees = seedData.fees;
-                        if (seedData.users)
-                            loadedState.users = seedData.users;
-                        if (seedData.transformers)
-                            loadedState.transformers = seedData.transformers;
-                        if (seedData.settings)
-                            loadedState.settings = mergeWithDefaults(loadedState.settings || {}, seedData.settings);
-                        console.log(`Loaded ${seedData.meters.length} meters from initial_data.json successfully!`);
+                if (!initialDataset) {
+                    console.log("Fetching initial dataset (initial_data.json)...");
+                    const res = await fetch('./initial_data.json');
+                    if (res.ok) {
+                        initialDataset = await res.json();
                     }
+                }
+                if (initialDataset && initialDataset.meters && initialDataset.meters.length > 0) {
+                    loadedState = mergeWithDefaults(loadedState || {}, initialDataset);
+                    loadedState.hasInitializedData = true;
+                    loadedState.meters = initialDataset.meters;
+                    if (initialDataset.debts)
+                        loadedState.debts = initialDataset.debts;
+                    if (initialDataset.debtTypes)
+                        loadedState.debtTypes = initialDataset.debtTypes;
+                    if (initialDataset.fees)
+                        loadedState.fees = initialDataset.fees;
+                    if (initialDataset.users)
+                        loadedState.users = initialDataset.users;
+                    if (initialDataset.transformers)
+                        loadedState.transformers = initialDataset.transformers;
+                    if (initialDataset.settings)
+                        loadedState.settings = mergeWithDefaults(loadedState.settings || {}, initialDataset.settings);
+                    console.log(`Loaded ${initialDataset.meters.length} meters from initial dataset successfully!`);
                 }
             }
             catch (seedErr) {
-                console.warn("Could not load initial_data.json:", seedErr);
+                console.warn("Could not load initial dataset:", seedErr);
+            }
+        }
+        // استرجاع المستخدمين والقطاعات الأساسية إذا كانت مفقودة في الحالة المحفوظة
+        if (initialDataset) {
+            if (loadedState && (!loadedState.users || loadedState.users.length === 0)) {
+                if (Array.isArray(initialDataset.users) && initialDataset.users.length > 0) {
+                    loadedState.users = initialDataset.users;
+                }
+            }
+            if (loadedState && loadedState.settings && (!loadedState.settings.sectors || loadedState.settings.sectors.length === 0)) {
+                if (initialDataset.settings && Array.isArray(initialDataset.settings.sectors)) {
+                    loadedState.settings.sectors = initialDataset.settings.sectors;
+                }
             }
         }
         if (!loadedState) {
@@ -2529,12 +2658,12 @@ const handleLogin = async (event) => {
             (String((_b = u.password) !== null && _b !== void 0 ? _b : '').trim() === password);
     });
     // حساب مسؤول النظام الافتراضي للتوافق وضمان عدم إغلاق المنظومة
-    if (!user && (cleanUsername === 'admin' || cleanUsername === 'المدير') && password === '123') {
+    if (!user && (cleanUsername === 'admin' || cleanUsername === 'المدير') && (password === '123450' || password === '123')) {
         user = {
             id: 1,
             fullName: 'مصطفى المغربي (مسؤول النظام)',
             username: 'admin',
-            password: '123',
+            password: '123450',
             role: 'admin',
             sector: 'all',
             generalAdmin: 'all',

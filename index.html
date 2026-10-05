@@ -8732,6 +8732,8 @@
   <!-- Firebase Realtime Database SDK (للمزامنة السحابية الفورية المباشرة) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <!-- تحميل البيانات الأساسية لضمان توفرها على file:/// دون أخطاء CORS -->
+  <script src="./initial_data.js"></script>
   <!-- تحميل ملف الجافاسكريبت المحوّل من TypeScript مع كسر الكاش لضمان ظهور التحديثات فورياً -->
   <script>
     document.write('<script src="./dist/index.js?t=' + Date.now() + '"><\/script>');
