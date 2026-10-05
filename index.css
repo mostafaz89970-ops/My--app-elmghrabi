@@ -4136,7 +4136,7 @@ body:has(#login-screen.active) {
     inset: 0 0 0 auto;
     width: 50%;
     content: "";
-    background-color: #f7f7fb;
+    background-color: #fff;
     background-image: url("./public/login-towers.svg");
     background-position: center;
     background-repeat: no-repeat;
