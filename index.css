@@ -3928,3 +3928,197 @@ body.dark-mode #modal-org-edit-item .form-control {
     background: rgba(15, 23, 42, 0.75) !important;
     backdrop-filter: blur(4px) !important;
 }
+
+/* Match the unified charging portal's clean, centered login layout. */
+body:has(#login-screen.active) {
+    background: #fff !important;
+    overflow: auto !important;
+}
+
+#login-screen,
+#login-screen.active {
+    position: fixed !important;
+    inset: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    padding: 24px 16px !important;
+    overflow-y: auto !important;
+    background: #fff !important;
+    box-sizing: border-box !important;
+}
+
+#login-screen .login-wrapper {
+    width: 100% !important;
+    max-width: 420px !important;
+    margin: auto !important;
+    padding: 16px 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    box-sizing: border-box !important;
+}
+
+#login-screen .main-app-title {
+    display: none !important;
+}
+
+#login-screen .login-box {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    color: #202124 !important;
+    text-align: right !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-sizing: border-box !important;
+}
+
+#login-screen .login-box-header {
+    margin: 0 0 26px !important;
+    text-align: center !important;
+}
+
+#login-screen .login-box-header h2,
+#login-screen .login-subtitle {
+    display: none !important;
+}
+
+#login-screen .logo-container-login {
+    width: 42px !important;
+    height: 42px !important;
+    margin: 0 auto 8px !important;
+}
+
+#login-screen .logo-container-login svg {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+#login-screen #login-company-name {
+    margin: 0 0 8px !important;
+    color: #25213f !important;
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+}
+
+#login-screen .login-box-header h2 {
+    margin: 0 !important;
+    color: #25213f !important;
+    font-size: 1.35rem !important;
+    font-weight: 700 !important;
+}
+
+#login-screen .login-subtitle {
+    margin: 6px 0 0 !important;
+    color: #6b7280 !important;
+    font-size: 0.9rem !important;
+}
+
+#login-screen #login-form {
+    text-align: right !important;
+}
+
+#login-screen .login-box .input-group {
+    margin: 0 0 15px !important;
+}
+
+#login-screen .login-box .input-group label {
+    display: block !important;
+    margin: 0 0 0 !important;
+    color: #29263e !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+}
+
+#login-screen .login-box .input-group select,
+#login-screen .login-box .input-group input {
+    width: 100% !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 0 12px !important;
+    color: #30313a !important;
+    background: #fff !important;
+    border: 1px solid #d5d6db !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    font-size: 0.95rem !important;
+    box-sizing: border-box !important;
+}
+
+#login-screen .login-box .input-group select:disabled {
+    color: #777982 !important;
+    background: #f7f7f8 !important;
+}
+
+#login-screen .login-box .input-group select option {
+    color: #30313a !important;
+    background: #fff !important;
+}
+
+#login-screen .login-box .input-group input:focus,
+#login-screen .login-box .input-group select:focus {
+    border-color: #49408f !important;
+    outline: 0 !important;
+    box-shadow: 0 0 0 2px rgba(73, 64, 143, 0.12) !important;
+}
+
+#login-screen #password {
+    padding-left: 44px !important;
+}
+
+#login-screen #toggle-password-visibility {
+    color: #646575 !important;
+}
+
+#login-screen .btn-login {
+    width: 100% !important;
+    min-height: 44px !important;
+    margin-top: 2px !important;
+    padding: 10px 16px !important;
+    color: #fff !important;
+    background: #40378b !important;
+    border: 1px solid #40378b !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+}
+
+#login-screen .btn-login:hover {
+    background: #332b74 !important;
+}
+
+#login-screen #login-error {
+    margin: 0 0 12px !important;
+    color: #b42318 !important;
+    background: #fff1f0 !important;
+    border-radius: 4px !important;
+}
+
+#login-screen .login-box-footer {
+    margin: 18px 0 0 !important;
+}
+
+#login-screen #login-footer-text,
+#login-screen.active #login-footer-text {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    color: #8a8b93 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    font-size: 0.75rem !important;
+    line-height: 1.5 !important;
+    pointer-events: auto !important;
+}
