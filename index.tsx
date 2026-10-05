@@ -1278,7 +1278,7 @@ const getAvailableSectors = (): string[] => {
 
     // 1. من الهيكل الإداري
     Object.keys(struct || {}).forEach(s => {
-        if (s && s !== 'all' && s !== 'الكل') set.add(s.trim());
+        if (s && s !== 'all' && s !== 'الكل' && s !== '🌐 الإدارة المركزية العامة') set.add(s.trim());
     });
 
     // 2. من إعدادات القطاعات
@@ -1309,6 +1309,18 @@ const getAvailableSectors = (): string[] => {
             if (s && s !== 'all' && s !== 'الكل') set.add(s.trim());
         });
     }
+
+    // 6. قائمة القطاعات الثابتة كـ fallback مضمون — تضمن ظهور القطاعات دائماً حتى لو كانت قاعدة البيانات فارغة
+    const fallbackSectors = [
+        'قطاع شمال المنيا',
+        'قطاع جنوب المنيا',
+        'قطاع بني سويف',
+        'قطاع الفيوم',
+        'قطاع أسيوط شمال',
+        'قطاع أسيوط جنوب',
+        'قطاع الوادي الجديد'
+    ];
+    fallbackSectors.forEach(s => set.add(s));
 
     return Array.from(set);
 };

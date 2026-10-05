@@ -3935,7 +3935,10 @@ body:has(#login-screen.active) {
     overflow: auto !important;
 }
 
-#login-screen,
+#login-screen:not(.active) {
+    display: none !important;
+}
+
 #login-screen.active {
     position: fixed !important;
     inset: 0 !important;
@@ -4123,7 +4126,6 @@ body:has(#login-screen.active) {
     pointer-events: auto !important;
 }
 
-#login-screen,
 #login-screen.active {
     justify-content: flex-end !important;
     padding: 0 !important;
