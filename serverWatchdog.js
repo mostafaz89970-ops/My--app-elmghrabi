@@ -10,7 +10,7 @@
 
 'use strict';
 
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -38,6 +38,7 @@ let serverProcess     = null;
 let restartTimestamps = [];
 let lastSessionRenew  = 0;
 let isRestarting      = false;
+let consecutiveHealthFailures = 0;
 
 // ─── تسجيل الأحداث ──────────────────────────────────────────────────────────
 function log(level, msg) {
@@ -65,7 +66,7 @@ function checkServerHealth() {
             }
         );
         req.on('error', () => resolve(false));
-        req.setTimeout(4000, () => { req.destroy(); resolve(false); });
+        req.setTimeout(15000, () => { req.destroy(); resolve(false); });
         req.end();
     });
 }
@@ -102,23 +103,6 @@ function renewSessionViaSever() {
 }
 
 
-function killPortProcesses(p) {
-    try {
-        const out = execSync(`netstat -ano | findstr :${p}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-        const lines = out.split('\n');
-        for (const line of lines) {
-            if (line.includes('LISTENING')) {
-                const parts = line.trim().split(/\s+/);
-                const pid = parts[parts.length - 1];
-                if (pid && pid !== String(process.pid) && pid !== '0') {
-                    log('INFO', `تحرير المنفذ ${p} من PID: ${pid}`);
-                    try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch (_) {}
-                }
-            }
-        }
-    } catch (_) {}
-}
-
 // ─── حماية من الـ crash loop ───────────────────────────────────────────────
 function canRestart() {
     const now = Date.now();
@@ -136,13 +120,12 @@ function canRestart() {
 function startServer() {
     if (isRestarting) return;
     if (!canRestart()) {
-        // انتظر 2 دقيقة ثم حاول مجدداً
-        killPortProcesses(PORT); restartTimestamps = []; setTimeout(startServer, 5000);
+        restartTimestamps = [];
+        setTimeout(startServer, RESTART_WINDOW_MS);
         return;
     }
 
     isRestarting = true;
-    killPortProcesses(PORT);
     log('INFO', 'جارٍ تشغيل internalCardServer.js...');
 
     serverProcess = spawn(process.execPath, [SERVER_SCRIPT], {
@@ -186,14 +169,18 @@ async function healthLoop() {
     const alive = await checkServerHealth();
 
     if (!alive) {
-        log('WARN', `السيرفر على port ${PORT} لا يستجيب — جارٍ إعادة التشغيل...`);
-        // إذا كانت العملية موجودة لكن لا تستجيب، أنهها أولاً
+        consecutiveHealthFailures += 1;
+        log('WARN', `فشل فحص صحة السيرفر (${consecutiveHealthFailures}/3).`);
+        if (consecutiveHealthFailures < 3) return;
+
+        log('WARN', `السيرفر على port ${PORT} لم يستجب لثلاثة فحوصات — جارٍ إعادة تشغيل العملية التابعة فقط...`);
         if (serverProcess) {
             try { serverProcess.kill('SIGTERM'); } catch (_) {}
-            serverProcess = null;
+        } else {
+            setTimeout(startServer, 500);
         }
-        setTimeout(startServer, 500);
     } else {
+        consecutiveHealthFailures = 0;
         restartTimestamps = []; // تصفير عداد المحاولات عند استقرار السيرفر
         // السيرفر يعمل — تحقق من الجلسة إن مضى وقت كافٍ
         const now = Date.now();

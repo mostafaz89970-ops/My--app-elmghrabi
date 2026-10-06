@@ -1006,13 +1006,8 @@
           </div>
           <div class="input-group">
             <label for="username">اسم المستخدم</label>
-            <select id="username" name="username" required="" autocomplete="off">
-              <option value="" disabled selected>-- اختر اسم المستخدم --</option>
-              <option value="admin">مصطفى المغربي (@admin) ⭐ (مسؤول)</option>
-              <option value="المدير">مصطفى المغربي (@المدير) ⭐ (مسؤول)</option>
-              <option value="Eng - MOstafaEl mghrabi">Eng - MOstafa (@Eng - MOstafaEl mghrabi) ⭐ (مسؤول)</option>
-              <option value="احمد مصطفى">احمد مصطفى مغربي (@احمد مصطفى) [هندسة كهرباء بني مزار]</option>
-              <option value="محمود رفعت">محمود رفعت ابو جرابيع (@محمود رفعت) [هندسة كهرباء بني مزار]</option>
+            <select id="username" name="username" required="" autocomplete="off" disabled>
+              <option value="" disabled selected>-- اختر القطاع والإدارة أولاً --</option>
             </select>
             <div id="login-user-affiliation" style="display: none; font-size: 0.85rem; color: #60a5fa; margin-top: 6px; font-weight: bold; background: rgba(30, 58, 138, 0.4); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(96, 165, 250, 0.3);">
               <span style="margin-left: 4px;">🏢</span>
@@ -1120,11 +1115,69 @@
             }
           };
 
+          var defaultUsers = [
+            { id: 1, fullName: 'مصطفى المغربي', username: 'admin', role: 'admin', sector: 'all', generalAdmin: 'all', subAdmin: 'all' },
+            { id: 2, fullName: 'مصطفى المغربي', username: 'المدير', role: 'admin', sector: 'all', generalAdmin: 'all', subAdmin: 'all' },
+            { id: 3, fullName: 'Eng - MOstafa', username: 'Eng - MOstafaEl mghrabi', role: 'supervisor', sector: 'all', generalAdmin: 'all', subAdmin: 'all' },
+            { id: 4, fullName: 'احمد مصطفى مغربي', username: 'احمد مصطفى', role: 'user', sector: 'قطاع شمال المنيا', generalAdmin: 'الإدارة العامة لهندسات شمال المنيا', subAdmin: 'هندسة كهرباء بني مزار' },
+            { id: 5, fullName: 'محمود رفعت ابو جرابيع', username: 'محمود رفعت', role: 'user', sector: 'قطاع شمال المنيا', generalAdmin: 'الإدارة العامة لهندسات شمال المنيا', subAdmin: 'هندسة كهرباء بني مزار' }
+          ];
+
           var secEl = document.getElementById('login-sector');
           var genEl = document.getElementById('login-general-admin');
           var subEl = document.getElementById('login-sub-admin');
+          var userEl = document.getElementById('username');
 
-          if (!secEl || !genEl || !subEl) return;
+          if (!secEl || !genEl || !subEl || !userEl) return;
+
+          function filterUsers(sVal, gVal, bVal) {
+            var all = (window.__INITIAL_DATA__ && window.__INITIAL_DATA__.users && window.__INITIAL_DATA__.users.length > 0)
+              ? window.__INITIAL_DATA__.users
+              : defaultUsers;
+
+            if (!sVal) {
+              userEl.innerHTML = '<option value="" disabled selected>-- اختر القطاع والإدارة أولاً --</option>';
+              userEl.disabled = true;
+              return;
+            }
+
+            var matched = all.filter(function(u) {
+              var uSec = (u.sector || '').trim();
+              var uGen = (u.generalAdmin || '').trim();
+              var uSub = (u.subAdmin || u.branch || '').trim();
+
+              if (sVal === 'all' || sVal === 'الكل') {
+                if (uSec !== 'all' && uSec !== 'الكل' && uSec !== '') return false;
+              } else {
+                if (uSec !== sVal) return false;
+              }
+
+              if (gVal && gVal !== 'all' && gVal !== '') {
+                if (uGen && uGen !== 'all' && uGen !== gVal) return false;
+              }
+
+              if (bVal && bVal !== 'all' && bVal !== '') {
+                if (uSub && uSub !== 'all' && uSub !== bVal) return false;
+              }
+
+              return true;
+            });
+
+            if (matched.length === 0) {
+              userEl.innerHTML = '<option value="" disabled selected>-- لا يوجد مستخدمين مسجلين في هذا القطاع / الفرع --</option>';
+              userEl.disabled = true;
+              return;
+            }
+
+            userEl.disabled = false;
+            var html = '<option value="" disabled selected>-- اختر اسم المستخدم (' + matched.length + ') --</option>';
+            matched.forEach(function(u) {
+              var badge = (u.role === 'admin' || u.username === 'admin') ? ' ⭐ (مسؤول)' : '';
+              var brTxt = (u.subAdmin || u.branch) && u.subAdmin !== 'all' ? ' [' + (u.subAdmin || u.branch) + ']' : '';
+              html += '<option value="' + u.username + '">' + (u.fullName || u.username) + ' (@' + u.username + ')' + badge + brTxt + '</option>';
+            });
+            userEl.innerHTML = html;
+          }
 
           secEl.addEventListener('change', function() {
             var sVal = secEl.value;
@@ -1134,6 +1187,7 @@
 
             if (!sVal) {
               genEl.disabled = true;
+              filterUsers('', '', '');
               return;
             }
 
@@ -1153,6 +1207,8 @@
             }
 
             genEl.disabled = false;
+            filterUsers(sVal, '', '');
+
             if (gaKeys.length === 1 && sVal !== 'all') {
               genEl.value = gaKeys[0];
               genEl.dispatchEvent(new Event('change'));
@@ -1166,6 +1222,7 @@
 
             if (!gVal) {
               subEl.disabled = true;
+              filterUsers(sVal, '', '');
               return;
             }
 
@@ -1186,9 +1243,19 @@
             });
 
             subEl.disabled = false;
+            filterUsers(sVal, gVal, '');
+
             if (branches.length === 1) {
               subEl.value = branches[0];
+              subEl.dispatchEvent(new Event('change'));
             }
+          });
+
+          subEl.addEventListener('change', function() {
+            var sVal = secEl.value;
+            var gVal = genEl.value;
+            var bVal = subEl.value;
+            filterUsers(sVal, gVal, bVal);
           });
         })();
         </script>

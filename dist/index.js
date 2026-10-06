@@ -2001,25 +2001,49 @@ const populateUserDropdown = () => {
             { id: 2, fullName: 'مصطفى المغربي (المدير)', username: 'المدير', password: '123', role: 'admin', sector: 'all', generalAdmin: 'all', subAdmin: 'all' }
         ];
     }
-    // دالة تحديث قائمة المستخدمين وفقاً للتصفية الحالية مع تضمين مسؤولي النظام دائماً
+    // دالة تحديث قائمة المستخدمين وحصر كل مستخدم حصرياً في قطاعه وإدارته وفرعه المسجل
     const updateUsersDropdown = (sec, gen, sub) => {
         const curUser = usernameSelect.value;
+        // إذا لم يتم اختيار أي قطاع بعد، يتم تعطيل القائمة تماماً وعدم إظهار أي مستخدم
+        if (!sec) {
+            usernameSelect.disabled = true;
+            usernameSelect.innerHTML = '<option value="" disabled selected>-- اختر القطاع والإدارة أولاً --</option>';
+            return;
+        }
         const filtered = allUsers.filter(u => {
-            if (u.role === 'admin' || u.username === 'admin' || u.sector === 'all' || u.sector === 'الكل' || !u.sector)
-                return true;
-            if (sec && sec !== 'all' && sec !== '' && u.sector && u.sector !== sec)
-                return false;
-            if (gen && gen !== 'all' && gen !== '' && u.generalAdmin && u.generalAdmin !== 'all' && u.generalAdmin !== gen)
-                return false;
+            const uSec = (u.sector || '').trim();
+            const uGen = (u.generalAdmin || '').trim();
+            const uSub = (u.subAdmin || u.branch || '').trim();
+            // 1. فحص القطاع بدقة تامة
+            if (sec === 'all' || sec === 'الكل') {
+                // العرض العام يقتصر على أصحاب الصلاحية العامة (الإدارة المركزية)
+                if (uSec !== 'all' && uSec !== 'الكل' && uSec !== '')
+                    return false;
+            }
+            else {
+                // قطاع محدد: يجب أن يطابق المستخدم تماماً هذا القطاع
+                if (uSec !== sec)
+                    return false;
+            }
+            // 2. فحص الإدارة العامة (إذا تم اختيار إدارة محددة)
+            if (gen && gen !== 'all' && gen !== '') {
+                if (uGen && uGen !== 'all' && uGen !== gen)
+                    return false;
+            }
+            // 3. فحص الفرع / الهندسة (إذا تم اختيار فرع أو هندسة محددة)
             if (sub && sub !== 'all' && sub !== '') {
-                const uSub = u.subAdmin || u.branch;
                 if (uSub && uSub !== 'all' && uSub !== sub)
                     return false;
             }
             return true;
         });
+        if (filtered.length === 0) {
+            usernameSelect.disabled = true;
+            usernameSelect.innerHTML = '<option value="" disabled selected>-- لا يوجد مستخدمين مسجلين في هذا القطاع / الفرع --</option>';
+            return;
+        }
         usernameSelect.disabled = false;
-        let html = '<option value="" disabled selected>-- اختر اسم المستخدم --</option>';
+        let html = '<option value="" disabled selected>-- اختر اسم المستخدم (' + filtered.length + ') --</option>';
         filtered.sort((a, b) => {
             if (a.role === 'admin' && b.role !== 'admin')
                 return -1;

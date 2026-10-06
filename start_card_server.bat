@@ -1,38 +1,46 @@
 @echo off
-setlocal EnableDelayedExpansion
-title منظومة العدادات 2025 - خدمة الكروت
+setlocal
+chcp 65001 >nul
 cd /d "%~dp0"
 
-:: ─── فحص Node.js ────────────────────────────────────────────────────────────
-where node >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] Node.js غير موجود. يرجى تثبيته اولا.
+set "NODE_EXE="
+for /f "delims=" %%N in ('where node.exe 2^>nul') do if not defined NODE_EXE set "NODE_EXE=%%N"
+if not defined NODE_EXE (
+    echo [ERROR] Node.js is not installed or is not available in PATH.
+    echo Install Node.js LTS, then run this file again.
     pause
     exit /b 1
 )
 
-:: ─── تحقق من عدم وجود نسخة اخرى تعمل ──────────────────────────────────────
-for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":5002.*LISTENING"') do (
-    set "existPid=%%a"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-RestMethod 'http://127.0.0.1:5002/api/status' -TimeoutSec 2; if ($r.success) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+if errorlevel 1 (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-NetTCPConnection -State Listen -LocalPort 5002 -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }" >nul 2>&1
+    if errorlevel 1 (
+        echo [ERROR] Port 5002 is occupied by another application. No process was stopped.
+        pause
+        exit /b 1
+    )
+    echo Starting the local reports server...
+    start "" /min "%NODE_EXE%" "%~dp0serverWatchdog.js"
+) else (
+    echo The local reports server is already running.
 )
-if defined existPid (
-    echo [INFO] الخدمة تعمل بالفعل على port 5002 ^(PID: !existPid!^)
-    echo [INFO] لا حاجة لإعادة التشغيل.
-    goto :end
+
+set /a "ATTEMPTS=0"
+:wait_for_server
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-RestMethod 'http://127.0.0.1:5002/api/status' -TimeoutSec 2; if ($r.success) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+if not errorlevel 1 goto server_ready
+set /a "ATTEMPTS+=1"
+if %ATTEMPTS% GEQ 15 (
+    echo [ERROR] The reports server did not start. Check watchdog.log for details.
+    pause
+    exit /b 1
 )
+timeout /t 1 /nobreak >nul
+goto wait_for_server
 
-:: ─── تشغيل الـ Watchdog (يدير السيرفر ويراقبه) ──────────────────────────────
-echo ═══════════════════════════════════════════════════
-echo   منظومة العدادات 2025 — خدمة الكروت الذكية
-echo   الـ Watchdog يبدأ ويراقب السيرفر تلقائياً
-echo ═══════════════════════════════════════════════════
-echo.
-
-:: تشغيل Watchdog في نافذة مخفية (لا تزعج المستخدم)
-start "" /B /MIN node "%~dp0serverWatchdog.js"
-
-echo [OK] خدمة الكروت والمراقبة بدأت بنجاح في الخلفية.
-echo.
-
-:end
+:server_ready
+echo [OK] The local reports server is ready at http://127.0.0.1:5002
+start "" "https://mostafaz89970-ops.github.io/My--app-elmghrabi/"
 endlocal
+exit /b 0

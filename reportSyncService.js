@@ -21,7 +21,7 @@ async function fetchMeedcoDailySales(dateStr) {
     const unifiedClient = require('./unifiedCardClient');
 
     try {
-        const token = await unifiedClient.ensureValidSession();
+        let token = await unifiedClient.ensureValidSession();
         const cfg = unifiedClient.getMeedcoConfig();
 
         const fromDate = `${dateStr}T00:00:00.000Z`;
@@ -56,27 +56,29 @@ async function fetchMeedcoDailySales(dateStr) {
             publicAdminIdsOnCharge: null
         });
 
-        const options = {
-            hostname: 'report-api-prod.meedco.cyuni.net',
-            port: 443,
-            path: '/ChargingReports/TotalSalesUserExcel',
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(payload),
-                'Origin': 'https://report-prod.meedco.cyuni.net',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-            },
-            rejectUnauthorized: false
-        };
-
-        const excelBuffer = await new Promise((resolve, reject) => {
-            const req = https.request(options, (res) => {
+        const fetchReport = (authToken) => new Promise((resolve, reject) => {
+            const req = https.request({
+                hostname: 'report-api-prod.meedco.cyuni.net',
+                port: 443,
+                path: '/ChargingReports/TotalSalesUserExcel',
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + authToken,
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(payload),
+                    'Origin': 'https://report-prod.meedco.cyuni.net',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+                },
+                rejectUnauthorized: false
+            }, (res) => {
                 if (res.statusCode !== 200) {
                     let errBody = '';
                     res.on('data', d => errBody += d);
-                    res.on('end', () => reject(new Error(`MEEDCO HTTP ${res.statusCode}: ${errBody}`)));
+                    res.on('end', () => {
+                        const error = new Error(`MEEDCO HTTP ${res.statusCode}: ${errBody}`);
+                        error.statusCode = res.statusCode;
+                        reject(error);
+                    });
                     return;
                 }
                 const chunks = [];
@@ -87,6 +89,16 @@ async function fetchMeedcoDailySales(dateStr) {
             req.write(payload);
             req.end();
         });
+
+        let excelBuffer;
+        try {
+            excelBuffer = await fetchReport(token);
+        } catch (err) {
+            if (err.statusCode !== 401) throw err;
+            console.warn(`[ReportSync] MEEDCO rejected the session for ${dateStr}; refreshing once.`);
+            token = await unifiedClient.refreshMeedcoSession();
+            excelBuffer = await fetchReport(token);
+        }
 
         const tempExcelPath = path.join(CACHE_DIR, `temp_meedco_${dateStr}_${Date.now()}.xlsx`);
         fs.writeFileSync(tempExcelPath, excelBuffer);
@@ -199,6 +211,7 @@ async function fetchMaasaraDailySales(dateStr, toDateStr = null) {
         try {
             const liveRaw = JSON.parse(fs.readFileSync(liveCacheFile, 'utf8'));
             if (liveRaw && Array.isArray(liveRaw.users) && liveRaw.users.length > 0) {
+                liveRaw.isCached = true;
                 // Normalize: live cache uses amount/count, standard expects totalAmount/rechargesCount
                 liveRaw.users = liveRaw.users.map(u => ({
                     ...u,
@@ -330,7 +343,9 @@ async function fetchMaasaraDailySales(dateStr, toDateStr = null) {
 
     if (fs.existsSync(cacheFile)) {
         try {
-            return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+            const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+            cached.isCached = true;
+            return cached;
         } catch (e) {}
     }
     return { success: true, connected: false, totalUsers: 0, totalRecharges: 0, totalAmount: 0, users: [] };
@@ -550,6 +565,19 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
         }
     }
 
+    const sourceWarnings = [
+        { source: 'MEEDCO', data: meedcoData },
+        { source: 'المعصرة', data: maasaraData },
+        { source: 'إسكرا', data: iskraData }
+    ].flatMap(({ source, data }) => {
+        if (!data || data.success === false || data.connected === false) {
+            return [{ source, date: dateStr, message: data?.error || 'تعذر الاتصال المباشر بالمنظومة' }];
+        }
+        return data.isCached
+            ? [{ source, date: dateStr, message: 'تم استخدام بيانات محفوظة؛ لم يكتمل التحديث المباشر' }]
+            : [];
+    });
+
     return {
         date: dateStr,
         userName: targetUserName,
@@ -559,7 +587,8 @@ async function getUserDailyPrograms(dateStr, targetUserName) {
         totalAmount: Math.round((meedcoAmount + maasaraAmount + iskraAmount) * 100) / 100,
         totalCount: meedcoCount + maasaraCount + iskraCount,
         meedcoItems: meedcoItems,
-        maasaraItems: maasaraItems
+        maasaraItems: maasaraItems,
+        sourceWarnings
     };
 }
 
@@ -616,6 +645,18 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
             fetchMaasaraDailySales(d)
         ]);
         return { date: d, meedco: meedcoRes, iskra: iskraRes, maasara: maasaraRes };
+    }));
+    const sourceWarnings = dayResults.flatMap(day => [
+        { source: 'MEEDCO', data: day.meedco },
+        { source: 'المعصرة', data: day.maasara },
+        { source: 'إسكرا', data: day.iskra }
+    ].flatMap(({ source, data }) => {
+        if (!data || data.success === false || data.connected === false) {
+            return [{ source, date: day.date, message: data?.error || 'تعذر الاتصال المباشر بالمنظومة' }];
+        }
+        return data.isCached
+            ? [{ source, date: day.date, message: 'تم استخدام بيانات محفوظة؛ لم يكتمل التحديث المباشر' }]
+            : [];
     }));
 
     // قراءة كافة الحافظات المحفوظة ضمن الفترة
@@ -781,6 +822,7 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
         toDate: toDateStr,
         branch: branchFilter || 'all',
         cachedAt: new Date().toISOString(),
+        sourceWarnings,
         summary: {
             totalUsersCount: userList.length,
             grandMeedcoAmount: Math.round(grandMeedcoAmount * 100) / 100,

@@ -6,11 +6,29 @@ const WebSocket = require('ws');
 const WS_URL = 'ws://127.0.0.1:5001/v1';
 const MEEDCO_API_HOST = 'api-prod.meedco.cyuni.net';
 const MEEDCO_APP_ORIGIN = 'https://app-prod.meedco.cyuni.net';
+const MEEDCO_REPORT_API_HOST = 'report-api-prod.meedco.cyuni.net';
+const MEEDCO_REPORT_APP_ORIGIN = 'https://report-prod.meedco.cyuni.net';
 
 // Cached tokens in memory
 let cachedAuthToken = null;
 let cachedUcsToken = null;
 let lastUcsTokenTime = 0;
+let reportSessionManaged = false;
+let reportSessionCredentials = null;
+let reportSessionGeneration = 0;
+
+function clearReportSession() {
+    reportSessionGeneration += 1;
+    reportSessionManaged = true;
+    reportSessionCredentials = null;
+    cachedAuthToken = null;
+    cachedUcsToken = null;
+    lastUcsTokenTime = 0;
+    lastMeedcoRefreshAt = 0;
+    lastMeedcoRefreshToken = null;
+    lastMeedcoRefreshError = null;
+    lastMeedcoRefreshGeneration = -1;
+}
 
 
 // --- Direct MEEDCO Live Authentication & Auto-Renewal ---
@@ -45,6 +63,24 @@ function saveMeedcoConfig(cfg) {
 }
 
 async function loginMeedcoLive(credentials = {}) {
+    const transient = credentials.transient === true;
+    if (!credentials.sessionRefresh) {
+        reportSessionGeneration += 1;
+        lastMeedcoRefreshAt = 0;
+        lastMeedcoRefreshToken = null;
+        lastMeedcoRefreshError = null;
+    }
+    if (transient) {
+        reportSessionManaged = true;
+        reportSessionCredentials = null;
+        cachedAuthToken = null;
+        cachedUcsToken = null;
+        lastUcsTokenTime = 0;
+    } else {
+        reportSessionManaged = false;
+        reportSessionCredentials = null;
+    }
+
     const cfg = getMeedcoConfig();
     const username = (credentials.username !== undefined ? credentials.username : cfg.username) || "سناء عبدالستار عبدالعزيز";
     const password = (credentials.password !== undefined ? credentials.password : cfg.password) || "";
@@ -66,10 +102,12 @@ async function loginMeedcoLive(credentials = {}) {
         password,
         IPAddress: '127.0.0.1'
     });
+    const loginApiHost = transient ? MEEDCO_REPORT_API_HOST : MEEDCO_API_HOST;
+    const loginAppOrigin = transient ? MEEDCO_REPORT_APP_ORIGIN : MEEDCO_APP_ORIGIN;
 
     return new Promise((resolve) => {
         const req = https.request({
-            hostname: MEEDCO_API_HOST,
+            hostname: loginApiHost,
             port: 443,
             path: '/Accounts/login',
             method: 'POST',
@@ -77,7 +115,7 @@ async function loginMeedcoLive(credentials = {}) {
             headers: {
                 'Content-Type': 'application/json; charset=utf-8',
                 'Content-Length': Buffer.byteLength(payload),
-                'Origin': MEEDCO_APP_ORIGIN,
+                'Origin': loginAppOrigin,
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
             }
         }, (res) => {
@@ -89,24 +127,40 @@ async function loginMeedcoLive(credentials = {}) {
                     if (parsed && parsed.data && parsed.data.token) {
                         cachedAuthToken = parsed.data.token;
                         cachedUcsToken = null; // force fresh UCS token
-                        fs.writeFileSync(path.join(__dirname, '.session_token'), cachedAuthToken, 'utf8');
-                        
-                        cfg.saved = credentials.remember !== false;
-                        cfg.username = username;
-                        if (credentials.remember !== false) {
-                            cfg.password = password;
-                        }
-                        cfg.sectorId = sectorId;
-                        cfg.publicAdminId = publicAdministrationId;
-                        cfg.subAdminId = subAdministrationId;
-                        cfg.rechargeCenterId = rechargeCenterId;
-                        cfg.lastLogin = new Date().toISOString();
-                        cfg.userName = parsed.data.userName || username;
-                        saveMeedcoConfig(cfg);
 
-                        try {
-                            await getUcsToken(true);
-                        } catch (uErr) {}
+                        if (transient) {
+                            reportSessionCredentials = {
+                                username,
+                                password,
+                                sectorId,
+                                publicAdminId: publicAdministrationId,
+                                subAdminId: subAdministrationId,
+                                rechargeCenterId,
+                                remember: false,
+                                transient: true
+                            };
+                        } else {
+                            fs.writeFileSync(path.join(__dirname, '.session_token'), cachedAuthToken, 'utf8');
+
+                            cfg.saved = credentials.remember !== false;
+                            cfg.username = username;
+                            if (credentials.remember !== false) {
+                                cfg.password = password;
+                            }
+                            cfg.sectorId = sectorId;
+                            cfg.publicAdminId = publicAdministrationId;
+                            cfg.subAdminId = subAdministrationId;
+                            cfg.rechargeCenterId = rechargeCenterId;
+                            cfg.lastLogin = new Date().toISOString();
+                            cfg.userName = parsed.data.userName || username;
+                            saveMeedcoConfig(cfg);
+                        }
+
+                        if (!transient) {
+                            try {
+                                await getUcsToken(true);
+                            } catch (uErr) {}
+                        }
 
                         resolve({
                             success: true,
@@ -145,8 +199,81 @@ async function loginMeedcoLive(credentials = {}) {
     });
 }
 
+let meedcoRefreshPromise = null;
+let lastMeedcoRefreshAt = 0;
+let lastMeedcoRefreshToken = null;
+let lastMeedcoRefreshError = null;
+let lastMeedcoRefreshGeneration = -1;
+let meedcoRefreshPromiseGeneration = -1;
+async function refreshMeedcoSession() {
+    const generation = reportSessionGeneration;
+    if (lastMeedcoRefreshGeneration === generation && Date.now() - lastMeedcoRefreshAt < 60_000) {
+        if (lastMeedcoRefreshError) throw lastMeedcoRefreshError;
+        if (lastMeedcoRefreshToken) return lastMeedcoRefreshToken;
+    }
+    if (!meedcoRefreshPromise || meedcoRefreshPromiseGeneration !== generation) {
+        meedcoRefreshPromiseGeneration = generation;
+        const credentials = reportSessionCredentials
+            ? { ...reportSessionCredentials, sessionRefresh: true }
+            : { sessionRefresh: true };
+        const refreshPromise = (async () => {
+            const result = await loginMeedcoLive(credentials);
+            if (!result.success || !result.data?.token) {
+                throw new Error(result.message || 'تعذر تجديد جلسة MEEDCO');
+            }
+            return result.data.token;
+        })().then(token => {
+            if (generation === reportSessionGeneration) {
+                lastMeedcoRefreshAt = Date.now();
+                lastMeedcoRefreshToken = token;
+                lastMeedcoRefreshError = null;
+                lastMeedcoRefreshGeneration = generation;
+            }
+            return token;
+        }).catch(err => {
+            if (generation === reportSessionGeneration) {
+                lastMeedcoRefreshAt = Date.now();
+                lastMeedcoRefreshToken = null;
+                lastMeedcoRefreshError = err;
+                lastMeedcoRefreshGeneration = generation;
+            }
+            throw err;
+        });
+        meedcoRefreshPromise = refreshPromise;
+        const clearRefreshPromise = () => {
+            if (meedcoRefreshPromise === refreshPromise) {
+                meedcoRefreshPromise = null;
+                meedcoRefreshPromiseGeneration = -1;
+            }
+        };
+        refreshPromise.then(clearRefreshPromise, clearRefreshPromise);
+    }
+    return meedcoRefreshPromise;
+}
+
+
 let isReloggingIn = false;
 async function ensureValidSession(force = false) {
+    if (reportSessionManaged) {
+        if (!cachedAuthToken) {
+            if (!reportSessionCredentials) {
+                throw new Error('سجّل الدخول إلى MEEDCO من حساب الموظف أولاً لعرض التقارير.');
+            }
+            return refreshMeedcoSession();
+        }
+
+        try {
+            const parts = cachedAuthToken.split('.');
+            if (parts.length === 3) {
+                const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+                const exp = payload.exp ? payload.exp * 1000 : 0;
+                if (!exp || exp > Date.now()) return cachedAuthToken;
+            }
+        } catch (_) {}
+
+        return refreshMeedcoSession();
+    }
+
     if (isReloggingIn) {
         await new Promise(resolve => setTimeout(resolve, 2000));
         return cachedAuthToken;
@@ -294,6 +421,8 @@ function getActiveAuthToken() {
         } catch (_) {}
         return 0;
     }
+
+    if (reportSessionManaged) return cachedAuthToken;
 
     // 1. Try to read latest token directly from Chrome LevelDB (most fresh)
     let chromeToken = null;
@@ -3084,6 +3213,8 @@ module.exports = {
     createDebtLive,
     calculateConsumptionPoundsLive,
     loginMeedcoLive,
+    refreshMeedcoSession,
+    clearReportSession,
     getMeedcoStatus,
     getMeedcoHierarchyLive,
     ensureValidSession,
