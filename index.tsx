@@ -5161,17 +5161,22 @@ const handleLogin = async (event: Event) => {
 
         if (mainContent) mainContent.style.display = 'block';
 
-        document.querySelectorAll('.content-section.active').forEach(section => section.classList.remove('active'));
+        // تنظيف وإخفاء جميع الأقسام والشاشات نهائياً لضمان عدم ظهور أي صفحة أخرى أسفل لوحة التحكم
+        document.querySelectorAll('.content-section').forEach(section => {
+            section.classList.remove('active');
+            (section as HTMLElement).style.display = 'none';
+            (section as HTMLElement).style.removeProperty('display');
+        });
         const dashboard = document.getElementById('dashboard');
         if (dashboard) {
             dashboard.classList.add('active');
-            dashboard.style.removeProperty('display');
+            dashboard.style.display = 'block';
         }
 
         document.querySelectorAll('.sidebar-nav .nav-link.active').forEach(link => link.classList.remove('active'));
         document.querySelector('.sidebar-nav .nav-link[data-target="dashboard"]')?.classList.add('active');
 
-        setPageTitle(state.settings?.companyName || 'ELMAGHRABI');
+        setPageTitle(state.settings?.companyName || 'ELMGHRABI');
 
         window.requestAnimationFrame(() => renderDashboard());
         window.setTimeout(() => renderDashboard(), 100);
@@ -5196,6 +5201,12 @@ const handleLogout = () => {
     loggedInUser = null;
     localStorage.removeItem('currentUser');
     localStorage.removeItem('lastActiveSection');
+    // تنظيف جميع الأقسام النشطة عند الخروج
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.remove('active');
+        (section as HTMLElement).style.display = 'none';
+        (section as HTMLElement).style.removeProperty('display');
+    });
     showScreen('login-screen');
     populateUserDropdown(); // Repopulate in case users changed
 };
@@ -65811,8 +65822,9 @@ const setupOrgHierarchyEvents = () => {
 
 
         // Show active section
-        document.querySelectorAll('.content-section.active').forEach(section => {
+        document.querySelectorAll('.content-section').forEach(section => {
             section.classList.remove('active');
+            (section as HTMLElement).style.display = 'none';
             (section as HTMLElement).style.removeProperty('display');
         });
 
@@ -66684,6 +66696,7 @@ const setupOrgHierarchyEvents = () => {
     document.getElementById('login-form')?.addEventListener('submit', handleLogin);
 
         document.getElementById('header-logout-btn')?.addEventListener('click', handleLogout);
+        document.getElementById('sidebar-logout-btn')?.addEventListener('click', handleLogout);
 
         // مستمعات شريط تبديل النطاق (القطاع، الإدارة العامة، والفرع) للأدمن
 

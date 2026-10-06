@@ -2769,15 +2769,20 @@ const handleLogin = async (event) => {
         }
         if (mainContent)
             mainContent.style.display = 'block';
-        document.querySelectorAll('.content-section.active').forEach(section => section.classList.remove('active'));
+        // تنظيف وإخفاء جميع الأقسام والشاشات نهائياً لضمان عدم ظهور أي صفحة أخرى أسفل لوحة التحكم
+        document.querySelectorAll('.content-section').forEach(section => {
+            section.classList.remove('active');
+            section.style.display = 'none';
+            section.style.removeProperty('display');
+        });
         const dashboard = document.getElementById('dashboard');
         if (dashboard) {
             dashboard.classList.add('active');
-            dashboard.style.removeProperty('display');
+            dashboard.style.display = 'block';
         }
         document.querySelectorAll('.sidebar-nav .nav-link.active').forEach(link => link.classList.remove('active'));
         (_b = document.querySelector('.sidebar-nav .nav-link[data-target="dashboard"]')) === null || _b === void 0 ? void 0 : _b.classList.add('active');
-        setPageTitle(((_c = state.settings) === null || _c === void 0 ? void 0 : _c.companyName) || 'ELMAGHRABI');
+        setPageTitle(((_c = state.settings) === null || _c === void 0 ? void 0 : _c.companyName) || 'ELMGHRABI');
         window.requestAnimationFrame(() => renderDashboard());
         window.setTimeout(() => renderDashboard(), 100);
         showToast(`مرحباً بك ${user.fullName || user.username}، تم تسجيل الدخول بنجاح!`, 'success');
@@ -2799,6 +2804,12 @@ const handleLogout = () => {
     loggedInUser = null;
     localStorage.removeItem('currentUser');
     localStorage.removeItem('lastActiveSection');
+    // تنظيف جميع الأقسام النشطة عند الخروج
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.remove('active');
+        section.style.display = 'none';
+        section.style.removeProperty('display');
+    });
     showScreen('login-screen');
     populateUserDropdown(); // Repopulate in case users changed
 };
@@ -40103,8 +40114,9 @@ function handleNavigation(event) {
     const sidebarLink = document.querySelector(`.sidebar-nav .nav-link[data-target="${targetId}"]`);
     sidebarLink === null || sidebarLink === void 0 ? void 0 : sidebarLink.classList.add('active');
     // Show active section
-    document.querySelectorAll('.content-section.active').forEach(section => {
+    document.querySelectorAll('.content-section').forEach(section => {
         section.classList.remove('active');
+        section.style.display = 'none';
         section.style.removeProperty('display');
     });
     // Always clear and empty fields if leaving meter-movements section
@@ -40415,7 +40427,7 @@ function handleNavigation(event) {
  */
 const setupEventListeners = () => {
     // Welcome Screen Listeners
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119, _120, _121, _122, _123, _124, _125, _126, _127, _128, _129, _130, _131, _132, _133, _134, _135, _136, _137, _138, _139, _140, _141, _142, _143, _144, _145;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119, _120, _121, _122, _123, _124, _125, _126, _127, _128, _129, _130, _131, _132, _133, _134, _135, _136, _137, _138, _139, _140, _141, _142, _143, _144, _145, _146;
     (_a = document.getElementById('start-new-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', handleStartNew);
     (_b = document.getElementById('import-from-welcome-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleImportFromWelcome);
     // ================= Treasury Event Listeners =================
@@ -40596,8 +40608,9 @@ const setupEventListeners = () => {
     });
     (_2 = document.getElementById('login-form')) === null || _2 === void 0 ? void 0 : _2.addEventListener('submit', handleLogin);
     (_3 = document.getElementById('header-logout-btn')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', handleLogout);
+    (_4 = document.getElementById('sidebar-logout-btn')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', handleLogout);
     // مستمعات شريط تبديل النطاق (القطاع، الإدارة العامة، والفرع) للأدمن
-    (_4 = document.getElementById('scope-sector-select')) === null || _4 === void 0 ? void 0 : _4.addEventListener('change', (e) => {
+    (_5 = document.getElementById('scope-sector-select')) === null || _5 === void 0 ? void 0 : _5.addEventListener('change', (e) => {
         currentAdminScopeSector = e.target.value;
         currentAdminScopeGeneralAdmin = 'all';
         currentAdminScopeBranch = 'all';
@@ -40605,14 +40618,14 @@ const setupEventListeners = () => {
         refreshCurrentActiveSection();
         showToast(`تم تبديل عرض القطاع: ${currentAdminScopeSector === 'all' ? 'جميع القطاعات' : currentAdminScopeSector}`, 'info');
     });
-    (_5 = document.getElementById('scope-general-admin-select')) === null || _5 === void 0 ? void 0 : _5.addEventListener('change', (e) => {
+    (_6 = document.getElementById('scope-general-admin-select')) === null || _6 === void 0 ? void 0 : _6.addEventListener('change', (e) => {
         currentAdminScopeGeneralAdmin = e.target.value;
         currentAdminScopeBranch = 'all';
         updateAdminScopeUI();
         refreshCurrentActiveSection();
         showToast(`تم تبديل عرض الإدارة العامة: ${currentAdminScopeGeneralAdmin === 'all' ? 'جميع الإدارات العامة' : currentAdminScopeGeneralAdmin}`, 'info');
     });
-    (_6 = document.getElementById('scope-branch-select')) === null || _6 === void 0 ? void 0 : _6.addEventListener('change', (e) => {
+    (_7 = document.getElementById('scope-branch-select')) === null || _7 === void 0 ? void 0 : _7.addEventListener('change', (e) => {
         currentAdminScopeBranch = e.target.value;
         refreshCurrentActiveSection();
         showToast(`تم تبديل عرض الإدارة الفرعية: ${currentAdminScopeBranch === 'all' ? 'جميع الإدارات الفرعية' : currentAdminScopeBranch}`, 'info');
@@ -40622,31 +40635,31 @@ const setupEventListeners = () => {
         link.addEventListener('click', handleNavigation);
     });
     // Meter Management Listeners
-    (_7 = document.getElementById('add-meter-record-btn')) === null || _7 === void 0 ? void 0 : _7.addEventListener('click', () => openMeterForm());
-    (_8 = document.getElementById('meter-form')) === null || _8 === void 0 ? void 0 : _8.addEventListener('submit', handleMeterFormSubmit);
-    (_9 = document.getElementById('meterType')) === null || _9 === void 0 ? void 0 : _9.addEventListener('change', () => updateMeterFormVisibility());
-    (_10 = document.getElementById('sidebar-add-mukaysa-btn')) === null || _10 === void 0 ? void 0 : _10.addEventListener('click', (e) => { e.preventDefault(); openMukayasatForm(); });
-    (_11 = document.getElementById('mukayasat-form')) === null || _11 === void 0 ? void 0 : _11.addEventListener('submit', handleMukayasatFormSubmit);
-    (_12 = document.getElementById('print-mukayasa-btn')) === null || _12 === void 0 ? void 0 : _12.addEventListener('click', handlePrintMukayasaDetails);
+    (_8 = document.getElementById('add-meter-record-btn')) === null || _8 === void 0 ? void 0 : _8.addEventListener('click', () => openMeterForm());
+    (_9 = document.getElementById('meter-form')) === null || _9 === void 0 ? void 0 : _9.addEventListener('submit', handleMeterFormSubmit);
+    (_10 = document.getElementById('meterType')) === null || _10 === void 0 ? void 0 : _10.addEventListener('change', () => updateMeterFormVisibility());
+    (_11 = document.getElementById('sidebar-add-mukaysa-btn')) === null || _11 === void 0 ? void 0 : _11.addEventListener('click', (e) => { e.preventDefault(); openMukayasatForm(); });
+    (_12 = document.getElementById('mukayasat-form')) === null || _12 === void 0 ? void 0 : _12.addEventListener('submit', handleMukayasatFormSubmit);
+    (_13 = document.getElementById('print-mukayasa-btn')) === null || _13 === void 0 ? void 0 : _13.addEventListener('click', handlePrintMukayasaDetails);
     // Transformer Management Listeners
-    (_13 = document.getElementById('transformer-form')) === null || _13 === void 0 ? void 0 : _13.addEventListener('submit', handleTransformerRegistrationSubmit);
-    (_14 = document.getElementById('transformer-query-form')) === null || _14 === void 0 ? void 0 : _14.addEventListener('submit', handleTransformerQuerySearch);
-    (_15 = document.getElementById('transformer-load-form')) === null || _15 === void 0 ? void 0 : _15.addEventListener('submit', handleTransformerLoadSubmit);
-    (_16 = document.getElementById('transformer-load-name')) === null || _16 === void 0 ? void 0 : _16.addEventListener('change', handleTransformerLoadNameChange);
+    (_14 = document.getElementById('transformer-form')) === null || _14 === void 0 ? void 0 : _14.addEventListener('submit', handleTransformerRegistrationSubmit);
+    (_15 = document.getElementById('transformer-query-form')) === null || _15 === void 0 ? void 0 : _15.addEventListener('submit', handleTransformerQuerySearch);
+    (_16 = document.getElementById('transformer-load-form')) === null || _16 === void 0 ? void 0 : _16.addEventListener('submit', handleTransformerLoadSubmit);
+    (_17 = document.getElementById('transformer-load-name')) === null || _17 === void 0 ? void 0 : _17.addEventListener('change', handleTransformerLoadNameChange);
     initializeTransformerLoadRecordFilters();
     ['transformer-load-capacity', 'transformer-load-s1-r', 'transformer-load-s1-s', 'transformer-load-s1-t', 'transformer-load-s2-r', 'transformer-load-s2-s', 'transformer-load-s2-t', 'transformer-load-s3-r', 'transformer-load-s3-s', 'transformer-load-s3-t', 'transformer-load-s4-r', 'transformer-load-s4-s', 'transformer-load-s4-t', 'transformer-load-streets-r', 'transformer-load-streets-s', 'transformer-load-streets-t'].forEach((id) => {
         const element = document.getElementById(id);
         element === null || element === void 0 ? void 0 : element.addEventListener('input', calculateTransformerLoadAutoValues);
     });
-    (_17 = document.getElementById('print-transformers-list-btn')) === null || _17 === void 0 ? void 0 : _17.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
-    (_18 = document.getElementById('export-transformers-excel-btn')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', handleExportTransformersExcel);
-    (_19 = document.getElementById('import-transformers-excel-trigger')) === null || _19 === void 0 ? void 0 : _19.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_20 = document.getElementById('transformers-excel-upload')) === null || _20 === void 0 ? void 0 : _20.addEventListener('change', handleImportTransformersExcel);
-    (_21 = document.getElementById('transfer-selected-transformers-btn')) === null || _21 === void 0 ? void 0 : _21.addEventListener('click', handleOpenTransferSelectedTransformersModal);
-    (_22 = document.getElementById('btn-confirm-transfer-transformers')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', handleConfirmTransferTransformers);
-    (_23 = document.getElementById('delete-scope-transformers-btn')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', handleOpenBulkDeleteScopeModal);
-    (_24 = document.getElementById('btn-confirm-delete-scope-transformers')) === null || _24 === void 0 ? void 0 : _24.addEventListener('click', handleConfirmBulkDeleteScopeTransformers);
-    (_25 = document.getElementById('delete-selected-transformers-btn')) === null || _25 === void 0 ? void 0 : _25.addEventListener('click', handleDeleteSelectedTransformers);
+    (_18 = document.getElementById('print-transformers-list-btn')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
+    (_19 = document.getElementById('export-transformers-excel-btn')) === null || _19 === void 0 ? void 0 : _19.addEventListener('click', handleExportTransformersExcel);
+    (_20 = document.getElementById('import-transformers-excel-trigger')) === null || _20 === void 0 ? void 0 : _20.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_21 = document.getElementById('transformers-excel-upload')) === null || _21 === void 0 ? void 0 : _21.addEventListener('change', handleImportTransformersExcel);
+    (_22 = document.getElementById('transfer-selected-transformers-btn')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', handleOpenTransferSelectedTransformersModal);
+    (_23 = document.getElementById('btn-confirm-transfer-transformers')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', handleConfirmTransferTransformers);
+    (_24 = document.getElementById('delete-scope-transformers-btn')) === null || _24 === void 0 ? void 0 : _24.addEventListener('click', handleOpenBulkDeleteScopeModal);
+    (_25 = document.getElementById('btn-confirm-delete-scope-transformers')) === null || _25 === void 0 ? void 0 : _25.addEventListener('click', handleConfirmBulkDeleteScopeTransformers);
+    (_26 = document.getElementById('delete-selected-transformers-btn')) === null || _26 === void 0 ? void 0 : _26.addEventListener('click', handleDeleteSelectedTransformers);
     // Close modal buttons for transformer transfer and bulk delete modals
     document.querySelectorAll('#modal-transfer-transformers .close-modal, #modal-bulk-delete-transformers .close-modal').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -40660,18 +40673,18 @@ const setupEventListeners = () => {
         var _a;
         (_a = document.getElementById(id)) === null || _a === void 0 ? void 0 : _a.addEventListener('input', () => renderTransformerListSection());
     });
-    (_26 = document.getElementById('select-all-transformers')) === null || _26 === void 0 ? void 0 : _26.addEventListener('change', (e) => {
+    (_27 = document.getElementById('select-all-transformers')) === null || _27 === void 0 ? void 0 : _27.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
         document.querySelectorAll('.transformer-row-checkbox').forEach(cb => cb.checked = isChecked);
     });
-    (_27 = document.getElementById('print-installation-details-btn')) === null || _27 === void 0 ? void 0 : _27.addEventListener('click', handlePrintInstallationDetails);
-    (_28 = document.getElementById('clear-mukayasa-form-btn')) === null || _28 === void 0 ? void 0 : _28.addEventListener('click', handleClearMukayasaForm);
+    (_28 = document.getElementById('print-installation-details-btn')) === null || _28 === void 0 ? void 0 : _28.addEventListener('click', handlePrintInstallationDetails);
+    (_29 = document.getElementById('clear-mukayasa-form-btn')) === null || _29 === void 0 ? void 0 : _29.addEventListener('click', handleClearMukayasaForm);
     // Judicial Control Listeners
-    (_29 = document.getElementById('print-judicial-control-btn')) === null || _29 === void 0 ? void 0 : _29.addEventListener('click', handlePrintJudicialControlDetails);
-    (_30 = document.getElementById('judicial-control-form')) === null || _30 === void 0 ? void 0 : _30.addEventListener('submit', handleJudicialControlFormSubmit);
+    (_30 = document.getElementById('print-judicial-control-btn')) === null || _30 === void 0 ? void 0 : _30.addEventListener('click', handlePrintJudicialControlDetails);
+    (_31 = document.getElementById('judicial-control-form')) === null || _31 === void 0 ? void 0 : _31.addEventListener('submit', handleJudicialControlFormSubmit);
     // Judicial Control Filter Listeners
-    (_31 = document.getElementById('add-zinat-btn')) === null || _31 === void 0 ? void 0 : _31.addEventListener('click', openZinatForm);
-    (_32 = document.getElementById('zinat-form')) === null || _32 === void 0 ? void 0 : _32.addEventListener('submit', handleZinatFormSubmit);
+    (_32 = document.getElementById('add-zinat-btn')) === null || _32 === void 0 ? void 0 : _32.addEventListener('click', openZinatForm);
+    (_33 = document.getElementById('zinat-form')) === null || _33 === void 0 ? void 0 : _33.addEventListener('submit', handleZinatFormSubmit);
     const zinatFilterForm = document.getElementById('zinat-collection-filter-form');
     zinatFilterForm === null || zinatFilterForm === void 0 ? void 0 : zinatFilterForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -40681,12 +40694,12 @@ const setupEventListeners = () => {
         setTimeout(() => renderZinatCollectionSection(), 0);
     });
     // Print List Buttons
-    (_33 = document.getElementById('print-lost-memos-list-btn')) === null || _33 === void 0 ? void 0 : _33.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
-    (_34 = document.getElementById('print-judicial-control-list-btn')) === null || _34 === void 0 ? void 0 : _34.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
-    (_35 = document.getElementById('print-collection-judicial-btn')) === null || _35 === void 0 ? void 0 : _35.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
-    (_36 = document.getElementById('print-collection-zinat-btn')) === null || _36 === void 0 ? void 0 : _36.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
+    (_34 = document.getElementById('print-lost-memos-list-btn')) === null || _34 === void 0 ? void 0 : _34.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
+    (_35 = document.getElementById('print-judicial-control-list-btn')) === null || _35 === void 0 ? void 0 : _35.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
+    (_36 = document.getElementById('print-collection-judicial-btn')) === null || _36 === void 0 ? void 0 : _36.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
+    (_37 = document.getElementById('print-collection-zinat-btn')) === null || _37 === void 0 ? void 0 : _37.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
     // Judicial Collection Filter Listener
-    (_37 = document.getElementById('judicial-collection-filter-form')) === null || _37 === void 0 ? void 0 : _37.addEventListener('input', () => {
+    (_38 = document.getElementById('judicial-collection-filter-form')) === null || _38 === void 0 ? void 0 : _38.addEventListener('input', () => {
         renderJudicialCollectionSection();
     });
     // Judicial Control Filter Listeners
@@ -40703,9 +40716,9 @@ const setupEventListeners = () => {
         setTimeout(() => applyAndRenderJudicialControlList(), 0); // Use timeout to allow form to reset first
     });
     // Lost Memo Listeners
-    (_38 = document.getElementById('add-lost-memo-btn')) === null || _38 === void 0 ? void 0 : _38.addEventListener('click', () => openLostMemoForm());
-    (_39 = document.getElementById('lost-memo-form')) === null || _39 === void 0 ? void 0 : _39.addEventListener('submit', handleLostMemoFormSubmit);
-    (_40 = document.getElementById('print-lost-memo-btn')) === null || _40 === void 0 ? void 0 : _40.addEventListener('click', handlePrintLostMemo);
+    (_39 = document.getElementById('add-lost-memo-btn')) === null || _39 === void 0 ? void 0 : _39.addEventListener('click', () => openLostMemoForm());
+    (_40 = document.getElementById('lost-memo-form')) === null || _40 === void 0 ? void 0 : _40.addEventListener('submit', handleLostMemoFormSubmit);
+    (_41 = document.getElementById('print-lost-memo-btn')) === null || _41 === void 0 ? void 0 : _41.addEventListener('click', handlePrintLostMemo);
     const mukSearchForm = document.getElementById('mukayasat-search-form');
     mukSearchForm === null || mukSearchForm === void 0 ? void 0 : mukSearchForm.addEventListener('submit', handleMukayasatSearch);
     if (mukSearchForm) {
@@ -40717,7 +40730,7 @@ const setupEventListeners = () => {
             handleGoBack();
         }
     });
-    (_41 = document.getElementById('meters-table-filter')) === null || _41 === void 0 ? void 0 : _41.addEventListener('input', (e) => {
+    (_42 = document.getElementById('meters-table-filter')) === null || _42 === void 0 ? void 0 : _42.addEventListener('input', (e) => {
         const filterValue = e.target.value.toLowerCase();
         const table = document.getElementById('meters-table');
         filterTable(table, filterValue);
@@ -40745,10 +40758,10 @@ const setupEventListeners = () => {
             });
         }
     });
-    (_42 = document.getElementById('btn-search-subscribers-all')) === null || _42 === void 0 ? void 0 : _42.addEventListener('click', handleAllSubscribersSearch);
-    (_43 = document.getElementById('btn-reset-subscribers-all')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', handleResetAllSubscribersSearch);
-    (_44 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', handleDeleteSelectedSubscribersAll);
-    (_45 = document.getElementById('subscriberType')) === null || _45 === void 0 ? void 0 : _45.addEventListener('change', (e) => {
+    (_43 = document.getElementById('btn-search-subscribers-all')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', handleAllSubscribersSearch);
+    (_44 = document.getElementById('btn-reset-subscribers-all')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', handleResetAllSubscribersSearch);
+    (_45 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _45 === void 0 ? void 0 : _45.addEventListener('click', handleDeleteSelectedSubscribersAll);
+    (_46 = document.getElementById('subscriberType')) === null || _46 === void 0 ? void 0 : _46.addEventListener('change', (e) => {
         var _a;
         const select = e.target;
         const isSearchMode = !((_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.contains('hidden'));
@@ -40767,30 +40780,30 @@ const setupEventListeners = () => {
         updateMeterFormVisibility();
     });
     // Subscriber Statement Listener (الاستعلام عن مشترك)
-    (_46 = document.getElementById('subscriber-statement-form')) === null || _46 === void 0 ? void 0 : _46.addEventListener('submit', (e) => {
+    (_47 = document.getElementById('subscriber-statement-form')) === null || _47 === void 0 ? void 0 : _47.addEventListener('submit', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
-    (_47 = document.getElementById('statement-search-btn')) === null || _47 === void 0 ? void 0 : _47.addEventListener('click', (e) => {
+    (_48 = document.getElementById('statement-search-btn')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
     // قراءة الكارت الذكي
-    (_48 = document.getElementById('statement-read-card-btn')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', (e) => {
+    (_49 = document.getElementById('statement-read-card-btn')) === null || _49 === void 0 ? void 0 : _49.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadSmartCard();
     });
-    (_49 = document.getElementById('smart-card-close-btn')) === null || _49 === void 0 ? void 0 : _49.addEventListener('click', () => {
+    (_50 = document.getElementById('smart-card-close-btn')) === null || _50 === void 0 ? void 0 : _50.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_50 = document.getElementById('smart-card-close-x-btn')) === null || _50 === void 0 ? void 0 : _50.addEventListener('click', () => {
+    (_51 = document.getElementById('smart-card-close-x-btn')) === null || _51 === void 0 ? void 0 : _51.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_51 = document.getElementById('smart-card-search-now-btn')) === null || _51 === void 0 ? void 0 : _51.addEventListener('click', () => {
+    (_52 = document.getElementById('smart-card-search-now-btn')) === null || _52 === void 0 ? void 0 : _52.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
@@ -40799,7 +40812,7 @@ const setupEventListeners = () => {
     // كروت التحكم (Control Cards Event Listeners)
     // مسح كارت التحكم
     // إغلاق نافذة نجاح تحديث كارت التحكم
-    (_52 = document.getElementById('btn-close-renewed-dialog')) === null || _52 === void 0 ? void 0 : _52.addEventListener('click', () => {
+    (_53 = document.getElementById('btn-close-renewed-dialog')) === null || _53 === void 0 ? void 0 : _53.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-renew-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -40811,7 +40824,7 @@ const setupEventListeners = () => {
             clearControlCardUI();
     });
     // قراءة الكارت يدوياً من داخل نافذة التحديث في حال رغب المستخدم
-    (_53 = document.getElementById('btn-manual-read-after-renew')) === null || _53 === void 0 ? void 0 : _53.addEventListener('click', () => {
+    (_54 = document.getElementById('btn-manual-read-after-renew')) === null || _54 === void 0 ? void 0 : _54.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-renew-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -40821,12 +40834,12 @@ const setupEventListeners = () => {
         }
         handleReadControlCard();
     });
-    (_54 = document.getElementById('btn-clear-control-card')) === null || _54 === void 0 ? void 0 : _54.addEventListener('click', (e) => {
+    (_55 = document.getElementById('btn-clear-control-card')) === null || _55 === void 0 ? void 0 : _55.addEventListener('click', (e) => {
         e.preventDefault();
         handleClearControlCard();
     });
     // زر الرجوع من تفاصيل كارت التحكم
-    (_55 = document.getElementById('btn-back-to-read-control')) === null || _55 === void 0 ? void 0 : _55.addEventListener('click', (e) => {
+    (_56 = document.getElementById('btn-back-to-read-control')) === null || _56 === void 0 ? void 0 : _56.addEventListener('click', (e) => {
         e.preventDefault();
         navigateToSection('read-control-card');
     });
@@ -40851,7 +40864,7 @@ const setupEventListeners = () => {
         });
     });
     // كارت تحكم متقدم
-    (_56 = document.getElementById('btn-adv-ctrl-search')) === null || _56 === void 0 ? void 0 : _56.addEventListener('click', () => {
+    (_57 = document.getElementById('btn-adv-ctrl-search')) === null || _57 === void 0 ? void 0 : _57.addEventListener('click', () => {
         var _a;
         const query = (_a = document.getElementById('adv-ctrl-search-input')) === null || _a === void 0 ? void 0 : _a.value.trim();
         if (!query) {
@@ -40870,7 +40883,7 @@ const setupEventListeners = () => {
             showToast('لم يتم العثور على مشترك بهذا الكود أو الرقم.', 'error');
         }
     });
-    (_57 = document.getElementById('btn-adv-ctrl-read-card')) === null || _57 === void 0 ? void 0 : _57.addEventListener('click', async () => {
+    (_58 = document.getElementById('btn-adv-ctrl-read-card')) === null || _58 === void 0 ? void 0 : _58.addEventListener('click', async () => {
         showToast('جاري قراءة كارت التحكم المتقدم...');
         await handleReadControlCard();
         if (currentControlCardData) {
@@ -40879,27 +40892,27 @@ const setupEventListeners = () => {
             showToast('تم استيراد بيانات الكارت بنجاح!', 'success');
         }
     });
-    (_58 = document.getElementById('advanced-control-card-form')) === null || _58 === void 0 ? void 0 : _58.addEventListener('submit', (e) => {
+    (_59 = document.getElementById('advanced-control-card-form')) === null || _59 === void 0 ? void 0 : _59.addEventListener('submit', (e) => {
         e.preventDefault();
         showToast('تمت كتابة وتجهيز كارت التحكم المتقدم بنجاح!', 'success');
     });
-    (_59 = document.getElementById('btn-adv-ctrl-clear')) === null || _59 === void 0 ? void 0 : _59.addEventListener('click', () => {
+    (_60 = document.getElementById('btn-adv-ctrl-clear')) === null || _60 === void 0 ? void 0 : _60.addEventListener('click', () => {
         handleClearControlCard();
     });
     // كارت تجميع فني
-    (_60 = document.getElementById('btn-read-tech-collect-card')) === null || _60 === void 0 ? void 0 : _60.addEventListener('click', (e) => {
+    (_61 = document.getElementById('btn-read-tech-collect-card')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadTechCollectCard();
     });
-    (_61 = document.getElementById('btn-renew-tech-collect-card')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', (e) => {
+    (_62 = document.getElementById('btn-renew-tech-collect-card')) === null || _62 === void 0 ? void 0 : _62.addEventListener('click', (e) => {
         e.preventDefault();
         handleRenewTechCollectCard();
     });
-    (_62 = document.getElementById('btn-back-to-tech-collect')) === null || _62 === void 0 ? void 0 : _62.addEventListener('click', (e) => {
+    (_63 = document.getElementById('btn-back-to-tech-collect')) === null || _63 === void 0 ? void 0 : _63.addEventListener('click', (e) => {
         e.preventDefault();
         navigateToSection('tech-collect-card');
     });
-    (_63 = document.getElementById('tc-meters-filter')) === null || _63 === void 0 ? void 0 : _63.addEventListener('input', (e) => {
+    (_64 = document.getElementById('tc-meters-filter')) === null || _64 === void 0 ? void 0 : _64.addEventListener('input', (e) => {
         const term = e.target.value.trim().toLowerCase();
         const rows = document.querySelectorAll('#tech-collect-meters-tbody tr');
         rows.forEach(r => {
@@ -40928,7 +40941,7 @@ const setupEventListeners = () => {
                 targetTc.style.display = 'block';
         });
     });
-    (_64 = document.getElementById('select-detail-meter')) === null || _64 === void 0 ? void 0 : _64.addEventListener('change', (e) => {
+    (_65 = document.getElementById('select-detail-meter')) === null || _65 === void 0 ? void 0 : _65.addEventListener('change', (e) => {
         const mNum = e.target.value;
         if (!mNum)
             return;
@@ -40937,7 +40950,7 @@ const setupEventListeners = () => {
             renderControlCardDetailsSection(match);
         }
     });
-    (_65 = document.getElementById('btn-show-meter-statement')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', () => {
+    (_66 = document.getElementById('btn-show-meter-statement')) === null || _66 === void 0 ? void 0 : _66.addEventListener('click', () => {
         if (selectedControlMeterDetail) {
             const mNum = selectedControlMeterDetail.meterNumber || selectedControlMeterDetail.meterId;
             if (mNum) {
@@ -40953,29 +40966,29 @@ const setupEventListeners = () => {
             showToast('يرجى اختيار عداد أولاً لعرض كشف حسابه.', 'warning');
         }
     });
-    (_66 = document.getElementById('btn-read-control-card')) === null || _66 === void 0 ? void 0 : _66.addEventListener('click', (e) => {
+    (_67 = document.getElementById('btn-read-control-card')) === null || _67 === void 0 ? void 0 : _67.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadControlCard();
     });
-    (_67 = document.getElementById('btn-renew-control-card')) === null || _67 === void 0 ? void 0 : _67.addEventListener('click', (e) => {
+    (_68 = document.getElementById('btn-renew-control-card')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', (e) => {
         e.preventDefault();
         handleRenewControlCard();
     });
-    (_68 = document.getElementById('btn-print-control-card')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', (e) => {
+    (_69 = document.getElementById('btn-print-control-card')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', (e) => {
         e.preventDefault();
         handlePrintControlCardReport();
     });
-    (_69 = document.getElementById('control-card-meter-details-close')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', () => {
+    (_70 = document.getElementById('control-card-meter-details-close')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_70 = document.getElementById('control-card-meter-details-close-x')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', () => {
+    (_71 = document.getElementById('control-card-meter-details-close-x')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_71 = document.getElementById('ctrl-meters-filter')) === null || _71 === void 0 ? void 0 : _71.addEventListener('input', (e) => {
+    (_72 = document.getElementById('ctrl-meters-filter')) === null || _72 === void 0 ? void 0 : _72.addEventListener('input', (e) => {
         const term = e.target.value.trim().toLowerCase();
         const rows = document.querySelectorAll('#control-card-meters-tbody tr');
         rows.forEach(r => {
@@ -40984,15 +40997,15 @@ const setupEventListeners = () => {
             r.style.display = text.includes(term) ? '' : 'none';
         });
     });
-    (_72 = document.getElementById('issue-control-card-form')) === null || _72 === void 0 ? void 0 : _72.addEventListener('submit', (e) => {
+    (_73 = document.getElementById('issue-control-card-form')) === null || _73 === void 0 ? void 0 : _73.addEventListener('submit', (e) => {
         e.preventDefault();
         handleIssueControlCard(e);
     });
-    (_73 = document.getElementById('issue-meter-company')) === null || _73 === void 0 ? void 0 : _73.addEventListener('change', (e) => {
+    (_74 = document.getElementById('issue-meter-company')) === null || _74 === void 0 ? void 0 : _74.addEventListener('change', (e) => {
         const val = e.target.value;
         handleCompanyChange(val);
     });
-    (_74 = document.getElementById('issue-technician')) === null || _74 === void 0 ? void 0 : _74.addEventListener('change', (e) => {
+    (_75 = document.getElementById('issue-technician')) === null || _75 === void 0 ? void 0 : _75.addEventListener('change', (e) => {
         const sel = e.target;
         const opt = sel.options[sel.selectedIndex];
         const codeInput = document.getElementById('issue-tech-code');
@@ -41000,7 +41013,7 @@ const setupEventListeners = () => {
             codeInput.value = (opt === null || opt === void 0 ? void 0 : opt.getAttribute('data-code')) || '';
         }
     });
-    (_75 = document.getElementById('issue-control-op-type')) === null || _75 === void 0 ? void 0 : _75.addEventListener('change', (e) => {
+    (_76 = document.getElementById('issue-control-op-type')) === null || _76 === void 0 ? void 0 : _76.addEventListener('change', (e) => {
         const val = e.target.value;
         const tampersWrap = document.getElementById('container-tampers');
         const manualDateWrap = document.getElementById('container-manual-date');
@@ -41009,7 +41022,7 @@ const setupEventListeners = () => {
         if (manualDateWrap)
             manualDateWrap.style.display = val === '0' ? 'block' : 'none';
     });
-    (_76 = document.getElementById('issue-control-type-meter')) === null || _76 === void 0 ? void 0 : _76.addEventListener('change', (e) => {
+    (_77 = document.getElementById('issue-control-type-meter')) === null || _77 === void 0 ? void 0 : _77.addEventListener('change', (e) => {
         const val = e.target.value;
         const singleWrap = document.getElementById('container-single-meter');
         const multiWrap = document.getElementById('container-multi-meters');
@@ -41021,7 +41034,7 @@ const setupEventListeners = () => {
         if (countWrap)
             countWrap.style.display = val === '2' ? 'block' : 'none';
     });
-    (_77 = document.getElementById('btn-add-meter-to-list')) === null || _77 === void 0 ? void 0 : _77.addEventListener('click', () => {
+    (_78 = document.getElementById('btn-add-meter-to-list')) === null || _78 === void 0 ? void 0 : _78.addEventListener('click', () => {
         const inp = document.getElementById('issue-multi-meter-input');
         const val = (inp === null || inp === void 0 ? void 0 : inp.value.trim()) || '';
         if (!val)
@@ -41035,16 +41048,16 @@ const setupEventListeners = () => {
             inp.value = '';
         renderIssuedMetersTags();
     });
-    (_78 = document.getElementById('issue-is-manual-date')) === null || _78 === void 0 ? void 0 : _78.addEventListener('change', (e) => {
+    (_79 = document.getElementById('issue-is-manual-date')) === null || _79 === void 0 ? void 0 : _79.addEventListener('change', (e) => {
         const wrap = document.getElementById('manual-date-picker-wrap');
         if (wrap)
             wrap.style.display = e.target.checked ? 'block' : 'none';
     });
-    (_79 = document.getElementById('btn-issue-card-reset')) === null || _79 === void 0 ? void 0 : _79.addEventListener('click', () => {
+    (_80 = document.getElementById('btn-issue-card-reset')) === null || _80 === void 0 ? void 0 : _80.addEventListener('click', () => {
         issuedMetersList = [];
         renderIssuedMetersTags();
     });
-    (_80 = document.getElementById('btn-close-issued-dialog')) === null || _80 === void 0 ? void 0 : _80.addEventListener('click', () => {
+    (_81 = document.getElementById('btn-close-issued-dialog')) === null || _81 === void 0 ? void 0 : _81.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -41053,7 +41066,7 @@ const setupEventListeners = () => {
                 dlg.style.display = 'none';
         }
     });
-    (_81 = document.getElementById('btn-read-issued-card-now')) === null || _81 === void 0 ? void 0 : _81.addEventListener('click', () => {
+    (_82 = document.getElementById('btn-read-issued-card-now')) === null || _82 === void 0 ? void 0 : _82.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -41088,21 +41101,21 @@ const setupEventListeners = () => {
         });
     });
     // Customer Management Listeners
-    (_82 = document.getElementById('cm-filters-form')) === null || _82 === void 0 ? void 0 : _82.addEventListener('submit', (e) => {
+    (_83 = document.getElementById('cm-filters-form')) === null || _83 === void 0 ? void 0 : _83.addEventListener('submit', (e) => {
         e.preventDefault();
         loadCustomers(1);
     });
-    (_83 = document.getElementById('btn-cm-reset')) === null || _83 === void 0 ? void 0 : _83.addEventListener('click', () => {
+    (_84 = document.getElementById('btn-cm-reset')) === null || _84 === void 0 ? void 0 : _84.addEventListener('click', () => {
         const form = document.getElementById('cm-filters-form');
         if (form)
             form.reset();
         loadCustomers(1);
     });
-    (_84 = document.getElementById('btn-cm-refresh')) === null || _84 === void 0 ? void 0 : _84.addEventListener('click', () => {
+    (_85 = document.getElementById('btn-cm-refresh')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', () => {
         loadCustomers(customerState.page);
     });
     // Open Add Customer Modal matching frame_025s
-    (_85 = document.getElementById('btn-cm-add-customer')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', () => {
+    (_86 = document.getElementById('btn-cm-add-customer')) === null || _86 === void 0 ? void 0 : _86.addEventListener('click', () => {
         const modal = document.getElementById('modal-add-customer');
         if (modal) {
             const dateInp = document.getElementById('add-cust-contract-date');
@@ -41112,7 +41125,7 @@ const setupEventListeners = () => {
         }
     });
     // Open Add Project Modal matching frame_033s
-    (_86 = document.getElementById('btn-cm-add-project')) === null || _86 === void 0 ? void 0 : _86.addEventListener('click', () => {
+    (_87 = document.getElementById('btn-cm-add-project')) === null || _87 === void 0 ? void 0 : _87.addEventListener('click', () => {
         const modal = document.getElementById('modal-add-project');
         if (modal) {
             const dateInp = document.getElementById('add-proj-date');
@@ -41122,11 +41135,11 @@ const setupEventListeners = () => {
         }
     });
     // Open Add Assay
-    (_87 = document.getElementById('btn-cm-add-assay')) === null || _87 === void 0 ? void 0 : _87.addEventListener('click', () => {
+    (_88 = document.getElementById('btn-cm-add-assay')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', () => {
         showToast('فتح شاشة تسجيل وإضافة مقايسة جديدة...');
     });
     // Check National ID button
-    (_88 = document.getElementById('btn-cust-check-id')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', () => {
+    (_89 = document.getElementById('btn-cust-check-id')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', () => {
         var _a;
         const nid = (_a = document.getElementById('add-cust-national-id')) === null || _a === void 0 ? void 0 : _a.value.trim();
         if (!nid || nid.length !== 14) {
@@ -41136,7 +41149,7 @@ const setupEventListeners = () => {
         showToast(`تم فحص الرقم القومي (${nid}) بنجاح: الرقم سليم وصالح للتسجيل ✓`, 'success');
     });
     // Save New Customer
-    (_89 = document.getElementById('btn-save-new-customer')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', async () => {
+    (_90 = document.getElementById('btn-save-new-customer')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', async () => {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
         const name = (_a = document.getElementById('add-cust-name')) === null || _a === void 0 ? void 0 : _a.value.trim();
         const meter = (_b = document.getElementById('add-cust-meter-no')) === null || _b === void 0 ? void 0 : _b.value.trim();
@@ -41186,7 +41199,7 @@ const setupEventListeners = () => {
         loadCustomers(1);
     });
     // Save New Project
-    (_90 = document.getElementById('btn-save-new-project')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', () => {
+    (_91 = document.getElementById('btn-save-new-project')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', () => {
         var _a;
         const projName = (_a = document.getElementById('add-proj-name')) === null || _a === void 0 ? void 0 : _a.value.trim();
         if (!projName) {
@@ -41198,27 +41211,27 @@ const setupEventListeners = () => {
         if (modal)
             modal.style.display = 'none';
     });
-    (_91 = document.getElementById('btn-cm-card-search')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', () => {
+    (_92 = document.getElementById('btn-cm-card-search')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', () => {
         handleCustomerCardSearch();
     });
-    (_92 = document.getElementById('cm-page-size')) === null || _92 === void 0 ? void 0 : _92.addEventListener('change', (e) => {
+    (_93 = document.getElementById('cm-page-size')) === null || _93 === void 0 ? void 0 : _93.addEventListener('change', (e) => {
         customerState.pageSize = Number(e.target.value) || 10;
         loadCustomers(1);
     });
-    (_93 = document.getElementById('cm-btn-first')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', () => {
+    (_94 = document.getElementById('cm-btn-first')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(1);
     });
-    (_94 = document.getElementById('cm-btn-prev')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', () => {
+    (_95 = document.getElementById('cm-btn-prev')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(customerState.page - 1);
     });
-    (_95 = document.getElementById('cm-btn-next')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', () => {
+    (_96 = document.getElementById('cm-btn-next')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(customerState.page + 1);
     });
-    (_96 = document.getElementById('cm-btn-last')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', () => {
+    (_97 = document.getElementById('cm-btn-last')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(totalPages);
@@ -41339,10 +41352,10 @@ const setupEventListeners = () => {
             }
         }
     });
-    (_97 = document.getElementById('save-details-btn')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', handleSaveDetails);
-    (_98 = document.getElementById('delete-subscriber-btn')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', handleDeleteSubscriber);
-    (_99 = document.getElementById('details-meterType')) === null || _99 === void 0 ? void 0 : _99.addEventListener('change', () => updateMeterFormVisibility('details-'));
-    (_100 = document.getElementById('details-subscriberType')) === null || _100 === void 0 ? void 0 : _100.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_98 = document.getElementById('save-details-btn')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', handleSaveDetails);
+    (_99 = document.getElementById('delete-subscriber-btn')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', handleDeleteSubscriber);
+    (_100 = document.getElementById('details-meterType')) === null || _100 === void 0 ? void 0 : _100.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_101 = document.getElementById('details-subscriberType')) === null || _101 === void 0 ? void 0 : _101.addEventListener('change', () => updateMeterFormVisibility('details-'));
     document.body.addEventListener('click', (event) => {
         const target = event.target;
         if (target.id === 'delete-selected-meters') {
@@ -41355,13 +41368,13 @@ const setupEventListeners = () => {
             checkboxes.forEach(checkbox => checkbox.checked = selectAllCheckbox.checked);
         }
     });
-    (_101 = document.getElementById('select-all-meters')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', (event) => {
+    (_102 = document.getElementById('select-all-meters')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', (event) => {
         const isChecked = event.target.checked;
         document.querySelectorAll('#meters-table tbody input[type="checkbox"].select-row').forEach((checkbox) => {
             checkbox.checked = isChecked;
         });
     });
-    (_102 = document.getElementById('btn-delete-by-status')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', () => {
+    (_103 = document.getElementById('btn-delete-by-status')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         const select = document.getElementById('delete-status-select');
         if (dialog && select) {
@@ -41370,12 +41383,12 @@ const setupEventListeners = () => {
             dialog.hidden = false;
         }
     });
-    (_103 = document.getElementById('delete-by-status-cancel')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', () => {
+    (_104 = document.getElementById('delete-by-status-cancel')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         if (dialog)
             dialog.hidden = true;
     });
-    (_104 = document.getElementById('delete-by-status-confirm')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', () => {
+    (_105 = document.getElementById('delete-by-status-confirm')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', () => {
         const select = document.getElementById('delete-status-select');
         const status = select.value;
         if (!status) {
@@ -41408,13 +41421,13 @@ const setupEventListeners = () => {
         showConfirmationDialog('تأكيد الحذف الجماعي', `هل أنت متأكد من حذف جميع المشتركين (${count}) الذين حالتهم "${status}"؟ لا يمكن التراجع عن هذا الإجراء.`, onConfirm);
     });
     // Repaired Meters Listeners
-    (_105 = document.getElementById('repair-search-form')) === null || _105 === void 0 ? void 0 : _105.addEventListener('submit', handleFaultyMeterSearch);
-    (_106 = document.getElementById('repair-form')) === null || _106 === void 0 ? void 0 : _106.addEventListener('submit', handleRepairFormSubmit);
-    (_107 = document.getElementById('repairStatus')) === null || _107 === void 0 ? void 0 : _107.addEventListener('change', updateRepairFormVisibility);
+    (_106 = document.getElementById('repair-search-form')) === null || _106 === void 0 ? void 0 : _106.addEventListener('submit', handleFaultyMeterSearch);
+    (_107 = document.getElementById('repair-form')) === null || _107 === void 0 ? void 0 : _107.addEventListener('submit', handleRepairFormSubmit);
+    (_108 = document.getElementById('repairStatus')) === null || _108 === void 0 ? void 0 : _108.addEventListener('change', updateRepairFormVisibility);
     // Reports Listeners
-    (_108 = document.getElementById('report-type')) === null || _108 === void 0 ? void 0 : _108.addEventListener('change', updateReportFilters);
-    (_109 = document.getElementById('report-generation-form')) === null || _109 === void 0 ? void 0 : _109.addEventListener('submit', handleGenerateReport);
-    (_110 = document.getElementById('print-report-btn')) === null || _110 === void 0 ? void 0 : _110.addEventListener('click', handlePrintReport);
+    (_109 = document.getElementById('report-type')) === null || _109 === void 0 ? void 0 : _109.addEventListener('change', updateReportFilters);
+    (_110 = document.getElementById('report-generation-form')) === null || _110 === void 0 ? void 0 : _110.addEventListener('submit', handleGenerateReport);
+    (_111 = document.getElementById('print-report-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', handlePrintReport);
     // Custom multiselect listener
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.multiselect-btn');
@@ -41465,11 +41478,11 @@ const setupEventListeners = () => {
         }
     });
     // Activity Log Listener
-    (_111 = document.getElementById('print-activity-log-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', handlePrintActivityLog);
+    (_112 = document.getElementById('print-activity-log-btn')) === null || _112 === void 0 ? void 0 : _112.addEventListener('click', handlePrintActivityLog);
     // User Management Listeners
-    (_112 = document.getElementById('user-form')) === null || _112 === void 0 ? void 0 : _112.addEventListener('submit', handleUserFormSubmit);
+    (_113 = document.getElementById('user-form')) === null || _113 === void 0 ? void 0 : _113.addEventListener('submit', handleUserFormSubmit);
     // Permissions Listeners (delegated inside render function)
-    (_113 = document.getElementById('permissions')) === null || _113 === void 0 ? void 0 : _113.addEventListener('change', (event) => {
+    (_114 = document.getElementById('permissions')) === null || _114 === void 0 ? void 0 : _114.addEventListener('change', (event) => {
         const target = event.target;
         if (!target.matches('input[type="checkbox"]'))
             return;
@@ -41483,32 +41496,32 @@ const setupEventListeners = () => {
             handlePermissionChange(event);
     });
     // Settings Listeners
-    (_114 = document.getElementById('export-backup-btn')) === null || _114 === void 0 ? void 0 : _114.addEventListener('click', handleExportBackup);
-    (_115 = document.getElementById('import-backup-btn')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', () => handleImportBackup());
-    (_116 = document.getElementById('export-csv-btn')) === null || _116 === void 0 ? void 0 : _116.addEventListener('click', handleExportCSV);
-    (_117 = document.getElementById('save-report-settings-btn')) === null || _117 === void 0 ? void 0 : _117.addEventListener('click', handleSaveReportSettings);
-    (_118 = document.getElementById('form-lifting-unit-delivery')) === null || _118 === void 0 ? void 0 : _118.addEventListener('submit', handleLiftingDeliverySubmit);
-    (_119 = document.getElementById('btn-cancel-lifting-delivery')) === null || _119 === void 0 ? void 0 : _119.addEventListener('click', handleCancelLiftingDelivery);
-    (_120 = document.getElementById('save-company-report-settings-btn')) === null || _120 === void 0 ? void 0 : _120.addEventListener('click', handleSaveCompanyReportSettings);
+    (_115 = document.getElementById('export-backup-btn')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', handleExportBackup);
+    (_116 = document.getElementById('import-backup-btn')) === null || _116 === void 0 ? void 0 : _116.addEventListener('click', () => handleImportBackup());
+    (_117 = document.getElementById('export-csv-btn')) === null || _117 === void 0 ? void 0 : _117.addEventListener('click', handleExportCSV);
+    (_118 = document.getElementById('save-report-settings-btn')) === null || _118 === void 0 ? void 0 : _118.addEventListener('click', handleSaveReportSettings);
+    (_119 = document.getElementById('form-lifting-unit-delivery')) === null || _119 === void 0 ? void 0 : _119.addEventListener('submit', handleLiftingDeliverySubmit);
+    (_120 = document.getElementById('btn-cancel-lifting-delivery')) === null || _120 === void 0 ? void 0 : _120.addEventListener('click', handleCancelLiftingDelivery);
+    (_121 = document.getElementById('save-company-report-settings-btn')) === null || _121 === void 0 ? void 0 : _121.addEventListener('click', handleSaveCompanyReportSettings);
     // مستمعات أحداث الطلبات قيد الانتظار
-    (_121 = document.getElementById('add-area-dialog-confirm-btn')) === null || _121 === void 0 ? void 0 : _121.addEventListener('click', confirmAddPendingArea);
-    (_122 = document.getElementById('add-area-dialog-cancel-btn')) === null || _122 === void 0 ? void 0 : _122.addEventListener('click', hideAddPendingAreaDialog);
-    (_123 = document.getElementById('add-pending-area-dialog')) === null || _123 === void 0 ? void 0 : _123.addEventListener('click', (event) => {
+    (_122 = document.getElementById('add-area-dialog-confirm-btn')) === null || _122 === void 0 ? void 0 : _122.addEventListener('click', confirmAddPendingArea);
+    (_123 = document.getElementById('add-area-dialog-cancel-btn')) === null || _123 === void 0 ? void 0 : _123.addEventListener('click', hideAddPendingAreaDialog);
+    (_124 = document.getElementById('add-pending-area-dialog')) === null || _124 === void 0 ? void 0 : _124.addEventListener('click', (event) => {
         if (event.target === document.getElementById('add-pending-area-dialog')) {
             hideAddPendingAreaDialog();
         }
     });
-    (_124 = document.getElementById('import-pending-excel-trigger-btn')) === null || _124 === void 0 ? void 0 : _124.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_125 = document.getElementById('pending-excel-upload')) === null || _125 === void 0 ? void 0 : _125.addEventListener('change', handleImportPendingExcel);
-    (_126 = document.getElementById('print-pending-requests-btn')) === null || _126 === void 0 ? void 0 : _126.addEventListener('click', handlePrintPendingRequests);
-    (_127 = document.getElementById('export-pending-excel-btn')) === null || _127 === void 0 ? void 0 : _127.addEventListener('click', handleExportPendingRequestsToExcel);
+    (_125 = document.getElementById('import-pending-excel-trigger-btn')) === null || _125 === void 0 ? void 0 : _125.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_126 = document.getElementById('pending-excel-upload')) === null || _126 === void 0 ? void 0 : _126.addEventListener('change', handleImportPendingExcel);
+    (_127 = document.getElementById('print-pending-requests-btn')) === null || _127 === void 0 ? void 0 : _127.addEventListener('click', handlePrintPendingRequests);
+    (_128 = document.getElementById('export-pending-excel-btn')) === null || _128 === void 0 ? void 0 : _128.addEventListener('click', handleExportPendingRequestsToExcel);
     // ربط أزرار العمليات الجماعية في صفحة الانتظار
-    (_128 = document.getElementById('assign-pending-requests-btn')) === null || _128 === void 0 ? void 0 : _128.addEventListener('click', handleAssignSelectedPendingRequests);
-    (_129 = document.getElementById('move-to-mukayasat-btn')) === null || _129 === void 0 ? void 0 : _129.addEventListener('click', handleMovePendingToMukayasat);
-    (_130 = document.getElementById('mark-pending-inspected-btn')) === null || _130 === void 0 ? void 0 : _130.addEventListener('click', handleMarkSelectedPendingInspected);
-    (_131 = document.getElementById('print-pending-inspection-btn')) === null || _131 === void 0 ? void 0 : _131.addEventListener('click', handlePrintSelectedPendingInspections);
-    (_132 = document.getElementById('delete-selected-pending-btn')) === null || _132 === void 0 ? void 0 : _132.addEventListener('click', handleDeleteSelectedPendingRequests);
-    (_133 = document.getElementById('add-pending-address-tab-btn')) === null || _133 === void 0 ? void 0 : _133.addEventListener('click', handleAddNewPendingAddressTab);
+    (_129 = document.getElementById('assign-pending-requests-btn')) === null || _129 === void 0 ? void 0 : _129.addEventListener('click', handleAssignSelectedPendingRequests);
+    (_130 = document.getElementById('move-to-mukayasat-btn')) === null || _130 === void 0 ? void 0 : _130.addEventListener('click', handleMovePendingToMukayasat);
+    (_131 = document.getElementById('mark-pending-inspected-btn')) === null || _131 === void 0 ? void 0 : _131.addEventListener('click', handleMarkSelectedPendingInspected);
+    (_132 = document.getElementById('print-pending-inspection-btn')) === null || _132 === void 0 ? void 0 : _132.addEventListener('click', handlePrintSelectedPendingInspections);
+    (_133 = document.getElementById('delete-selected-pending-btn')) === null || _133 === void 0 ? void 0 : _133.addEventListener('click', handleDeleteSelectedPendingRequests);
+    (_134 = document.getElementById('add-pending-address-tab-btn')) === null || _134 === void 0 ? void 0 : _134.addEventListener('click', handleAddNewPendingAddressTab);
     const pendingFilters = document.getElementById('pending-filters');
     if (pendingFilters) {
         const resetPending = () => { currentPendingPage = 1; pendingSelectedRequests = []; renderPendingRequestsSection(); };
@@ -41748,7 +41761,7 @@ const setupEventListeners = () => {
         });
     }
     // Company Logo Settings Listeners
-    (_134 = document.getElementById('developer-image-password-cancel')) === null || _134 === void 0 ? void 0 : _134.addEventListener('click', () => {
+    (_135 = document.getElementById('developer-image-password-cancel')) === null || _135 === void 0 ? void 0 : _135.addEventListener('click', () => {
         const dialog = document.getElementById('developer-image-password-dialog');
         const input = document.getElementById('developer-image-password');
         dialog === null || dialog === void 0 ? void 0 : dialog.setAttribute('hidden', '');
@@ -41756,7 +41769,7 @@ const setupEventListeners = () => {
             input.value = '';
         developerImagePasswordCallback = null;
     });
-    (_135 = document.getElementById('developer-image-password-confirm')) === null || _135 === void 0 ? void 0 : _135.addEventListener('click', () => {
+    (_136 = document.getElementById('developer-image-password-confirm')) === null || _136 === void 0 ? void 0 : _136.addEventListener('click', () => {
         const input = document.getElementById('developer-image-password');
         const error = document.getElementById('developer-image-password-error');
         const dialog = document.getElementById('developer-image-password-dialog');
@@ -41772,18 +41785,18 @@ const setupEventListeners = () => {
         input.value = '';
         callback === null || callback === void 0 ? void 0 : callback();
     });
-    (_136 = document.getElementById('upload-logo-btn')) === null || _136 === void 0 ? void 0 : _136.addEventListener('click', () => {
+    (_137 = document.getElementById('upload-logo-btn')) === null || _137 === void 0 ? void 0 : _137.addEventListener('click', () => {
         var _a;
         (_a = document.getElementById('logo-upload-input')) === null || _a === void 0 ? void 0 : _a.click();
     });
-    (_137 = document.getElementById('remove-logo-btn')) === null || _137 === void 0 ? void 0 : _137.addEventListener('click', () => {
+    (_138 = document.getElementById('remove-logo-btn')) === null || _138 === void 0 ? void 0 : _138.addEventListener('click', () => {
         state.settings.companyLogo = null;
         saveState();
         updateUI();
         renderSettingsSection(); // To update the preview
         showToast('تمت إزالة الشعار بنجاح.');
     });
-    (_138 = document.getElementById('logo-upload-input')) === null || _138 === void 0 ? void 0 : _138.addEventListener('change', (event) => {
+    (_139 = document.getElementById('logo-upload-input')) === null || _139 === void 0 ? void 0 : _139.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -41807,10 +41820,10 @@ const setupEventListeners = () => {
         };
         reader.readAsDataURL(file);
     });
-    (_139 = document.getElementById('upload-developer-image-btn')) === null || _139 === void 0 ? void 0 : _139.addEventListener('click', () => {
+    (_140 = document.getElementById('upload-developer-image-btn')) === null || _140 === void 0 ? void 0 : _140.addEventListener('click', () => {
         requestDeveloperImagePassword(() => { var _a; return (_a = document.getElementById('developer-image-upload-input')) === null || _a === void 0 ? void 0 : _a.click(); });
     });
-    (_140 = document.getElementById('remove-developer-image-btn')) === null || _140 === void 0 ? void 0 : _140.addEventListener('click', () => {
+    (_141 = document.getElementById('remove-developer-image-btn')) === null || _141 === void 0 ? void 0 : _141.addEventListener('click', () => {
         requestDeveloperImagePassword(() => {
             state.settings.developerImage = null;
             saveState();
@@ -41819,7 +41832,7 @@ const setupEventListeners = () => {
             showToast('تمت إزالة صورة المطور بنجاح.');
         });
     });
-    (_141 = document.getElementById('developer-image-upload-input')) === null || _141 === void 0 ? void 0 : _141.addEventListener('change', (event) => {
+    (_142 = document.getElementById('developer-image-upload-input')) === null || _142 === void 0 ? void 0 : _142.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -41840,7 +41853,7 @@ const setupEventListeners = () => {
         reader.onerror = () => showToast('حدث خطأ أثناء قراءة صورة المطور.', 'error');
         reader.readAsDataURL(file);
     });
-    (_142 = document.getElementById('logo-size-slider')) === null || _142 === void 0 ? void 0 : _142.addEventListener('input', (event) => {
+    (_143 = document.getElementById('logo-size-slider')) === null || _143 === void 0 ? void 0 : _143.addEventListener('input', (event) => {
         const slider = event.target;
         const newSize = parseInt(slider.value, 10);
         const valueDisplay = document.getElementById('logo-size-value');
@@ -41865,12 +41878,12 @@ const setupEventListeners = () => {
 
         `;
         addressContainer.insertBefore(bulkActions, addressContainer.querySelector('ul'));
-        (_143 = document.getElementById('btn-select-all-addresses')) === null || _143 === void 0 ? void 0 : _143.addEventListener('click', () => {
+        (_144 = document.getElementById('btn-select-all-addresses')) === null || _144 === void 0 ? void 0 : _144.addEventListener('click', () => {
             const cbs = document.querySelectorAll('.address-bulk-checkbox');
             const allSelected = Array.from(cbs).every(cb => cb.checked);
             cbs.forEach(cb => cb.checked = !allSelected);
         });
-        (_144 = document.getElementById('btn-delete-selected-addresses')) === null || _144 === void 0 ? void 0 : _144.addEventListener('click', () => {
+        (_145 = document.getElementById('btn-delete-selected-addresses')) === null || _145 === void 0 ? void 0 : _145.addEventListener('click', () => {
             const selected = Array.from(document.querySelectorAll('.address-bulk-checkbox:checked'));
             if (selected.length === 0)
                 return showToast('يرجى تحديد عناوين أولاً', 'error');
@@ -41940,7 +41953,7 @@ const setupEventListeners = () => {
         }, { passive: true });
     };
     initMobileAdaptation();
-    (_145 = document.getElementById('sidebar-toggle')) === null || _145 === void 0 ? void 0 : _145.addEventListener('click', () => {
+    (_146 = document.getElementById('sidebar-toggle')) === null || _146 === void 0 ? void 0 : _146.addEventListener('click', () => {
         document.body.classList.toggle('sidebar-collapsed');
     });
     // Accordion behavior for sidebar categories: when one <details> opens, close the others

@@ -966,12 +966,7 @@
         <h2 class="main-app-title">المنظومة الموحدة لادارة العدادات 2025</h2>
         <div class="login-box">
         <div class="login-box-header">
-          <div class="logo-container logo-container-login">
-            <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="30" cy="30" r="25" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
-              <text x="30" y="35" text-anchor="middle" font-size="10" fill="white" font-family="Arial, sans-serif" font-weight="bold">ELM</text>
-            </svg>
-          </div>
+          <div class="login-system-title">المنظومة الموحدة</div>
           <h1 id="login-company-name">ELMGHRABI</h1>
           <h2>تسجيل الدخول</h2>
           <p class="login-subtitle">مرحباً بعودتك! يرجى إدخال بياناتك.</p>
@@ -1495,6 +1490,10 @@
                 <small id="sidebar-user-role">Admin</small>
               </div>
             </div>
+            <button id="sidebar-logout-btn" class="btn" style="width: 100%; margin-top: 8px; background-color: #dc3545; color: white; padding: 6px 12px; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 6px;" title="تسجيل الخروج">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                تسجيل الخروج
+            </button>
           </div>
         </footer>
     </aside>
@@ -1511,33 +1510,33 @@
             </div>
         </div>
         <div class="header-brand">
-            <h3 id="header-company-name">ELMAGHRABI</h3>
+            <h3 id="header-company-name">ELMGHRABI</h3>
         </div>
-        <div class="header-actions" style="margin-right: auto; padding-left: 1rem; display: flex; align-items: center; gap: 10px;">
-            
 
-            <!-- أداة تبديل نطاق الفروع والقطاعات للأدمن والمديرين -->
-            <div id="admin-scope-container" style="display: none; align-items: center; gap: 6px; background: rgba(241, 245, 249, 0.95); padding: 4px 10px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                <span style="font-size: 0.82rem; font-weight: bold; color: #1e293b; display: flex; align-items: center; gap: 4px;">
-                    <span>🏢</span>
-                    <span>النطاق:</span>
-                </span>
-                <select id="scope-sector-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
-                    <option value="all">🌐 جميع القطاعات</option>
-                </select>
-                <select id="scope-general-admin-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
-                    <option value="all">🏢 جميع الإدارات العامة</option>
-                </select>
-                <select id="scope-branch-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
-                    <option value="all">🏛️ جميع الإدارات الفرعية / الهندسات</option>
-                </select>
-            </div>
-
-            <!-- شارة نطاق عمل المستخدم العادي -->
-            <div id="user-branch-badge" style="display: none; align-items: center; gap: 6px; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: bold;">
+        <!-- أداة تبديل نطاق الفروع والقطاعات للأدمن والمديرين -->
+        <div id="admin-scope-container" style="display: none; align-items: center; gap: 6px; background: rgba(241, 245, 249, 0.95); padding: 4px 10px; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <span class="scope-title" style="font-size: 0.82rem; font-weight: bold; color: #1e293b; display: flex; align-items: center; gap: 4px;">
                 <span>🏢</span>
-                <span id="user-branch-text">قطاع شمال المنيا - هندسة بني مزار</span>
-            </div>
+                <span>النطاق:</span>
+            </span>
+            <select id="scope-sector-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
+                <option value="all">🌐 جميع القطاعات</option>
+            </select>
+            <select id="scope-general-admin-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
+                <option value="all">🏢 جميع الإدارات العامة</option>
+            </select>
+            <select id="scope-branch-select" style="padding: 3px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 0.82rem; font-weight: 600; background: #fff; color: #0f172a; cursor: pointer;">
+                <option value="all">🏛️ جميع الإدارات الفرعية / الهندسات</option>
+            </select>
+        </div>
+
+        <!-- شارة نطاق عمل المستخدم العادي -->
+        <div id="user-branch-badge" style="display: none; align-items: center; gap: 6px; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: bold;">
+            <span>🏢</span>
+            <span id="user-branch-text">قطاع شمال المنيا - هندسة بني مزار</span>
+        </div>
+
+        <div class="header-actions" style="margin-right: auto; padding-left: 0.5rem; display: flex; align-items: center; gap: 6px;">
 
             <div id="cloud-sync-badge" class="cloud-sync-badge" style="display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; cursor: pointer; transition: all 0.3s ease;" title="المزامنة السحابية الفورية المباشرة">
                 <span id="cloud-sync-icon" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e;"></span>
@@ -1556,7 +1555,7 @@
             </button>
             <button id="header-logout-btn" class="btn" style="background-color: #dc3545; color: white; padding: 5px 10px; font-size: 0.9rem; display: flex; align-items: center;" title="تسجيل الخروج">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 5px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                تسجيل الخروج
+                <span class="logout-text">تسجيل الخروج</span>
             </button>
         </div>
       </header>
@@ -8980,19 +8979,19 @@
   <!-- HOTFIX: Ensure app container is hidden on logout -->
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const logoutBtn = document.getElementById('header-logout-btn');
-      if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-          // هذا الكود يعمل كإجراء وقائي لضمان إخفاء حاوية التطبيق بالكامل
-          // بعد لحظات من تنفيذ منطق تسجيل الخروج الأصلي.
-          setTimeout(() => {
-            const appContainer = document.getElementById('app-container');
-            if (appContainer) {
-              appContainer.style.display = 'none';
-            }
-          }, 50); // تأخير بسيط لضمان التنفيذ بعد الكود الأصلي
-        });
-      }
+      ['header-logout-btn', 'sidebar-logout-btn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          btn.addEventListener('click', () => {
+            setTimeout(() => {
+              const appContainer = document.getElementById('app-container');
+              if (appContainer) {
+                appContainer.style.display = 'none';
+              }
+            }, 50);
+          });
+        }
+      });
     });
   </script>
 
