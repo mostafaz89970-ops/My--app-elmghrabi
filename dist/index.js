@@ -42,7 +42,7 @@ let state = {
     ],
     settings: {
         orgStructure: undefined,
-        companyName: 'ELMAGHRABI',
+        companyName: 'ELMGHRABI',
         maintenanceMode: false,
         maintenanceMessage: 'يجري حالياً إجراء صيانة دورية وتحديثات هامة على المنظومة بواسطة المطور. تم إيقاف الدخول مؤقتاً لجميع المستخدمين لضمان دقة البيانات وسلامتها.',
         companyAddress: 'قطاع شمال المنيا - هندسة كهرباء بني مزار',
@@ -2366,12 +2366,18 @@ const updateUI = () => {
         developerImage.src = state.settings.developerImage || 'https://ui-avatars.com/api/?name=Moustafa+Elmaghrabi&background=1f2937&color=fff&size=256';
     }
     // Both login and app container elements
-    const companyName = state.settings.companyName || 'ELMAGHRABI';
+    const companyName = (state.settings.companyName && state.settings.companyName !== 'ELMAGHRABI') ? state.settings.companyName : 'ELMGHRABI';
     const footerText = 'منظومة العدادات 2025 - جميع الحقوق محفوظة ELMGHRABI © 2026';
     document.title = 'منظومة العدادات 2025';
-    document.getElementById('welcome-company-name').textContent = companyName;
-    document.getElementById('login-company-name').textContent = companyName;
-    document.getElementById('sidebar-company-name').textContent = companyName;
+    const welcomeCompEl = document.getElementById('welcome-company-name');
+    if (welcomeCompEl)
+        welcomeCompEl.textContent = 'ELMGHRABI';
+    const loginCompEl = document.getElementById('login-company-name');
+    if (loginCompEl)
+        loginCompEl.textContent = 'ELMGHRABI';
+    const sidebarCompEl = document.getElementById('sidebar-company-name');
+    if (sidebarCompEl)
+        sidebarCompEl.textContent = companyName;
     // document.getElementById('header-company-name')!.textContent = companyName;
     const welcomeFooter = document.getElementById('welcome-footer-text');
     if (welcomeFooter) {

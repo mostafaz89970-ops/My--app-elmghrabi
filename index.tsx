@@ -431,7 +431,7 @@ let state = {
 
         orgStructure: undefined as Record<string, Record<string, string[]>> | undefined,
 
-        companyName: 'ELMAGHRABI',
+        companyName: 'ELMGHRABI',
 
         maintenanceMode: false,
 
@@ -4494,7 +4494,7 @@ const updateUI = () => {
 
     // Both login and app container elements
 
-    const companyName = state.settings.companyName || 'ELMAGHRABI';
+    const companyName = (state.settings.companyName && state.settings.companyName !== 'ELMAGHRABI') ? state.settings.companyName : 'ELMGHRABI';
 
     const footerText = 'منظومة العدادات 2025 - جميع الحقوق محفوظة ELMGHRABI © 2026';
 
@@ -4502,11 +4502,14 @@ const updateUI = () => {
 
     document.title = 'منظومة العدادات 2025';
 
-    document.getElementById('welcome-company-name')!.textContent = companyName;
+    const welcomeCompEl = document.getElementById('welcome-company-name');
+    if (welcomeCompEl) welcomeCompEl.textContent = 'ELMGHRABI';
 
-    document.getElementById('login-company-name')!.textContent = companyName;
+    const loginCompEl = document.getElementById('login-company-name');
+    if (loginCompEl) loginCompEl.textContent = 'ELMGHRABI';
 
-    document.getElementById('sidebar-company-name')!.textContent = companyName;
+    const sidebarCompEl = document.getElementById('sidebar-company-name');
+    if (sidebarCompEl) sidebarCompEl.textContent = companyName;
 
     // document.getElementById('header-company-name')!.textContent = companyName;
 
