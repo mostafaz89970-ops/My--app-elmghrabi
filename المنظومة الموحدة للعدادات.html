@@ -6817,22 +6817,51 @@
                 <div style="padding: 16px 22px; border-bottom: 1.5px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-radius: 14px 14px 0 0;">
                     <div>
                         <h3 style="margin: 0; font-size: 1.2rem; font-weight: 900; color: #0f172a;" id="sp-tx-modal-user-name">كشف الشحنات التفصيلي للمحصل</h3>
-                        <p style="margin: 3px 0 0; font-size: 0.82rem; color: #64748b;" id="sp-tx-modal-meta">بيانات شحنات المنظومة الموحدة اليومية</p>
+                        <p style="margin: 3px 0 0; font-size: 0.82rem; color: #64748b;" id="sp-tx-modal-meta">بيانات شحنات كافة المنظومات اليومية (الموحد MEEDCO + المعصرة + إسكرا)</p>
                     </div>
                     <button type="button" id="btn-sp-tx-modal-close" style="background: none; border: none; font-size: 1.6rem; line-height: 1; cursor: pointer; color: #64748b;">&times;</button>
                 </div>
                 
                 <div style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
-                    <!-- كروت تلخيص سريعة للعمليات -->
+                    <!-- كروت تلخيص سريعة للعمليات لكافة المنظومات -->
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
-                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px 14px; border-radius: 8px;">
-                            <span style="font-size: 0.75rem; color: #166534; font-weight: 700; display: block;">إجمالي المبلغ المحصل:</span>
-                            <strong style="font-size: 1.25rem; color: #15803d; font-family: monospace;" id="sp-tx-modal-total-amt">0.00 ج.م</strong>
+                        <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; padding: 10px 14px; border-radius: 8px;">
+                            <span style="font-size: 0.75rem; color: #475569; font-weight: 700; display: block;">الإجمالي العام (كافة المنظومات):</span>
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                                <strong style="font-size: 1.2rem; color: #0f172a; font-family: monospace;" id="sp-tx-modal-total-amt">0.00 ج.م</strong>
+                                <span style="font-size: 0.8rem; color: #64748b; font-weight: bold;" id="sp-tx-modal-total-count">0 شحنة</span>
+                            </div>
                         </div>
                         <div style="background: #f0f9ff; border: 1px solid #bae6fd; padding: 10px 14px; border-radius: 8px;">
-                            <span style="font-size: 0.75rem; color: #0369a1; font-weight: 700; display: block;">إجمالي عدد العمليات:</span>
-                            <strong style="font-size: 1.25rem; color: #0284c7; font-family: monospace;" id="sp-tx-modal-total-count">0 شحنة</strong>
+                            <span style="font-size: 0.75rem; color: #0369a1; font-weight: 700; display: block;">الموحد MEEDCO:</span>
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                                <strong style="font-size: 1.15rem; color: #0284c7; font-family: monospace;" id="sp-tx-modal-meedco-amt">0.00 ج.م</strong>
+                                <span style="font-size: 0.8rem; color: #0369a1; font-weight: bold;" id="sp-tx-modal-meedco-count">0 شحنة</span>
+                            </div>
                         </div>
+                        <div style="background: #faf5ff; border: 1px solid #e9d5ff; padding: 10px 14px; border-radius: 8px;">
+                            <span style="font-size: 0.75rem; color: #7c3aed; font-weight: 700; display: block;">المعصرة:</span>
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                                <strong style="font-size: 1.15rem; color: #9333ea; font-family: monospace;" id="sp-tx-modal-maasara-amt">0.00 ج.م</strong>
+                                <span style="font-size: 0.8rem; color: #7c3aed; font-weight: bold;" id="sp-tx-modal-maasara-count">0 شحنة</span>
+                            </div>
+                        </div>
+                        <div style="background: #fefce8; border: 1px solid #fef08a; padding: 10px 14px; border-radius: 8px;">
+                            <span style="font-size: 0.75rem; color: #ca8a04; font-weight: 700; display: block;">إسكرا Iskra:</span>
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                                <strong style="font-size: 1.15rem; color: #d97706; font-family: monospace;" id="sp-tx-modal-iskra-amt">0.00 ج.م</strong>
+                                <span style="font-size: 0.8rem; color: #b45309; font-weight: bold;" id="sp-tx-modal-iskra-count">0 شحنة</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- أزرار التصفية السريعة بين المنظومات -->
+                    <div id="sp-tx-modal-filter-bar" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span style="font-size: 0.82rem; font-weight: bold; color: #475569;">تصفية العرض:</span>
+                        <button type="button" class="btn-tx-filter" data-filter="all" style="padding: 5px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #0284c7; color: #fff; font-size: 0.8rem; font-weight: bold; cursor: pointer;">الكل (كافة المنظومات)</button>
+                        <button type="button" class="btn-tx-filter" data-filter="meedco" style="padding: 5px 12px; border-radius: 6px; border: 1px solid #bae6fd; background: #f0f9ff; color: #0369a1; font-size: 0.8rem; font-weight: bold; cursor: pointer;">الموحد MEEDCO</button>
+                        <button type="button" class="btn-tx-filter" data-filter="maasara" style="padding: 5px 12px; border-radius: 6px; border: 1px solid #e9d5ff; background: #faf5ff; color: #7c3aed; font-size: 0.8rem; font-weight: bold; cursor: pointer;">المعصرة</button>
+                        <button type="button" class="btn-tx-filter" data-filter="iskra" style="padding: 5px 12px; border-radius: 6px; border: 1px solid #fef08a; background: #fefce8; color: #ca8a04; font-size: 0.8rem; font-weight: bold; cursor: pointer;">إسكرا Iskra</button>
                     </div>
 
                     <!-- جدول العمليات التفصيلية -->

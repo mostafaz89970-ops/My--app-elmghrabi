@@ -13130,6 +13130,24 @@ const handlePrintJudicialControlDetails = () => {
         document.getElementById('btn-sp-tx-modal-print')?.addEventListener('click', () => {
             printCurrentCashierTransactions();
         });
+
+        // Filter tabs in transactions modal
+        document.querySelectorAll('#sp-tx-modal-filter-bar .btn-tx-filter').forEach(btn => {
+            btn.addEventListener('click', (e: any) => {
+                const filter = e.currentTarget.getAttribute('data-filter') || 'all';
+                currentModalTxFilter = filter;
+                document.querySelectorAll('#sp-tx-modal-filter-bar .btn-tx-filter').forEach((b: any) => {
+                    if (b === e.currentTarget) {
+                        b.style.background = '#0284c7';
+                        b.style.color = '#fff';
+                    } else {
+                        b.style.background = '';
+                        b.style.color = '';
+                    }
+                });
+                renderCurrentCashierTransactionsModalRows();
+            });
+        });
     };
 
     // =========================================================================
@@ -13138,6 +13156,7 @@ const handlePrintJudicialControlDetails = () => {
 
     let currentComprehensiveReportData: any = null;
     let currentSelectedCashierForModal: any = null;
+    let currentModalTxFilter: string = 'all';
     let currentFilteredComprehensiveUsers: any[] = [];
 
     const renderComprehensiveSourceWarnings = (warnings: any[] = []) => {
@@ -13636,7 +13655,7 @@ const handlePrintJudicialControlDetails = () => {
                     </td>
                     <td style="padding: 10px 14px; text-align: center;">
                         <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
-                            ${((u.meedco?.items && u.meedco.items.length > 0) || (u.maasara?.items && u.maasara.items.length > 0)) ? `
+                            ${((u.meedco?.items && u.meedco.items.length > 0) || (u.maasara?.items && u.maasara.items.length > 0) || (u.iskra?.items && u.iskra.items.length > 0)) ? `
                                 <button type="button" class="btn-sp-view-tx" data-user="${esc(u.userName)}" title="عرض كشف الشحنات التفصيلي" style="background: #e0f2fe; color: #0369a1; border: none; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">
                                     🔍 كشف الشحنات
                                 </button>
@@ -13705,53 +13724,98 @@ const handlePrintJudicialControlDetails = () => {
         }
     };
 
+    const renderCurrentCashierTransactionsModalRows = () => {
+        if (!currentSelectedCashierForModal) return;
+        const user = currentSelectedCashierForModal;
+        const tbody = document.getElementById('sp-tx-modal-tbody');
+        if (!tbody) return;
+
+        const meedcoItems = (user.meedco?.items || []).map((it: any) => ({ ...it, sysKey: 'meedco', sysName: 'الموحد MEEDCO', sysColor: '#0369a1', sysBg: '#e0f2fe' }));
+        const maasaraItems = (user.maasara?.items || []).map((it: any) => ({ ...it, sysKey: 'maasara', sysName: 'المعصرة', sysColor: '#7c3aed', sysBg: '#faf5ff' }));
+        const iskraItems = (user.iskra?.items || []).map((it: any) => ({ ...it, sysKey: 'iskra', sysName: 'إسكرا Iskra', sysColor: '#d97706', sysBg: '#fef3c7' }));
+        const allItems = [...meedcoItems, ...maasaraItems, ...iskraItems];
+
+        let displayItems = allItems;
+        if (currentModalTxFilter === 'meedco') displayItems = meedcoItems;
+        else if (currentModalTxFilter === 'maasara') displayItems = maasaraItems;
+        else if (currentModalTxFilter === 'iskra') displayItems = iskraItems;
+
+        if (displayItems.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 25px; color: #94a3b8; font-weight: bold;">لا تتوفر تفاصيل حركات شحن مسجلة لهذا المحصل في هذه المنظومة</td></tr>`;
+            return;
+        }
+
+        const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        tbody.innerHTML = displayItems.map((it, idx) => `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px 10px; text-align: center; color: #94a3b8; font-size: 0.8rem;">${idx + 1}</td>
+                <td style="padding: 8px 10px; font-weight: 800; font-family: monospace; color: #0284c7;">
+                    ${esc(it.meterNumber)}
+                    ${it.sysName ? `<span style="font-size: 0.68rem; background: ${it.sysBg}; color: ${it.sysColor}; padding: 1px 6px; border-radius: 4px; margin-right: 4px; display: inline-block; font-weight: 700;">${it.sysName}</span>` : ''}
+                </td>
+                <td style="padding: 8px 10px; font-weight: 700; color: #1e293b;">${esc(it.customerName)}</td>
+                <td style="padding: 8px 10px; color: #64748b;">${esc(it.subAdmin)}</td>
+                <td style="padding: 8px 10px; font-family: monospace; color: #475569; font-size: 0.8rem;">${esc(it.receiptNumber)}</td>
+                <td style="padding: 8px 10px; text-align: center; font-family: monospace; font-size: 0.8rem; color: #64748b;">${esc(it.paymentTime)}</td>
+                <td style="padding: 8px 10px; text-align: center; font-weight: 900; font-family: monospace; color: #15803d;">${Number(it.amount || 0).toFixed(2)}</td>
+            </tr>
+        `).join('');
+    };
+
     const showUserTransactionsModal = (userName: string) => {
         if (!currentComprehensiveReportData || !Array.isArray(currentComprehensiveReportData.users)) return;
         const user = currentComprehensiveReportData.users.find((u: any) => u.userName === userName);
         if (!user) return;
 
         currentSelectedCashierForModal = user;
+        currentModalTxFilter = 'all';
 
         const modal = document.getElementById('sp-user-transactions-modal');
         const nameEl = document.getElementById('sp-tx-modal-user-name');
         const metaEl = document.getElementById('sp-tx-modal-meta');
         const amtEl = document.getElementById('sp-tx-modal-total-amt');
         const countEl = document.getElementById('sp-tx-modal-total-count');
-        const tbody = document.getElementById('sp-tx-modal-tbody');
+        const meedcoAmtEl = document.getElementById('sp-tx-modal-meedco-amt');
+        const meedcoCountEl = document.getElementById('sp-tx-modal-meedco-count');
+        const maasaraAmtEl = document.getElementById('sp-tx-modal-maasara-amt');
+        const maasaraCountEl = document.getElementById('sp-tx-modal-maasara-count');
+        const iskraAmtEl = document.getElementById('sp-tx-modal-iskra-amt');
+        const iskraCountEl = document.getElementById('sp-tx-modal-iskra-count');
 
         const date = currentComprehensiveReportData.date || '';
 
-        const meedcoItems = (user.meedco?.items || []).map((it: any) => ({ ...it, sysName: 'الموحد MEEDCO', sysColor: '#0369a1', sysBg: '#e0f2fe' }));
-        const maasaraItems = (user.maasara?.items || []).map((it: any) => ({ ...it, sysName: 'المعصرة', sysColor: '#7c3aed', sysBg: '#faf5ff' }));
-        const items = [...meedcoItems, ...maasaraItems];
-        const totalItemsAmount = (user.meedco?.amount || 0) + (user.maasara?.amount || 0);
+        const meedcoItems = user.meedco?.items || [];
+        const maasaraItems = user.maasara?.items || [];
+        const iskraItems = user.iskra?.items || [];
+        const allItemsCount = meedcoItems.length + maasaraItems.length + iskraItems.length;
+        const totalItemsAmount = (user.meedco?.amount || 0) + (user.maasara?.amount || 0) + (user.iskra?.amount || 0);
 
         if (nameEl) nameEl.textContent = `كشف الشحنات التفصيلي للمحصل: ${user.userName}`;
-        if (metaEl) metaEl.textContent = `تاريخ العمليات: ${date} | تفاصيل العمليات لكافة المنظومات`;
+        if (metaEl) metaEl.textContent = `تاريخ العمليات: ${date} | تفاصيل العمليات لكافة المنظومات (الموحد MEEDCO + المعصرة + إسكرا)`;
         if (amtEl) amtEl.textContent = Number(totalItemsAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
-        if (countEl) countEl.textContent = `${items.length} شحنة`;
+        if (countEl) countEl.textContent = `${allItemsCount} شحنة`;
 
-        if (tbody) {
-            if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 25px; color: #94a3b8;">لا تتوفر تفاصيل حركات شحن مسجلة لهذا المحصل</td></tr>`;
+        if (meedcoAmtEl) meedcoAmtEl.textContent = Number(user.meedco?.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+        if (meedcoCountEl) meedcoCountEl.textContent = `${meedcoItems.length} شحنة`;
+
+        if (maasaraAmtEl) maasaraAmtEl.textContent = Number(user.maasara?.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+        if (maasaraCountEl) maasaraCountEl.textContent = `${maasaraItems.length} شحنة`;
+
+        if (iskraAmtEl) iskraAmtEl.textContent = Number(user.iskra?.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+        if (iskraCountEl) iskraCountEl.textContent = `${iskraItems.length} شحنة`;
+
+        // Reset filter buttons state
+        document.querySelectorAll('#sp-tx-modal-filter-bar .btn-tx-filter').forEach((b: any) => {
+            if (b.getAttribute('data-filter') === 'all') {
+                (b as HTMLElement).style.background = '#0284c7';
+                (b as HTMLElement).style.color = '#fff';
             } else {
-                const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                tbody.innerHTML = items.map((it, idx) => `
-                    <tr style="border-bottom: 1px solid #f1f5f9;">
-                        <td style="padding: 8px 10px; text-align: center; color: #94a3b8;">${idx + 1}</td>
-                        <td style="padding: 8px 10px; font-weight: 800; font-family: monospace; color: #0284c7;">
-                            ${esc(it.meterNumber)}
-                            ${it.sysName ? `<span style="font-size: 0.68rem; background: ${it.sysBg}; color: ${it.sysColor}; padding: 1px 6px; border-radius: 4px; margin-right: 4px; display: inline-block;">${it.sysName}</span>` : ''}
-                        </td>
-                        <td style="padding: 8px 10px; font-weight: 700; color: #1e293b;">${esc(it.customerName)}</td>
-                        <td style="padding: 8px 10px; color: #64748b;">${esc(it.subAdmin)}</td>
-                        <td style="padding: 8px 10px; font-family: monospace; color: #475569; font-size: 0.8rem;">${esc(it.receiptNumber)}</td>
-                        <td style="padding: 8px 10px; text-align: center; font-family: monospace; font-size: 0.8rem; color: #64748b;">${esc(it.paymentTime)}</td>
-                        <td style="padding: 8px 10px; text-align: center; font-weight: 900; font-family: monospace; color: #15803d;">${Number(it.amount || 0).toFixed(2)}</td>
-                    </tr>
-                `).join('');
+                (b as HTMLElement).style.background = '';
+                (b as HTMLElement).style.color = '';
             }
-        }
+        });
+
+        renderCurrentCashierTransactionsModalRows();
 
         if (modal) modal.style.display = 'flex';
     };
@@ -13761,8 +13825,23 @@ const handlePrintJudicialControlDetails = () => {
         const user = currentSelectedCashierForModal;
         const meedcoItems = (user.meedco?.items || []).map((it: any) => ({ ...it, sysName: 'الموحد MEEDCO' }));
         const maasaraItems = (user.maasara?.items || []).map((it: any) => ({ ...it, sysName: 'المعصرة' }));
-        const items: any[] = [...meedcoItems, ...maasaraItems];
-        const totalItemsAmount = (user.meedco?.amount || 0) + (user.maasara?.amount || 0);
+        const iskraItems = (user.iskra?.items || []).map((it: any) => ({ ...it, sysName: 'إسكرا Iskra' }));
+        
+        let items: any[] = [...meedcoItems, ...maasaraItems, ...iskraItems];
+        let sysSubtitle = 'شامل العمليات (الموحد MEEDCO + المعصرة + إسكرا Iskra)';
+
+        if (currentModalTxFilter === 'meedco') {
+            items = meedcoItems;
+            sysSubtitle = 'منظومة الموحد MEEDCO فقط';
+        } else if (currentModalTxFilter === 'maasara') {
+            items = maasaraItems;
+            sysSubtitle = 'منظومة المعصرة فقط';
+        } else if (currentModalTxFilter === 'iskra') {
+            items = iskraItems;
+            sysSubtitle = 'منظومة إسكرا Iskra فقط';
+        }
+
+        const totalItemsAmount = items.reduce((acc, x) => acc + (Number(x.amount) || 0), 0);
         const date = (currentComprehensiveReportData?.date || new Date().toISOString().slice(0, 10));
 
         const esc = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -13770,7 +13849,7 @@ const handlePrintJudicialControlDetails = () => {
         let rows = items.map((it, idx) => `
             <tr>
                 <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${esc(it.meterNumber)} <span style="font-size: 9px; color: #666;">(${it.sysName || ''})</span></td>
+                <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${esc(it.meterNumber)} <span style="font-size: 9px; color: #475569; font-weight: bold;">(${esc(it.sysName || '')})</span></td>
                 <td style="border: 1px solid #cbd5e1; padding: 6px;">${esc(it.customerName)}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 6px;">${esc(it.subAdmin)}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-size: 11px;">${esc(it.receiptNumber)}</td>
@@ -13795,6 +13874,8 @@ const handlePrintJudicialControlDetails = () => {
                     th { border: 1.5px solid #000; background: #e2e8f0; padding: 8px; font-size: 12px; }
                     td { border: 1px solid #94a3b8; padding: 6px 8px; font-size: 11px; }
                     .total-row td { font-weight: bold; font-size: 13px; background: #f1f5f9; border-top: 2px solid #000; }
+                    .summary-box { display: flex; gap: 15px; margin-bottom: 12px; flex-wrap: wrap; }
+                    .summary-item { border: 1px solid #94a3b8; padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; background: #f8fafc; }
                     .sig-grid { display: flex; justify-content: space-between; margin-top: 40px; text-align: center; font-weight: bold; font-size: 13px; }
                     @media print { body { margin: 0; } }
                 </style>
@@ -13808,7 +13889,12 @@ const handlePrintJudicialControlDetails = () => {
                 <div class="meta-grid">
                     <div>اسم المحصل: <span>${esc(user.userName)}</span></div>
                     <div>تاريخ العمليات: <span>${date}</span></div>
-                    <div>المنظومات: <span>شامل العمليات (الموحد MEEDCO + المعصرة)</span></div>
+                    <div>المنظومات: <span>${sysSubtitle}</span></div>
+                </div>
+                <div class="summary-box">
+                    <div class="summary-item">الموحد MEEDCO: ${Number(user.meedco?.amount || 0).toFixed(2)} ج.م (${(user.meedco?.items || []).length} شحنة)</div>
+                    <div class="summary-item">المعصرة: ${Number(user.maasara?.amount || 0).toFixed(2)} ج.م (${(user.maasara?.items || []).length} شحنة)</div>
+                    <div class="summary-item">إسكرا Iskra: ${Number(user.iskra?.amount || 0).toFixed(2)} ج.م (${(user.iskra?.items || []).length} شحنة)</div>
                 </div>
                 <table>
                     <thead>
@@ -13825,7 +13911,7 @@ const handlePrintJudicialControlDetails = () => {
                     <tbody>
                         ${rows}
                         <tr class="total-row">
-                            <td colspan="6" style="text-align: left; padding-left: 20px;">الإجمالي العام للعمليات (${items.length} شحنة):</td>
+                            <td colspan="6" style="text-align: left; padding-left: 20px;">الإجمالي للمطبوع (${items.length} شحنة):</td>
                             <td style="text-align: center;">${Number(totalItemsAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م</td>
                         </tr>
                     </tbody>

@@ -183,8 +183,67 @@ async function fetchDailyReport(dateStr, toDateStr = null) {
     try {
         let authCookie = await ensureSession();
 
-        // استخدام صيغة التاريخ الصريحة YYYY-MM-DD لضمان قراءة اليوم المحدد فقط دون التداخل مع الأيام التالية
-        const payload = JSON.stringify({
+        // 1. جلب كشف الشحنات التفصيلي لكافة المستخدمين والمحصلين
+        const detailedPayload = JSON.stringify({
+            Page: 1,
+            Sort: '',
+            ItemsPerPage: '5000',
+            FromDate: fromDate,
+            ToDate: toDate,
+            Orderstatus: 'شحنة ناجحة'
+        });
+
+        let detailedResp = await httpReq({
+            path: '/Contract/GetAllCustomersRechargeReportWithPointOfSale',
+            method: 'POST',
+            contentType: 'application/json',
+            headers: {
+                'Cookie': authCookie,
+                'Referer': `http://${MAASARA_HOST}:${MAASARA_PORT}/Reports/CustomerRechargeByUsers`
+            }
+        }, detailedPayload);
+
+        // إذا كانت الجلسة منتهية، أعد تسجيل الدخول مرة أخرى
+        if (detailedResp.status === 302 || detailedResp.status === 401 || (detailedResp.body && detailedResp.body.includes('/Account/Login'))) {
+            console.log('[Maasara] Session expired, re-authenticating...');
+            authCookie = await ensureSession(true);
+            detailedResp = await httpReq({
+                path: '/Contract/GetAllCustomersRechargeReportWithPointOfSale',
+                method: 'POST',
+                contentType: 'application/json',
+                headers: {
+                    'Cookie': authCookie,
+                    'Referer': `http://${MAASARA_HOST}:${MAASARA_PORT}/Reports/CustomerRechargeByUsers`
+                }
+            }, detailedPayload);
+        }
+
+        const userItemsMap = {};
+        try {
+            const dData = JSON.parse(detailedResp.body);
+            if (dData && dData.Success && dData.Result && Array.isArray(dData.Result.Items)) {
+                dData.Result.Items.forEach(it => {
+                    const uName = (it.OrderCreator || '').trim();
+                    if (!uName) return;
+                    if (!userItemsMap[uName]) userItemsMap[uName] = [];
+                    const txAmt = Math.round((Number(it.TotalAmount) || Number(it.NetAmount) || 0) * 100) / 100;
+                    userItemsMap[uName].push({
+                        meterNumber: String(it.SerialNumber || '').trim(),
+                        customerName: String(it.CustomerCodyName || it.Name || it.CustomerCode || '').trim(),
+                        subAdmin: String(it.Department || it.PointOfSaleName || '').trim(),
+                        receiptNumber: String(it.OrderSequence || it.orderID || it.FawryFCRN || '').trim(),
+                        paymentTime: String(it.TransactionDate || '').replace('T', ' ').trim(),
+                        paymentDate: (it.TransactionDate ? it.TransactionDate.slice(0, 10) : fromDate),
+                        amount: txAmt
+                    });
+                });
+            }
+        } catch (e) {
+            console.warn('[Maasara] Failed to parse detailed transactions:', e.message);
+        }
+
+        // 2. جلب التقرير التجميعي الإجمالي للتأكد من شمول كافة المحصلين
+        const totallyPayload = JSON.stringify({
             Page: 1,
             Sort: '',
             ItemsPerPage: '1000',
@@ -202,46 +261,52 @@ async function fetchDailyReport(dateStr, toDateStr = null) {
                 'Cookie': authCookie,
                 'Referer': `http://${MAASARA_HOST}:${MAASARA_PORT}/Reports/CustomersRechargesTotalPaymentByUser`
             }
-        }, payload);
+        }, totallyPayload);
 
-        // إذا كانت الجلسة منتهية (302 redirect أو خطأ)، أعد تسجيل الدخول مرة أخرى
-        if (repResp.status === 302 || repResp.status === 401 || (repResp.body && repResp.body.includes('/Account/Login'))) {
-            console.log('[Maasara] Session expired, re-authenticating...');
-            authCookie = await ensureSession(true);
-            repResp = await httpReq({
-                path: '/Contract/GetAllCustomersRechargeReportWithPointOfSaleTotally',
-                method: 'POST',
-                contentType: 'application/json',
-                headers: {
-                    'Cookie': authCookie,
-                    'Referer': `http://${MAASARA_HOST}:${MAASARA_PORT}/Reports/CustomersRechargesTotalPaymentByUser`
-                }
-            }, payload);
+        const usersMap = {};
+
+        try {
+            const data = JSON.parse(repResp.body);
+            if (data && data.Success && data.Result && Array.isArray(data.Result.Items)) {
+                data.Result.Items.forEach(it => {
+                    const uName = (it.OrderCreator || '').trim();
+                    if (!uName) return;
+                    const totalAmt = Math.round((Number(it.TotalAmount) || 0) * 100) / 100;
+                    const netAmt = Math.round((Number(it.NetAmount) || 0) * 100) / 100;
+                    const count = Number(it.RechargesCount) || 0;
+                    if (totalAmt > 0 || count > 0) {
+                        usersMap[uName] = {
+                            userName: uName,
+                            totalAmount: totalAmt,
+                            netAmount: netAmt,
+                            rechargesCount: count,
+                            branch: it.PointOfSaleName || 'بنى مزار شرق',
+                            items: userItemsMap[uName] || []
+                        };
+                    }
+                });
+            }
+        } catch (_) {}
+
+        // دمج المحصلين الذين وردت لهم شحنات تفصيلية ولم يظهروا في التجميعي
+        for (const [uName, itms] of Object.entries(userItemsMap)) {
+            if (!usersMap[uName] && itms.length > 0) {
+                const uTotal = Math.round(itms.reduce((acc, x) => acc + x.amount, 0) * 100) / 100;
+                usersMap[uName] = {
+                    userName: uName,
+                    totalAmount: uTotal,
+                    netAmount: uTotal,
+                    rechargesCount: itms.length,
+                    branch: itms[0]?.subAdmin || 'بنى مزار شرق',
+                    items: itms
+                };
+            } else if (usersMap[uName] && (!usersMap[uName].items || usersMap[uName].items.length === 0)) {
+                usersMap[uName].items = itms;
+            }
         }
 
-        const data = JSON.parse(repResp.body);
-        if (data && data.Success && data.Result && Array.isArray(data.Result.Items)) {
-            const rawItems = data.Result.Items;
-            const users = rawItems.map(it => {
-                const totalAmt = Math.round((Number(it.TotalAmount) || 0) * 100) / 100;
-                const netAmt = Math.round((Number(it.NetAmount) || 0) * 100) / 100;
-                const count = Number(it.RechargesCount) || 0;
-                return {
-                    userName: (it.OrderCreator || '').trim(),
-                    totalAmount: totalAmt,
-                    netAmount: netAmt,
-                    rechargesCount: count,
-                    branch: it.PointOfSaleName || 'بنى مزار شرق',
-                    items: [{
-                        paymentDate: dateStr,
-                        amount: totalAmt,
-                        netAmount: netAmt,
-                        rechargesCount: count,
-                        branch: it.PointOfSaleName || 'بنى مزار شرق'
-                    }]
-                };
-            }).filter(u => u.userName && u.totalAmount > 0);
-
+        const users = Object.values(usersMap);
+        if (users.length > 0) {
             const totalAmount = Math.round(users.reduce((s, u) => s + u.totalAmount, 0) * 100) / 100;
             const totalRecharges = users.reduce((s, u) => s + u.rechargesCount, 0);
 

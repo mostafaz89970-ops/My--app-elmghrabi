@@ -468,66 +468,73 @@ async function fetchIskraDailySales(dateStr) {
 
         const { sessionId, userId } = loginRes;
 
-        // 2. تشغيل تقرير مبيعات المستخدمين (Report 14)
-        const reportPayload = JSON.stringify({
-            reportId: 14,
-            extention: 'XLSX',
-            filters: [
-                { name: 'FROM_DATE', jasperKey: 'FROM_DATE', value: dateStr },
-                { name: 'TO_DATE', jasperKey: 'TO_DATE', value: dateStr },
-                { name: 'STATION_IDS', jasperKey: 'STATION_IDS', value: '32' },
-                { name: 'SECTOR_IDS', jasperKey: 'SECTOR_IDS', value: '5' }
-            ]
-        });
-
-        const xlsxBuffer = await new Promise((resolve, reject) => {
-            const req = http.request({
-                hostname: '200.1.1.201',
-                port: 8013,
-                path: '/SPMeters/api/report/execute',
-                method: 'POST',
-                headers: {
-                    'Cookie': sessionId,
-                    'userId': String(userId),
-                    'stationIds': '32',
-                    'stationIdsReports': '32',
-                    'Content-Type': 'application/json;charset=UTF-8',
-                    'Content-Length': Buffer.byteLength(reportPayload)
-                },
-                timeout: 8000
-            }, (res) => {
-                if (res.statusCode !== 200) {
-                    let errBody = '';
-                    res.on('data', d => errBody += d);
-                    res.on('end', () => reject(new Error(`Iskra report HTTP ${res.statusCode}: ${errBody}`)));
-                    return;
-                }
-                const chunks = [];
-                res.on('data', c => chunks.push(c));
-                res.on('end', () => resolve(Buffer.concat(chunks)));
+        const executeIskraReport = async (repId) => {
+            const reportPayload = JSON.stringify({
+                reportId: repId,
+                extention: 'XLSX',
+                filters: [
+                    { name: 'FROM_DATE', jasperKey: 'FROM_DATE', value: dateStr },
+                    { name: 'TO_DATE', jasperKey: 'TO_DATE', value: dateStr },
+                    { name: 'STATION_IDS', jasperKey: 'STATION_IDS', value: '32' },
+                    { name: 'SECTOR_IDS', jasperKey: 'SECTOR_IDS', value: '5' }
+                ]
             });
-            req.on('error', reject);
-            req.on('timeout', () => { req.destroy(); reject(new Error('Iskra execute report timeout')); });
-            req.write(reportPayload);
-            req.end();
-        });
 
-        // 3. حفظ ومعالجة ملف الإكسل عبر البارسر المعتمد
-        const tempXlsxPath = path.join(CACHE_DIR, `temp_iskra_${dateStr}_${Date.now()}.xlsx`);
-        fs.writeFileSync(tempXlsxPath, xlsxBuffer);
-
-        const scriptPath = path.join(__dirname, 'parse_iskra_excel.py');
-        const parsedResult = await new Promise((resolve, reject) => {
-            execFile('python', [scriptPath, tempXlsxPath], { maxBuffer: 1024 * 1024 * 50, encoding: 'utf8' }, (err, stdout, stderr) => {
-                try { fs.unlinkSync(tempXlsxPath); } catch (e) {}
-                if (err) return reject(new Error('Python parse error: ' + (stderr || err.message)));
-                try {
-                    resolve(JSON.parse(stdout));
-                } catch (e) {
-                    reject(new Error('Failed to parse Iskra JSON: ' + e.message));
-                }
+            const xlsxBuffer = await new Promise((resolve, reject) => {
+                const req = http.request({
+                    hostname: '200.1.1.201',
+                    port: 8013,
+                    path: '/SPMeters/api/report/execute',
+                    method: 'POST',
+                    headers: {
+                        'Cookie': sessionId,
+                        'userId': String(userId),
+                        'stationIds': '32',
+                        'stationIdsReports': '32',
+                        'Content-Type': 'application/json;charset=UTF-8',
+                        'Content-Length': Buffer.byteLength(reportPayload)
+                    },
+                    timeout: 10000
+                }, (res) => {
+                    if (res.statusCode !== 200) {
+                        let errBody = '';
+                        res.on('data', d => errBody += d);
+                        res.on('end', () => reject(new Error(`Iskra report HTTP ${res.statusCode}: ${errBody}`)));
+                        return;
+                    }
+                    const chunks = [];
+                    res.on('data', c => chunks.push(c));
+                    res.on('end', () => resolve(Buffer.concat(chunks)));
+                });
+                req.on('error', reject);
+                req.on('timeout', () => { req.destroy(); reject(new Error('Iskra execute report timeout')); });
+                req.write(reportPayload);
+                req.end();
             });
-        });
+
+            const tempXlsxPath = path.join(CACHE_DIR, `temp_iskra_${repId}_${dateStr}_${Date.now()}.xlsx`);
+            fs.writeFileSync(tempXlsxPath, xlsxBuffer);
+
+            const scriptPath = path.join(__dirname, 'parse_iskra_excel.py');
+            return new Promise((resolve, reject) => {
+                execFile('python', [scriptPath, tempXlsxPath], { maxBuffer: 1024 * 1024 * 50, encoding: 'utf8' }, (err, stdout, stderr) => {
+                    try { fs.unlinkSync(tempXlsxPath); } catch (e) {}
+                    if (err) return reject(new Error('Python parse error: ' + (stderr || err.message)));
+                    try {
+                        resolve(JSON.parse(stdout));
+                    } catch (e) {
+                        reject(new Error('Failed to parse Iskra JSON: ' + e.message));
+                    }
+                });
+            });
+        };
+
+        // 2. تشغيل تقرير الشحنات التفصيلي (Report 15) أولاً للحصول على تفاصيل العمليات
+        let parsedResult = await executeIskraReport(15).catch(() => null);
+        // في حال لم يعد بيانات، نشغل تقرير مبيعات المستخدمين (Report 14) كخطة بديلة
+        if (!parsedResult || !parsedResult.success || !Array.isArray(parsedResult.users) || parsedResult.users.length === 0) {
+            parsedResult = await executeIskraReport(14).catch(() => null);
+        }
 
         if (parsedResult && parsedResult.success) {
             parsedResult.fetchedAt = new Date().toISOString();
@@ -630,12 +637,14 @@ async function getUserDailyPrograms(dateStr, targetUserName, toDateStr = null, t
     // 3. إسكرا
     let iskraAmount = 0;
     let iskraCount = 0;
+    let iskraItems = [];
     const iskraData = await fetchIskraDailySales(dateStr);
     if (iskraData && Array.isArray(iskraData.users)) {
         const found = iskraData.users.find(u => isArabicMatch(u.userName, cleanTarget));
         if (found) {
             iskraAmount = found.totalAmount || 0;
-            iskraCount = found.rechargesCount || 0;
+            iskraCount = found.rechargesCount || (found.items ? found.items.length : 0);
+            iskraItems = found.items || [];
         }
     }
 
@@ -655,13 +664,14 @@ async function getUserDailyPrograms(dateStr, targetUserName, toDateStr = null, t
     return {
         date: dateStr,
         userName: targetUserName,
-        unified: { amount: meedcoAmount, count: meedcoCount, itemsCount: meedcoItems.length },
+        unified: { amount: meedcoAmount, count: meedcoCount, itemsCount: meedcoItems.length, items: meedcoItems },
         maasara: { amount: maasaraAmount, count: maasaraCount, items: maasaraItems, dailyBreakdown: maasaraDailyBreakdown },
-        iskra: { amount: iskraAmount, count: iskraCount },
+        iskra: { amount: iskraAmount, count: iskraCount, items: iskraItems },
         totalAmount: Math.round((meedcoAmount + maasaraAmount + iskraAmount) * 100) / 100,
         totalCount: meedcoCount + maasaraCount + iskraCount,
         meedcoItems: meedcoItems,
         maasaraItems: maasaraItems,
+        iskraItems: iskraItems,
         sourceWarnings
     };
 }
@@ -803,6 +813,9 @@ async function getComprehensiveDailyReport(fromDateStr, toDateStr, branchFilter)
                 if (entry) {
                     entry.iskra.amount = Math.round((entry.iskra.amount + (u.totalAmount || 0)) * 100) / 100;
                     entry.iskra.count += (u.rechargesCount || 0);
+                    if (Array.isArray(u.items) && u.items.length > 0) {
+                        entry.iskra.items.push(...u.items);
+                    }
                 }
             });
         }
