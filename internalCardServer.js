@@ -1172,13 +1172,15 @@ function startInternalServer(port = 5002) {
                 }
             }
 
-            // 8.2 جلب مبالغ وعدد شحنات البرامج لمستخدم معين في تاريخ محدد
+            // 8.2 جلب مبالغ وعدد شحنات البرامج لمستخدم معين في تاريخ محدد أو نطاق تاريخي
             if (pathname === '/api/reports/user-programs') {
                 const reportSync = require('./reportSyncService');
-                const date = url.searchParams.get('date') || new Date().toISOString().slice(0, 10);
+                const date = url.searchParams.get('date') || url.searchParams.get('from') || new Date().toISOString().slice(0, 10);
+                const toDate = url.searchParams.get('toDate') || url.searchParams.get('to') || date;
                 const userName = url.searchParams.get('user') || '';
+                const todayOnly = url.searchParams.get('todayOnly') === 'true' || url.searchParams.get('filterToday') === 'true';
                 try {
-                    const data = await reportSync.getUserDailyPrograms(date, userName);
+                    const data = await reportSync.getUserDailyPrograms(date, userName, toDate, todayOnly);
                     res.writeHead(200);
                     res.end(JSON.stringify({ success: true, data }));
                 } catch (e) {

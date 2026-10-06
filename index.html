@@ -1385,7 +1385,7 @@
                 </li>
 
                 <!-- قسم حافظات التوريد الجديد (Supply Portfolios) -->
-                <li class="nav-category">
+                <li class="nav-category" data-permission="view_supply_portfolio">
                     <details open>
                         <summary>
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1396,9 +1396,9 @@
                             <span>حافظات التوريد</span>
                         </summary>
                         <ul>
-                            <li><a href="#" class="nav-link" data-target="supply-portfolio-new"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg><span>تسجيل حافظة توريد</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="supply-portfolio-archive"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><span>سجل وأرشيف الحافظات</span></a></li>
-                            <li><a href="#" class="nav-link" data-target="supply-portfolio-detailed-report"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg><span>التقرير المالي والتفصيلي للبرامج</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="supply-portfolio-new" data-permission="view_supply_portfolio"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg><span>تسجيل حافظة توريد</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="supply-portfolio-archive" data-permission="view_supply_portfolio"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><span>سجل وأرشيف الحافظات</span></a></li>
+                            <li><a href="#" class="nav-link" data-target="supply-portfolio-detailed-report" data-permission="view_supply_portfolio"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg><span>التقرير المالي والتفصيلي للبرامج</span></a></li>
                         </ul>
                     </details>
                 </li>
@@ -6103,6 +6103,10 @@
                         <div>
                             <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 5px;">تاريخ التوريد</label>
                             <input type="date" id="sp-portfolio-date" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-weight: 700; color: #0f172a;">
+                            <div style="display: flex; gap: 4px; margin-top: 5px;">
+                                <button type="button" id="btn-sp-date-today" style="flex: 1; padding: 3px 6px; font-size: 0.74rem; font-weight: 800; background: #0284c7; color: #fff; border: none; border-radius: 4px; cursor: pointer;">اليوم</button>
+                                <button type="button" id="btn-sp-date-yesterday" style="flex: 1; padding: 3px 6px; font-size: 0.74rem; font-weight: 700; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">أمس</button>
+                            </div>
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 5px;">توقيت الحافظة</label>
@@ -6284,17 +6288,36 @@
 
                             <div style="display: flex; flex-direction: column; gap: 12px;">
                                 <!-- البرنامج الموحد MEEDCO -->
-                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-                                    <div>
-                                        <div style="display: flex; align-items: center; gap: 8px;">
-                                            <strong style="color: #0369a1; font-size: 0.95rem;">البرنامج الموحد (MEEDCO)</strong>
-                                            <span id="sp-count-unified-badge" style="font-size: 0.75rem; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-weight: 800; display: inline-flex; align-items: center;">0 شحنة</span>
+                                <div style="background: #f0f9ff; border: 1.5px solid #bae6fd; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                        <div>
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <strong style="color: #0369a1; font-size: 1rem;">البرنامج الموحد (MEEDCO)</strong>
+                                                <span id="sp-count-unified-badge" style="font-size: 0.75rem; background: #0284c7; color: #ffffff; padding: 2px 8px; border-radius: 12px; font-weight: 800; display: inline-flex; align-items: center;">0 شحنة</span>
+                                                <span id="sp-unified-date-plan-badge" style="font-size: 0.72rem; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; padding: 2px 8px; border-radius: 10px; font-weight: 700; display: inline-flex; align-items: center;">خطة اليوم فقط</span>
+                                            </div>
+                                            <span style="font-size: 0.78rem; color: #475569;">إجمالي مبيعات وشحن منظومة MEEDCO (مع فحص تلقائي للنوبات ومطابقة اليوم)</span>
                                         </div>
-                                        <span style="font-size: 0.78rem; color: #64748b;">إجمالي توريد وتحصيل منظومة الشحن الموحدة</span>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <button type="button" id="btn-sp-fetch-unified-only" class="btn" title="جلب مبيعات الموحد فقط بالخطة المحددة" style="background: #0284c7; color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.82rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 1px 3px rgba(2,132,199,0.3);">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                                <span>جلب تقرير الموحد</span>
+                                            </button>
+                                            <div style="display: flex; align-items: center; gap: 6px;">
+                                                <input type="number" id="sp-system-unified" min="0" step="0.01" value="0" class="sp-system-input" style="width: 140px; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #0284c7; border-radius: 6px; padding: 6px; color: #0369a1; background: #ffffff;">
+                                                <span style="font-weight: 700; color: #0369a1; font-size: 0.85rem;">ج.م</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <input type="number" id="sp-system-unified" min="0" step="0.01" value="0" class="sp-system-input" style="width: 140px; text-align: center; font-weight: 900; font-size: 1.05rem; font-family: monospace; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 6px; color: #0369a1;">
-                                        <span style="font-weight: 700; color: #64748b; font-size: 0.85rem;">ج.م</span>
+                                    <!-- شريط خطة التاريخ السريعة للموحد -->
+                                    <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e0f2fe; border-radius: 6px; padding: 6px 10px; font-size: 0.78rem; flex-wrap: wrap; gap: 6px;">
+                                        <span style="color: #64748b; font-weight: 700;">خطة جلب الموحد السريعة:</span>
+                                        <div style="display: flex; gap: 4px; align-items: center;" id="sp-unified-plan-group">
+                                            <button type="button" class="sp-unified-plan-btn active" data-plan="today" style="background: #0284c7; color: #fff; border: 1px solid #0284c7; border-radius: 4px; padding: 3px 8px; font-size: 0.75rem; font-weight: 800; cursor: pointer;">اليوم فقط (ذكي)</button>
+                                            <button type="button" class="sp-unified-plan-btn" data-plan="yesterday_today" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">أمس واليوم (عزل اليوم)</button>
+                                            <button type="button" class="sp-unified-plan-btn" data-plan="yesterday_only" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">أمس فقط</button>
+                                        </div>
+                                        <span id="sp-unified-plan-hint" style="color: #0284c7; font-size: 0.73rem; font-weight: 600;">يتم فحص مبيعات اليوم مع توسيع نافذة الأمس تلقائياً عند الحاجة</span>
                                     </div>
                                 </div>
 
@@ -6674,7 +6697,9 @@
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
                                 <span>تطبيق الفلترة</span>
                             </button>
-                            <button type="button" id="btn-sp-detail-preset-today" class="btn" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">اليوم فقط</button>
+                            <button type="button" id="btn-sp-detail-preset-today" class="btn" style="background: #0284c7; color: #ffffff; border: 1px solid #0284c7; padding: 7px 12px; border-radius: 6px; font-weight: 800; font-size: 0.82rem; cursor: pointer;">اليوم فقط (افتراضي)</button>
+                            <button type="button" id="btn-sp-detail-preset-yesterday-today" class="btn" style="background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">أمس واليوم (الخطة السريعة)</button>
+                            <button type="button" id="btn-sp-detail-preset-yesterday" class="btn" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">أمس فقط</button>
                             <button type="button" id="btn-sp-detail-preset-month" class="btn" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 7px 12px; border-radius: 6px; font-weight: 800; font-size: 0.82rem; cursor: pointer;">الشهر بالكامل</button>
                         </div>
                     </div>

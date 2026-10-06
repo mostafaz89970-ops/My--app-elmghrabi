@@ -243,19 +243,19 @@ let state = {
             'view_treasury_dashboard': { name: 'عرض لوحة الخزينة اليومية', roles: ['admin', 'supervisor'] },
             'manage_treasury_settlements': { name: 'إدارة تصفيات العهد ووقف الحسابات', roles: ['admin', 'supervisor'] },
             'view_treasury_transactions': { name: 'عرض سجل المعاملات المالية بالخزينة', roles: ['admin', 'supervisor'] },
-            'view_supply_portfolio': { name: 'عرض حافظات التوريد والتقرير المالي للبرامج', roles: ['admin', 'supervisor', 'user', 'accountant', 'reports', 'technical'] },
+            'view_supply_portfolio': { name: 'عرض حافظات التوريد والتقرير المالي للبرامج', roles: ['admin', 'supervisor'] },
             'view_collection_section': { name: 'عرض قسم التحصيل', roles: ['admin', 'supervisor', 'user'] },
             'view_collection_judicial': { name: 'عرض وإدارة تحصيل الضبطية', roles: ['admin', 'supervisor', 'user'] },
             'view_collection_zinat': { name: 'عرض وإدارة تحصيل زينات', roles: ['admin', 'supervisor', 'user'] },
             'register_zinat': { name: 'إضافة طلب وتصريح زينات', roles: ['admin', 'supervisor', 'user'] },
             'manage_collection': { name: 'إدارة التحصيل (تسجيل الدفع)', roles: ['admin', 'supervisor'] },
-            'view_control_cards_section': { name: 'عرض قسم كروت التحكم الذكية', roles: ['admin', 'supervisor', 'user'] },
-            'read_control_card': { name: 'قراءة كارت التحكم', roles: ['admin', 'supervisor', 'user'] },
-            'issue_control_card': { name: 'إصدار كروت التحكم وبرمجتها', roles: ['admin', 'supervisor', 'user'] },
-            'control_card_details': { name: 'تفاصيل قراءة كارت التحكم', roles: ['admin', 'supervisor', 'user'] },
-            'advanced_control_card': { name: 'كارت تحكم متقدم', roles: ['admin', 'supervisor', 'user'] },
-            'tech_collect_card': { name: 'قراءة كارت تجميع فني', roles: ['admin', 'supervisor', 'user'] },
-            'tech_collect_card_details': { name: 'تفاصيل كارت التجميع الفني', roles: ['admin', 'supervisor', 'user'] },
+            'view_control_cards_section': { name: 'عرض قسم كروت التحكم الذكية', roles: ['admin', 'supervisor'] },
+            'read_control_card': { name: 'قراءة كارت التحكم', roles: ['admin', 'supervisor'] },
+            'issue_control_card': { name: 'إصدار كروت التحكم وبرمجتها', roles: ['admin', 'supervisor'] },
+            'control_card_details': { name: 'تفاصيل قراءة كارت التحكم', roles: ['admin', 'supervisor'] },
+            'advanced_control_card': { name: 'كارت تحكم متقدم', roles: ['admin', 'supervisor'] },
+            'tech_collect_card': { name: 'قراءة كارت تجميع فني', roles: ['admin', 'supervisor'] },
+            'tech_collect_card_details': { name: 'تفاصيل كارت التجميع الفني', roles: ['admin', 'supervisor'] },
             'view_debts_and_fees_section': { name: 'عرض قسم الاستثناءات والرسوم والديون', roles: ['admin', 'supervisor'] },
             'debts_management': { name: 'إدارة حسابات الديون والمديونيات', roles: ['admin', 'supervisor'] },
             'debt_types': { name: 'إدارة أنواع الديون وتعديلها', roles: ['admin', 'supervisor'] },
@@ -1665,14 +1665,23 @@ const loadState = async () => {
         const mergedState = mergeWithDefaults(loadedState, defaultState);
         if (mergedState && mergedState.settings && mergedState.settings.permissions) {
             const ctrlKeys = ['view_control_cards_section', 'read_control_card', 'issue_control_card', 'control_card_details', 'advanced_control_card', 'tech_collect_card', 'tech_collect_card_details'];
-            ctrlKeys.forEach(k => { if (!mergedState.settings.permissions[k]) {
-                mergedState.settings.permissions[k] = defaultState.settings.permissions[k] || { name: k, roles: ['admin', 'supervisor', 'user', 'reports', 'معاينات', 'reviewer'] };
+            ctrlKeys.forEach(k => {
+                if (!mergedState.settings.permissions[k]) {
+                    mergedState.settings.permissions[k] = defaultState.settings.permissions[k] || { name: k, roles: ['admin', 'supervisor'] };
+                }
+            });
+            // ضبط وترقية أمنية: تنظيف دور 'user' من كروت التحكم وحافظات التوريد إن لم تكن ممنوحة صراحة
+            if (!mergedState.settings._perm_v2_sanitized) {
+                mergedState.settings._perm_v2_sanitized = true;
+                if (mergedState.settings.permissions['view_supply_portfolio'] && Array.isArray(mergedState.settings.permissions['view_supply_portfolio'].roles)) {
+                    mergedState.settings.permissions['view_supply_portfolio'].roles = mergedState.settings.permissions['view_supply_portfolio'].roles.filter((r) => r !== 'user' && r !== 'accountant' && r !== 'technical');
+                }
+                ctrlKeys.forEach(k => {
+                    if (mergedState.settings.permissions[k] && Array.isArray(mergedState.settings.permissions[k].roles)) {
+                        mergedState.settings.permissions[k].roles = mergedState.settings.permissions[k].roles.filter((r) => r !== 'user' && r !== 'reports' && r !== 'معاينات' && r !== 'reviewer');
+                    }
+                });
             }
-            else if (Array.isArray(mergedState.settings.permissions[k].roles)) {
-                ['user', 'reports', 'معاينات', 'reviewer'].forEach(role => { if (!mergedState.settings.permissions[k].roles.includes(role)) {
-                    mergedState.settings.permissions[k].roles.push(role);
-                } });
-            } });
         }
         if (typeof mergedState.settings !== 'object' || mergedState.settings === null) {
             mergedState.settings = defaultState.settings;
@@ -2464,11 +2473,16 @@ const hasPermission = (permissionKey) => {
     // Super admin has all permissions
     if (isSystemAdmin(loggedInUser))
         return true;
-    // Control Card shortcut: always allow if permission key includes 'control_card'
-    if (String(permissionKey).includes('control_card'))
+    // فحص الاستثناءات والحظر الصريح على مستوى المستخدم
+    if (Array.isArray(loggedInUser.deniedPermissions) && loggedInUser.deniedPermissions.includes(permissionKey)) {
+        return false;
+    }
+    // فحص الصلاحيات الممنوحة صراحة لهذا المستخدم الفردي
+    if (Array.isArray(loggedInUser.permissions) && loggedInUser.permissions.includes(permissionKey)) {
         return true;
+    }
     const permission = state.settings.permissions[permissionKey];
-    return permission && permission.roles.includes(loggedInUser.role);
+    return !!(permission && Array.isArray(permission.roles) && permission.roles.includes(loggedInUser.role));
 };
 const hasDashboardPermission = (permissionKey) => {
     if (!loggedInUser)
@@ -2861,8 +2875,8 @@ const renderDashboard = () => {
                 { id: 'clear-card', title: 'مسح كارت', permission: 'manage_clear_card', icon: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>', tileColor: 'tile-purple' },
                 { id: 'meter-movements', title: 'حركات عداد', permission: 'view_meter_movements', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', tileColor: 'tile-sky' },
                 { id: 'account-statement', title: 'كشف حساب مشترك', permission: 'view_meter_movements', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', tileColor: 'tile-cyan' },
-                { id: 'supply-portfolio-new', title: 'تسجيل حافظة توريد', permission: 'view_meter_movements', icon: '<rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>', tileColor: 'tile-emerald' },
-                { id: 'supply-portfolio-archive', title: 'سجل وأرشيف الحافظات', permission: 'view_meter_movements', icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>', tileColor: 'tile-indigo' },
+                { id: 'supply-portfolio-new', title: 'تسجيل حافظة توريد', permission: 'view_supply_portfolio', icon: '<rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>', tileColor: 'tile-emerald' },
+                { id: 'supply-portfolio-archive', title: 'سجل وأرشيف الحافظات', permission: 'view_supply_portfolio', icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>', tileColor: 'tile-indigo' },
                 { id: 'new-card-with-charge', title: 'كارت بديل بشحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/><path d="M12 14v4M10 16h4"/>', tileColor: 'tile-teal' },
                 { id: 'new-card-no-charge', title: 'بديل بدون شحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>', tileColor: 'tile-slate' },
                 { id: 'subscribers-faults', title: 'مرفوع أعطال', permission: 'view_subscribers_faults', filter: 'مرفوع أعطال', icon: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>', tileColor: 'tile-amber', count: scopedMeters.filter(m => m.subscriberType === 'مرفوع أعطال').length },
@@ -7794,7 +7808,7 @@ const exportSupplyPortfoliosToExcel = () => {
     showToast('تم تصدير سجل حافظات التوريد بنجاح!', 'success');
 };
 const initSupplyPortfoliosListeners = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23;
     // Calculation input triggers
     document.querySelectorAll('.sp-calc-input, .sp-system-input').forEach(inp => {
         inp.addEventListener('input', () => calculateSupplyPortfolioLive());
@@ -7950,11 +7964,71 @@ const initSupplyPortfoliosListeners = () => {
     (_w = document.getElementById('sp-portfolio-date')) === null || _w === void 0 ? void 0 : _w.addEventListener('change', () => {
         autoFetchUserProgramsRevenue(false);
     });
+    // Quick date buttons for supply portfolio
+    (_x = document.getElementById('btn-sp-date-today')) === null || _x === void 0 ? void 0 : _x.addEventListener('click', () => {
+        const dateInput = document.getElementById('sp-portfolio-date');
+        if (dateInput) {
+            dateInput.value = new Date().toISOString().slice(0, 10);
+            autoFetchUserProgramsRevenue(true);
+        }
+    });
+    (_y = document.getElementById('btn-sp-date-yesterday')) === null || _y === void 0 ? void 0 : _y.addEventListener('click', () => {
+        const dateInput = document.getElementById('sp-portfolio-date');
+        if (dateInput) {
+            const yStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+            dateInput.value = yStr;
+            autoFetchUserProgramsRevenue(true);
+        }
+    });
+    // Quick MEEDCO plan buttons
+    document.querySelectorAll('#sp-unified-plan-group .sp-unified-plan-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('#sp-unified-plan-group .sp-unified-plan-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = '#f1f5f9';
+                b.style.color = '#334155';
+                b.style.borderColor = '#cbd5e1';
+                b.style.fontWeight = '700';
+            });
+            const clicked = e.currentTarget;
+            clicked.classList.add('active');
+            clicked.style.background = '#0284c7';
+            clicked.style.color = '#fff';
+            clicked.style.borderColor = '#0284c7';
+            clicked.style.fontWeight = '800';
+            const plan = clicked.getAttribute('data-plan');
+            const hint = document.getElementById('sp-unified-plan-hint');
+            const badge = document.getElementById('sp-unified-date-plan-badge');
+            if (plan === 'yesterday_today') {
+                if (hint)
+                    hint.textContent = 'خطة سريعة: فحص من أمس إلى اليوم واستخراج وعرض اليوم فقط لحل تأخير النوبات';
+                if (badge)
+                    badge.textContent = 'أمس واليوم (عزل اليوم)';
+            }
+            else if (plan === 'yesterday_only') {
+                if (hint)
+                    hint.textContent = 'عرض عمليات وشحنات الأمس بالكامل';
+                if (badge)
+                    badge.textContent = 'خطة الأمس فقط';
+            }
+            else {
+                if (hint)
+                    hint.textContent = 'يتم فحص مبيعات اليوم مع توسيع نافذة الأمس تلقائياً عند الحاجة';
+                if (badge)
+                    badge.textContent = 'خطة اليوم فقط';
+            }
+            autoFetchUserProgramsRevenue(true, true);
+        });
+    });
+    // Fetch unified report only
+    (_z = document.getElementById('btn-sp-fetch-unified-only')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', () => {
+        autoFetchUserProgramsRevenue(true, true);
+    });
     // Automatically re-fetch programs revenue when custom user input changes or blurs
-    (_x = document.getElementById('sp-portfolio-user')) === null || _x === void 0 ? void 0 : _x.addEventListener('change', () => {
+    (_0 = document.getElementById('sp-portfolio-user')) === null || _0 === void 0 ? void 0 : _0.addEventListener('change', () => {
         autoFetchUserProgramsRevenue(false);
     });
-    (_y = document.getElementById('sp-portfolio-user')) === null || _y === void 0 ? void 0 : _y.addEventListener('blur', () => {
+    (_1 = document.getElementById('sp-portfolio-user')) === null || _1 === void 0 ? void 0 : _1.addEventListener('blur', () => {
         autoFetchUserProgramsRevenue(false);
     });
     // Maasara Excel File Upload
@@ -8007,24 +8081,24 @@ const initSupplyPortfoliosListeners = () => {
         });
     }
     // Modal close
-    (_z = document.getElementById('btn-sp-modal-close')) === null || _z === void 0 ? void 0 : _z.addEventListener('click', () => {
+    (_2 = document.getElementById('btn-sp-modal-close')) === null || _2 === void 0 ? void 0 : _2.addEventListener('click', () => {
         const modal = document.getElementById('sp-details-modal');
         if (modal)
             modal.style.display = 'none';
     });
-    (_0 = document.getElementById('btn-sp-modal-dismiss')) === null || _0 === void 0 ? void 0 : _0.addEventListener('click', () => {
+    (_3 = document.getElementById('btn-sp-modal-dismiss')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', () => {
         const modal = document.getElementById('sp-details-modal');
         if (modal)
             modal.style.display = 'none';
     });
     // ================= Detailed Report Section Event Listeners =================
-    (_1 = document.getElementById('btn-sp-detail-refresh')) === null || _1 === void 0 ? void 0 : _1.addEventListener('click', () => {
+    (_4 = document.getElementById('btn-sp-detail-refresh')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', () => {
         loadComprehensiveDailyReport(true);
     });
-    (_2 = document.getElementById('btn-sp-detail-apply')) === null || _2 === void 0 ? void 0 : _2.addEventListener('click', () => {
+    (_5 = document.getElementById('btn-sp-detail-apply')) === null || _5 === void 0 ? void 0 : _5.addEventListener('click', () => {
         loadComprehensiveDailyReport(false);
     });
-    (_3 = document.getElementById('btn-sp-detail-preset-today')) === null || _3 === void 0 ? void 0 : _3.addEventListener('click', () => {
+    (_6 = document.getElementById('btn-sp-detail-preset-today')) === null || _6 === void 0 ? void 0 : _6.addEventListener('click', () => {
         const fromInput = document.getElementById('sp-detail-from-date');
         const toInput = document.getElementById('sp-detail-to-date');
         const todayStr = new Date().toISOString().slice(0, 10);
@@ -8034,7 +8108,28 @@ const initSupplyPortfoliosListeners = () => {
             toInput.value = todayStr;
         loadComprehensiveDailyReport(false);
     });
-    (_4 = document.getElementById('btn-sp-detail-preset-month')) === null || _4 === void 0 ? void 0 : _4.addEventListener('click', () => {
+    (_7 = document.getElementById('btn-sp-detail-preset-yesterday-today')) === null || _7 === void 0 ? void 0 : _7.addEventListener('click', () => {
+        const fromInput = document.getElementById('sp-detail-from-date');
+        const toInput = document.getElementById('sp-detail-to-date');
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const yStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        if (fromInput)
+            fromInput.value = yStr;
+        if (toInput)
+            toInput.value = todayStr;
+        loadComprehensiveDailyReport(false);
+    });
+    (_8 = document.getElementById('btn-sp-detail-preset-yesterday')) === null || _8 === void 0 ? void 0 : _8.addEventListener('click', () => {
+        const fromInput = document.getElementById('sp-detail-from-date');
+        const toInput = document.getElementById('sp-detail-to-date');
+        const yStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        if (fromInput)
+            fromInput.value = yStr;
+        if (toInput)
+            toInput.value = yStr;
+        loadComprehensiveDailyReport(false);
+    });
+    (_9 = document.getElementById('btn-sp-detail-preset-month')) === null || _9 === void 0 ? void 0 : _9.addEventListener('click', () => {
         const fromInput = document.getElementById('sp-detail-from-date');
         const toInput = document.getElementById('sp-detail-to-date');
         const today = new Date();
@@ -8046,47 +8141,47 @@ const initSupplyPortfoliosListeners = () => {
             toInput.value = todayStr;
         loadComprehensiveDailyReport(false);
     });
-    (_5 = document.getElementById('sp-detail-from-date')) === null || _5 === void 0 ? void 0 : _5.addEventListener('change', () => {
+    (_10 = document.getElementById('sp-detail-from-date')) === null || _10 === void 0 ? void 0 : _10.addEventListener('change', () => {
         loadComprehensiveDailyReport(false);
     });
-    (_6 = document.getElementById('sp-detail-to-date')) === null || _6 === void 0 ? void 0 : _6.addEventListener('change', () => {
+    (_11 = document.getElementById('sp-detail-to-date')) === null || _11 === void 0 ? void 0 : _11.addEventListener('change', () => {
         loadComprehensiveDailyReport(false);
     });
-    (_7 = document.getElementById('sp-detail-branch-filter')) === null || _7 === void 0 ? void 0 : _7.addEventListener('change', () => {
+    (_12 = document.getElementById('sp-detail-branch-filter')) === null || _12 === void 0 ? void 0 : _12.addEventListener('change', () => {
         loadComprehensiveDailyReport(false);
     });
-    (_8 = document.getElementById('sp-detail-user-filter')) === null || _8 === void 0 ? void 0 : _8.addEventListener('change', () => {
+    (_13 = document.getElementById('sp-detail-user-filter')) === null || _13 === void 0 ? void 0 : _13.addEventListener('change', () => {
         filterAndRenderComprehensiveTable();
     });
-    (_9 = document.getElementById('sp-detail-date')) === null || _9 === void 0 ? void 0 : _9.addEventListener('change', () => {
+    (_14 = document.getElementById('sp-detail-date')) === null || _14 === void 0 ? void 0 : _14.addEventListener('change', () => {
         loadComprehensiveDailyReport(false);
     });
-    (_10 = document.getElementById('sp-detail-search-user')) === null || _10 === void 0 ? void 0 : _10.addEventListener('input', () => {
+    (_15 = document.getElementById('sp-detail-search-user')) === null || _15 === void 0 ? void 0 : _15.addEventListener('input', () => {
         filterAndRenderComprehensiveTable();
     });
-    (_11 = document.getElementById('sp-detail-status-filter')) === null || _11 === void 0 ? void 0 : _11.addEventListener('change', () => {
+    (_16 = document.getElementById('sp-detail-status-filter')) === null || _16 === void 0 ? void 0 : _16.addEventListener('change', () => {
         filterAndRenderComprehensiveTable();
     });
-    (_12 = document.getElementById('btn-sp-detail-print-all')) === null || _12 === void 0 ? void 0 : _12.addEventListener('click', () => {
+    (_17 = document.getElementById('btn-sp-detail-print-all')) === null || _17 === void 0 ? void 0 : _17.addEventListener('click', () => {
         printComprehensiveDailyReport();
     });
-    (_13 = document.getElementById('btn-sp-detail-export-excel')) === null || _13 === void 0 ? void 0 : _13.addEventListener('click', () => {
+    (_18 = document.getElementById('btn-sp-detail-export-excel')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', () => {
         exportComprehensiveDailyReportToExcel();
     });
-    (_14 = document.getElementById('btn-sp-detail-nav-new')) === null || _14 === void 0 ? void 0 : _14.addEventListener('click', gotoNew);
-    (_15 = document.getElementById('btn-sp-detail-nav-archive')) === null || _15 === void 0 ? void 0 : _15.addEventListener('click', gotoArchive);
+    (_19 = document.getElementById('btn-sp-detail-nav-new')) === null || _19 === void 0 ? void 0 : _19.addEventListener('click', gotoNew);
+    (_20 = document.getElementById('btn-sp-detail-nav-archive')) === null || _20 === void 0 ? void 0 : _20.addEventListener('click', gotoArchive);
     // Transactions modal handlers
-    (_16 = document.getElementById('btn-sp-tx-modal-close')) === null || _16 === void 0 ? void 0 : _16.addEventListener('click', () => {
+    (_21 = document.getElementById('btn-sp-tx-modal-close')) === null || _21 === void 0 ? void 0 : _21.addEventListener('click', () => {
         const m = document.getElementById('sp-user-transactions-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_17 = document.getElementById('btn-sp-tx-modal-dismiss')) === null || _17 === void 0 ? void 0 : _17.addEventListener('click', () => {
+    (_22 = document.getElementById('btn-sp-tx-modal-dismiss')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', () => {
         const m = document.getElementById('sp-user-transactions-modal');
         if (m)
             m.style.display = 'none';
     });
-    (_18 = document.getElementById('btn-sp-tx-modal-print')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', () => {
+    (_23 = document.getElementById('btn-sp-tx-modal-print')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', () => {
         printCurrentCashierTransactions();
     });
 };
@@ -8110,12 +8205,13 @@ const renderComprehensiveSourceWarnings = (warnings = []) => {
     notice.textContent = `تنبيه: التقرير جزئي أو يحتوي على بيانات محفوظة؛ لا تعتبر المبالغ الصفرية تأكيداً بعدم وجود عمليات. ${details}${remaining}`;
     notice.style.display = 'block';
 };
-const autoFetchUserProgramsRevenue = async (showToastNotice = true) => {
-    var _a, _b, _c, _d, _e, _f;
+const autoFetchUserProgramsRevenue = async (showToastNotice = true, unifiedOnly = false) => {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const dateInput = document.getElementById('sp-portfolio-date');
     const userInput = document.getElementById('sp-portfolio-user');
     const userSelect = document.getElementById('sp-portfolio-user-select');
     const btnText = document.getElementById('btn-sp-auto-fetch-text');
+    const btnUnified = document.getElementById('btn-sp-fetch-unified-only');
     const date = ((dateInput === null || dateInput === void 0 ? void 0 : dateInput.value) || new Date().toISOString().slice(0, 10)).trim();
     const userName = ((userInput === null || userInput === void 0 ? void 0 : userInput.value) || (userSelect === null || userSelect === void 0 ? void 0 : userSelect.value) || '').trim();
     if (!userName) {
@@ -8123,10 +8219,38 @@ const autoFetchUserProgramsRevenue = async (showToastNotice = true) => {
             showToast('يرجى اختيار اسم المستخدم / المحصل أولاً لجلب شحناته ومبيعاته', 'warning');
         return;
     }
-    if (btnText)
+    if (unifiedOnly && btnUnified) {
+        btnUnified.setAttribute('data-orig-html', btnUnified.innerHTML);
+        btnUnified.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg><span>جارِ الجلب... ⏳</span>';
+    }
+    else if (btnText) {
         btnText.textContent = 'جارِ الجلب والمطابقة... ⏳';
+    }
     try {
-        const url = `http://127.0.0.1:5002/api/reports/user-programs?date=${encodeURIComponent(date)}&user=${encodeURIComponent(userName)}`;
+        // فحص خطة التاريخ المحددة للموحد
+        const activePlanBtn = document.querySelector('#sp-unified-plan-group .sp-unified-plan-btn.active');
+        const currentPlan = (activePlanBtn === null || activePlanBtn === void 0 ? void 0 : activePlanBtn.getAttribute('data-plan')) || 'today';
+        let fromDate = date;
+        let toDate = date;
+        let todayOnly = 'true';
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        if (currentPlan === 'yesterday_today') {
+            fromDate = yesterdayStr;
+            toDate = date || todayStr;
+            todayOnly = 'true';
+        }
+        else if (currentPlan === 'yesterday_only') {
+            fromDate = yesterdayStr;
+            toDate = yesterdayStr;
+            todayOnly = 'false';
+        }
+        else {
+            fromDate = date;
+            toDate = date;
+            todayOnly = 'true';
+        }
+        const url = `http://127.0.0.1:5002/api/reports/user-programs?date=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}&todayOnly=${encodeURIComponent(todayOnly)}&user=${encodeURIComponent(userName)}`;
         const res = await fetch(url).then(r => r.json()).catch(() => null);
         if (res && res.success && res.data) {
             const d = res.data;
@@ -8141,11 +8265,19 @@ const autoFetchUserProgramsRevenue = async (showToastNotice = true) => {
                     el.textContent = text;
             };
             setVal('sp-system-unified', ((_a = d.unified) === null || _a === void 0 ? void 0 : _a.amount) || 0);
-            setVal('sp-system-maasara', ((_b = d.maasara) === null || _b === void 0 ? void 0 : _b.amount) || 0);
-            setVal('sp-system-iskra', ((_c = d.iskra) === null || _c === void 0 ? void 0 : _c.amount) || 0);
-            setText('sp-count-unified-badge', `${((_d = d.unified) === null || _d === void 0 ? void 0 : _d.count) || 0} شحنة`);
-            setText('sp-count-maasara-badge', `${((_e = d.maasara) === null || _e === void 0 ? void 0 : _e.count) || 0} شحنة`);
-            setText('sp-count-iskra-badge', `${((_f = d.iskra) === null || _f === void 0 ? void 0 : _f.count) || 0} شحنة`);
+            setText('sp-count-unified-badge', `${((_b = d.unified) === null || _b === void 0 ? void 0 : _b.count) || 0} شحنة`);
+            if (unifiedOnly) {
+                calculateSupplyPortfolioLive();
+                if (showToastNotice) {
+                    const planLabel = currentPlan === 'yesterday_today' ? ' (خطة أمس واليوم - عزل اليوم)' : (currentPlan === 'yesterday_only' ? ' (أمس فقط)' : ' (اليوم فقط)');
+                    showToast(`تم جلب تقرير الموحد لـ (${userName}): ${((_c = d.unified) === null || _c === void 0 ? void 0 : _c.count) || 0} شحنة بإجمالي ${(((_d = d.unified) === null || _d === void 0 ? void 0 : _d.amount) || 0).toLocaleString()} ج.م${planLabel} ✓`, 'success');
+                }
+                return;
+            }
+            setVal('sp-system-maasara', ((_e = d.maasara) === null || _e === void 0 ? void 0 : _e.amount) || 0);
+            setVal('sp-system-iskra', ((_f = d.iskra) === null || _f === void 0 ? void 0 : _f.amount) || 0);
+            setText('sp-count-maasara-badge', `${((_g = d.maasara) === null || _g === void 0 ? void 0 : _g.count) || 0} شحنة`);
+            setText('sp-count-iskra-badge', `${((_h = d.iskra) === null || _h === void 0 ? void 0 : _h.count) || 0} شحنة`);
             setText('sp-total-recharges-badge', `${d.totalCount || 0} شحنة`);
             const maasaraHint = document.getElementById('sp-maasara-daily-hint');
             if (maasaraHint) {
@@ -8202,6 +8334,10 @@ const autoFetchUserProgramsRevenue = async (showToastNotice = true) => {
     finally {
         if (btnText)
             btnText.textContent = 'جلب ومطابقة مبالغ البرامج آلياً';
+        if (unifiedOnly && btnUnified) {
+            const orig = btnUnified.getAttribute('data-orig-html');
+            btnUnified.innerHTML = orig || '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg><span>جلب تقرير الموحد</span>';
+        }
     }
 };
 const loadComprehensiveDailyReport = async (forceSync = false) => {
@@ -8228,9 +8364,8 @@ const loadComprehensiveDailyReport = async (forceSync = false) => {
     catch (_) { }
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
     if (fromInput && !fromInput.value) {
-        fromInput.value = firstDayOfMonth;
+        fromInput.value = todayStr;
     }
     if (toInput && !toInput.value) {
         toInput.value = todayStr;
@@ -17509,7 +17644,7 @@ const renderPermissionsSection = () => {
         {
             title: 'كروت التحكم الذكية (Smart Cards)',
             icon: '💳',
-            keys: ['view_control_cards_section', 'read_control_card', 'issue_control_card']
+            keys: ['view_control_cards_section', 'read_control_card', 'issue_control_card', 'control_card_details', 'advanced_control_card', 'tech_collect_card', 'tech_collect_card_details']
         },
         {
             title: 'الاستثناءات والرسوم والدمغات والديون',
@@ -40077,8 +40212,19 @@ function handleNavigation(event) {
     const targetId = targetLink.dataset.target;
     if (!targetId)
         return;
-    // Verify permission for target link
-    const requiredPermission = targetLink.dataset.permission;
+    // Verify permission for target link or target section
+    const sectionPermissionMap = {
+        'supply-portfolio-new': 'view_supply_portfolio',
+        'supply-portfolio-archive': 'view_supply_portfolio',
+        'supply-portfolio-detailed-report': 'view_supply_portfolio',
+        'read-control-card': 'read_control_card',
+        'control-card-details': 'control_card_details',
+        'issue-control-card': 'issue_control_card',
+        'advanced-control-card': 'advanced_control_card',
+        'tech-collect-card': 'tech_collect_card',
+        'tech-collect-card-details': 'tech_collect_card_details'
+    };
+    const requiredPermission = (targetLink.dataset.permission || sectionPermissionMap[targetId]);
     if (requiredPermission && !hasPermission(requiredPermission)) {
         showToast('ليس لديك صلاحية للوصول إلى هذا القسم.', 'error');
         return;

@@ -832,7 +832,7 @@ let state = {
             'manage_treasury_settlements': { name: 'إدارة تصفيات العهد ووقف الحسابات', roles: ['admin', 'supervisor'] },
 
             'view_treasury_transactions': { name: 'عرض سجل المعاملات المالية بالخزينة', roles: ['admin', 'supervisor'] },
-            'view_supply_portfolio': { name: 'عرض حافظات التوريد والتقرير المالي للبرامج', roles: ['admin', 'supervisor', 'user', 'accountant', 'reports', 'technical'] },
+            'view_supply_portfolio': { name: 'عرض حافظات التوريد والتقرير المالي للبرامج', roles: ['admin', 'supervisor'] },
 
             'view_collection_section': { name: 'عرض قسم التحصيل', roles: ['admin', 'supervisor', 'user'] },
 
@@ -844,19 +844,19 @@ let state = {
 
             'manage_collection': { name: 'إدارة التحصيل (تسجيل الدفع)', roles: ['admin', 'supervisor'] },
 
-            'view_control_cards_section': { name: 'عرض قسم كروت التحكم الذكية', roles: ['admin', 'supervisor', 'user'] },
+            'view_control_cards_section': { name: 'عرض قسم كروت التحكم الذكية', roles: ['admin', 'supervisor'] },
 
-            'read_control_card': { name: 'قراءة كارت التحكم', roles: ['admin', 'supervisor', 'user'] },
+            'read_control_card': { name: 'قراءة كارت التحكم', roles: ['admin', 'supervisor'] },
 
-            'issue_control_card': { name: 'إصدار كروت التحكم وبرمجتها', roles: ['admin', 'supervisor', 'user'] },
+            'issue_control_card': { name: 'إصدار كروت التحكم وبرمجتها', roles: ['admin', 'supervisor'] },
 
-            'control_card_details': { name: 'تفاصيل قراءة كارت التحكم', roles: ['admin', 'supervisor', 'user'] },
+            'control_card_details': { name: 'تفاصيل قراءة كارت التحكم', roles: ['admin', 'supervisor'] },
 
-            'advanced_control_card': { name: 'كارت تحكم متقدم', roles: ['admin', 'supervisor', 'user'] },
+            'advanced_control_card': { name: 'كارت تحكم متقدم', roles: ['admin', 'supervisor'] },
 
-            'tech_collect_card': { name: 'قراءة كارت تجميع فني', roles: ['admin', 'supervisor', 'user'] },
+            'tech_collect_card': { name: 'قراءة كارت تجميع فني', roles: ['admin', 'supervisor'] },
 
-            'tech_collect_card_details': { name: 'تفاصيل كارت التجميع الفني', roles: ['admin', 'supervisor', 'user'] },
+            'tech_collect_card_details': { name: 'تفاصيل كارت التجميع الفني', roles: ['admin', 'supervisor'] },
 
             'view_debts_and_fees_section': { name: 'عرض قسم الاستثناءات والرسوم والديون', roles: ['admin', 'supervisor'] },
 
@@ -3422,7 +3422,27 @@ const loadState = async () => {
 
         const mergedState = mergeWithDefaults(loadedState, defaultState);
 
-        if (mergedState && mergedState.settings && mergedState.settings.permissions) { const ctrlKeys = ['view_control_cards_section', 'read_control_card', 'issue_control_card', 'control_card_details', 'advanced_control_card', 'tech_collect_card', 'tech_collect_card_details']; ctrlKeys.forEach(k => { if (!mergedState.settings.permissions[k]) { mergedState.settings.permissions[k] = defaultState.settings.permissions[k] || { name: k, roles: ['admin', 'supervisor', 'user', 'reports', 'معاينات', 'reviewer'] }; } else if (Array.isArray(mergedState.settings.permissions[k].roles)) { ['user', 'reports', 'معاينات', 'reviewer'].forEach(role => { if (!mergedState.settings.permissions[k].roles.includes(role)) { mergedState.settings.permissions[k].roles.push(role); } }); } }); }
+        if (mergedState && mergedState.settings && mergedState.settings.permissions) {
+            const ctrlKeys = ['view_control_cards_section', 'read_control_card', 'issue_control_card', 'control_card_details', 'advanced_control_card', 'tech_collect_card', 'tech_collect_card_details'];
+            ctrlKeys.forEach(k => {
+                if (!mergedState.settings.permissions[k]) {
+                    mergedState.settings.permissions[k] = defaultState.settings.permissions[k] || { name: k, roles: ['admin', 'supervisor'] };
+                }
+            });
+
+            // ضبط وترقية أمنية: تنظيف دور 'user' من كروت التحكم وحافظات التوريد إن لم تكن ممنوحة صراحة
+            if (!(mergedState.settings as any)._perm_v2_sanitized) {
+                (mergedState.settings as any)._perm_v2_sanitized = true;
+                if (mergedState.settings.permissions['view_supply_portfolio'] && Array.isArray(mergedState.settings.permissions['view_supply_portfolio'].roles)) {
+                    mergedState.settings.permissions['view_supply_portfolio'].roles = mergedState.settings.permissions['view_supply_portfolio'].roles.filter((r: string) => r !== 'user' && r !== 'accountant' && r !== 'technical');
+                }
+                ctrlKeys.forEach(k => {
+                    if (mergedState.settings.permissions[k] && Array.isArray(mergedState.settings.permissions[k].roles)) {
+                        mergedState.settings.permissions[k].roles = mergedState.settings.permissions[k].roles.filter((r: string) => r !== 'user' && r !== 'reports' && r !== 'معاينات' && r !== 'reviewer');
+                    }
+                });
+            }
+        }
 
 
 
@@ -4639,12 +4659,19 @@ const hasPermission = (permissionKey: keyof typeof state.settings.permissions): 
 
     if (isSystemAdmin(loggedInUser)) return true;
 
-    // Control Card shortcut: always allow if permission key includes 'control_card'
-    if (String(permissionKey).includes('control_card')) return true;
+    // فحص الاستثناءات والحظر الصريح على مستوى المستخدم
+    if (Array.isArray((loggedInUser as any).deniedPermissions) && (loggedInUser as any).deniedPermissions.includes(permissionKey)) {
+        return false;
+    }
+
+    // فحص الصلاحيات الممنوحة صراحة لهذا المستخدم الفردي
+    if (Array.isArray((loggedInUser as any).permissions) && (loggedInUser as any).permissions.includes(permissionKey)) {
+        return true;
+    }
 
     const permission = state.settings.permissions[permissionKey];
 
-    return permission && permission.roles.includes(loggedInUser.role);
+    return !!(permission && Array.isArray(permission.roles) && permission.roles.includes(loggedInUser.role));
 
 };
 
@@ -5340,8 +5367,8 @@ const renderDashboard = () => {
                 { id: 'meter-movements', title: 'حركات عداد', permission: 'view_meter_movements', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', tileColor: 'tile-sky' },
 
                 { id: 'account-statement', title: 'كشف حساب مشترك', permission: 'view_meter_movements', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', tileColor: 'tile-cyan' },
-                { id: 'supply-portfolio-new', title: 'تسجيل حافظة توريد', permission: 'view_meter_movements', icon: '<rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>', tileColor: 'tile-emerald' },
-                { id: 'supply-portfolio-archive', title: 'سجل وأرشيف الحافظات', permission: 'view_meter_movements', icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>', tileColor: 'tile-indigo' },
+                { id: 'supply-portfolio-new', title: 'تسجيل حافظة توريد', permission: 'view_supply_portfolio', icon: '<rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>', tileColor: 'tile-emerald' },
+                { id: 'supply-portfolio-archive', title: 'سجل وأرشيف الحافظات', permission: 'view_supply_portfolio', icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>', tileColor: 'tile-indigo' },
 
                 { id: 'new-card-with-charge', title: 'كارت بديل بشحن', permission: 'manage_replacement_cards', icon: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/><path d="M12 14v4M10 16h4"/>', tileColor: 'tile-teal' },
 
@@ -12881,6 +12908,63 @@ const handlePrintJudicialControlDetails = () => {
             autoFetchUserProgramsRevenue(false);
         });
 
+        // Quick date buttons for supply portfolio
+        document.getElementById('btn-sp-date-today')?.addEventListener('click', () => {
+            const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
+            if (dateInput) {
+                dateInput.value = new Date().toISOString().slice(0, 10);
+                autoFetchUserProgramsRevenue(true);
+            }
+        });
+
+        document.getElementById('btn-sp-date-yesterday')?.addEventListener('click', () => {
+            const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
+            if (dateInput) {
+                const yStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+                dateInput.value = yStr;
+                autoFetchUserProgramsRevenue(true);
+            }
+        });
+
+        // Quick MEEDCO plan buttons
+        document.querySelectorAll('#sp-unified-plan-group .sp-unified-plan-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('#sp-unified-plan-group .sp-unified-plan-btn').forEach(b => {
+                    b.classList.remove('active');
+                    (b as HTMLElement).style.background = '#f1f5f9';
+                    (b as HTMLElement).style.color = '#334155';
+                    (b as HTMLElement).style.borderColor = '#cbd5e1';
+                    (b as HTMLElement).style.fontWeight = '700';
+                });
+                const clicked = e.currentTarget as HTMLElement;
+                clicked.classList.add('active');
+                clicked.style.background = '#0284c7';
+                clicked.style.color = '#fff';
+                clicked.style.borderColor = '#0284c7';
+                clicked.style.fontWeight = '800';
+
+                const plan = clicked.getAttribute('data-plan');
+                const hint = document.getElementById('sp-unified-plan-hint');
+                const badge = document.getElementById('sp-unified-date-plan-badge');
+                if (plan === 'yesterday_today') {
+                    if (hint) hint.textContent = 'خطة سريعة: فحص من أمس إلى اليوم واستخراج وعرض اليوم فقط لحل تأخير النوبات';
+                    if (badge) badge.textContent = 'أمس واليوم (عزل اليوم)';
+                } else if (plan === 'yesterday_only') {
+                    if (hint) hint.textContent = 'عرض عمليات وشحنات الأمس بالكامل';
+                    if (badge) badge.textContent = 'خطة الأمس فقط';
+                } else {
+                    if (hint) hint.textContent = 'يتم فحص مبيعات اليوم مع توسيع نافذة الأمس تلقائياً عند الحاجة';
+                    if (badge) badge.textContent = 'خطة اليوم فقط';
+                }
+                autoFetchUserProgramsRevenue(true, true);
+            });
+        });
+
+        // Fetch unified report only
+        document.getElementById('btn-sp-fetch-unified-only')?.addEventListener('click', () => {
+            autoFetchUserProgramsRevenue(true, true);
+        });
+
         // Automatically re-fetch programs revenue when custom user input changes or blurs
         document.getElementById('sp-portfolio-user')?.addEventListener('change', () => {
             autoFetchUserProgramsRevenue(false);
@@ -12962,6 +13046,25 @@ const handlePrintJudicialControlDetails = () => {
             const todayStr = new Date().toISOString().slice(0, 10);
             if (fromInput) fromInput.value = todayStr;
             if (toInput) toInput.value = todayStr;
+            loadComprehensiveDailyReport(false);
+        });
+
+        document.getElementById('btn-sp-detail-preset-yesterday-today')?.addEventListener('click', () => {
+            const fromInput = document.getElementById('sp-detail-from-date') as HTMLInputElement | null;
+            const toInput = document.getElementById('sp-detail-to-date') as HTMLInputElement | null;
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const yStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+            if (fromInput) fromInput.value = yStr;
+            if (toInput) toInput.value = todayStr;
+            loadComprehensiveDailyReport(false);
+        });
+
+        document.getElementById('btn-sp-detail-preset-yesterday')?.addEventListener('click', () => {
+            const fromInput = document.getElementById('sp-detail-from-date') as HTMLInputElement | null;
+            const toInput = document.getElementById('sp-detail-to-date') as HTMLInputElement | null;
+            const yStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+            if (fromInput) fromInput.value = yStr;
+            if (toInput) toInput.value = yStr;
             loadComprehensiveDailyReport(false);
         });
 
@@ -13051,11 +13154,12 @@ const handlePrintJudicialControlDetails = () => {
         notice.style.display = 'block';
     };
 
-    const autoFetchUserProgramsRevenue = async (showToastNotice = true) => {
+    const autoFetchUserProgramsRevenue = async (showToastNotice = true, unifiedOnly = false) => {
         const dateInput = document.getElementById('sp-portfolio-date') as HTMLInputElement | null;
         const userInput = document.getElementById('sp-portfolio-user') as HTMLInputElement | null;
         const userSelect = document.getElementById('sp-portfolio-user-select') as HTMLSelectElement | null;
         const btnText = document.getElementById('btn-sp-auto-fetch-text');
+        const btnUnified = document.getElementById('btn-sp-fetch-unified-only');
 
         const date = (dateInput?.value || new Date().toISOString().slice(0, 10)).trim();
         const userName = (userInput?.value || userSelect?.value || '').trim();
@@ -13065,10 +13169,40 @@ const handlePrintJudicialControlDetails = () => {
             return;
         }
 
-        if (btnText) btnText.textContent = 'جارِ الجلب والمطابقة... ⏳';
+        if (unifiedOnly && btnUnified) {
+            btnUnified.setAttribute('data-orig-html', btnUnified.innerHTML);
+            btnUnified.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg><span>جارِ الجلب... ⏳</span>';
+        } else if (btnText) {
+            btnText.textContent = 'جارِ الجلب والمطابقة... ⏳';
+        }
 
         try {
-            const url = `http://127.0.0.1:5002/api/reports/user-programs?date=${encodeURIComponent(date)}&user=${encodeURIComponent(userName)}`;
+            // فحص خطة التاريخ المحددة للموحد
+            const activePlanBtn = document.querySelector('#sp-unified-plan-group .sp-unified-plan-btn.active') as HTMLElement | null;
+            const currentPlan = activePlanBtn?.getAttribute('data-plan') || 'today';
+
+            let fromDate = date;
+            let toDate = date;
+            let todayOnly = 'true';
+
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+            if (currentPlan === 'yesterday_today') {
+                fromDate = yesterdayStr;
+                toDate = date || todayStr;
+                todayOnly = 'true';
+            } else if (currentPlan === 'yesterday_only') {
+                fromDate = yesterdayStr;
+                toDate = yesterdayStr;
+                todayOnly = 'false';
+            } else {
+                fromDate = date;
+                toDate = date;
+                todayOnly = 'true';
+            }
+
+            const url = `http://127.0.0.1:5002/api/reports/user-programs?date=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}&todayOnly=${encodeURIComponent(todayOnly)}&user=${encodeURIComponent(userName)}`;
             const res = await fetch(url).then(r => r.json()).catch(() => null);
 
             if (res && res.success && res.data) {
@@ -13083,10 +13217,20 @@ const handlePrintJudicialControlDetails = () => {
                 };
 
                 setVal('sp-system-unified', d.unified?.amount || 0);
+                setText('sp-count-unified-badge', `${d.unified?.count || 0} شحنة`);
+
+                if (unifiedOnly) {
+                    calculateSupplyPortfolioLive();
+                    if (showToastNotice) {
+                        const planLabel = currentPlan === 'yesterday_today' ? ' (خطة أمس واليوم - عزل اليوم)' : (currentPlan === 'yesterday_only' ? ' (أمس فقط)' : ' (اليوم فقط)');
+                        showToast(`تم جلب تقرير الموحد لـ (${userName}): ${d.unified?.count || 0} شحنة بإجمالي ${(d.unified?.amount || 0).toLocaleString()} ج.م${planLabel} ✓`, 'success');
+                    }
+                    return;
+                }
+
                 setVal('sp-system-maasara', d.maasara?.amount || 0);
                 setVal('sp-system-iskra', d.iskra?.amount || 0);
 
-                setText('sp-count-unified-badge', `${d.unified?.count || 0} شحنة`);
                 setText('sp-count-maasara-badge', `${d.maasara?.count || 0} شحنة`);
                 setText('sp-count-iskra-badge', `${d.iskra?.count || 0} شحنة`);
                 setText('sp-total-recharges-badge', `${d.totalCount || 0} شحنة`);
@@ -13141,6 +13285,10 @@ const handlePrintJudicialControlDetails = () => {
             if (showToastNotice) showToast('تعذر استيراد مبالغ البرامج: ' + e.message, 'error');
         } finally {
             if (btnText) btnText.textContent = 'جلب ومطابقة مبالغ البرامج آلياً';
+            if (unifiedOnly && btnUnified) {
+                const orig = btnUnified.getAttribute('data-orig-html');
+                btnUnified.innerHTML = orig || '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg><span>جلب تقرير الموحد</span>';
+            }
         }
     };
 
@@ -13168,9 +13316,8 @@ const handlePrintJudicialControlDetails = () => {
 
         const today = new Date();
         const todayStr = today.toISOString().slice(0, 10);
-        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
         if (fromInput && !fromInput.value) {
-            fromInput.value = firstDayOfMonth;
+            fromInput.value = todayStr;
         }
         if (toInput && !toInput.value) {
             toInput.value = todayStr;
@@ -28535,7 +28682,7 @@ const handlePrintJudicialControlDetails = () => {
 
                 icon: '💳',
 
-                keys: ['view_control_cards_section', 'read_control_card', 'issue_control_card']
+                keys: ['view_control_cards_section', 'read_control_card', 'issue_control_card', 'control_card_details', 'advanced_control_card', 'tech_collect_card', 'tech_collect_card_details']
 
             },
 
@@ -65739,9 +65886,20 @@ const setupOrgHierarchyEvents = () => {
 
 
 
-        // Verify permission for target link
+        // Verify permission for target link or target section
+        const sectionPermissionMap: Record<string, string> = {
+            'supply-portfolio-new': 'view_supply_portfolio',
+            'supply-portfolio-archive': 'view_supply_portfolio',
+            'supply-portfolio-detailed-report': 'view_supply_portfolio',
+            'read-control-card': 'read_control_card',
+            'control-card-details': 'control_card_details',
+            'issue-control-card': 'issue_control_card',
+            'advanced-control-card': 'advanced_control_card',
+            'tech-collect-card': 'tech_collect_card',
+            'tech-collect-card-details': 'tech_collect_card_details'
+        };
 
-        const requiredPermission = (targetLink as HTMLElement).dataset.permission as any;
+        const requiredPermission = ((targetLink as HTMLElement).dataset.permission || sectionPermissionMap[targetId]) as any;
 
         if (requiredPermission && !hasPermission(requiredPermission)) {
 

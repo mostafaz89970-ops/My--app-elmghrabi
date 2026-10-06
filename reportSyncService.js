@@ -12,24 +12,26 @@ if (!fs.existsSync(CACHE_DIR)) {
 /**
  * جلب تقرير مبيعات وشحنات المنظومة الموحدة (MEEDCO) لليوم المحدد
  */
-async function fetchMeedcoDailySales(dateStr) {
+async function fetchMeedcoDailySales(dateStr, toDateStr = null) {
     if (!dateStr) {
         dateStr = new Date().toISOString().slice(0, 10);
     }
-
-    const cacheFile = path.join(CACHE_DIR, `meedco_${dateStr}.json`);
+    const startStr = String(dateStr).trim().slice(0, 10);
+    const endStr = toDateStr ? String(toDateStr).trim().slice(0, 10) : startStr;
+    const cacheKey = startStr === endStr ? startStr : `${startStr}_${endStr}`;
+    const cacheFile = path.join(CACHE_DIR, `meedco_${cacheKey}.json`);
     const unifiedClient = require('./unifiedCardClient');
 
     try {
         let token = await unifiedClient.ensureValidSession();
         const cfg = unifiedClient.getMeedcoConfig();
 
-        const fromDate = `${dateStr}T00:00:00.000Z`;
-        const toDate = `${dateStr}T23:59:59.999Z`;
+        const fromDate = `${startStr}T00:00:00.000Z`;
+        const toDate = `${endStr}T23:59:59.999Z`;
 
-        const payload = JSON.stringify({
-            fromDate: fromDate,
-            toDate: toDate,
+        const buildPayload = (fDate, tDate) => JSON.stringify({
+            fromDate: fDate,
+            toDate: tDate,
             CustomerTypeIds: null,
             ProvinceIds: null,
             sectorIds: cfg.sectorId ? [cfg.sectorId] : [],
@@ -56,7 +58,9 @@ async function fetchMeedcoDailySales(dateStr) {
             publicAdminIdsOnCharge: null
         });
 
-        const fetchReport = (authToken) => new Promise((resolve, reject) => {
+        const initialPayload = buildPayload(fromDate, toDate);
+
+        const fetchReport = (authToken, customPayload = initialPayload) => new Promise((resolve, reject) => {
             const req = https.request({
                 hostname: 'report-api-prod.meedco.cyuni.net',
                 port: 443,
@@ -65,7 +69,7 @@ async function fetchMeedcoDailySales(dateStr) {
                 headers: {
                     'Authorization': 'Bearer ' + authToken,
                     'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(payload),
+                    'Content-Length': Buffer.byteLength(customPayload),
                     'Origin': 'https://report-prod.meedco.cyuni.net',
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
                 },
@@ -86,7 +90,7 @@ async function fetchMeedcoDailySales(dateStr) {
                 res.on('end', () => resolve(Buffer.concat(chunks)));
             });
             req.on('error', reject);
-            req.write(payload);
+            req.write(customPayload);
             req.end();
         });
 
@@ -95,17 +99,17 @@ async function fetchMeedcoDailySales(dateStr) {
             excelBuffer = await fetchReport(token);
         } catch (err) {
             if (err.statusCode !== 401) throw err;
-            console.warn(`[ReportSync] MEEDCO rejected the session for ${dateStr}; refreshing once.`);
+            console.warn(`[ReportSync] MEEDCO rejected the session for ${cacheKey}; refreshing once.`);
             token = await unifiedClient.refreshMeedcoSession();
             excelBuffer = await fetchReport(token);
         }
 
-        const tempExcelPath = path.join(CACHE_DIR, `temp_meedco_${dateStr}_${Date.now()}.xlsx`);
+        const tempExcelPath = path.join(CACHE_DIR, `temp_meedco_${cacheKey}_${Date.now()}.xlsx`);
         fs.writeFileSync(tempExcelPath, excelBuffer);
 
         // تشغيل بارسر البايثون المعتمد
         const scriptPath = path.join(__dirname, 'parse_meedco_excel.py');
-        const parsedResult = await new Promise((resolve, reject) => {
+        let parsedResult = await new Promise((resolve, reject) => {
             execFile('python', [scriptPath, tempExcelPath], { maxBuffer: 1024 * 1024 * 50, encoding: 'utf8' }, (err, stdout, stderr) => {
                 try { fs.unlinkSync(tempExcelPath); } catch (e) {}
                 if (err) {
@@ -120,6 +124,57 @@ async function fetchMeedcoDailySales(dateStr) {
             });
         });
 
+        // خطة ذكية للتعامل مع فرق التاريخ في سيرفر المنظومة:
+        // إذا كان البحث ليوم واحد وعادت النتيجة فارغة، نطلب من سيرفر MEEDCO فترة موسعة (أمس + اليوم)
+        // ثم نفلتر داخلياً لاستخراج عمليات اليوم فقط وعرض اليوم فقط
+        if (startStr === endStr && (!parsedResult || !parsedResult.users || parsedResult.users.length === 0)) {
+            try {
+                const prevDateObj = new Date(new Date(startStr).getTime() - 86400000);
+                const prevDateStr = prevDateObj.toISOString().slice(0, 10);
+                const widerFromDate = `${prevDateStr}T00:00:00.000Z`;
+                const widerPayload = buildPayload(widerFromDate, toDate);
+                const widerBuffer = await fetchReport(token, widerPayload);
+                const widerTempPath = path.join(CACHE_DIR, `temp_meedco_wider_${cacheKey}_${Date.now()}.xlsx`);
+                fs.writeFileSync(widerTempPath, widerBuffer);
+                const widerParsed = await new Promise((resolve) => {
+                    execFile('python', [scriptPath, widerTempPath], { maxBuffer: 1024 * 1024 * 50, encoding: 'utf8' }, (err, stdout) => {
+                        try { fs.unlinkSync(widerTempPath); } catch (e) {}
+                        if (err) return resolve(null);
+                        try { resolve(JSON.parse(stdout)); } catch (e) { resolve(null); }
+                    });
+                });
+                if (widerParsed && widerParsed.success && Array.isArray(widerParsed.users) && widerParsed.users.length > 0) {
+                    // عزل شحنات اليوم فقط وحساب إجماليات اليوم فقط
+                    const todayUsers = widerParsed.users.map(u => {
+                        const targetItems = (u.items || []).filter(it => {
+                            const pTime = String(it.paymentTime || '');
+                            return pTime.includes(startStr) || pTime.includes(startStr.split('-').reverse().join('/')) || pTime.includes(startStr.replace(/-/g, '/'));
+                        });
+                        if (targetItems.length > 0) {
+                            const sumAmount = roundToTwo(targetItems.reduce((acc, it) => acc + (Number(it.amount) || 0), 0));
+                            return {
+                                ...u,
+                                totalAmount: sumAmount,
+                                rechargesCount: targetItems.length,
+                                items: targetItems,
+                                isExtractedFromShift: true
+                            };
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    if (todayUsers.length > 0) {
+                        parsedResult = {
+                            ...widerParsed,
+                            users: todayUsers,
+                            isFallbackExtracted: true
+                        };
+                    }
+                }
+            } catch (fbErr) {
+                console.warn('[ReportSync] MEEDCO shift fallback failed:', fbErr.message);
+            }
+        }
+
         if (parsedResult && parsedResult.success) {
             parsedResult.fetchedAt = new Date().toISOString();
             fs.writeFileSync(cacheFile, JSON.stringify(parsedResult, null, 2), 'utf8');
@@ -129,7 +184,7 @@ async function fetchMeedcoDailySales(dateStr) {
         }
 
     } catch (err) {
-        console.warn(`[ReportSync] MEEDCO live fetch failed for ${dateStr}:`, err.message);
+        console.warn(`[ReportSync] MEEDCO live fetch failed for ${cacheKey}:`, err.message);
         // Fallback to cache if exists
         if (fs.existsSync(cacheFile)) {
             try {
@@ -496,24 +551,43 @@ async function fetchIskraDailySales(dateStr) {
 }
 
 /**
- * جلب الأرقام المحددة لمستخدم معين في يوم محدد لجميع البرامج
+ * جلب الأرقام المحددة لمستخدم معين في يوم محدد لجميع البرامج مع دعم النطاق الزمني وفلترة اليوم فقط
  */
-async function getUserDailyPrograms(dateStr, targetUserName) {
+async function getUserDailyPrograms(dateStr, targetUserName, toDateStr = null, todayOnly = false) {
     if (!targetUserName) return null;
     const cleanTarget = targetUserName.replace(/\s+/g, ' ').trim();
+    const cleanDate = (dateStr || new Date().toISOString().slice(0, 10)).trim();
+    const cleanToDate = toDateStr ? toDateStr.trim() : cleanDate;
 
     // 1. MEEDCO
     let meedcoAmount = 0;
     let meedcoCount = 0;
     let meedcoItems = [];
+    let meedcoFullRangeAmount = 0;
+    let meedcoFullRangeCount = 0;
 
-    const meedcoData = await fetchMeedcoDailySales(dateStr);
+    const meedcoData = await fetchMeedcoDailySales(cleanDate, cleanToDate);
     if (meedcoData && meedcoData.success && Array.isArray(meedcoData.users)) {
         const found = meedcoData.users.find(u => isArabicMatch(u.userName, cleanTarget));
         if (found) {
-            meedcoAmount = found.totalAmount || 0;
-            meedcoCount = found.rechargesCount || (found.items ? found.items.length : 0);
-            meedcoItems = found.items || [];
+            meedcoFullRangeAmount = found.totalAmount || 0;
+            meedcoFullRangeCount = found.rechargesCount || (found.items ? found.items.length : 0);
+            
+            if (todayOnly && cleanDate !== cleanToDate) {
+                // فلترة وعرض شحنات اليوم فقط (اليوم الأحدث في النطاق)
+                const targetDay = (cleanToDate > cleanDate) ? cleanToDate : cleanDate;
+                const todayItems = (found.items || []).filter(it => {
+                    const pTime = String(it.paymentTime || it.paymentDate || '');
+                    return pTime.includes(targetDay) || pTime.includes(targetDay.split('-').reverse().join('/')) || pTime.includes(targetDay.replace(/-/g, '/'));
+                });
+                meedcoAmount = roundToTwo(todayItems.reduce((acc, it) => acc + (Number(it.amount) || 0), 0));
+                meedcoCount = todayItems.length;
+                meedcoItems = todayItems;
+            } else {
+                meedcoAmount = found.totalAmount || 0;
+                meedcoCount = found.rechargesCount || (found.items ? found.items.length : 0);
+                meedcoItems = found.items || [];
+            }
         }
     }
 
