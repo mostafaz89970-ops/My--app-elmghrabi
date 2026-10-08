@@ -3643,8 +3643,94 @@ const getMeterSearchMatches = (rawQuery) => {
         return nameMatch || chassisMatch || codeMatch || refMatch || addrMatch || panelMatch;
     });
 };
+const BASIC_METER_FORM_FIELD_IDS = [
+    'subscriberName',
+    'codeName',
+    'address',
+    'subscriptionCode',
+    'sector',
+    'generalAdmin',
+    'subAdmin',
+    'meterChassisNumber',
+    'panelNumber',
+    'accountRefF',
+    'accountRefH',
+    'accountRefY',
+    'accountRefM',
+    'meterCapacity',
+    'meterType',
+    'activityType',
+    'locationDescription',
+    'subscriptionType'
+];
+const OPERATIONAL_METER_FORM_FIELD_IDS = [
+    'subscriberType',
+    'removalReason',
+    'removalDate',
+    'removedBy',
+    'readingAtRemoval',
+    'cardStatus',
+    'newMeterChassisNumber',
+    'newMeterType',
+    'installationDate',
+    'installedBy',
+    'demolitionType',
+    'demolitionDate',
+    'meterReceivedBy'
+];
+const freezeBasicMeterFormFields = () => {
+    BASIC_METER_FORM_FIELD_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.disabled = true;
+            el.style.backgroundColor = '#f1f5f9';
+            el.style.cursor = 'not-allowed';
+            el.style.borderColor = '#cbd5e1';
+            el.style.color = '#334155';
+            el.title = 'حقل مجمد لحماية البيانات الأساسية من التعديل والعبث';
+        }
+    });
+    const subTypeSelect = document.getElementById('subscriberType');
+    if (subTypeSelect) {
+        subTypeSelect.disabled = false;
+        subTypeSelect.style.backgroundColor = '#ffffff';
+        subTypeSelect.style.cursor = 'pointer';
+        subTypeSelect.style.borderColor = '#0284c7';
+        subTypeSelect.style.boxShadow = '0 0 0 3px rgba(2, 132, 199, 0.18)';
+        subTypeSelect.style.color = '#0f172a';
+        subTypeSelect.title = 'اختر نوع المشترك / الحالة لتسجيل عملية جديدة (مثل أعطال أو إحلال)';
+    }
+};
+const ensureOperationalFieldsEnabled = () => {
+    var _a;
+    const currentSubType = ((_a = document.getElementById('subscriberType')) === null || _a === void 0 ? void 0 : _a.value) || '';
+    OPERATIONAL_METER_FORM_FIELD_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el)
+            return;
+        // في حالة 'مرفوع إحلال'، تقوم updateMeterFormVisibility بتحديد سبب الرفع إلى 'إحلال' وتعطيله، نحترم ذلك
+        if (id === 'removalReason' && currentSubType === 'مرفوع إحلال') {
+            return;
+        }
+        el.disabled = false;
+        el.style.backgroundColor = '#ffffff';
+        el.style.cursor = '';
+        el.style.color = '#0f172a';
+        el.style.borderColor = '';
+        el.title = '';
+    });
+    // تعبئة تاريخ الرفع تلقائياً بتاريخ اليوم إذا كان فارغاً عند اختيار حالة تتضمن رفعاً
+    const isFaulty = currentSubType.includes('أعطال') || currentSubType.includes('اعطال') || currentSubType.includes('عطل');
+    const isReplacement = currentSubType.includes('إحلال') || currentSubType.includes('احلال') || currentSubType.includes('استبدال');
+    if (isFaulty || isReplacement) {
+        const removalDateInput = document.getElementById('removalDate');
+        if (removalDateInput && !removalDateInput.value) {
+            removalDateInput.value = new Date().toISOString().split('T')[0];
+        }
+    }
+};
 const populateMeterFormForSearch = (data) => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c;
     const form = document.getElementById('meter-form');
     if (!form)
         return;
@@ -3658,9 +3744,6 @@ const populateMeterFormForSearch = (data) => {
         if (data[input.id] !== undefined && data[input.id] !== null) {
             input.value = String(data[input.id]);
         }
-        // إتاحة كافة الحقول للتعديل وإلغاء أي تعطيل سابق
-        input.disabled = false;
-        input.style.backgroundColor = '';
     });
     // تعبئة حقول مرجع الحساب المركب
     const refF = document.getElementById('accountRefF');
@@ -3690,16 +3773,21 @@ const populateMeterFormForSearch = (data) => {
         generalAdmin: data.generalAdmin,
         subAdmin: data.subAdmin || data.branch || data.branchName
     });
-    // تحديث عنوان الصفحة للإشارة إلى تعديل السجل
+    // تجميد الحقول الأساسية لمنع العبث بالبيانات مع إبقاء نوع المشترك متاحاً
+    freezeBasicMeterFormFields();
+    // تحديث ظهور الحقول الشرطية وتفعيل الحقول التشغيلية
+    updateMeterFormVisibility();
+    ensureOperationalFieldsEnabled();
+    // تحديث عنوان الصفحة للإشارة إلى السجل الحالي
     const formTitle = document.getElementById('meter-form-title');
     if (formTitle)
-        formTitle.textContent = `تعديل / تحديث سجل العداد: ${data.subscriberName || ''}`;
-    // إظهار شريط تنبيه العداد المحدد
+        formTitle.textContent = `سجل العداد: ${data.subscriberName || ''}`;
+    // إظهار شريط تنبيه العداد المحدد مع التوضيح
     const activeNotice = document.getElementById('meter-search-active-notice');
     const activeText = document.getElementById('meter-search-active-text');
     if (activeNotice && activeText) {
         const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        activeText.innerHTML = `<strong>تم تحميل السجل:</strong> ${esc(data.subscriberName || '')} | شاسية: <span style="font-family:monospace;font-weight:bold;color:#0284c7;">${esc(data.meterChassisNumber || '—')}</span> | كود: <span style="font-family:monospace;color:#15803d;">${esc(data.subscriptionCode || '—')}</span>`;
+        activeText.innerHTML = `🔒 <strong>تم تجميد البيانات الأساسية:</strong> ${esc(data.subscriberName || '')} | شاسية: <span style="font-family:monospace;font-weight:bold;color:#0284c7;">${esc(data.meterChassisNumber || '—')}</span> | كود: <span style="font-family:monospace;color:#15803d;">${esc(data.subscriptionCode || '—')}</span> <span style="display:inline-block;margin-right:8px;font-size:0.8rem;color:#065f46;">(حقل نوع المشترك متاح لاختيار أعطال/إحلال لتسجيل سبب الرفع)</span>`;
         activeNotice.classList.remove('hidden');
     }
     // إظهار زر الإلغاء والتفريغ
@@ -3707,10 +3795,6 @@ const populateMeterFormForSearch = (data) => {
     // إخفاء نتائج وقوائم البحث المنسدلة
     (_b = document.getElementById('meter-search-results-box')) === null || _b === void 0 ? void 0 : _b.classList.add('hidden');
     (_c = document.getElementById('meter-search-suggestions')) === null || _c === void 0 ? void 0 : _c.classList.add('hidden');
-    // تفعيل التغييرات لإظهار الحقول الشرطية حسب نوع العداد وحالة المشترك
-    (_d = document.getElementById('meterType')) === null || _d === void 0 ? void 0 : _d.dispatchEvent(new Event('change'));
-    (_e = document.getElementById('subscriberType')) === null || _e === void 0 ? void 0 : _e.dispatchEvent(new Event('change'));
-    updateMeterFormVisibility();
 };
 const handleMeterRegistrationSearch = () => {
     const queryInput = document.getElementById('meter-search-query');
@@ -3878,7 +3962,16 @@ const clearMeterRegistrationSearch = () => {
     inputs.forEach(input => {
         input.disabled = false;
         input.style.backgroundColor = '';
+        input.style.cursor = '';
+        input.style.borderColor = '';
+        input.style.color = '';
+        input.title = '';
     });
+    const subscriberTypeSelect = document.getElementById('subscriberType');
+    if (subscriberTypeSelect) {
+        subscriberTypeSelect.style.border = '';
+        subscriberTypeSelect.style.boxShadow = '';
+    }
     (_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.add('hidden');
     (_b = document.getElementById('meter-search-active-notice')) === null || _b === void 0 ? void 0 : _b.classList.add('hidden');
     (_c = document.getElementById('meter-search-results-box')) === null || _c === void 0 ? void 0 : _c.classList.add('hidden');
@@ -3903,7 +3996,15 @@ const unlockMeterFormFields = () => {
     inputs.forEach(input => {
         input.disabled = false;
         input.style.backgroundColor = '';
+        input.style.cursor = '';
+        input.style.borderColor = '';
+        input.style.color = '';
+        input.title = '';
     });
+    const activeText = document.getElementById('meter-search-active-text');
+    if (activeText) {
+        activeText.innerHTML = activeText.innerHTML.replace('🔒 <strong>تم تجميد البيانات الأساسية:</strong>', '🔓 <strong>تم إلغاء تجميد الحقول للتعديل:</strong>');
+    }
     showToast('تم إتاحة تعديل كافة الحقول بنجاح.');
 };
 const handleAllSubscribersSearch = () => {
@@ -4152,8 +4253,6 @@ const openMeterForm = () => {
     }
     // Reset search UI state on open
     clearMeterRegistrationSearch();
-    // Reset search UI state on open
-    clearMeterRegistrationSearch();
     document.getElementById('meter-form-title').textContent = 'إضافة سجل عداد جديد';
     // Trigger change events to show/hide conditional fields correctly on load
     (_a = document.getElementById('meterType')) === null || _a === void 0 ? void 0 : _a.dispatchEvent(new Event('change'));
@@ -4274,7 +4373,8 @@ const handleMeterFormSubmit = async (event) => {
     // Save individual parts
     Object.assign(formData, { accountRefF, accountRefH, accountRefY, accountRefM });
     // Force new record creation for 'مرفوع أعطال' to preserve original data
-    if (formData.subscriberType === 'مرفوع أعطال' && existingId) {
+    const isFaultyRecord = formData.subscriberType === 'مرفوع أعطال' || formData.subscriberType === 'مرفوع اعطال' || (typeof formData.subscriberType === 'string' && (formData.subscriberType.includes('أعطال') || formData.subscriberType.includes('اعطال')));
+    if (isFaultyRecord && existingId) {
         existingId = null;
         formData.id = Date.now();
     }
@@ -4288,7 +4388,7 @@ const handleMeterFormSubmit = async (event) => {
         const existingMeterByChassis = state.meters.find(m => m.meterChassisNumber === formData.meterChassisNumber && m.id !== formData.id);
         if (existingMeterByChassis) {
             // Allow duplicate chassis for 'مرفوع أعطال' to enable creating a copy
-            if (formData.subscriberType !== 'مرفوع أعطال') {
+            if (!isFaultyRecord) {
                 showToast('خطأ: رقم شاسية العداد مسجل بالفعل.', 'error');
                 showFieldError(document.getElementById('meterChassisNumber'), 'رقم الشاسية هذا مسجل بالفعل');
                 return;
@@ -41226,22 +41326,28 @@ const setupEventListeners = () => {
     (_47 = document.getElementById('btn-reset-subscribers-all')) === null || _47 === void 0 ? void 0 : _47.addEventListener('click', handleResetAllSubscribersSearch);
     (_48 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', handleDeleteSelectedSubscribersAll);
     (_49 = document.getElementById('subscriberType')) === null || _49 === void 0 ? void 0 : _49.addEventListener('change', (e) => {
-        var _a;
+        var _a, _b;
         const select = e.target;
-        const isSearchMode = !((_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.contains('hidden'));
-        if (isSearchMode && select.value === 'مرفوع أعطال') {
-            const subscriptionCode = document.getElementById('subscriptionCode').value;
-            const subscriberName = document.getElementById('subscriberName').value;
-            // Find the latest meter for this subscriber (Newest first)
+        const meterIdInput = document.getElementById('meter-id');
+        const isLoadedMeter = !!(meterIdInput && meterIdInput.value);
+        // إذا لم يكن العداد محملاً مسبقاً من البحث، وتم اختيار مرفوع أعطال، يتم محاولة جلب آخر عداد تلقائياً
+        if (!isLoadedMeter && select.value === 'مرفوع أعطال') {
+            const subscriptionCode = (_a = document.getElementById('subscriptionCode')) === null || _a === void 0 ? void 0 : _a.value;
+            const subscriberName = (_b = document.getElementById('subscriberName')) === null || _b === void 0 ? void 0 : _b.value;
             const latestMeter = [...state.meters].reverse().find(m => (subscriptionCode && m.subscriptionCode === subscriptionCode) ||
                 (!subscriptionCode && subscriberName && m.subscriberName === subscriberName));
             if (latestMeter) {
                 populateMeterFormForSearch(latestMeter);
-                // Restore the selected value as populateMeterFormForSearch might have overwritten it
                 select.value = 'مرفوع أعطال';
             }
         }
+        // تحديث إظهار الحقول الشرطية (بيانات الرفع، سبب الرفع، التركيب، إلخ)
         updateMeterFormVisibility();
+        // إذا كان السجل محملاً من البحث، نحافظ على تجميد الحقول الأساسية مع ضمان تفعيل الحقول التشغيلية الجديدة
+        if (isLoadedMeter) {
+            freezeBasicMeterFormFields();
+        }
+        ensureOperationalFieldsEnabled();
     });
     // Subscriber Statement Listener (الاستعلام عن مشترك)
     (_50 = document.getElementById('subscriber-statement-form')) === null || _50 === void 0 ? void 0 : _50.addEventListener('submit', (e) => {
