@@ -6640,234 +6640,365 @@ const filterTableByMultipleCriteria = (tableId: string) => {
 
 
 
+// دالة مساعدة لتوحيد النصوص العربية والأرقام للبحث الدقيق
+const normalizeString = (str: string | any | undefined | null): string => {
+    if (!str) return '';
+    return String(str)
+        .replace(/[أإآ]/g, 'ا')
+        .replace(/ة/g, 'ه')
+        .replace(/ى/g, 'ي')
+        .replace(/[٠-٩]/g, d => '0123456789'['٠١٢٣٤٥٦٧٨٩'.indexOf(d)])
+        .toLowerCase()
+        .trim();
+};
+
+// --- Search Helper Functions ---
+const searchIncludes = (dataStr: string | undefined | null, searchStr: string | null | undefined): boolean => {
+    if (!searchStr) return true;
+    return normalizeString(dataStr).includes(normalizeString(searchStr));
+};
+
+const searchAllTerms = (dataStr: string | undefined | null, searchStr: string | null | undefined): boolean => {
+    if (!searchStr) return true;
+    const normData = normalizeString(dataStr);
+    const terms = normalizeString(searchStr).split(' ').filter(t => t.trim() !== '');
+    return terms.every(term => normData.includes(term));
+};
+
+const searchAnyTerm = (dataStr: string | undefined | null, searchStr: string | null | undefined): boolean => {
+    if (!searchStr) return true;
+    const normData = normalizeString(dataStr);
+    const terms = normalizeString(searchStr).split(' ').filter(t => t.trim() !== '');
+    return terms.some(term => normData.includes(term));
+};
+
+// =========================================================================
+// وظائف البحث الذكي في صفحة تسجيل عداد (Meter Registration Search)
+// =========================================================================
+
+const getMeterSearchMatches = (rawQuery: string): DataItem[] => {
+    const q = rawQuery.trim();
+    if (!q) return [];
+
+    const allMeters = Array.isArray(state.meters) ? state.meters : [];
+    return [...allMeters].reverse().filter(m => {
+        if (!m) return false;
+
+        // 1. مطابقة الاسم والاسم الكودي
+        const nameMatch = searchAllTerms(m.subscriberName, q) ||
+            searchAllTerms(m.newSubscriberName, q) ||
+            searchAllTerms(m.codeName, q);
+
+        // 2. مطابقة رقم الشاسية بكافة أنواعه
+        const chassisMatch = searchIncludes(String(m.meterChassisNumber || ''), q) ||
+            searchIncludes(String(m.newMeterChassisNumber || ''), q) ||
+            searchIncludes(String(m.newMeterChassisNumberForReplacement || ''), q) ||
+            searchIncludes(String(m.oldMeterChassisNumber || ''), q) ||
+            searchIncludes(String(m.chassisNumber || ''), q);
+
+        // 3. مطابقة كود الاشتراك
+        const codeMatch = searchIncludes(String(m.subscriptionCode || ''), q);
+
+        // 4. مطابقة مرجع الحساب
+        const fullRef = `${m.accountRefF || ''}${m.accountRefH || ''}${m.accountRefY || ''}${m.accountRefM || ''}`;
+        const refMatch = searchIncludes(String(m.accountReference || ''), q) ||
+            (fullRef ? searchIncludes(fullRef, q) : false);
+
+        // 5. مطابقة العنوان
+        const addrMatch = searchAllTerms(m.address, q);
+
+        // 6. مطابقة رقم اللوحة
+        const panelMatch = searchIncludes(String(m.panelNumber || ''), q);
+
+        return nameMatch || chassisMatch || codeMatch || refMatch || addrMatch || panelMatch;
+    });
+};
+
 const populateMeterFormForSearch = (data: DataItem) => {
-
     const form = document.getElementById('meter-form') as HTMLFormElement;
-
     if (!form) return;
 
-
-
-    // Populate fields
-
-    const inputs = form.querySelectorAll('input, select, textarea');
-
-    inputs.forEach((input: any) => {
-
-        if (input.id && data[input.id] !== undefined) {
-
-            input.value = data[input.id];
-
-        }
-
-        // Disable all except subscriberType and removal fields
-
-        if (input.id !== 'subscriberType' && input.id !== 'removalReason' && input.id !== 'removalDate' && input.id !== 'removedBy' && input.id !== 'cardStatus') {
-
-            input.disabled = true;
-
-            input.style.backgroundColor = '#e9ecef';
-
-        }
-
-    });
-
-
-
-    // 🔧 FIXED: ضمان تعبئة dropdown وصف المكان
-
-    const locationSelect = document.getElementById('locationDescription') as HTMLSelectElement;
-
-    if (locationSelect && data.locationDescription && state.settings.placeDescriptions.includes(data.locationDescription)) {
-
-        locationSelect.value = data.locationDescription;
-
-    }
-
-
-
-    // Handle ID
-
-    (document.getElementById('meter-id') as HTMLInputElement).value = String(data.id);
-
-
-
-    // ضبط حقول الإدارات لبيانات المشترك
-
-    setupDepartmentFormFields('', {
-
-        sector: data.sector,
-
-        generalAdmin: data.generalAdmin,
-
-        subAdmin: data.subAdmin || data.branch || data.branchName
-
-    });
-
-
-
-    // Show clear button
-
-    document.getElementById('meter-search-clear-btn')?.classList.remove('hidden');
-
-
-
-    // Trigger visibility update to handle button state
-
-    updateMeterFormVisibility();
-
-};
-
-
-
-const handleMeterRegistrationSearch = () => {
-
-    const queryInput = document.getElementById('meter-search-query') as HTMLInputElement;
-
-    const query = queryInput.value.trim().toLowerCase();
-
-
-
-    if (!query) {
-
-        showToast('يرجى إدخال بيانات للبحث.', 'error');
-
-        return;
-
-    }
-
-
-
-    const result = [...state.meters].reverse().find(m =>
-
-        (m.subscriberName && m.subscriberName.toLowerCase().includes(query)) ||
-
-        (m.meterChassisNumber && m.meterChassisNumber.toLowerCase().includes(query)) ||
-
-        (m.subscriptionCode && m.subscriptionCode.toLowerCase().includes(query))
-
-    );
-
-
-
-    if (result) {
-
-        populateMeterFormForSearch(result);
-
-        showToast('تم العثور على البيانات.');
-
-    } else {
-
-        showToast('لم يتم العثور على بيانات مطابقة.', 'error');
-
-    }
-
-};
-
-
-
-const clearMeterRegistrationSearch = () => {
-
-    const form = document.getElementById('meter-form') as HTMLFormElement;
-
-    if (!form) return;
-
-
-
+    // تفريغ النموذج من أي قيم قديمة قبل التعبئة
     form.reset();
 
-    (document.getElementById('meter-id') as HTMLInputElement).value = '';
+    // تعبئة كافة عناصر النموذج بالبيانات المطابقة
+    const inputs = form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea');
+    inputs.forEach(input => {
+        if (!input.id) return;
+        if (data[input.id] !== undefined && data[input.id] !== null) {
+            input.value = String(data[input.id]);
+        }
+        // إتاحة كافة الحقول للتعديل وإلغاء أي تعطيل سابق
+        input.disabled = false;
+        input.style.backgroundColor = '';
+    });
+
+    // تعبئة حقول مرجع الحساب المركب
+    const refF = document.getElementById('accountRefF') as HTMLInputElement | null;
+    const refH = document.getElementById('accountRefH') as HTMLInputElement | null;
+    const refY = document.getElementById('accountRefY') as HTMLInputElement | null;
+    const refM = document.getElementById('accountRefM') as HTMLInputElement | null;
+    if (refF && data.accountRefF !== undefined) refF.value = String(data.accountRefF || '');
+    if (refH && data.accountRefH !== undefined) refH.value = String(data.accountRefH || '');
+    if (refY && data.accountRefY !== undefined) refY.value = String(data.accountRefY || '');
+    if (refM && data.accountRefM !== undefined) refM.value = String(data.accountRefM || '');
+
+    // وصف المكان
+    const locationSelect = document.getElementById('locationDescription') as HTMLSelectElement;
+    if (locationSelect && data.locationDescription) {
+        locationSelect.value = data.locationDescription;
+    }
+
+    // حفظ معرف العداد
+    const idInput = document.getElementById('meter-id') as HTMLInputElement;
+    if (idInput) idInput.value = String(data.id);
+
+    // ضبط حقول الإدارات لبيانات المشترك
+    setupDepartmentFormFields('', {
+        sector: data.sector,
+        generalAdmin: data.generalAdmin,
+        subAdmin: data.subAdmin || data.branch || data.branchName
+    });
+
+    // تحديث عنوان الصفحة للإشارة إلى تعديل السجل
+    const formTitle = document.getElementById('meter-form-title');
+    if (formTitle) formTitle.textContent = `تعديل / تحديث سجل العداد: ${data.subscriberName || ''}`;
+
+    // إظهار شريط تنبيه العداد المحدد
+    const activeNotice = document.getElementById('meter-search-active-notice');
+    const activeText = document.getElementById('meter-search-active-text');
+    if (activeNotice && activeText) {
+        const esc = (s: any) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        activeText.innerHTML = `<strong>تم تحميل السجل:</strong> ${esc(data.subscriberName || '')} | شاسية: <span style="font-family:monospace;font-weight:bold;color:#0284c7;">${esc(data.meterChassisNumber || '—')}</span> | كود: <span style="font-family:monospace;color:#15803d;">${esc(data.subscriptionCode || '—')}</span>`;
+        activeNotice.classList.remove('hidden');
+    }
+
+    // إظهار زر الإلغاء والتفريغ
+    document.getElementById('meter-search-clear-btn')?.classList.remove('hidden');
+
+    // إخفاء نتائج وقوائم البحث المنسدلة
+    document.getElementById('meter-search-results-box')?.classList.add('hidden');
+    document.getElementById('meter-search-suggestions')?.classList.add('hidden');
+
+    // تفعيل التغييرات لإظهار الحقول الشرطية حسب نوع العداد وحالة المشترك
+    document.getElementById('meterType')?.dispatchEvent(new Event('change'));
+    document.getElementById('subscriberType')?.dispatchEvent(new Event('change'));
+
+    updateMeterFormVisibility();
+};
+
+const handleMeterRegistrationSearch = () => {
+    const queryInput = document.getElementById('meter-search-query') as HTMLInputElement | null;
+    if (!queryInput) return;
+    const query = queryInput.value.trim();
+
+    if (!query) {
+        showToast('يرجى إدخال بيانات للبحث (الاسم، رقم الشاسية، كود المشترك، أو مرجع الحساب).', 'error');
+        queryInput.focus();
+        return;
+    }
+
+    // إخفاء الاقتراحات السريعة
+    const suggestionsEl = document.getElementById('meter-search-suggestions');
+    if (suggestionsEl) suggestionsEl.classList.add('hidden');
+
+    const resultsBox = document.getElementById('meter-search-results-box');
+    const matches = getMeterSearchMatches(query);
+
+    if (matches.length === 0) {
+        if (resultsBox) {
+            resultsBox.classList.add('hidden');
+            resultsBox.innerHTML = '';
+        }
+        showToast(`لم يتم العثور على أي بيانات مطابقة للبحث: "${query}"`, 'error');
+        return;
+    }
+
+    if (matches.length === 1) {
+        if (resultsBox) {
+            resultsBox.classList.add('hidden');
+            resultsBox.innerHTML = '';
+        }
+        populateMeterFormForSearch(matches[0]);
+        showToast(`تم العثور على بيانات المشترك: ${matches[0].subscriberName || 'بدون اسم'}`);
+        return;
+    }
+
+    // نتائج متعددة: عرض جدول تفاعلي لاختيار السجل المطلوب
+    renderMeterSearchResultsTable(matches);
+};
+
+const renderMeterSearchResultsTable = (matches: DataItem[]) => {
+    const resultsBox = document.getElementById('meter-search-results-box');
+    if (!resultsBox) return;
+
+    const esc = (s: any) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const rowsHtml = matches.slice(0, 50).map((m, idx) => `
+        <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.15s ease;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">
+            <td style="padding: 8px 10px; text-align: center; color: #64748b; font-size: 0.82rem;">${idx + 1}</td>
+            <td style="padding: 8px 10px; font-weight: 700; color: #0f172a;">${esc(m.subscriberName || '—')}</td>
+            <td style="padding: 8px 10px; font-weight: 800; font-family: monospace; color: #0284c7;">${esc(m.meterChassisNumber || '—')}</td>
+            <td style="padding: 8px 10px; font-family: monospace; color: #475569;">${esc(m.subscriptionCode || '—')}</td>
+            <td style="padding: 8px 10px; color: #334155; font-size: 0.85rem;">${esc(m.address || '—')}</td>
+            <td style="padding: 8px 10px; color: #64748b; font-size: 0.85rem;">${esc(m.subAdmin || m.branch || '—')}</td>
+            <td style="padding: 8px 10px; text-align: center;">
+                <span style="font-size: 0.78rem; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${esc(m.subscriberType || 'عادي')}</span>
+            </td>
+            <td style="padding: 8px 10px; text-align: center;">
+                <button type="button" class="btn-select-searched-meter" data-meter-id="${m.id}" style="background: #10b981; color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                    <span>اختيار وتعبئة ↵</span>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+
+    resultsBox.innerHTML = `
+        <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+            <div style="padding: 10px 14px; background: #f1f5f9; border-bottom: 1px solid #cbd5e1; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 800; font-size: 0.9rem; color: #1e293b;">
+                    📋 تم العثور على ${matches.length} نتيجة مطابقة. اختر السجل المطلوب لتعبئته في النموذج:
+                </span>
+                <button type="button" id="btn-close-meter-results" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #64748b; line-height: 1;">&times;</button>
+            </div>
+            <div style="max-height: 260px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.85rem;">
+                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">
+                        <tr style="border-bottom: 1.5px solid #cbd5e1; color: #475569;">
+                            <th style="padding: 8px 10px; text-align: center; width: 35px;">م</th>
+                            <th style="padding: 8px 10px;">اسم المشترك</th>
+                            <th style="padding: 8px 10px;">رقم الشاسية</th>
+                            <th style="padding: 8px 10px;">كود الاشتراك</th>
+                            <th style="padding: 8px 10px;">العنوان</th>
+                            <th style="padding: 8px 10px;">الإدارة</th>
+                            <th style="padding: 8px 10px; text-align: center;">الحالة</th>
+                            <th style="padding: 8px 10px; text-align: center; width: 110px;">الإجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    resultsBox.classList.remove('hidden');
+
+    // تفعيل أزرار الاختيار
+    resultsBox.querySelectorAll('.btn-select-searched-meter').forEach(btn => {
+        btn.addEventListener('click', (e: any) => {
+            const mId = parseInt(e.currentTarget.getAttribute('data-meter-id'), 10);
+            const found = state.meters.find(m => m.id === mId);
+            if (found) {
+                populateMeterFormForSearch(found);
+                resultsBox.classList.add('hidden');
+                showToast(`تم تعبئة بيانات المشترك: ${found.subscriberName}`);
+            }
+        });
+    });
+
+    document.getElementById('btn-close-meter-results')?.addEventListener('click', () => {
+        resultsBox.classList.add('hidden');
+    });
+};
+
+const handleMeterRegistrationLiveSuggestions = () => {
+    const queryInput = document.getElementById('meter-search-query') as HTMLInputElement | null;
+    const suggestionsEl = document.getElementById('meter-search-suggestions');
+    if (!queryInput || !suggestionsEl) return;
+
+    const query = queryInput.value.trim();
+    if (query.length < 2) {
+        suggestionsEl.classList.add('hidden');
+        suggestionsEl.innerHTML = '';
+        return;
+    }
+
+    const matches = getMeterSearchMatches(query).slice(0, 8);
+    if (matches.length === 0) {
+        suggestionsEl.classList.add('hidden');
+        suggestionsEl.innerHTML = '';
+        return;
+    }
+
+    const esc = (s: any) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    suggestionsEl.innerHTML = matches.map(m => `
+        <div class="meter-search-suggestion-item" data-meter-id="${m.id}" style="padding: 9px 14px; border-bottom: 1px solid #f1f5f9; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.15s ease;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='#fff'">
+            <div>
+                <strong style="color: #0f172a; font-size: 0.9rem; display: block;">${esc(m.subscriberName || 'بدون اسم')}</strong>
+                <span style="font-size: 0.78rem; color: #64748b;">كود: <span style="font-family: monospace; color: #0369a1;">${esc(m.subscriptionCode || '—')}</span> | عنوان: ${esc(m.address || '—')}</span>
+            </div>
+            <div style="text-align: left;">
+                <span style="font-family: monospace; font-weight: bold; color: #0284c7; font-size: 0.85rem; background: #e0f2fe; padding: 2px 6px; border-radius: 4px;">شاسية: ${esc(m.meterChassisNumber || '—')}</span>
+            </div>
+        </div>
+    `).join('');
+
+    suggestionsEl.classList.remove('hidden');
+
+    suggestionsEl.querySelectorAll('.meter-search-suggestion-item').forEach(item => {
+        item.addEventListener('click', (e: any) => {
+            const mId = parseInt(e.currentTarget.getAttribute('data-meter-id'), 10);
+            const found = state.meters.find(m => m.id === mId);
+            if (found) {
+                populateMeterFormForSearch(found);
+                suggestionsEl.classList.add('hidden');
+                const resultsBox = document.getElementById('meter-search-results-box');
+                if (resultsBox) resultsBox.classList.add('hidden');
+                showToast(`تم تعبئة بيانات المشترك: ${found.subscriberName}`);
+            }
+        });
+    });
+};
+
+const clearMeterRegistrationSearch = () => {
+    const form = document.getElementById('meter-form') as HTMLFormElement;
+    if (!form) return;
+
+    form.reset();
+    clearFormErrors(form);
+
+    const idInput = document.getElementById('meter-id') as HTMLInputElement;
+    if (idInput) idInput.value = '';
 
     setupDepartmentFormFields('');
 
-
-
-    const inputs = form.querySelectorAll('input, select, textarea');
-
-    inputs.forEach((input: any) => {
-
+    const inputs = form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea');
+    inputs.forEach(input => {
         input.disabled = false;
-
         input.style.backgroundColor = '';
-
     });
 
-
-
     document.getElementById('meter-search-clear-btn')?.classList.add('hidden');
+    document.getElementById('meter-search-active-notice')?.classList.add('hidden');
+    document.getElementById('meter-search-results-box')?.classList.add('hidden');
+    const suggestionsEl = document.getElementById('meter-search-suggestions');
+    if (suggestionsEl) {
+        suggestionsEl.classList.add('hidden');
+        suggestionsEl.innerHTML = '';
+    }
 
     const queryInput = document.getElementById('meter-search-query') as HTMLInputElement;
-
     if (queryInput) queryInput.value = '';
 
-
+    const formTitle = document.getElementById('meter-form-title');
+    if (formTitle) formTitle.textContent = 'إضافة سجل عداد جديد';
 
     updateMeterFormVisibility();
-
 };
 
+const unlockMeterFormFields = () => {
+    const form = document.getElementById('meter-form') as HTMLFormElement;
+    if (!form) return;
 
-
-// دالة مساعدة لتوحيد النصوص العربية والأرقام للبحث الدقيق
-
-const normalizeString = (str: string | any | undefined | null): string => {
-
-    if (!str) return '';
-
-    return String(str)
-
-        .replace(/[أإآ]/g, 'ا')
-
-        .replace(/ة/g, 'ه')
-
-        .replace(/ى/g, 'ي')
-
-        .replace(/[٠-٩]/g, d => '0123456789'['٠١٢٣٤٥٦٧٨٩'.indexOf(d)])
-
-        .toLowerCase()
-
-        .trim();
-
-};
-
-
-
-// --- Search Helper Functions ---
-
-const searchIncludes = (dataStr: string | undefined | null, searchStr: string | null | undefined): boolean => {
-
-    if (!searchStr) return true;
-
-    return normalizeString(dataStr).includes(normalizeString(searchStr));
-
-};
-
-
-
-const searchAllTerms = (dataStr: string | undefined | null, searchStr: string | null | undefined): boolean => {
-
-    if (!searchStr) return true;
-
-    const normData = normalizeString(dataStr);
-
-    const terms = normalizeString(searchStr).split(' ').filter(t => t.trim() !== '');
-
-    return terms.every(term => normData.includes(term));
-
-};
-
-
-
-const searchAnyTerm = (dataStr: string | undefined | null, searchStr: string | null | undefined): boolean => {
-
-    if (!searchStr) return true;
-
-    const normData = normalizeString(dataStr);
-
-    const terms = normalizeString(searchStr).split(' ').filter(t => t.trim() !== '');
-
-    return terms.some(term => normData.includes(term));
-
+    const inputs = form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea');
+    inputs.forEach(input => {
+        input.disabled = false;
+        input.style.backgroundColor = '';
+    });
+    showToast('تم إتاحة تعديل كافة الحقول بنجاح.');
 };
 
 
@@ -7386,45 +7517,8 @@ const openMeterForm = () => {
 
 
 
-    // Inject Search UI
-
-    const formContainer = document.getElementById('meter-registration');
-
-    if (formContainer && !document.getElementById('meter-search-container')) {
-
-        const searchDiv = document.createElement('div');
-
-        searchDiv.id = 'meter-search-container';
-
-        searchDiv.className = 'search-section';
-
-        searchDiv.style.cssText = 'margin-bottom: 20px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;';
-
-        searchDiv.innerHTML = `
-
-            <input type="text" id="meter-search-query" placeholder="بحث بالاسم، رقم الشاسية، أو كود المشترك" class="form-control" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-
-            <button type="button" id="meter-search-btn" class="btn">بحث</button>
-
-            <button type="button" id="meter-search-clear-btn" class="btn btn-secondary hidden">إلغاء</button>
-
-        `;
-
-        const formTitle = document.getElementById('meter-form-title');
-
-        if (formTitle && formTitle.parentNode) {
-
-            formTitle.parentNode.insertBefore(searchDiv, formTitle.nextSibling);
-
-        }
-
-
-
-        document.getElementById('meter-search-btn')?.addEventListener('click', handleMeterRegistrationSearch);
-
-        document.getElementById('meter-search-clear-btn')?.addEventListener('click', clearMeterRegistrationSearch);
-
-    }
+    // Reset search UI state on open
+    clearMeterRegistrationSearch();
 
 
 
@@ -66027,12 +66121,9 @@ const setupOrgHierarchyEvents = () => {
 
 
 
-        if (targetId === 'meter-registration' && targetLink.id === 'sidebar-add-meter-btn') {
-
+        if (targetId === 'meter-registration') {
             openMeterForm();
-
             return; // Stop further execution to avoid double navigation logic
-
         }
 
 
@@ -67001,12 +67092,37 @@ const setupOrgHierarchyEvents = () => {
 
 
         // Meter Management Listeners
-
         document.getElementById('add-meter-record-btn')?.addEventListener('click', () => openMeterForm());
-
         document.getElementById('meter-form')?.addEventListener('submit', handleMeterFormSubmit);
-
         document.getElementById('meterType')?.addEventListener('change', () => updateMeterFormVisibility());
+
+        // Meter Registration Search Listeners
+        document.getElementById('meter-search-btn')?.addEventListener('click', handleMeterRegistrationSearch);
+        const meterSearchQueryInput = document.getElementById('meter-search-query') as HTMLInputElement | null;
+        meterSearchQueryInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleMeterRegistrationSearch();
+            }
+        });
+        let meterSearchDebounceTimer: any = null;
+        meterSearchQueryInput?.addEventListener('input', () => {
+            clearTimeout(meterSearchDebounceTimer);
+            meterSearchDebounceTimer = setTimeout(() => {
+                handleMeterRegistrationLiveSuggestions();
+            }, 250);
+        });
+        document.getElementById('meter-search-clear-btn')?.addEventListener('click', clearMeterRegistrationSearch);
+        document.getElementById('btn-meter-search-unlock')?.addEventListener('click', unlockMeterFormFields);
+
+        // Close suggestions dropdown when clicking outside
+        document.addEventListener('click', (e: any) => {
+            const searchContainer = document.getElementById('meter-search-container');
+            const suggestionsEl = document.getElementById('meter-search-suggestions');
+            if (searchContainer && suggestionsEl && !searchContainer.contains(e.target)) {
+                suggestionsEl.classList.add('hidden');
+            }
+        });
 
 
 

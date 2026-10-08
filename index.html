@@ -1610,6 +1610,31 @@
                     <span>رجوع</span>
                 </button>
             </div>
+            <!-- حقل البحث الذكي عن العداد / المشترك -->
+            <div id="meter-search-container" class="search-section" style="margin-bottom: 20px; background: #f8fafc; padding: 16px 20px; border-radius: 10px; border: 1.5px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; position: relative; min-width: 260px;">
+                        <input type="text" id="meter-search-query" placeholder="🔍 ابحث بالاسم، رقم الشاسية، كود المشترك، مرجع الحساب، أو العنوان..." class="form-control" autocomplete="off" style="width: 100%; padding: 10px 14px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;">
+                        <div id="meter-search-suggestions" class="hidden" style="position: absolute; top: 100%; left: 0; right: 0; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); max-height: 280px; overflow-y: auto; z-index: 1050; margin-top: 4px;"></div>
+                    </div>
+                    <button type="button" id="meter-search-btn" class="btn" style="background: #0284c7; color: #fff; padding: 10px 20px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <span>بحث</span>
+                    </button>
+                    <button type="button" id="meter-search-clear-btn" class="btn btn-secondary hidden" style="background: #e2e8f0; color: #334155; padding: 10px 16px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                        إلغاء وتفريغ
+                    </button>
+                </div>
+                <!-- حاوية نتائج البحث المتعددة -->
+                <div id="meter-search-results-box" class="hidden" style="margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 12px;"></div>
+                <!-- شريط تنبيه بحالة العداد المحدد -->
+                <div id="meter-search-active-notice" class="hidden" style="margin-top: 12px; padding: 10px 14px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; color: #065f46;">
+                    <span id="meter-search-active-text">تم تحميل بيانات العداد</span>
+                    <button type="button" id="btn-meter-search-unlock" class="btn btn-sm" style="background: #059669; color: #fff; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">
+                        تعديل كافة الحقول 🔓
+                    </button>
+                </div>
+            </div>
             <div class="form-container">
                  <form id="meter-form" class="form-grid" novalidate>
                     <input type="hidden" id="meter-id">

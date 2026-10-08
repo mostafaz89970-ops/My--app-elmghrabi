@@ -3577,78 +3577,6 @@ const filterTableByMultipleCriteria = (tableId) => {
         row.style.display = isVisible ? '' : 'none';
     });
 };
-const populateMeterFormForSearch = (data) => {
-    var _a;
-    const form = document.getElementById('meter-form');
-    if (!form)
-        return;
-    // Populate fields
-    const inputs = form.querySelectorAll('input, select, textarea');
-    inputs.forEach((input) => {
-        if (input.id && data[input.id] !== undefined) {
-            input.value = data[input.id];
-        }
-        // Disable all except subscriberType and removal fields
-        if (input.id !== 'subscriberType' && input.id !== 'removalReason' && input.id !== 'removalDate' && input.id !== 'removedBy' && input.id !== 'cardStatus') {
-            input.disabled = true;
-            input.style.backgroundColor = '#e9ecef';
-        }
-    });
-    // 🔧 FIXED: ضمان تعبئة dropdown وصف المكان
-    const locationSelect = document.getElementById('locationDescription');
-    if (locationSelect && data.locationDescription && state.settings.placeDescriptions.includes(data.locationDescription)) {
-        locationSelect.value = data.locationDescription;
-    }
-    // Handle ID
-    document.getElementById('meter-id').value = String(data.id);
-    // ضبط حقول الإدارات لبيانات المشترك
-    setupDepartmentFormFields('', {
-        sector: data.sector,
-        generalAdmin: data.generalAdmin,
-        subAdmin: data.subAdmin || data.branch || data.branchName
-    });
-    // Show clear button
-    (_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.remove('hidden');
-    // Trigger visibility update to handle button state
-    updateMeterFormVisibility();
-};
-const handleMeterRegistrationSearch = () => {
-    const queryInput = document.getElementById('meter-search-query');
-    const query = queryInput.value.trim().toLowerCase();
-    if (!query) {
-        showToast('يرجى إدخال بيانات للبحث.', 'error');
-        return;
-    }
-    const result = [...state.meters].reverse().find(m => (m.subscriberName && m.subscriberName.toLowerCase().includes(query)) ||
-        (m.meterChassisNumber && m.meterChassisNumber.toLowerCase().includes(query)) ||
-        (m.subscriptionCode && m.subscriptionCode.toLowerCase().includes(query)));
-    if (result) {
-        populateMeterFormForSearch(result);
-        showToast('تم العثور على البيانات.');
-    }
-    else {
-        showToast('لم يتم العثور على بيانات مطابقة.', 'error');
-    }
-};
-const clearMeterRegistrationSearch = () => {
-    var _a;
-    const form = document.getElementById('meter-form');
-    if (!form)
-        return;
-    form.reset();
-    document.getElementById('meter-id').value = '';
-    setupDepartmentFormFields('');
-    const inputs = form.querySelectorAll('input, select, textarea');
-    inputs.forEach((input) => {
-        input.disabled = false;
-        input.style.backgroundColor = '';
-    });
-    (_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.add('hidden');
-    const queryInput = document.getElementById('meter-search-query');
-    if (queryInput)
-        queryInput.value = '';
-    updateMeterFormVisibility();
-};
 // دالة مساعدة لتوحيد النصوص العربية والأرقام للبحث الدقيق
 const normalizeString = (str) => {
     if (!str)
@@ -3680,6 +3608,303 @@ const searchAnyTerm = (dataStr, searchStr) => {
     const normData = normalizeString(dataStr);
     const terms = normalizeString(searchStr).split(' ').filter(t => t.trim() !== '');
     return terms.some(term => normData.includes(term));
+};
+// =========================================================================
+// وظائف البحث الذكي في صفحة تسجيل عداد (Meter Registration Search)
+// =========================================================================
+const getMeterSearchMatches = (rawQuery) => {
+    const q = rawQuery.trim();
+    if (!q)
+        return [];
+    const allMeters = Array.isArray(state.meters) ? state.meters : [];
+    return [...allMeters].reverse().filter(m => {
+        if (!m)
+            return false;
+        // 1. مطابقة الاسم والاسم الكودي
+        const nameMatch = searchAllTerms(m.subscriberName, q) ||
+            searchAllTerms(m.newSubscriberName, q) ||
+            searchAllTerms(m.codeName, q);
+        // 2. مطابقة رقم الشاسية بكافة أنواعه
+        const chassisMatch = searchIncludes(String(m.meterChassisNumber || ''), q) ||
+            searchIncludes(String(m.newMeterChassisNumber || ''), q) ||
+            searchIncludes(String(m.newMeterChassisNumberForReplacement || ''), q) ||
+            searchIncludes(String(m.oldMeterChassisNumber || ''), q) ||
+            searchIncludes(String(m.chassisNumber || ''), q);
+        // 3. مطابقة كود الاشتراك
+        const codeMatch = searchIncludes(String(m.subscriptionCode || ''), q);
+        // 4. مطابقة مرجع الحساب
+        const fullRef = `${m.accountRefF || ''}${m.accountRefH || ''}${m.accountRefY || ''}${m.accountRefM || ''}`;
+        const refMatch = searchIncludes(String(m.accountReference || ''), q) ||
+            (fullRef ? searchIncludes(fullRef, q) : false);
+        // 5. مطابقة العنوان
+        const addrMatch = searchAllTerms(m.address, q);
+        // 6. مطابقة رقم اللوحة
+        const panelMatch = searchIncludes(String(m.panelNumber || ''), q);
+        return nameMatch || chassisMatch || codeMatch || refMatch || addrMatch || panelMatch;
+    });
+};
+const populateMeterFormForSearch = (data) => {
+    var _a, _b, _c, _d, _e;
+    const form = document.getElementById('meter-form');
+    if (!form)
+        return;
+    // تفريغ النموذج من أي قيم قديمة قبل التعبئة
+    form.reset();
+    // تعبئة كافة عناصر النموذج بالبيانات المطابقة
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        if (!input.id)
+            return;
+        if (data[input.id] !== undefined && data[input.id] !== null) {
+            input.value = String(data[input.id]);
+        }
+        // إتاحة كافة الحقول للتعديل وإلغاء أي تعطيل سابق
+        input.disabled = false;
+        input.style.backgroundColor = '';
+    });
+    // تعبئة حقول مرجع الحساب المركب
+    const refF = document.getElementById('accountRefF');
+    const refH = document.getElementById('accountRefH');
+    const refY = document.getElementById('accountRefY');
+    const refM = document.getElementById('accountRefM');
+    if (refF && data.accountRefF !== undefined)
+        refF.value = String(data.accountRefF || '');
+    if (refH && data.accountRefH !== undefined)
+        refH.value = String(data.accountRefH || '');
+    if (refY && data.accountRefY !== undefined)
+        refY.value = String(data.accountRefY || '');
+    if (refM && data.accountRefM !== undefined)
+        refM.value = String(data.accountRefM || '');
+    // وصف المكان
+    const locationSelect = document.getElementById('locationDescription');
+    if (locationSelect && data.locationDescription) {
+        locationSelect.value = data.locationDescription;
+    }
+    // حفظ معرف العداد
+    const idInput = document.getElementById('meter-id');
+    if (idInput)
+        idInput.value = String(data.id);
+    // ضبط حقول الإدارات لبيانات المشترك
+    setupDepartmentFormFields('', {
+        sector: data.sector,
+        generalAdmin: data.generalAdmin,
+        subAdmin: data.subAdmin || data.branch || data.branchName
+    });
+    // تحديث عنوان الصفحة للإشارة إلى تعديل السجل
+    const formTitle = document.getElementById('meter-form-title');
+    if (formTitle)
+        formTitle.textContent = `تعديل / تحديث سجل العداد: ${data.subscriberName || ''}`;
+    // إظهار شريط تنبيه العداد المحدد
+    const activeNotice = document.getElementById('meter-search-active-notice');
+    const activeText = document.getElementById('meter-search-active-text');
+    if (activeNotice && activeText) {
+        const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        activeText.innerHTML = `<strong>تم تحميل السجل:</strong> ${esc(data.subscriberName || '')} | شاسية: <span style="font-family:monospace;font-weight:bold;color:#0284c7;">${esc(data.meterChassisNumber || '—')}</span> | كود: <span style="font-family:monospace;color:#15803d;">${esc(data.subscriptionCode || '—')}</span>`;
+        activeNotice.classList.remove('hidden');
+    }
+    // إظهار زر الإلغاء والتفريغ
+    (_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.remove('hidden');
+    // إخفاء نتائج وقوائم البحث المنسدلة
+    (_b = document.getElementById('meter-search-results-box')) === null || _b === void 0 ? void 0 : _b.classList.add('hidden');
+    (_c = document.getElementById('meter-search-suggestions')) === null || _c === void 0 ? void 0 : _c.classList.add('hidden');
+    // تفعيل التغييرات لإظهار الحقول الشرطية حسب نوع العداد وحالة المشترك
+    (_d = document.getElementById('meterType')) === null || _d === void 0 ? void 0 : _d.dispatchEvent(new Event('change'));
+    (_e = document.getElementById('subscriberType')) === null || _e === void 0 ? void 0 : _e.dispatchEvent(new Event('change'));
+    updateMeterFormVisibility();
+};
+const handleMeterRegistrationSearch = () => {
+    const queryInput = document.getElementById('meter-search-query');
+    if (!queryInput)
+        return;
+    const query = queryInput.value.trim();
+    if (!query) {
+        showToast('يرجى إدخال بيانات للبحث (الاسم، رقم الشاسية، كود المشترك، أو مرجع الحساب).', 'error');
+        queryInput.focus();
+        return;
+    }
+    // إخفاء الاقتراحات السريعة
+    const suggestionsEl = document.getElementById('meter-search-suggestions');
+    if (suggestionsEl)
+        suggestionsEl.classList.add('hidden');
+    const resultsBox = document.getElementById('meter-search-results-box');
+    const matches = getMeterSearchMatches(query);
+    if (matches.length === 0) {
+        if (resultsBox) {
+            resultsBox.classList.add('hidden');
+            resultsBox.innerHTML = '';
+        }
+        showToast(`لم يتم العثور على أي بيانات مطابقة للبحث: "${query}"`, 'error');
+        return;
+    }
+    if (matches.length === 1) {
+        if (resultsBox) {
+            resultsBox.classList.add('hidden');
+            resultsBox.innerHTML = '';
+        }
+        populateMeterFormForSearch(matches[0]);
+        showToast(`تم العثور على بيانات المشترك: ${matches[0].subscriberName || 'بدون اسم'}`);
+        return;
+    }
+    // نتائج متعددة: عرض جدول تفاعلي لاختيار السجل المطلوب
+    renderMeterSearchResultsTable(matches);
+};
+const renderMeterSearchResultsTable = (matches) => {
+    var _a;
+    const resultsBox = document.getElementById('meter-search-results-box');
+    if (!resultsBox)
+        return;
+    const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const rowsHtml = matches.slice(0, 50).map((m, idx) => `
+        <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.15s ease;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">
+            <td style="padding: 8px 10px; text-align: center; color: #64748b; font-size: 0.82rem;">${idx + 1}</td>
+            <td style="padding: 8px 10px; font-weight: 700; color: #0f172a;">${esc(m.subscriberName || '—')}</td>
+            <td style="padding: 8px 10px; font-weight: 800; font-family: monospace; color: #0284c7;">${esc(m.meterChassisNumber || '—')}</td>
+            <td style="padding: 8px 10px; font-family: monospace; color: #475569;">${esc(m.subscriptionCode || '—')}</td>
+            <td style="padding: 8px 10px; color: #334155; font-size: 0.85rem;">${esc(m.address || '—')}</td>
+            <td style="padding: 8px 10px; color: #64748b; font-size: 0.85rem;">${esc(m.subAdmin || m.branch || '—')}</td>
+            <td style="padding: 8px 10px; text-align: center;">
+                <span style="font-size: 0.78rem; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${esc(m.subscriberType || 'عادي')}</span>
+            </td>
+            <td style="padding: 8px 10px; text-align: center;">
+                <button type="button" class="btn-select-searched-meter" data-meter-id="${m.id}" style="background: #10b981; color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                    <span>اختيار وتعبئة ↵</span>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+    resultsBox.innerHTML = `
+        <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+            <div style="padding: 10px 14px; background: #f1f5f9; border-bottom: 1px solid #cbd5e1; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 800; font-size: 0.9rem; color: #1e293b;">
+                    📋 تم العثور على ${matches.length} نتيجة مطابقة. اختر السجل المطلوب لتعبئته في النموذج:
+                </span>
+                <button type="button" id="btn-close-meter-results" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #64748b; line-height: 1;">&times;</button>
+            </div>
+            <div style="max-height: 260px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.85rem;">
+                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">
+                        <tr style="border-bottom: 1.5px solid #cbd5e1; color: #475569;">
+                            <th style="padding: 8px 10px; text-align: center; width: 35px;">م</th>
+                            <th style="padding: 8px 10px;">اسم المشترك</th>
+                            <th style="padding: 8px 10px;">رقم الشاسية</th>
+                            <th style="padding: 8px 10px;">كود الاشتراك</th>
+                            <th style="padding: 8px 10px;">العنوان</th>
+                            <th style="padding: 8px 10px;">الإدارة</th>
+                            <th style="padding: 8px 10px; text-align: center;">الحالة</th>
+                            <th style="padding: 8px 10px; text-align: center; width: 110px;">الإجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    resultsBox.classList.remove('hidden');
+    // تفعيل أزرار الاختيار
+    resultsBox.querySelectorAll('.btn-select-searched-meter').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const mId = parseInt(e.currentTarget.getAttribute('data-meter-id'), 10);
+            const found = state.meters.find(m => m.id === mId);
+            if (found) {
+                populateMeterFormForSearch(found);
+                resultsBox.classList.add('hidden');
+                showToast(`تم تعبئة بيانات المشترك: ${found.subscriberName}`);
+            }
+        });
+    });
+    (_a = document.getElementById('btn-close-meter-results')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => {
+        resultsBox.classList.add('hidden');
+    });
+};
+const handleMeterRegistrationLiveSuggestions = () => {
+    const queryInput = document.getElementById('meter-search-query');
+    const suggestionsEl = document.getElementById('meter-search-suggestions');
+    if (!queryInput || !suggestionsEl)
+        return;
+    const query = queryInput.value.trim();
+    if (query.length < 2) {
+        suggestionsEl.classList.add('hidden');
+        suggestionsEl.innerHTML = '';
+        return;
+    }
+    const matches = getMeterSearchMatches(query).slice(0, 8);
+    if (matches.length === 0) {
+        suggestionsEl.classList.add('hidden');
+        suggestionsEl.innerHTML = '';
+        return;
+    }
+    const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    suggestionsEl.innerHTML = matches.map(m => `
+        <div class="meter-search-suggestion-item" data-meter-id="${m.id}" style="padding: 9px 14px; border-bottom: 1px solid #f1f5f9; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.15s ease;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='#fff'">
+            <div>
+                <strong style="color: #0f172a; font-size: 0.9rem; display: block;">${esc(m.subscriberName || 'بدون اسم')}</strong>
+                <span style="font-size: 0.78rem; color: #64748b;">كود: <span style="font-family: monospace; color: #0369a1;">${esc(m.subscriptionCode || '—')}</span> | عنوان: ${esc(m.address || '—')}</span>
+            </div>
+            <div style="text-align: left;">
+                <span style="font-family: monospace; font-weight: bold; color: #0284c7; font-size: 0.85rem; background: #e0f2fe; padding: 2px 6px; border-radius: 4px;">شاسية: ${esc(m.meterChassisNumber || '—')}</span>
+            </div>
+        </div>
+    `).join('');
+    suggestionsEl.classList.remove('hidden');
+    suggestionsEl.querySelectorAll('.meter-search-suggestion-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            const mId = parseInt(e.currentTarget.getAttribute('data-meter-id'), 10);
+            const found = state.meters.find(m => m.id === mId);
+            if (found) {
+                populateMeterFormForSearch(found);
+                suggestionsEl.classList.add('hidden');
+                const resultsBox = document.getElementById('meter-search-results-box');
+                if (resultsBox)
+                    resultsBox.classList.add('hidden');
+                showToast(`تم تعبئة بيانات المشترك: ${found.subscriberName}`);
+            }
+        });
+    });
+};
+const clearMeterRegistrationSearch = () => {
+    var _a, _b, _c;
+    const form = document.getElementById('meter-form');
+    if (!form)
+        return;
+    form.reset();
+    clearFormErrors(form);
+    const idInput = document.getElementById('meter-id');
+    if (idInput)
+        idInput.value = '';
+    setupDepartmentFormFields('');
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.disabled = false;
+        input.style.backgroundColor = '';
+    });
+    (_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.add('hidden');
+    (_b = document.getElementById('meter-search-active-notice')) === null || _b === void 0 ? void 0 : _b.classList.add('hidden');
+    (_c = document.getElementById('meter-search-results-box')) === null || _c === void 0 ? void 0 : _c.classList.add('hidden');
+    const suggestionsEl = document.getElementById('meter-search-suggestions');
+    if (suggestionsEl) {
+        suggestionsEl.classList.add('hidden');
+        suggestionsEl.innerHTML = '';
+    }
+    const queryInput = document.getElementById('meter-search-query');
+    if (queryInput)
+        queryInput.value = '';
+    const formTitle = document.getElementById('meter-form-title');
+    if (formTitle)
+        formTitle.textContent = 'إضافة سجل عداد جديد';
+    updateMeterFormVisibility();
+};
+const unlockMeterFormFields = () => {
+    const form = document.getElementById('meter-form');
+    if (!form)
+        return;
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.disabled = false;
+        input.style.backgroundColor = '';
+    });
+    showToast('تم إتاحة تعديل كافة الحقول بنجاح.');
 };
 const handleAllSubscribersSearch = () => {
     // Get raw values directly by ID
@@ -3873,7 +4098,7 @@ const setupDepartmentFormFields = (prefix = '', initialValues) => {
     updateGenAdmins(initGA, initSub);
 };
 const openMeterForm = () => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c;
     ensureMeterSupplyCompanyField('');
     setupDepartmentFormFields('');
     const form = document.getElementById('meter-form');
@@ -3925,38 +4150,17 @@ const openMeterForm = () => {
     if (detailsLocationSelect) {
         populateSelect(detailsLocationSelect, state.settings.placeDescriptions, 'اختر وصف المكان');
     }
-    // Inject Search UI
-    const formContainer = document.getElementById('meter-registration');
-    if (formContainer && !document.getElementById('meter-search-container')) {
-        const searchDiv = document.createElement('div');
-        searchDiv.id = 'meter-search-container';
-        searchDiv.className = 'search-section';
-        searchDiv.style.cssText = 'margin-bottom: 20px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;';
-        searchDiv.innerHTML = `
-
-            <input type="text" id="meter-search-query" placeholder="بحث بالاسم، رقم الشاسية، أو كود المشترك" class="form-control" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-
-            <button type="button" id="meter-search-btn" class="btn">بحث</button>
-
-            <button type="button" id="meter-search-clear-btn" class="btn btn-secondary hidden">إلغاء</button>
-
-        `;
-        const formTitle = document.getElementById('meter-form-title');
-        if (formTitle && formTitle.parentNode) {
-            formTitle.parentNode.insertBefore(searchDiv, formTitle.nextSibling);
-        }
-        (_a = document.getElementById('meter-search-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', handleMeterRegistrationSearch);
-        (_b = document.getElementById('meter-search-clear-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', clearMeterRegistrationSearch);
-    }
+    // Reset search UI state on open
+    clearMeterRegistrationSearch();
     // Reset search UI state on open
     clearMeterRegistrationSearch();
     document.getElementById('meter-form-title').textContent = 'إضافة سجل عداد جديد';
     // Trigger change events to show/hide conditional fields correctly on load
-    (_c = document.getElementById('meterType')) === null || _c === void 0 ? void 0 : _c.dispatchEvent(new Event('change'));
-    (_d = document.getElementById('subscriberType')) === null || _d === void 0 ? void 0 : _d.dispatchEvent(new Event('change'));
+    (_a = document.getElementById('meterType')) === null || _a === void 0 ? void 0 : _a.dispatchEvent(new Event('change'));
+    (_b = document.getElementById('subscriberType')) === null || _b === void 0 ? void 0 : _b.dispatchEvent(new Event('change'));
     // Navigate to the form section
     document.querySelectorAll('.content-section.active').forEach(s => s.classList.remove('active'));
-    (_e = document.getElementById('meter-registration')) === null || _e === void 0 ? void 0 : _e.classList.add('active');
+    (_c = document.getElementById('meter-registration')) === null || _c === void 0 ? void 0 : _c.classList.add('active');
     setPageTitle('تسجيل عداد');
 };
 const resetMeterForm = () => {
@@ -40330,7 +40534,7 @@ function handleNavigation(event) {
             btn.classList.remove('active');
         }
     });
-    if (targetId === 'meter-registration' && targetLink.id === 'sidebar-add-meter-btn') {
+    if (targetId === 'meter-registration') {
         openMeterForm();
         return; // Stop further execution to avoid double navigation logic
     }
@@ -40661,7 +40865,7 @@ function handleNavigation(event) {
  */
 const setupEventListeners = () => {
     // Welcome Screen Listeners
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119, _120, _121, _122, _123, _124, _125, _126, _127, _128, _129, _130, _131, _132, _133, _134, _135, _136, _137, _138, _139, _140, _141, _142, _143, _144, _145, _146;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, _61, _62, _63, _64, _65, _66, _67, _68, _69, _70, _71, _72, _73, _74, _75, _76, _77, _78, _79, _80, _81, _82, _83, _84, _85, _86, _87, _88, _89, _90, _91, _92, _93, _94, _95, _96, _97, _98, _99, _100, _101, _102, _103, _104, _105, _106, _107, _108, _109, _110, _111, _112, _113, _114, _115, _116, _117, _118, _119, _120, _121, _122, _123, _124, _125, _126, _127, _128, _129, _130, _131, _132, _133, _134, _135, _136, _137, _138, _139, _140, _141, _142, _143, _144, _145, _146, _147, _148, _149;
     (_a = document.getElementById('start-new-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', handleStartNew);
     (_b = document.getElementById('import-from-welcome-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', handleImportFromWelcome);
     // ================= Treasury Event Listeners =================
@@ -40872,28 +41076,54 @@ const setupEventListeners = () => {
     (_8 = document.getElementById('add-meter-record-btn')) === null || _8 === void 0 ? void 0 : _8.addEventListener('click', () => openMeterForm());
     (_9 = document.getElementById('meter-form')) === null || _9 === void 0 ? void 0 : _9.addEventListener('submit', handleMeterFormSubmit);
     (_10 = document.getElementById('meterType')) === null || _10 === void 0 ? void 0 : _10.addEventListener('change', () => updateMeterFormVisibility());
-    (_11 = document.getElementById('sidebar-add-mukaysa-btn')) === null || _11 === void 0 ? void 0 : _11.addEventListener('click', (e) => { e.preventDefault(); openMukayasatForm(); });
-    (_12 = document.getElementById('mukayasat-form')) === null || _12 === void 0 ? void 0 : _12.addEventListener('submit', handleMukayasatFormSubmit);
-    (_13 = document.getElementById('print-mukayasa-btn')) === null || _13 === void 0 ? void 0 : _13.addEventListener('click', handlePrintMukayasaDetails);
+    // Meter Registration Search Listeners
+    (_11 = document.getElementById('meter-search-btn')) === null || _11 === void 0 ? void 0 : _11.addEventListener('click', handleMeterRegistrationSearch);
+    const meterSearchQueryInput = document.getElementById('meter-search-query');
+    meterSearchQueryInput === null || meterSearchQueryInput === void 0 ? void 0 : meterSearchQueryInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleMeterRegistrationSearch();
+        }
+    });
+    let meterSearchDebounceTimer = null;
+    meterSearchQueryInput === null || meterSearchQueryInput === void 0 ? void 0 : meterSearchQueryInput.addEventListener('input', () => {
+        clearTimeout(meterSearchDebounceTimer);
+        meterSearchDebounceTimer = setTimeout(() => {
+            handleMeterRegistrationLiveSuggestions();
+        }, 250);
+    });
+    (_12 = document.getElementById('meter-search-clear-btn')) === null || _12 === void 0 ? void 0 : _12.addEventListener('click', clearMeterRegistrationSearch);
+    (_13 = document.getElementById('btn-meter-search-unlock')) === null || _13 === void 0 ? void 0 : _13.addEventListener('click', unlockMeterFormFields);
+    // Close suggestions dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        const searchContainer = document.getElementById('meter-search-container');
+        const suggestionsEl = document.getElementById('meter-search-suggestions');
+        if (searchContainer && suggestionsEl && !searchContainer.contains(e.target)) {
+            suggestionsEl.classList.add('hidden');
+        }
+    });
+    (_14 = document.getElementById('sidebar-add-mukaysa-btn')) === null || _14 === void 0 ? void 0 : _14.addEventListener('click', (e) => { e.preventDefault(); openMukayasatForm(); });
+    (_15 = document.getElementById('mukayasat-form')) === null || _15 === void 0 ? void 0 : _15.addEventListener('submit', handleMukayasatFormSubmit);
+    (_16 = document.getElementById('print-mukayasa-btn')) === null || _16 === void 0 ? void 0 : _16.addEventListener('click', handlePrintMukayasaDetails);
     // Transformer Management Listeners
-    (_14 = document.getElementById('transformer-form')) === null || _14 === void 0 ? void 0 : _14.addEventListener('submit', handleTransformerRegistrationSubmit);
-    (_15 = document.getElementById('transformer-query-form')) === null || _15 === void 0 ? void 0 : _15.addEventListener('submit', handleTransformerQuerySearch);
-    (_16 = document.getElementById('transformer-load-form')) === null || _16 === void 0 ? void 0 : _16.addEventListener('submit', handleTransformerLoadSubmit);
-    (_17 = document.getElementById('transformer-load-name')) === null || _17 === void 0 ? void 0 : _17.addEventListener('change', handleTransformerLoadNameChange);
+    (_17 = document.getElementById('transformer-form')) === null || _17 === void 0 ? void 0 : _17.addEventListener('submit', handleTransformerRegistrationSubmit);
+    (_18 = document.getElementById('transformer-query-form')) === null || _18 === void 0 ? void 0 : _18.addEventListener('submit', handleTransformerQuerySearch);
+    (_19 = document.getElementById('transformer-load-form')) === null || _19 === void 0 ? void 0 : _19.addEventListener('submit', handleTransformerLoadSubmit);
+    (_20 = document.getElementById('transformer-load-name')) === null || _20 === void 0 ? void 0 : _20.addEventListener('change', handleTransformerLoadNameChange);
     initializeTransformerLoadRecordFilters();
     ['transformer-load-capacity', 'transformer-load-s1-r', 'transformer-load-s1-s', 'transformer-load-s1-t', 'transformer-load-s2-r', 'transformer-load-s2-s', 'transformer-load-s2-t', 'transformer-load-s3-r', 'transformer-load-s3-s', 'transformer-load-s3-t', 'transformer-load-s4-r', 'transformer-load-s4-s', 'transformer-load-s4-t', 'transformer-load-streets-r', 'transformer-load-streets-s', 'transformer-load-streets-t'].forEach((id) => {
         const element = document.getElementById(id);
         element === null || element === void 0 ? void 0 : element.addEventListener('input', calculateTransformerLoadAutoValues);
     });
-    (_18 = document.getElementById('print-transformers-list-btn')) === null || _18 === void 0 ? void 0 : _18.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
-    (_19 = document.getElementById('export-transformers-excel-btn')) === null || _19 === void 0 ? void 0 : _19.addEventListener('click', handleExportTransformersExcel);
-    (_20 = document.getElementById('import-transformers-excel-trigger')) === null || _20 === void 0 ? void 0 : _20.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_21 = document.getElementById('transformers-excel-upload')) === null || _21 === void 0 ? void 0 : _21.addEventListener('change', handleImportTransformersExcel);
-    (_22 = document.getElementById('transfer-selected-transformers-btn')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', handleOpenTransferSelectedTransformersModal);
-    (_23 = document.getElementById('btn-confirm-transfer-transformers')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', handleConfirmTransferTransformers);
-    (_24 = document.getElementById('delete-scope-transformers-btn')) === null || _24 === void 0 ? void 0 : _24.addEventListener('click', handleOpenBulkDeleteScopeModal);
-    (_25 = document.getElementById('btn-confirm-delete-scope-transformers')) === null || _25 === void 0 ? void 0 : _25.addEventListener('click', handleConfirmBulkDeleteScopeTransformers);
-    (_26 = document.getElementById('delete-selected-transformers-btn')) === null || _26 === void 0 ? void 0 : _26.addEventListener('click', handleDeleteSelectedTransformers);
+    (_21 = document.getElementById('print-transformers-list-btn')) === null || _21 === void 0 ? void 0 : _21.addEventListener('click', () => handlePrintTable('transformers-table', 'قائمة المحولات'));
+    (_22 = document.getElementById('export-transformers-excel-btn')) === null || _22 === void 0 ? void 0 : _22.addEventListener('click', handleExportTransformersExcel);
+    (_23 = document.getElementById('import-transformers-excel-trigger')) === null || _23 === void 0 ? void 0 : _23.addEventListener('click', () => { var _a; return (_a = document.getElementById('transformers-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_24 = document.getElementById('transformers-excel-upload')) === null || _24 === void 0 ? void 0 : _24.addEventListener('change', handleImportTransformersExcel);
+    (_25 = document.getElementById('transfer-selected-transformers-btn')) === null || _25 === void 0 ? void 0 : _25.addEventListener('click', handleOpenTransferSelectedTransformersModal);
+    (_26 = document.getElementById('btn-confirm-transfer-transformers')) === null || _26 === void 0 ? void 0 : _26.addEventListener('click', handleConfirmTransferTransformers);
+    (_27 = document.getElementById('delete-scope-transformers-btn')) === null || _27 === void 0 ? void 0 : _27.addEventListener('click', handleOpenBulkDeleteScopeModal);
+    (_28 = document.getElementById('btn-confirm-delete-scope-transformers')) === null || _28 === void 0 ? void 0 : _28.addEventListener('click', handleConfirmBulkDeleteScopeTransformers);
+    (_29 = document.getElementById('delete-selected-transformers-btn')) === null || _29 === void 0 ? void 0 : _29.addEventListener('click', handleDeleteSelectedTransformers);
     // Close modal buttons for transformer transfer and bulk delete modals
     document.querySelectorAll('#modal-transfer-transformers .close-modal, #modal-bulk-delete-transformers .close-modal').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -40907,18 +41137,18 @@ const setupEventListeners = () => {
         var _a;
         (_a = document.getElementById(id)) === null || _a === void 0 ? void 0 : _a.addEventListener('input', () => renderTransformerListSection());
     });
-    (_27 = document.getElementById('select-all-transformers')) === null || _27 === void 0 ? void 0 : _27.addEventListener('change', (e) => {
+    (_30 = document.getElementById('select-all-transformers')) === null || _30 === void 0 ? void 0 : _30.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
         document.querySelectorAll('.transformer-row-checkbox').forEach(cb => cb.checked = isChecked);
     });
-    (_28 = document.getElementById('print-installation-details-btn')) === null || _28 === void 0 ? void 0 : _28.addEventListener('click', handlePrintInstallationDetails);
-    (_29 = document.getElementById('clear-mukayasa-form-btn')) === null || _29 === void 0 ? void 0 : _29.addEventListener('click', handleClearMukayasaForm);
+    (_31 = document.getElementById('print-installation-details-btn')) === null || _31 === void 0 ? void 0 : _31.addEventListener('click', handlePrintInstallationDetails);
+    (_32 = document.getElementById('clear-mukayasa-form-btn')) === null || _32 === void 0 ? void 0 : _32.addEventListener('click', handleClearMukayasaForm);
     // Judicial Control Listeners
-    (_30 = document.getElementById('print-judicial-control-btn')) === null || _30 === void 0 ? void 0 : _30.addEventListener('click', handlePrintJudicialControlDetails);
-    (_31 = document.getElementById('judicial-control-form')) === null || _31 === void 0 ? void 0 : _31.addEventListener('submit', handleJudicialControlFormSubmit);
+    (_33 = document.getElementById('print-judicial-control-btn')) === null || _33 === void 0 ? void 0 : _33.addEventListener('click', handlePrintJudicialControlDetails);
+    (_34 = document.getElementById('judicial-control-form')) === null || _34 === void 0 ? void 0 : _34.addEventListener('submit', handleJudicialControlFormSubmit);
     // Judicial Control Filter Listeners
-    (_32 = document.getElementById('add-zinat-btn')) === null || _32 === void 0 ? void 0 : _32.addEventListener('click', openZinatForm);
-    (_33 = document.getElementById('zinat-form')) === null || _33 === void 0 ? void 0 : _33.addEventListener('submit', handleZinatFormSubmit);
+    (_35 = document.getElementById('add-zinat-btn')) === null || _35 === void 0 ? void 0 : _35.addEventListener('click', openZinatForm);
+    (_36 = document.getElementById('zinat-form')) === null || _36 === void 0 ? void 0 : _36.addEventListener('submit', handleZinatFormSubmit);
     const zinatFilterForm = document.getElementById('zinat-collection-filter-form');
     zinatFilterForm === null || zinatFilterForm === void 0 ? void 0 : zinatFilterForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -40928,12 +41158,12 @@ const setupEventListeners = () => {
         setTimeout(() => renderZinatCollectionSection(), 0);
     });
     // Print List Buttons
-    (_34 = document.getElementById('print-lost-memos-list-btn')) === null || _34 === void 0 ? void 0 : _34.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
-    (_35 = document.getElementById('print-judicial-control-list-btn')) === null || _35 === void 0 ? void 0 : _35.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
-    (_36 = document.getElementById('print-collection-judicial-btn')) === null || _36 === void 0 ? void 0 : _36.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
-    (_37 = document.getElementById('print-collection-zinat-btn')) === null || _37 === void 0 ? void 0 : _37.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
+    (_37 = document.getElementById('print-lost-memos-list-btn')) === null || _37 === void 0 ? void 0 : _37.addEventListener('click', () => handlePrintTable('lost-memos-table', 'قائمة المذكــــرات'));
+    (_38 = document.getElementById('print-judicial-control-list-btn')) === null || _38 === void 0 ? void 0 : _38.addEventListener('click', () => handlePrintTable('judicial-control-table', 'قائمة الضبطية القضائية'));
+    (_39 = document.getElementById('print-collection-judicial-btn')) === null || _39 === void 0 ? void 0 : _39.addEventListener('click', () => handlePrintTable('collection-judicial-table', 'قائمة تحصيل الضبطية القضائية'));
+    (_40 = document.getElementById('print-collection-zinat-btn')) === null || _40 === void 0 ? void 0 : _40.addEventListener('click', () => handlePrintTable('collection-zinat-table', 'قائمة تحصيل زينات'));
     // Judicial Collection Filter Listener
-    (_38 = document.getElementById('judicial-collection-filter-form')) === null || _38 === void 0 ? void 0 : _38.addEventListener('input', () => {
+    (_41 = document.getElementById('judicial-collection-filter-form')) === null || _41 === void 0 ? void 0 : _41.addEventListener('input', () => {
         renderJudicialCollectionSection();
     });
     // Judicial Control Filter Listeners
@@ -40950,9 +41180,9 @@ const setupEventListeners = () => {
         setTimeout(() => applyAndRenderJudicialControlList(), 0); // Use timeout to allow form to reset first
     });
     // Lost Memo Listeners
-    (_39 = document.getElementById('add-lost-memo-btn')) === null || _39 === void 0 ? void 0 : _39.addEventListener('click', () => openLostMemoForm());
-    (_40 = document.getElementById('lost-memo-form')) === null || _40 === void 0 ? void 0 : _40.addEventListener('submit', handleLostMemoFormSubmit);
-    (_41 = document.getElementById('print-lost-memo-btn')) === null || _41 === void 0 ? void 0 : _41.addEventListener('click', handlePrintLostMemo);
+    (_42 = document.getElementById('add-lost-memo-btn')) === null || _42 === void 0 ? void 0 : _42.addEventListener('click', () => openLostMemoForm());
+    (_43 = document.getElementById('lost-memo-form')) === null || _43 === void 0 ? void 0 : _43.addEventListener('submit', handleLostMemoFormSubmit);
+    (_44 = document.getElementById('print-lost-memo-btn')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', handlePrintLostMemo);
     const mukSearchForm = document.getElementById('mukayasat-search-form');
     mukSearchForm === null || mukSearchForm === void 0 ? void 0 : mukSearchForm.addEventListener('submit', handleMukayasatSearch);
     if (mukSearchForm) {
@@ -40964,7 +41194,7 @@ const setupEventListeners = () => {
             handleGoBack();
         }
     });
-    (_42 = document.getElementById('meters-table-filter')) === null || _42 === void 0 ? void 0 : _42.addEventListener('input', (e) => {
+    (_45 = document.getElementById('meters-table-filter')) === null || _45 === void 0 ? void 0 : _45.addEventListener('input', (e) => {
         const filterValue = e.target.value.toLowerCase();
         const table = document.getElementById('meters-table');
         filterTable(table, filterValue);
@@ -40992,10 +41222,10 @@ const setupEventListeners = () => {
             });
         }
     });
-    (_43 = document.getElementById('btn-search-subscribers-all')) === null || _43 === void 0 ? void 0 : _43.addEventListener('click', handleAllSubscribersSearch);
-    (_44 = document.getElementById('btn-reset-subscribers-all')) === null || _44 === void 0 ? void 0 : _44.addEventListener('click', handleResetAllSubscribersSearch);
-    (_45 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _45 === void 0 ? void 0 : _45.addEventListener('click', handleDeleteSelectedSubscribersAll);
-    (_46 = document.getElementById('subscriberType')) === null || _46 === void 0 ? void 0 : _46.addEventListener('change', (e) => {
+    (_46 = document.getElementById('btn-search-subscribers-all')) === null || _46 === void 0 ? void 0 : _46.addEventListener('click', handleAllSubscribersSearch);
+    (_47 = document.getElementById('btn-reset-subscribers-all')) === null || _47 === void 0 ? void 0 : _47.addEventListener('click', handleResetAllSubscribersSearch);
+    (_48 = document.getElementById('btn-delete-selected-subscribers-all')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', handleDeleteSelectedSubscribersAll);
+    (_49 = document.getElementById('subscriberType')) === null || _49 === void 0 ? void 0 : _49.addEventListener('change', (e) => {
         var _a;
         const select = e.target;
         const isSearchMode = !((_a = document.getElementById('meter-search-clear-btn')) === null || _a === void 0 ? void 0 : _a.classList.contains('hidden'));
@@ -41014,30 +41244,30 @@ const setupEventListeners = () => {
         updateMeterFormVisibility();
     });
     // Subscriber Statement Listener (الاستعلام عن مشترك)
-    (_47 = document.getElementById('subscriber-statement-form')) === null || _47 === void 0 ? void 0 : _47.addEventListener('submit', (e) => {
+    (_50 = document.getElementById('subscriber-statement-form')) === null || _50 === void 0 ? void 0 : _50.addEventListener('submit', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
-    (_48 = document.getElementById('statement-search-btn')) === null || _48 === void 0 ? void 0 : _48.addEventListener('click', (e) => {
+    (_51 = document.getElementById('statement-search-btn')) === null || _51 === void 0 ? void 0 : _51.addEventListener('click', (e) => {
         e.preventDefault();
         handleSubscriberStatementSearch(e);
     });
     // قراءة الكارت الذكي
-    (_49 = document.getElementById('statement-read-card-btn')) === null || _49 === void 0 ? void 0 : _49.addEventListener('click', (e) => {
+    (_52 = document.getElementById('statement-read-card-btn')) === null || _52 === void 0 ? void 0 : _52.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadSmartCard();
     });
-    (_50 = document.getElementById('smart-card-close-btn')) === null || _50 === void 0 ? void 0 : _50.addEventListener('click', () => {
+    (_53 = document.getElementById('smart-card-close-btn')) === null || _53 === void 0 ? void 0 : _53.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_51 = document.getElementById('smart-card-close-x-btn')) === null || _51 === void 0 ? void 0 : _51.addEventListener('click', () => {
+    (_54 = document.getElementById('smart-card-close-x-btn')) === null || _54 === void 0 ? void 0 : _54.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_52 = document.getElementById('smart-card-search-now-btn')) === null || _52 === void 0 ? void 0 : _52.addEventListener('click', () => {
+    (_55 = document.getElementById('smart-card-search-now-btn')) === null || _55 === void 0 ? void 0 : _55.addEventListener('click', () => {
         const dlg = document.getElementById('smart-card-details-dialog');
         if (dlg)
             dlg.hidden = true;
@@ -41046,7 +41276,7 @@ const setupEventListeners = () => {
     // كروت التحكم (Control Cards Event Listeners)
     // مسح كارت التحكم
     // إغلاق نافذة نجاح تحديث كارت التحكم
-    (_53 = document.getElementById('btn-close-renewed-dialog')) === null || _53 === void 0 ? void 0 : _53.addEventListener('click', () => {
+    (_56 = document.getElementById('btn-close-renewed-dialog')) === null || _56 === void 0 ? void 0 : _56.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-renew-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -41058,7 +41288,7 @@ const setupEventListeners = () => {
             clearControlCardUI();
     });
     // قراءة الكارت يدوياً من داخل نافذة التحديث في حال رغب المستخدم
-    (_54 = document.getElementById('btn-manual-read-after-renew')) === null || _54 === void 0 ? void 0 : _54.addEventListener('click', () => {
+    (_57 = document.getElementById('btn-manual-read-after-renew')) === null || _57 === void 0 ? void 0 : _57.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-renew-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -41068,12 +41298,12 @@ const setupEventListeners = () => {
         }
         handleReadControlCard();
     });
-    (_55 = document.getElementById('btn-clear-control-card')) === null || _55 === void 0 ? void 0 : _55.addEventListener('click', (e) => {
+    (_58 = document.getElementById('btn-clear-control-card')) === null || _58 === void 0 ? void 0 : _58.addEventListener('click', (e) => {
         e.preventDefault();
         handleClearControlCard();
     });
     // زر الرجوع من تفاصيل كارت التحكم
-    (_56 = document.getElementById('btn-back-to-read-control')) === null || _56 === void 0 ? void 0 : _56.addEventListener('click', (e) => {
+    (_59 = document.getElementById('btn-back-to-read-control')) === null || _59 === void 0 ? void 0 : _59.addEventListener('click', (e) => {
         e.preventDefault();
         navigateToSection('read-control-card');
     });
@@ -41098,7 +41328,7 @@ const setupEventListeners = () => {
         });
     });
     // كارت تحكم متقدم
-    (_57 = document.getElementById('btn-adv-ctrl-search')) === null || _57 === void 0 ? void 0 : _57.addEventListener('click', () => {
+    (_60 = document.getElementById('btn-adv-ctrl-search')) === null || _60 === void 0 ? void 0 : _60.addEventListener('click', () => {
         var _a;
         const query = (_a = document.getElementById('adv-ctrl-search-input')) === null || _a === void 0 ? void 0 : _a.value.trim();
         if (!query) {
@@ -41117,7 +41347,7 @@ const setupEventListeners = () => {
             showToast('لم يتم العثور على مشترك بهذا الكود أو الرقم.', 'error');
         }
     });
-    (_58 = document.getElementById('btn-adv-ctrl-read-card')) === null || _58 === void 0 ? void 0 : _58.addEventListener('click', async () => {
+    (_61 = document.getElementById('btn-adv-ctrl-read-card')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', async () => {
         showToast('جاري قراءة كارت التحكم المتقدم...');
         await handleReadControlCard();
         if (currentControlCardData) {
@@ -41126,27 +41356,27 @@ const setupEventListeners = () => {
             showToast('تم استيراد بيانات الكارت بنجاح!', 'success');
         }
     });
-    (_59 = document.getElementById('advanced-control-card-form')) === null || _59 === void 0 ? void 0 : _59.addEventListener('submit', (e) => {
+    (_62 = document.getElementById('advanced-control-card-form')) === null || _62 === void 0 ? void 0 : _62.addEventListener('submit', (e) => {
         e.preventDefault();
         showToast('تمت كتابة وتجهيز كارت التحكم المتقدم بنجاح!', 'success');
     });
-    (_60 = document.getElementById('btn-adv-ctrl-clear')) === null || _60 === void 0 ? void 0 : _60.addEventListener('click', () => {
+    (_63 = document.getElementById('btn-adv-ctrl-clear')) === null || _63 === void 0 ? void 0 : _63.addEventListener('click', () => {
         handleClearControlCard();
     });
     // كارت تجميع فني
-    (_61 = document.getElementById('btn-read-tech-collect-card')) === null || _61 === void 0 ? void 0 : _61.addEventListener('click', (e) => {
+    (_64 = document.getElementById('btn-read-tech-collect-card')) === null || _64 === void 0 ? void 0 : _64.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadTechCollectCard();
     });
-    (_62 = document.getElementById('btn-renew-tech-collect-card')) === null || _62 === void 0 ? void 0 : _62.addEventListener('click', (e) => {
+    (_65 = document.getElementById('btn-renew-tech-collect-card')) === null || _65 === void 0 ? void 0 : _65.addEventListener('click', (e) => {
         e.preventDefault();
         handleRenewTechCollectCard();
     });
-    (_63 = document.getElementById('btn-back-to-tech-collect')) === null || _63 === void 0 ? void 0 : _63.addEventListener('click', (e) => {
+    (_66 = document.getElementById('btn-back-to-tech-collect')) === null || _66 === void 0 ? void 0 : _66.addEventListener('click', (e) => {
         e.preventDefault();
         navigateToSection('tech-collect-card');
     });
-    (_64 = document.getElementById('tc-meters-filter')) === null || _64 === void 0 ? void 0 : _64.addEventListener('input', (e) => {
+    (_67 = document.getElementById('tc-meters-filter')) === null || _67 === void 0 ? void 0 : _67.addEventListener('input', (e) => {
         const term = e.target.value.trim().toLowerCase();
         const rows = document.querySelectorAll('#tech-collect-meters-tbody tr');
         rows.forEach(r => {
@@ -41175,7 +41405,7 @@ const setupEventListeners = () => {
                 targetTc.style.display = 'block';
         });
     });
-    (_65 = document.getElementById('select-detail-meter')) === null || _65 === void 0 ? void 0 : _65.addEventListener('change', (e) => {
+    (_68 = document.getElementById('select-detail-meter')) === null || _68 === void 0 ? void 0 : _68.addEventListener('change', (e) => {
         const mNum = e.target.value;
         if (!mNum)
             return;
@@ -41184,7 +41414,7 @@ const setupEventListeners = () => {
             renderControlCardDetailsSection(match);
         }
     });
-    (_66 = document.getElementById('btn-show-meter-statement')) === null || _66 === void 0 ? void 0 : _66.addEventListener('click', () => {
+    (_69 = document.getElementById('btn-show-meter-statement')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', () => {
         if (selectedControlMeterDetail) {
             const mNum = selectedControlMeterDetail.meterNumber || selectedControlMeterDetail.meterId;
             if (mNum) {
@@ -41200,29 +41430,29 @@ const setupEventListeners = () => {
             showToast('يرجى اختيار عداد أولاً لعرض كشف حسابه.', 'warning');
         }
     });
-    (_67 = document.getElementById('btn-read-control-card')) === null || _67 === void 0 ? void 0 : _67.addEventListener('click', (e) => {
+    (_70 = document.getElementById('btn-read-control-card')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', (e) => {
         e.preventDefault();
         handleReadControlCard();
     });
-    (_68 = document.getElementById('btn-renew-control-card')) === null || _68 === void 0 ? void 0 : _68.addEventListener('click', (e) => {
+    (_71 = document.getElementById('btn-renew-control-card')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', (e) => {
         e.preventDefault();
         handleRenewControlCard();
     });
-    (_69 = document.getElementById('btn-print-control-card')) === null || _69 === void 0 ? void 0 : _69.addEventListener('click', (e) => {
+    (_72 = document.getElementById('btn-print-control-card')) === null || _72 === void 0 ? void 0 : _72.addEventListener('click', (e) => {
         e.preventDefault();
         handlePrintControlCardReport();
     });
-    (_70 = document.getElementById('control-card-meter-details-close')) === null || _70 === void 0 ? void 0 : _70.addEventListener('click', () => {
+    (_73 = document.getElementById('control-card-meter-details-close')) === null || _73 === void 0 ? void 0 : _73.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_71 = document.getElementById('control-card-meter-details-close-x')) === null || _71 === void 0 ? void 0 : _71.addEventListener('click', () => {
+    (_74 = document.getElementById('control-card-meter-details-close-x')) === null || _74 === void 0 ? void 0 : _74.addEventListener('click', () => {
         const dlg = document.getElementById('control-card-meter-details-dialog');
         if (dlg)
             dlg.hidden = true;
     });
-    (_72 = document.getElementById('ctrl-meters-filter')) === null || _72 === void 0 ? void 0 : _72.addEventListener('input', (e) => {
+    (_75 = document.getElementById('ctrl-meters-filter')) === null || _75 === void 0 ? void 0 : _75.addEventListener('input', (e) => {
         const term = e.target.value.trim().toLowerCase();
         const rows = document.querySelectorAll('#control-card-meters-tbody tr');
         rows.forEach(r => {
@@ -41231,15 +41461,15 @@ const setupEventListeners = () => {
             r.style.display = text.includes(term) ? '' : 'none';
         });
     });
-    (_73 = document.getElementById('issue-control-card-form')) === null || _73 === void 0 ? void 0 : _73.addEventListener('submit', (e) => {
+    (_76 = document.getElementById('issue-control-card-form')) === null || _76 === void 0 ? void 0 : _76.addEventListener('submit', (e) => {
         e.preventDefault();
         handleIssueControlCard(e);
     });
-    (_74 = document.getElementById('issue-meter-company')) === null || _74 === void 0 ? void 0 : _74.addEventListener('change', (e) => {
+    (_77 = document.getElementById('issue-meter-company')) === null || _77 === void 0 ? void 0 : _77.addEventListener('change', (e) => {
         const val = e.target.value;
         handleCompanyChange(val);
     });
-    (_75 = document.getElementById('issue-technician')) === null || _75 === void 0 ? void 0 : _75.addEventListener('change', (e) => {
+    (_78 = document.getElementById('issue-technician')) === null || _78 === void 0 ? void 0 : _78.addEventListener('change', (e) => {
         const sel = e.target;
         const opt = sel.options[sel.selectedIndex];
         const codeInput = document.getElementById('issue-tech-code');
@@ -41247,7 +41477,7 @@ const setupEventListeners = () => {
             codeInput.value = (opt === null || opt === void 0 ? void 0 : opt.getAttribute('data-code')) || '';
         }
     });
-    (_76 = document.getElementById('issue-control-op-type')) === null || _76 === void 0 ? void 0 : _76.addEventListener('change', (e) => {
+    (_79 = document.getElementById('issue-control-op-type')) === null || _79 === void 0 ? void 0 : _79.addEventListener('change', (e) => {
         const val = e.target.value;
         const tampersWrap = document.getElementById('container-tampers');
         const manualDateWrap = document.getElementById('container-manual-date');
@@ -41256,7 +41486,7 @@ const setupEventListeners = () => {
         if (manualDateWrap)
             manualDateWrap.style.display = val === '0' ? 'block' : 'none';
     });
-    (_77 = document.getElementById('issue-control-type-meter')) === null || _77 === void 0 ? void 0 : _77.addEventListener('change', (e) => {
+    (_80 = document.getElementById('issue-control-type-meter')) === null || _80 === void 0 ? void 0 : _80.addEventListener('change', (e) => {
         const val = e.target.value;
         const singleWrap = document.getElementById('container-single-meter');
         const multiWrap = document.getElementById('container-multi-meters');
@@ -41268,7 +41498,7 @@ const setupEventListeners = () => {
         if (countWrap)
             countWrap.style.display = val === '2' ? 'block' : 'none';
     });
-    (_78 = document.getElementById('btn-add-meter-to-list')) === null || _78 === void 0 ? void 0 : _78.addEventListener('click', () => {
+    (_81 = document.getElementById('btn-add-meter-to-list')) === null || _81 === void 0 ? void 0 : _81.addEventListener('click', () => {
         const inp = document.getElementById('issue-multi-meter-input');
         const val = (inp === null || inp === void 0 ? void 0 : inp.value.trim()) || '';
         if (!val)
@@ -41282,16 +41512,16 @@ const setupEventListeners = () => {
             inp.value = '';
         renderIssuedMetersTags();
     });
-    (_79 = document.getElementById('issue-is-manual-date')) === null || _79 === void 0 ? void 0 : _79.addEventListener('change', (e) => {
+    (_82 = document.getElementById('issue-is-manual-date')) === null || _82 === void 0 ? void 0 : _82.addEventListener('change', (e) => {
         const wrap = document.getElementById('manual-date-picker-wrap');
         if (wrap)
             wrap.style.display = e.target.checked ? 'block' : 'none';
     });
-    (_80 = document.getElementById('btn-issue-card-reset')) === null || _80 === void 0 ? void 0 : _80.addEventListener('click', () => {
+    (_83 = document.getElementById('btn-issue-card-reset')) === null || _83 === void 0 ? void 0 : _83.addEventListener('click', () => {
         issuedMetersList = [];
         renderIssuedMetersTags();
     });
-    (_81 = document.getElementById('btn-close-issued-dialog')) === null || _81 === void 0 ? void 0 : _81.addEventListener('click', () => {
+    (_84 = document.getElementById('btn-close-issued-dialog')) === null || _84 === void 0 ? void 0 : _84.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -41300,7 +41530,7 @@ const setupEventListeners = () => {
                 dlg.style.display = 'none';
         }
     });
-    (_82 = document.getElementById('btn-read-issued-card-now')) === null || _82 === void 0 ? void 0 : _82.addEventListener('click', () => {
+    (_85 = document.getElementById('btn-read-issued-card-now')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', () => {
         const dlg = document.getElementById('dialog-issue-control-card-success');
         if (dlg) {
             if (typeof dlg.close === 'function')
@@ -41335,21 +41565,21 @@ const setupEventListeners = () => {
         });
     });
     // Customer Management Listeners
-    (_83 = document.getElementById('cm-filters-form')) === null || _83 === void 0 ? void 0 : _83.addEventListener('submit', (e) => {
+    (_86 = document.getElementById('cm-filters-form')) === null || _86 === void 0 ? void 0 : _86.addEventListener('submit', (e) => {
         e.preventDefault();
         loadCustomers(1);
     });
-    (_84 = document.getElementById('btn-cm-reset')) === null || _84 === void 0 ? void 0 : _84.addEventListener('click', () => {
+    (_87 = document.getElementById('btn-cm-reset')) === null || _87 === void 0 ? void 0 : _87.addEventListener('click', () => {
         const form = document.getElementById('cm-filters-form');
         if (form)
             form.reset();
         loadCustomers(1);
     });
-    (_85 = document.getElementById('btn-cm-refresh')) === null || _85 === void 0 ? void 0 : _85.addEventListener('click', () => {
+    (_88 = document.getElementById('btn-cm-refresh')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', () => {
         loadCustomers(customerState.page);
     });
     // Open Add Customer Modal matching frame_025s
-    (_86 = document.getElementById('btn-cm-add-customer')) === null || _86 === void 0 ? void 0 : _86.addEventListener('click', () => {
+    (_89 = document.getElementById('btn-cm-add-customer')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', () => {
         const modal = document.getElementById('modal-add-customer');
         if (modal) {
             const dateInp = document.getElementById('add-cust-contract-date');
@@ -41359,7 +41589,7 @@ const setupEventListeners = () => {
         }
     });
     // Open Add Project Modal matching frame_033s
-    (_87 = document.getElementById('btn-cm-add-project')) === null || _87 === void 0 ? void 0 : _87.addEventListener('click', () => {
+    (_90 = document.getElementById('btn-cm-add-project')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', () => {
         const modal = document.getElementById('modal-add-project');
         if (modal) {
             const dateInp = document.getElementById('add-proj-date');
@@ -41369,11 +41599,11 @@ const setupEventListeners = () => {
         }
     });
     // Open Add Assay
-    (_88 = document.getElementById('btn-cm-add-assay')) === null || _88 === void 0 ? void 0 : _88.addEventListener('click', () => {
+    (_91 = document.getElementById('btn-cm-add-assay')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', () => {
         showToast('فتح شاشة تسجيل وإضافة مقايسة جديدة...');
     });
     // Check National ID button
-    (_89 = document.getElementById('btn-cust-check-id')) === null || _89 === void 0 ? void 0 : _89.addEventListener('click', () => {
+    (_92 = document.getElementById('btn-cust-check-id')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', () => {
         var _a;
         const nid = (_a = document.getElementById('add-cust-national-id')) === null || _a === void 0 ? void 0 : _a.value.trim();
         if (!nid || nid.length !== 14) {
@@ -41383,7 +41613,7 @@ const setupEventListeners = () => {
         showToast(`تم فحص الرقم القومي (${nid}) بنجاح: الرقم سليم وصالح للتسجيل ✓`, 'success');
     });
     // Save New Customer
-    (_90 = document.getElementById('btn-save-new-customer')) === null || _90 === void 0 ? void 0 : _90.addEventListener('click', async () => {
+    (_93 = document.getElementById('btn-save-new-customer')) === null || _93 === void 0 ? void 0 : _93.addEventListener('click', async () => {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
         const name = (_a = document.getElementById('add-cust-name')) === null || _a === void 0 ? void 0 : _a.value.trim();
         const meter = (_b = document.getElementById('add-cust-meter-no')) === null || _b === void 0 ? void 0 : _b.value.trim();
@@ -41433,7 +41663,7 @@ const setupEventListeners = () => {
         loadCustomers(1);
     });
     // Save New Project
-    (_91 = document.getElementById('btn-save-new-project')) === null || _91 === void 0 ? void 0 : _91.addEventListener('click', () => {
+    (_94 = document.getElementById('btn-save-new-project')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', () => {
         var _a;
         const projName = (_a = document.getElementById('add-proj-name')) === null || _a === void 0 ? void 0 : _a.value.trim();
         if (!projName) {
@@ -41445,27 +41675,27 @@ const setupEventListeners = () => {
         if (modal)
             modal.style.display = 'none';
     });
-    (_92 = document.getElementById('btn-cm-card-search')) === null || _92 === void 0 ? void 0 : _92.addEventListener('click', () => {
+    (_95 = document.getElementById('btn-cm-card-search')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', () => {
         handleCustomerCardSearch();
     });
-    (_93 = document.getElementById('cm-page-size')) === null || _93 === void 0 ? void 0 : _93.addEventListener('change', (e) => {
+    (_96 = document.getElementById('cm-page-size')) === null || _96 === void 0 ? void 0 : _96.addEventListener('change', (e) => {
         customerState.pageSize = Number(e.target.value) || 10;
         loadCustomers(1);
     });
-    (_94 = document.getElementById('cm-btn-first')) === null || _94 === void 0 ? void 0 : _94.addEventListener('click', () => {
+    (_97 = document.getElementById('cm-btn-first')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(1);
     });
-    (_95 = document.getElementById('cm-btn-prev')) === null || _95 === void 0 ? void 0 : _95.addEventListener('click', () => {
+    (_98 = document.getElementById('cm-btn-prev')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', () => {
         if (customerState.page > 1)
             loadCustomers(customerState.page - 1);
     });
-    (_96 = document.getElementById('cm-btn-next')) === null || _96 === void 0 ? void 0 : _96.addEventListener('click', () => {
+    (_99 = document.getElementById('cm-btn-next')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(customerState.page + 1);
     });
-    (_97 = document.getElementById('cm-btn-last')) === null || _97 === void 0 ? void 0 : _97.addEventListener('click', () => {
+    (_100 = document.getElementById('cm-btn-last')) === null || _100 === void 0 ? void 0 : _100.addEventListener('click', () => {
         const totalPages = Math.ceil(customerState.total / customerState.pageSize);
         if (customerState.page < totalPages)
             loadCustomers(totalPages);
@@ -41586,10 +41816,10 @@ const setupEventListeners = () => {
             }
         }
     });
-    (_98 = document.getElementById('save-details-btn')) === null || _98 === void 0 ? void 0 : _98.addEventListener('click', handleSaveDetails);
-    (_99 = document.getElementById('delete-subscriber-btn')) === null || _99 === void 0 ? void 0 : _99.addEventListener('click', handleDeleteSubscriber);
-    (_100 = document.getElementById('details-meterType')) === null || _100 === void 0 ? void 0 : _100.addEventListener('change', () => updateMeterFormVisibility('details-'));
-    (_101 = document.getElementById('details-subscriberType')) === null || _101 === void 0 ? void 0 : _101.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_101 = document.getElementById('save-details-btn')) === null || _101 === void 0 ? void 0 : _101.addEventListener('click', handleSaveDetails);
+    (_102 = document.getElementById('delete-subscriber-btn')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', handleDeleteSubscriber);
+    (_103 = document.getElementById('details-meterType')) === null || _103 === void 0 ? void 0 : _103.addEventListener('change', () => updateMeterFormVisibility('details-'));
+    (_104 = document.getElementById('details-subscriberType')) === null || _104 === void 0 ? void 0 : _104.addEventListener('change', () => updateMeterFormVisibility('details-'));
     document.body.addEventListener('click', (event) => {
         const target = event.target;
         if (target.id === 'delete-selected-meters') {
@@ -41602,13 +41832,13 @@ const setupEventListeners = () => {
             checkboxes.forEach(checkbox => checkbox.checked = selectAllCheckbox.checked);
         }
     });
-    (_102 = document.getElementById('select-all-meters')) === null || _102 === void 0 ? void 0 : _102.addEventListener('click', (event) => {
+    (_105 = document.getElementById('select-all-meters')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', (event) => {
         const isChecked = event.target.checked;
         document.querySelectorAll('#meters-table tbody input[type="checkbox"].select-row').forEach((checkbox) => {
             checkbox.checked = isChecked;
         });
     });
-    (_103 = document.getElementById('btn-delete-by-status')) === null || _103 === void 0 ? void 0 : _103.addEventListener('click', () => {
+    (_106 = document.getElementById('btn-delete-by-status')) === null || _106 === void 0 ? void 0 : _106.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         const select = document.getElementById('delete-status-select');
         if (dialog && select) {
@@ -41617,12 +41847,12 @@ const setupEventListeners = () => {
             dialog.hidden = false;
         }
     });
-    (_104 = document.getElementById('delete-by-status-cancel')) === null || _104 === void 0 ? void 0 : _104.addEventListener('click', () => {
+    (_107 = document.getElementById('delete-by-status-cancel')) === null || _107 === void 0 ? void 0 : _107.addEventListener('click', () => {
         const dialog = document.getElementById('delete-by-status-dialog');
         if (dialog)
             dialog.hidden = true;
     });
-    (_105 = document.getElementById('delete-by-status-confirm')) === null || _105 === void 0 ? void 0 : _105.addEventListener('click', () => {
+    (_108 = document.getElementById('delete-by-status-confirm')) === null || _108 === void 0 ? void 0 : _108.addEventListener('click', () => {
         const select = document.getElementById('delete-status-select');
         const status = select.value;
         if (!status) {
@@ -41655,13 +41885,13 @@ const setupEventListeners = () => {
         showConfirmationDialog('تأكيد الحذف الجماعي', `هل أنت متأكد من حذف جميع المشتركين (${count}) الذين حالتهم "${status}"؟ لا يمكن التراجع عن هذا الإجراء.`, onConfirm);
     });
     // Repaired Meters Listeners
-    (_106 = document.getElementById('repair-search-form')) === null || _106 === void 0 ? void 0 : _106.addEventListener('submit', handleFaultyMeterSearch);
-    (_107 = document.getElementById('repair-form')) === null || _107 === void 0 ? void 0 : _107.addEventListener('submit', handleRepairFormSubmit);
-    (_108 = document.getElementById('repairStatus')) === null || _108 === void 0 ? void 0 : _108.addEventListener('change', updateRepairFormVisibility);
+    (_109 = document.getElementById('repair-search-form')) === null || _109 === void 0 ? void 0 : _109.addEventListener('submit', handleFaultyMeterSearch);
+    (_110 = document.getElementById('repair-form')) === null || _110 === void 0 ? void 0 : _110.addEventListener('submit', handleRepairFormSubmit);
+    (_111 = document.getElementById('repairStatus')) === null || _111 === void 0 ? void 0 : _111.addEventListener('change', updateRepairFormVisibility);
     // Reports Listeners
-    (_109 = document.getElementById('report-type')) === null || _109 === void 0 ? void 0 : _109.addEventListener('change', updateReportFilters);
-    (_110 = document.getElementById('report-generation-form')) === null || _110 === void 0 ? void 0 : _110.addEventListener('submit', handleGenerateReport);
-    (_111 = document.getElementById('print-report-btn')) === null || _111 === void 0 ? void 0 : _111.addEventListener('click', handlePrintReport);
+    (_112 = document.getElementById('report-type')) === null || _112 === void 0 ? void 0 : _112.addEventListener('change', updateReportFilters);
+    (_113 = document.getElementById('report-generation-form')) === null || _113 === void 0 ? void 0 : _113.addEventListener('submit', handleGenerateReport);
+    (_114 = document.getElementById('print-report-btn')) === null || _114 === void 0 ? void 0 : _114.addEventListener('click', handlePrintReport);
     // Custom multiselect listener
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.multiselect-btn');
@@ -41712,11 +41942,11 @@ const setupEventListeners = () => {
         }
     });
     // Activity Log Listener
-    (_112 = document.getElementById('print-activity-log-btn')) === null || _112 === void 0 ? void 0 : _112.addEventListener('click', handlePrintActivityLog);
+    (_115 = document.getElementById('print-activity-log-btn')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', handlePrintActivityLog);
     // User Management Listeners
-    (_113 = document.getElementById('user-form')) === null || _113 === void 0 ? void 0 : _113.addEventListener('submit', handleUserFormSubmit);
+    (_116 = document.getElementById('user-form')) === null || _116 === void 0 ? void 0 : _116.addEventListener('submit', handleUserFormSubmit);
     // Permissions Listeners (delegated inside render function)
-    (_114 = document.getElementById('permissions')) === null || _114 === void 0 ? void 0 : _114.addEventListener('change', (event) => {
+    (_117 = document.getElementById('permissions')) === null || _117 === void 0 ? void 0 : _117.addEventListener('change', (event) => {
         const target = event.target;
         if (!target.matches('input[type="checkbox"]'))
             return;
@@ -41730,32 +41960,32 @@ const setupEventListeners = () => {
             handlePermissionChange(event);
     });
     // Settings Listeners
-    (_115 = document.getElementById('export-backup-btn')) === null || _115 === void 0 ? void 0 : _115.addEventListener('click', handleExportBackup);
-    (_116 = document.getElementById('import-backup-btn')) === null || _116 === void 0 ? void 0 : _116.addEventListener('click', () => handleImportBackup());
-    (_117 = document.getElementById('export-csv-btn')) === null || _117 === void 0 ? void 0 : _117.addEventListener('click', handleExportCSV);
-    (_118 = document.getElementById('save-report-settings-btn')) === null || _118 === void 0 ? void 0 : _118.addEventListener('click', handleSaveReportSettings);
-    (_119 = document.getElementById('form-lifting-unit-delivery')) === null || _119 === void 0 ? void 0 : _119.addEventListener('submit', handleLiftingDeliverySubmit);
-    (_120 = document.getElementById('btn-cancel-lifting-delivery')) === null || _120 === void 0 ? void 0 : _120.addEventListener('click', handleCancelLiftingDelivery);
-    (_121 = document.getElementById('save-company-report-settings-btn')) === null || _121 === void 0 ? void 0 : _121.addEventListener('click', handleSaveCompanyReportSettings);
+    (_118 = document.getElementById('export-backup-btn')) === null || _118 === void 0 ? void 0 : _118.addEventListener('click', handleExportBackup);
+    (_119 = document.getElementById('import-backup-btn')) === null || _119 === void 0 ? void 0 : _119.addEventListener('click', () => handleImportBackup());
+    (_120 = document.getElementById('export-csv-btn')) === null || _120 === void 0 ? void 0 : _120.addEventListener('click', handleExportCSV);
+    (_121 = document.getElementById('save-report-settings-btn')) === null || _121 === void 0 ? void 0 : _121.addEventListener('click', handleSaveReportSettings);
+    (_122 = document.getElementById('form-lifting-unit-delivery')) === null || _122 === void 0 ? void 0 : _122.addEventListener('submit', handleLiftingDeliverySubmit);
+    (_123 = document.getElementById('btn-cancel-lifting-delivery')) === null || _123 === void 0 ? void 0 : _123.addEventListener('click', handleCancelLiftingDelivery);
+    (_124 = document.getElementById('save-company-report-settings-btn')) === null || _124 === void 0 ? void 0 : _124.addEventListener('click', handleSaveCompanyReportSettings);
     // مستمعات أحداث الطلبات قيد الانتظار
-    (_122 = document.getElementById('add-area-dialog-confirm-btn')) === null || _122 === void 0 ? void 0 : _122.addEventListener('click', confirmAddPendingArea);
-    (_123 = document.getElementById('add-area-dialog-cancel-btn')) === null || _123 === void 0 ? void 0 : _123.addEventListener('click', hideAddPendingAreaDialog);
-    (_124 = document.getElementById('add-pending-area-dialog')) === null || _124 === void 0 ? void 0 : _124.addEventListener('click', (event) => {
+    (_125 = document.getElementById('add-area-dialog-confirm-btn')) === null || _125 === void 0 ? void 0 : _125.addEventListener('click', confirmAddPendingArea);
+    (_126 = document.getElementById('add-area-dialog-cancel-btn')) === null || _126 === void 0 ? void 0 : _126.addEventListener('click', hideAddPendingAreaDialog);
+    (_127 = document.getElementById('add-pending-area-dialog')) === null || _127 === void 0 ? void 0 : _127.addEventListener('click', (event) => {
         if (event.target === document.getElementById('add-pending-area-dialog')) {
             hideAddPendingAreaDialog();
         }
     });
-    (_125 = document.getElementById('import-pending-excel-trigger-btn')) === null || _125 === void 0 ? void 0 : _125.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
-    (_126 = document.getElementById('pending-excel-upload')) === null || _126 === void 0 ? void 0 : _126.addEventListener('change', handleImportPendingExcel);
-    (_127 = document.getElementById('print-pending-requests-btn')) === null || _127 === void 0 ? void 0 : _127.addEventListener('click', handlePrintPendingRequests);
-    (_128 = document.getElementById('export-pending-excel-btn')) === null || _128 === void 0 ? void 0 : _128.addEventListener('click', handleExportPendingRequestsToExcel);
+    (_128 = document.getElementById('import-pending-excel-trigger-btn')) === null || _128 === void 0 ? void 0 : _128.addEventListener('click', () => { var _a; return (_a = document.getElementById('pending-excel-upload')) === null || _a === void 0 ? void 0 : _a.click(); });
+    (_129 = document.getElementById('pending-excel-upload')) === null || _129 === void 0 ? void 0 : _129.addEventListener('change', handleImportPendingExcel);
+    (_130 = document.getElementById('print-pending-requests-btn')) === null || _130 === void 0 ? void 0 : _130.addEventListener('click', handlePrintPendingRequests);
+    (_131 = document.getElementById('export-pending-excel-btn')) === null || _131 === void 0 ? void 0 : _131.addEventListener('click', handleExportPendingRequestsToExcel);
     // ربط أزرار العمليات الجماعية في صفحة الانتظار
-    (_129 = document.getElementById('assign-pending-requests-btn')) === null || _129 === void 0 ? void 0 : _129.addEventListener('click', handleAssignSelectedPendingRequests);
-    (_130 = document.getElementById('move-to-mukayasat-btn')) === null || _130 === void 0 ? void 0 : _130.addEventListener('click', handleMovePendingToMukayasat);
-    (_131 = document.getElementById('mark-pending-inspected-btn')) === null || _131 === void 0 ? void 0 : _131.addEventListener('click', handleMarkSelectedPendingInspected);
-    (_132 = document.getElementById('print-pending-inspection-btn')) === null || _132 === void 0 ? void 0 : _132.addEventListener('click', handlePrintSelectedPendingInspections);
-    (_133 = document.getElementById('delete-selected-pending-btn')) === null || _133 === void 0 ? void 0 : _133.addEventListener('click', handleDeleteSelectedPendingRequests);
-    (_134 = document.getElementById('add-pending-address-tab-btn')) === null || _134 === void 0 ? void 0 : _134.addEventListener('click', handleAddNewPendingAddressTab);
+    (_132 = document.getElementById('assign-pending-requests-btn')) === null || _132 === void 0 ? void 0 : _132.addEventListener('click', handleAssignSelectedPendingRequests);
+    (_133 = document.getElementById('move-to-mukayasat-btn')) === null || _133 === void 0 ? void 0 : _133.addEventListener('click', handleMovePendingToMukayasat);
+    (_134 = document.getElementById('mark-pending-inspected-btn')) === null || _134 === void 0 ? void 0 : _134.addEventListener('click', handleMarkSelectedPendingInspected);
+    (_135 = document.getElementById('print-pending-inspection-btn')) === null || _135 === void 0 ? void 0 : _135.addEventListener('click', handlePrintSelectedPendingInspections);
+    (_136 = document.getElementById('delete-selected-pending-btn')) === null || _136 === void 0 ? void 0 : _136.addEventListener('click', handleDeleteSelectedPendingRequests);
+    (_137 = document.getElementById('add-pending-address-tab-btn')) === null || _137 === void 0 ? void 0 : _137.addEventListener('click', handleAddNewPendingAddressTab);
     const pendingFilters = document.getElementById('pending-filters');
     if (pendingFilters) {
         const resetPending = () => { currentPendingPage = 1; pendingSelectedRequests = []; renderPendingRequestsSection(); };
@@ -41995,7 +42225,7 @@ const setupEventListeners = () => {
         });
     }
     // Company Logo Settings Listeners
-    (_135 = document.getElementById('developer-image-password-cancel')) === null || _135 === void 0 ? void 0 : _135.addEventListener('click', () => {
+    (_138 = document.getElementById('developer-image-password-cancel')) === null || _138 === void 0 ? void 0 : _138.addEventListener('click', () => {
         const dialog = document.getElementById('developer-image-password-dialog');
         const input = document.getElementById('developer-image-password');
         dialog === null || dialog === void 0 ? void 0 : dialog.setAttribute('hidden', '');
@@ -42003,7 +42233,7 @@ const setupEventListeners = () => {
             input.value = '';
         developerImagePasswordCallback = null;
     });
-    (_136 = document.getElementById('developer-image-password-confirm')) === null || _136 === void 0 ? void 0 : _136.addEventListener('click', () => {
+    (_139 = document.getElementById('developer-image-password-confirm')) === null || _139 === void 0 ? void 0 : _139.addEventListener('click', () => {
         const input = document.getElementById('developer-image-password');
         const error = document.getElementById('developer-image-password-error');
         const dialog = document.getElementById('developer-image-password-dialog');
@@ -42019,18 +42249,18 @@ const setupEventListeners = () => {
         input.value = '';
         callback === null || callback === void 0 ? void 0 : callback();
     });
-    (_137 = document.getElementById('upload-logo-btn')) === null || _137 === void 0 ? void 0 : _137.addEventListener('click', () => {
+    (_140 = document.getElementById('upload-logo-btn')) === null || _140 === void 0 ? void 0 : _140.addEventListener('click', () => {
         var _a;
         (_a = document.getElementById('logo-upload-input')) === null || _a === void 0 ? void 0 : _a.click();
     });
-    (_138 = document.getElementById('remove-logo-btn')) === null || _138 === void 0 ? void 0 : _138.addEventListener('click', () => {
+    (_141 = document.getElementById('remove-logo-btn')) === null || _141 === void 0 ? void 0 : _141.addEventListener('click', () => {
         state.settings.companyLogo = null;
         saveState();
         updateUI();
         renderSettingsSection(); // To update the preview
         showToast('تمت إزالة الشعار بنجاح.');
     });
-    (_139 = document.getElementById('logo-upload-input')) === null || _139 === void 0 ? void 0 : _139.addEventListener('change', (event) => {
+    (_142 = document.getElementById('logo-upload-input')) === null || _142 === void 0 ? void 0 : _142.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -42054,10 +42284,10 @@ const setupEventListeners = () => {
         };
         reader.readAsDataURL(file);
     });
-    (_140 = document.getElementById('upload-developer-image-btn')) === null || _140 === void 0 ? void 0 : _140.addEventListener('click', () => {
+    (_143 = document.getElementById('upload-developer-image-btn')) === null || _143 === void 0 ? void 0 : _143.addEventListener('click', () => {
         requestDeveloperImagePassword(() => { var _a; return (_a = document.getElementById('developer-image-upload-input')) === null || _a === void 0 ? void 0 : _a.click(); });
     });
-    (_141 = document.getElementById('remove-developer-image-btn')) === null || _141 === void 0 ? void 0 : _141.addEventListener('click', () => {
+    (_144 = document.getElementById('remove-developer-image-btn')) === null || _144 === void 0 ? void 0 : _144.addEventListener('click', () => {
         requestDeveloperImagePassword(() => {
             state.settings.developerImage = null;
             saveState();
@@ -42066,7 +42296,7 @@ const setupEventListeners = () => {
             showToast('تمت إزالة صورة المطور بنجاح.');
         });
     });
-    (_142 = document.getElementById('developer-image-upload-input')) === null || _142 === void 0 ? void 0 : _142.addEventListener('change', (event) => {
+    (_145 = document.getElementById('developer-image-upload-input')) === null || _145 === void 0 ? void 0 : _145.addEventListener('change', (event) => {
         var _a;
         const file = (_a = event.target.files) === null || _a === void 0 ? void 0 : _a[0];
         if (!file)
@@ -42087,7 +42317,7 @@ const setupEventListeners = () => {
         reader.onerror = () => showToast('حدث خطأ أثناء قراءة صورة المطور.', 'error');
         reader.readAsDataURL(file);
     });
-    (_143 = document.getElementById('logo-size-slider')) === null || _143 === void 0 ? void 0 : _143.addEventListener('input', (event) => {
+    (_146 = document.getElementById('logo-size-slider')) === null || _146 === void 0 ? void 0 : _146.addEventListener('input', (event) => {
         const slider = event.target;
         const newSize = parseInt(slider.value, 10);
         const valueDisplay = document.getElementById('logo-size-value');
@@ -42112,12 +42342,12 @@ const setupEventListeners = () => {
 
         `;
         addressContainer.insertBefore(bulkActions, addressContainer.querySelector('ul'));
-        (_144 = document.getElementById('btn-select-all-addresses')) === null || _144 === void 0 ? void 0 : _144.addEventListener('click', () => {
+        (_147 = document.getElementById('btn-select-all-addresses')) === null || _147 === void 0 ? void 0 : _147.addEventListener('click', () => {
             const cbs = document.querySelectorAll('.address-bulk-checkbox');
             const allSelected = Array.from(cbs).every(cb => cb.checked);
             cbs.forEach(cb => cb.checked = !allSelected);
         });
-        (_145 = document.getElementById('btn-delete-selected-addresses')) === null || _145 === void 0 ? void 0 : _145.addEventListener('click', () => {
+        (_148 = document.getElementById('btn-delete-selected-addresses')) === null || _148 === void 0 ? void 0 : _148.addEventListener('click', () => {
             const selected = Array.from(document.querySelectorAll('.address-bulk-checkbox:checked'));
             if (selected.length === 0)
                 return showToast('يرجى تحديد عناوين أولاً', 'error');
@@ -42187,7 +42417,7 @@ const setupEventListeners = () => {
         }, { passive: true });
     };
     initMobileAdaptation();
-    (_146 = document.getElementById('sidebar-toggle')) === null || _146 === void 0 ? void 0 : _146.addEventListener('click', () => {
+    (_149 = document.getElementById('sidebar-toggle')) === null || _149 === void 0 ? void 0 : _149.addEventListener('click', () => {
         document.body.classList.toggle('sidebar-collapsed');
     });
     // Accordion behavior for sidebar categories: when one <details> opens, close the others
